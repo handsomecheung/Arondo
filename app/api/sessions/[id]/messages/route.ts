@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, updateSession, addMessage } from "@/lib/store";
-import { getAgent } from "@/lib/agents";
+import { getAgent, AgentType } from "@/lib/agents";
 import { eventBus } from "@/lib/event-bus";
 
 export async function POST(
@@ -34,14 +34,11 @@ export async function POST(
     });
     eventBus.publish({ type: "message_added", payload: userMsg });
 
-    // 2. Formulate context-aware follow-up prompt for the agent
-    const followUpPrompt = 
-      `You are working in this repository. Previously, you were asked to do: "${session.prompt}"\n` +
-      `Now, the user has provided the following follow-up feedback/instruction:\n\n"${trimmedMessage}"\n\n` +
-      `Please apply the requested changes directly on the filesystem.`;
+    // 3. Get the agent
+    const agent = getAgent(session.agentType as AgentType);
 
-    // 3. Get the agent and retrieve the new execution command
-    const agent = getAgent(session.agentType as "gemini");
+    // 2. Use the new instruction directly as follow-up prompt (since the session context is resumed)
+    const followUpPrompt = trimmedMessage;
     const command = agent.getCommand({ prompt: followUpPrompt, repoPath: session.repoPath, sessionId: id, isResume: true });
 
     // 4. Update session status back to running and store the command
@@ -79,7 +76,7 @@ async function runAgentInBackground(
     // Reset/clear logs for this follow-up execution
     await clearSessionLog(sessionId, messageId);
 
-    const agent = getAgent(agentType as "gemini");
+    const agent = getAgent(agentType as AgentType);
 
     const result = await agent.run({
       prompt,

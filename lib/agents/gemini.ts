@@ -10,11 +10,6 @@ import { BaseAgent, AgentRunOptions, AgentResult } from "./base";
 export class GeminiAgent extends BaseAgent {
   readonly name = "gemini";
 
-  private getSystemPrompt(prompt: string): string {
-    const systemConstraint = "\n\n[IMPORTANT: Do NOT create any pull requests, push to remote repositories, or commit the changes. Only make the required code changes directly on the filesystem.]";
-    return prompt + systemConstraint;
-  }
-
   getCommand({ prompt, sessionId, isResume }: Omit<AgentRunOptions, "onOutput">): string {
     const fullPrompt = this.getSystemPrompt(prompt);
     const escapedPrompt = fullPrompt.replace(/"/g, '\\"');

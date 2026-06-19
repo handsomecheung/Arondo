@@ -728,6 +728,7 @@ export default function HomePage() {
                 id="agent-select"
               >
                 <option value="gemini">Gemini</option>
+                <option value="antigravity">Antigravity (agy)</option>
               </select>
             </div>
           )}

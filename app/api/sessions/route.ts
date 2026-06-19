@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessions, createSession, updateSession, addMessage } from "@/lib/store";
-import { getAgent } from "@/lib/agents";
+import { getAgent, AgentType } from "@/lib/agents";
 import { eventBus } from "@/lib/event-bus";
 
 export async function GET() {
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   });
 
   // Get the agent and retrieve the execution command with sessionId
-  const agent = getAgent(agentType as "gemini");
+  const agent = getAgent(agentType as AgentType);
   const command = agent.getCommand({ prompt, repoPath, sessionId: session.id, isResume: false });
 
   // Update the session with the generated command
@@ -68,7 +68,7 @@ async function runAgentInBackground(
     // Initialize/clear log file bound to this specific messageId
     await clearSessionLog(sessionId, messageId);
 
-    const agent = getAgent(agentType as "gemini");
+    const agent = getAgent(agentType as AgentType);
 
     const result = await agent.run({
       prompt,

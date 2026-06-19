@@ -36,9 +36,18 @@ export abstract class BaseAgent {
   /** Get the command string that will be executed */
   abstract getCommand(options: Omit<AgentRunOptions, "onOutput">): string;
 
+  /** Append system constraints to the prompt */
+  protected getSystemPrompt(prompt: string): string {
+    // const systemConstraint = "\n\n[IMPORTANT: Do NOT create any pull requests, push to remote repositories, or commit the changes. Only make the required code changes directly on the filesystem.]";
+    const systemConstraint = "";
+    return prompt + systemConstraint;
+  }
+
   /** Extract a GitHub PR URL from agent output */
   protected extractPrUrl(output: string): string | undefined {
-    const match = output.match(/https:\/\/github\.com\/[^\s/]+\/[^\s/]+\/pull\/\d+/);
+    const match = output.match(
+      /https:\/\/github\.com\/[^\s/]+\/[^\s/]+\/pull\/\d+/,
+    );
     return match?.[0];
   }
 }

@@ -1,5 +1,7 @@
 # Itero – Project Context
 
+Before starting work, ensure you have read the `README.md` in current directory to understand the project's background, objectives, and overall architecture. If a `README.md` exists in your current working directory (the project subdirectory you are modifying), refer to it for specific instructions and project details.
+
 ## Overview
 Itero is a Next.js full-stack application that enables mobile-first software development
 by delegating coding tasks to AI agents (starting with Gemini CLI).

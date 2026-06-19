@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessions, updateSession, addMessage } from "@/lib/store";
-import { getAgent } from "@/lib/agents";
+import { getAgent, AgentType } from "@/lib/agents";
 import { eventBus } from "@/lib/event-bus";
 import crypto from "crypto";
 
@@ -66,14 +66,11 @@ export async function POST(req: NextRequest) {
   const userMsg = await addMessage({ sessionId: session.id, role: "user", content });
   eventBus.publish({ type: "message_added", payload: userMsg });
 
-  // Build a follow-up prompt
-  const followUpPrompt =
-    `You previously worked on this repository and created PR: ${prUrl}\n` +
-    `A reviewer left the following comment:\n\n"${commentBody}"\n\n` +
-    `Please address the reviewer's feedback, commit the changes, and push to the existing PR branch.`;
+  // Retrieve agent
+  const agent = getAgent(session.agentType as AgentType);
 
-  // Retrieve command
-  const agent = getAgent(session.agentType as "gemini");
+  // Build a follow-up prompt (since the session context is resumed, pass the comment directly)
+  const followUpPrompt = commentBody;
   const command = agent.getCommand({ prompt: followUpPrompt, repoPath: session.repoPath, sessionId: session.id, isResume: true });
 
   // Update session status to running and store the command
@@ -108,7 +105,7 @@ async function runFollowUp(
     // Clear logs for this new follow-up run
     await clearSessionLog(sessionId, messageId);
 
-    const agent = getAgent(agentType as "gemini");
+    const agent = getAgent(agentType as AgentType);
     const result = await agent.run({
       prompt,
       repoPath,
