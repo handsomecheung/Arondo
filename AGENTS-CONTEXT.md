@@ -37,7 +37,6 @@ app/
           route.ts      # GET: check status of auto-script analysis; POST: start AI analysis in background
     messages/route.ts   # GET: list messages for a session
     stream/route.ts     # SSE endpoint for real-time updates (session_updated, message_added, session_deleted, agent_output)
-    webhook/route.ts    # GitHub Webhook receiver (PR review comments → agent follow-up in resume mode)
 lib/
   store.ts              # File-based JSON storage (sessions, messages, logs, projects, scripts)
   event-bus.ts          # In-memory SSE pub/sub (singleton)
@@ -67,16 +66,17 @@ data/                   # Runtime data (gitignored)
 1. Create `lib/agents/<name>.ts` implementing `BaseAgent`
 2. Register it in `lib/agents/index.ts` AGENTS map
 
-## Environment Variables
-- `GITHUB_WEBHOOK_SECRET` – Optional. Used to verify GitHub webhook signatures.
-
 ## Development
 ```bash
 npm run dev   # Start dev server on http://localhost:3250
 ```
 
 ## Core Logging & Session Lifecycle Features
-- **Message-specific execution logs**: Every agent execution creates a specific system message (`⚙️ Executing command...`). The resulting terminal outputs are streamed and stored in `data/sessions/[sessionId]/logs/[systemMsgId].log`. The UI displays a trigger button underneath each command run to open a modal for that execution log.
+- **Message-specific execution logs**: Every agent or script execution creates a specific system message (e.g. `⚙️ Executing command...`). The resulting terminal outputs are streamed and stored in `data/sessions/[sessionId]/logs/[systemMsgId].log`. The UI displays a trigger button (e.g., "Agent Execution Log" or "Script Execution Log") underneath each command run to open a modal for that execution log.
+- **Task Queue & Log Popup**: Active tasks are tracked in a global header queue. Clicking any running task in the queue automatically switches the workspace to the corresponding session, retrieves its `messageId`, and opens the log modal.
+- **Real-time Streaming & Auto-scroll**: If the log modal represents an active command execution, it displays a pulsating `⟳ Streaming...` badge, and new log lines appended via SSE automatically scroll the modal console output to the bottom.
+- **Concurrency & Responsiveness**: The chat prompt remains open during script execution. Multiple background scripts can be run concurrently in a single session (concurrency is restricted only on multiple calls to the exact same script).
+- **Auto-Closing Dropdowns**: Both the Task Queue dropdown and the Three-Dot Action Menu are equipped with outside-click detection, closing automatically when the user clicks elsewhere.
 - **Session Resumption**: Maintains task context on follow-ups. The `gemini` agent uses `gemini --resume <sessionId>`. The `antigravity` agent matches the Itero session ID with the internal agy conversation UUID using `agy-sessions.json` and runs `agy --conversation <agyId>`.
 - **Integrated Diff Viewer (diff2html)**: Renders a beautiful visual HTML diff of code modifications. The backend runs git and exports the output to `data/sessions/[sessionId]/diff.html` via `diff2html` and serves it on demand.
 - **Three-Dot Action Menu**: Compact dropdown menu in the header containing "Show Diff", "Commit Changes", "Create PR" (or "View PR"), and "Delete Session" to ensure mobile-friendly navigation.
