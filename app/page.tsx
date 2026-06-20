@@ -127,6 +127,16 @@ function IconTrash() {
   );
 }
 
+function IconMoreVertical() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="12" cy="5" r="1" />
+      <circle cx="12" cy="19" r="1" />
+    </svg>
+  );
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatTime(iso: string) {
@@ -182,6 +192,7 @@ export default function HomePage() {
   // GitHub states
   const [githubConfigured, setGithubConfigured] = useState(false);
   const [isCreatingPr, setIsCreatingPr] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Console log state
   const [sessionLog, setSessionLog] = useState("");
@@ -394,6 +405,7 @@ export default function HomePage() {
     setSessionLog(""); // Clear log
     setActiveLogMsgId(null);
     setLogModalOpen(false);
+    setMenuOpen(false);
     setTimeout(() => textareaRef.current?.focus(), 50);
   };
 
@@ -426,6 +438,7 @@ export default function HomePage() {
     setSidebarOpen(false);
     setActiveLogMsgId(null);
     setLogModalOpen(false);
+    setMenuOpen(false);
   };
 
   const handleDeleteSession = async (id: string) => {
@@ -527,21 +540,9 @@ export default function HomePage() {
                   {session.status === "running" && "⟳ "}
                   {session.status}
                 </span>
-                <span style={{ fontSize: 10, color: "var(--text-muted)", marginLeft: "auto", marginRight: 8 }}>
+                <span style={{ fontSize: 10, color: "var(--text-muted)", marginLeft: "auto" }}>
                   {session.agentType}
                 </span>
-                <button
-                  className="session-delete-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteSession(session.id);
-                  }}
-                  title="Delete session"
-                  disabled={session.status === "running"}
-                  aria-label="Delete session"
-                >
-                  <IconTrash />
-                </button>
               </div>
               <div className="task-item-prompt">{session.prompt}</div>
               <div className="task-item-time">{formatRelative(session.createdAt)}</div>
@@ -568,32 +569,71 @@ export default function HomePage() {
               </span>
             </div>
             
-            <div style={{ display: "flex", alignItems: "center" }}>
-              {selectedSession.prUrl ? (
-                <a
-                  href={selectedSession.prUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="pr-link"
-                  id="pr-link"
-                >
-                  <IconGitPullRequest />
-                  View PR
-                  <IconExternalLink />
-                </a>
-              ) : (
-                selectedSession.status === "done" && (
-                  <button
-                    className="pr-create-btn"
-                    onClick={handleCreatePr}
-                    disabled={!githubConfigured || isCreatingPr}
-                    title={githubConfigured ? "Create Pull Request" : "GITHUB_TOKEN env is missing"}
-                    id="create-pr-btn"
+            <div style={{ display: "flex", alignItems: "center", position: "relative" }}>
+              <button
+                className="menu-trigger-btn"
+                onClick={() => setMenuOpen(!menuOpen)}
+                id="session-menu-btn"
+                title="Session Menu"
+              >
+                <IconMoreVertical />
+              </button>
+              
+              {menuOpen && (
+                <div className="session-dropdown-menu">
+                  {/* Show Diff */}
+                  <a
+                    href={`/api/sessions/${selectedSessionId}/diff`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="menu-item"
+                    onClick={() => setMenuOpen(false)}
+                    id="menu-show-diff"
                   >
-                    <IconGitPullRequest />
-                    {isCreatingPr ? "Creating PR…" : "Create PR"}
+                    🔍 Show Diff
+                  </a>
+
+                  {/* Create PR / View PR */}
+                  {selectedSession.prUrl ? (
+                    <a
+                      href={selectedSession.prUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="menu-item"
+                      onClick={() => setMenuOpen(false)}
+                      id="menu-view-pr"
+                    >
+                      <IconGitPullRequest /> View PR
+                    </a>
+                  ) : (
+                    selectedSession.status === "done" && (
+                      <button
+                        className="menu-item"
+                        onClick={() => {
+                          handleCreatePr();
+                          setMenuOpen(false);
+                        }}
+                        disabled={!githubConfigured || isCreatingPr}
+                        id="menu-create-pr"
+                      >
+                        <IconGitPullRequest /> {isCreatingPr ? "Creating PR…" : "Create PR"}
+                      </button>
+                    )
+                  )}
+
+                  {/* Delete Session */}
+                  <button
+                    className="menu-item delete"
+                    onClick={() => {
+                      handleDeleteSession(selectedSessionId!);
+                      setMenuOpen(false);
+                    }}
+                    disabled={selectedSession.status === "running"}
+                    id="menu-delete-session"
+                  >
+                    <IconTrash /> Delete Session
                   </button>
-                )
+                </div>
               )}
             </div>
           </div>

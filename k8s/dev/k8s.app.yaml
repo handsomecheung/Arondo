@@ -29,7 +29,7 @@ metadata:
     gethomepage.dev/group: AI
     gethomepage.dev/name: Itero
     gethomepage.dev/href: https://itero.__{{infra.domains:f:x}}__/
-    gethomepage.dev/weight: "10"
+    gethomepage.dev/weight: "5"
 spec:
   ingressClassName: traefik
   rules:
