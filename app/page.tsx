@@ -2296,6 +2296,13 @@ export default function HomePage() {
                           className="menu-item"
                           disabled={true}
                           id="menu-show-diff"
+                          title={
+                            isRunning
+                              ? "Agent is running"
+                              : isCheckingGitChanges
+                              ? "Checking git changes..."
+                              : "No changes detected in git repository"
+                          }
                         >
                           🔍 Show Diff
                         </button>
@@ -2326,7 +2333,19 @@ export default function HomePage() {
                           isCheckingGitChanges ||
                           !hasGitChanges
                         }
-                        title={!isGitRepo ? "Not a git repository" : undefined}
+                        title={
+                          !isGitRepo
+                            ? "Not a git repository"
+                            : isRunning
+                            ? "Agent is running"
+                            : isCommitting
+                            ? "Committing changes in progress..."
+                            : isCheckingGitChanges
+                            ? "Checking git changes..."
+                            : !hasGitChanges
+                            ? "No changes to commit"
+                            : undefined
+                        }
                         id="menu-commit-changes"
                       >
                         <IconGitCommit />{" "}
@@ -2356,7 +2375,15 @@ export default function HomePage() {
                               setMenuOpen(false);
                             }}
                             disabled={!isGitRepo || !githubConfigured || isCreatingPr}
-                            title={!isGitRepo ? "Not a git repository" : !githubConfigured ? "GitHub not configured" : undefined}
+                            title={
+                              !isGitRepo
+                                ? "Not a git repository"
+                                : !githubConfigured
+                                ? "GitHub not configured"
+                                : isCreatingPr
+                                ? "Creating pull request in progress..."
+                                : undefined
+                            }
                             id="menu-create-pr"
                           >
                             <IconGitPullRequest />{" "}
@@ -2375,6 +2402,7 @@ export default function HomePage() {
                           <button
                             className="menu-item"
                             disabled={isAgentRunning}
+                            title={isAgentRunning ? "Agent is running" : undefined}
                             id="menu-run-script"
                           >
                             <IconPlay /> Run Script
@@ -2389,7 +2417,11 @@ export default function HomePage() {
                                   onClick={() => handleRunScript(s.name)}
                                   disabled={selectedSession?.runningScripts?.includes(s.name)}
                                   id={`menu-run-script-${s.name.replace(/\s+/g, "-")}`}
-                                  title={s.command}
+                                  title={
+                                    selectedSession?.runningScripts?.includes(s.name)
+                                      ? "Script is already running"
+                                      : s.command
+                                  }
                                 >
                                   {s.name}
                                 </button>
@@ -2421,6 +2453,11 @@ export default function HomePage() {
                           setMenuOpen(false);
                         }}
                         disabled={selectedSession.status === "running"}
+                        title={
+                          selectedSession.status === "running"
+                            ? "Cannot delete a running session"
+                            : undefined
+                        }
                         id="menu-delete-session"
                       >
                         <IconTrash /> Delete Session

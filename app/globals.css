@@ -1263,6 +1263,7 @@ html, body {
 .session-dropdown-menu .menu-item:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  pointer-events: auto;
 }
 
 .session-dropdown-menu .menu-item.delete {
