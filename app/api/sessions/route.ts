@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   session.command = command;
 
   // Save the user message
-  const userMessage = await addMessage({ sessionId: session.id, role: "user", content: prompt });
+  const userMessage = await addMessage({ sessionId: session.id, role: "user", content: prompt, type: "chat-user" });
   eventBus.publish({ type: "message_added", payload: userMessage });
 
   // Add system message logging the CLI command to chat
@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
     sessionId: session.id,
     role: "system",
     content: `⚙️ Executing command:\n\`\`\`bash\n${command}\n\`\`\``,
+    type: "agent-run",
   });
   eventBus.publish({ type: "message_added", payload: systemMsg });
   eventBus.publish({ type: "session_updated", payload: session });
@@ -91,14 +92,14 @@ async function runAgentInBackground(
       ? "✅ Done!"
       : `❌ Error: ${result.error}`;
 
-    const agentMsg = await addMsg({ sessionId, role: "agent", content });
+    const agentMsg = await addMsg({ sessionId, role: "agent", content, type: "agent-return" });
     eventBus.publish({ type: "message_added", payload: agentMsg });
     eventBus.publish({ type: "session_updated", payload: updated });
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     await appendSessionLog(sessionId, messageId, `[Internal error] ${errorMessage}`);
     const updated = await updateSession(sessionId, { status: "error", errorMessage });
-    const agentMsg = await addMessage({ sessionId, role: "system", content: `❌ Internal error: ${errorMessage}` });
+    const agentMsg = await addMessage({ sessionId, role: "system", content: `❌ Internal error: ${errorMessage}`, type: "agent-return" });
     eventBus.publish({ type: "message_added", payload: agentMsg });
     eventBus.publish({ type: "session_updated", payload: updated });
   }

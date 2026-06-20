@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type SessionStatus = "idle" | "running" | "done" | "error";
+type SessionStatus = "idle" | "running" | "script-running" | "done" | "error";
 
 interface Session {
   id: string;
@@ -18,6 +18,7 @@ interface Session {
   command?: string;
   createdAt: string;
   updatedAt: string;
+  runningScripts?: string[];
 }
 
 interface Project {
@@ -37,10 +38,42 @@ interface Message {
   sessionId: string;
   role: "user" | "agent" | "system";
   content: string;
+  type?: string;
   createdAt: string;
 }
 
+interface TaskItem {
+  id: string;
+  type: "script" | "agent";
+  name: string;
+  sessionId: string;
+  status: "running" | "done" | "error";
+  createdAt: number;
+  messageId?: string;
+}
+
 // ─── Icons ────────────────────────────────────────────────────────────────────
+
+function IconTaskQueue() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <line x1="9" y1="9" x2="15" y2="9" />
+      <line x1="9" y1="13" x2="15" y2="13" />
+      <line x1="9" y1="17" x2="15" y2="17" />
+    </svg>
+  );
+}
+
 
 function IconSend() {
   return (
@@ -350,6 +383,12 @@ export default function HomePage() {
   const [isNewSession, setIsNewSession] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Task Queue states
+  const [taskQueue, setTaskQueue] = useState<TaskItem[]>([]);
+  const [taskQueueOpen, setTaskQueueOpen] = useState(false);
+  const taskQueueRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   // Project states
   const [sidebarMode, setSidebarMode] = useState<"sessions" | "projects">(
     "sessions",
@@ -419,12 +458,64 @@ export default function HomePage() {
     activeLogMsgIdRef.current = activeLogMsgId;
   }, [activeLogMsgId]);
 
+  const logPreRef = useRef<HTMLPreElement>(null);
+  useEffect(() => {
+    if (logModalOpen && logPreRef.current) {
+      logPreRef.current.scrollTop = logPreRef.current.scrollHeight;
+    }
+  }, [sessionLog, logModalOpen]);
+
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const selectedSession =
     sessions.find((s) => s.id === selectedSessionId) ?? null;
-  const isRunning = selectedSession?.status === "running";
+  const isRunning =
+    selectedSession?.status === "running" ||
+    selectedSession?.status === "script-running";
+  const isAgentRunning = taskQueue.some(
+    (t) => t.sessionId === selectedSessionId && t.type === "agent",
+  );
+
+  // Close task queue dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        taskQueueRef.current &&
+        !taskQueueRef.current.contains(event.target as Node)
+      ) {
+        setTaskQueueOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // Close session menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(event.target as Node)
+      ) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // Auto-close task queue if it becomes empty
+  useEffect(() => {
+    if (taskQueue.length === 0) {
+      setTaskQueueOpen(false);
+    }
+  }, [taskQueue.length]);
+
 
   // Find the ID of the last command execution system message in the list
   const lastExecMsgId = [...messages]
@@ -535,6 +626,80 @@ export default function HomePage() {
       .then((data: Session[]) => {
         setSessions(data);
         if (data.length > 0) setSelectedSessionId(data[0].id);
+
+        // Add running sessions to task queue
+        const running = data.filter((s) => s.status === "running" || s.status === "script-running");
+        if (running.length > 0) {
+          const initTasks: TaskItem[] = [];
+          running.forEach((s) => {
+            if (s.status === "running") {
+              initTasks.push({
+                id: `task-${s.id}-init-agent`,
+                type: "agent",
+                name: `Agent: ${s.prompt}`,
+                sessionId: s.id,
+                status: "running",
+                createdAt: new Date(s.updatedAt || s.createdAt).getTime(),
+              });
+            }
+            if (s.status === "script-running" && s.runningScripts) {
+              s.runningScripts.forEach((scriptName) => {
+                initTasks.push({
+                  id: `task-${s.id}-init-script-${scriptName}`,
+                  type: "script",
+                  name: `Script: ${scriptName}`,
+                  sessionId: s.id,
+                  status: "running",
+                  createdAt: new Date(s.updatedAt || s.createdAt).getTime(),
+                });
+              });
+            }
+          });
+          setTaskQueue(initTasks);
+
+          // Correct the agent & script task details asynchronously by reading messages
+          running.forEach((s) => {
+            if (s.status === "running") {
+              fetch(`/api/messages?sessionId=${s.id}`)
+                .then((r) => r.json())
+                .then((msgs: Message[]) => {
+                  const lastRunMsg = [...msgs]
+                    .reverse()
+                    .find((m) => m.type === "agent-run");
+                  if (lastRunMsg) {
+                    setTaskQueue((prev) =>
+                      prev.map((t) =>
+                        t.id === `task-${s.id}-init-agent`
+                          ? { ...t, name: `Agent: ${s.prompt}`, messageId: lastRunMsg.id }
+                          : t,
+                      ),
+                    );
+                  }
+                })
+                .catch(console.error);
+            } else if (s.status === "script-running" && s.runningScripts) {
+              fetch(`/api/messages?sessionId=${s.id}`)
+                .then((r) => r.json())
+                .then((msgs: Message[]) => {
+                  s.runningScripts?.forEach((scriptName) => {
+                    const matchMsg = [...msgs]
+                      .reverse()
+                      .find((m) => m.type === "script-run" && m.content.includes(`Running script: **${scriptName}**`));
+                    if (matchMsg) {
+                      setTaskQueue((prev) =>
+                        prev.map((t) =>
+                          t.id === `task-${s.id}-init-script-${scriptName}`
+                            ? { ...t, messageId: matchMsg.id }
+                            : t,
+                        ),
+                      );
+                    }
+                  });
+                })
+                .catch(console.error);
+            }
+          });
+        }
       })
       .catch(console.error);
 
@@ -652,6 +817,25 @@ export default function HomePage() {
           setSessions((prev) =>
             prev.map((s) => (s.id === updated.id ? updated : s)),
           );
+          if (updated.status === "script-running") {
+            setTaskQueue((prev) =>
+              prev.filter((t) => {
+                if (t.sessionId !== updated.id) return true;
+                if (t.type === "agent") return false;
+                const running = updated.runningScripts || [];
+                const scriptName = t.name.startsWith("Script: ") ? t.name.substring(8) : t.name;
+                return running.includes(scriptName);
+              })
+            );
+          } else if (
+            updated.status === "done" ||
+            updated.status === "error" ||
+            updated.status === "idle"
+          ) {
+            setTaskQueue((prev) =>
+              prev.filter((t) => t.sessionId !== updated.id),
+            );
+          }
         }
 
         if (event.type === "session_deleted") {
@@ -673,6 +857,49 @@ export default function HomePage() {
               if (prev.find((m) => m.id === msg.id)) return prev;
               return [...prev, msg];
             });
+          }
+
+          // Map messageId to the corresponding task in taskQueue
+          if (msg.role === "system") {
+            if (msg.type === "agent-run") {
+              setTaskQueue((prev) => {
+                const idx = prev.findIndex(
+                  (t) => t.sessionId === msg.sessionId && t.type === "agent" && !t.messageId
+                );
+                if (idx !== -1) {
+                  const next = [...prev];
+                  next[idx] = { ...next[idx], messageId: msg.id };
+                  return next;
+                }
+                return prev;
+              });
+            } else if (msg.type === "script-run") {
+              setTaskQueue((prev) => {
+                let idx = -1;
+                const match = msg.content.match(/Running script:\s*\*\*([^*]+)\*\*/i);
+                if (match) {
+                  const sName = match[1].trim();
+                  idx = prev.findIndex(
+                    (t) =>
+                      t.sessionId === msg.sessionId &&
+                      t.type === "script" &&
+                      !t.messageId &&
+                      (t.name === `Script: ${sName}` || t.name === sName)
+                  );
+                }
+                if (idx === -1) {
+                  idx = prev.findIndex(
+                    (t) => t.sessionId === msg.sessionId && t.type === "script" && !t.messageId
+                  );
+                }
+                if (idx !== -1) {
+                  const next = [...prev];
+                  next[idx] = { ...next[idx], messageId: msg.id };
+                  return next;
+                }
+                return prev;
+              });
+            }
           }
         }
 
@@ -726,6 +953,17 @@ export default function HomePage() {
           }),
         });
         const newSession: Session = await res.json();
+        setTaskQueue((prev) => [
+          ...prev,
+          {
+            id: `agent-${newSession.id}-${Date.now()}`,
+            type: "agent",
+            name: `Agent: ${trimmed}`,
+            sessionId: newSession.id,
+            status: "running",
+            createdAt: Date.now(),
+          },
+        ]);
         setSessions((prev) => [newSession, ...prev]);
         setSelectedSessionId(newSession.id);
         setIsNewSession(false);
@@ -734,14 +972,32 @@ export default function HomePage() {
         setLogModalOpen(false);
         loadProjects();
       } else {
-        const res = await fetch(`/api/sessions/${selectedSessionId}/messages`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: trimmed }),
-        });
-        if (!res.ok) {
-          const data = await res.json();
-          alert(data.error || "Failed to send message");
+        const tempTaskId = `agent-${selectedSessionId}-${Date.now()}`;
+        setTaskQueue((prev) => [
+          ...prev,
+          {
+            id: tempTaskId,
+            type: "agent",
+            name: `Agent: ${trimmed}`,
+            sessionId: selectedSessionId,
+            status: "running",
+            createdAt: Date.now(),
+          },
+        ]);
+        try {
+          const res = await fetch(`/api/sessions/${selectedSessionId}/messages`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: trimmed, type: "chat-user" }),
+          });
+          if (!res.ok) {
+            const data = await res.json();
+            alert(data.error || "Failed to send message");
+            setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
+          }
+        } catch (err) {
+          console.error(err);
+          setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
         }
       }
     } catch (err) {
@@ -754,6 +1010,7 @@ export default function HomePage() {
     isNewSession,
     selectedSessionId,
     loadProjects,
+    setTaskQueue,
   ]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -781,6 +1038,18 @@ export default function HomePage() {
     setMenuOpen(false);
     setScriptSubMenuOpen(false);
     setIsRunningScript(true);
+    const tempTaskId = `script-${selectedSessionId}-${Date.now()}`;
+    setTaskQueue((prev) => [
+      ...prev,
+      {
+        id: tempTaskId,
+        type: "script",
+        name: `Script: ${scriptName}`,
+        sessionId: selectedSessionId,
+        status: "running",
+        createdAt: Date.now(),
+      },
+    ]);
     try {
       const res = await fetch(`/api/sessions/${selectedSessionId}/run-script`, {
         method: "POST",
@@ -793,12 +1062,14 @@ export default function HomePage() {
           title: "Run Script Error",
           message: data.error || "Failed to run script",
         });
+        setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
       }
     } catch (err: any) {
       setApiError({
         title: "Run Script Error",
         message: err.message || "An error occurred while running the script.",
       });
+      setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
     } finally {
       setIsRunningScript(false);
     }
@@ -1053,21 +1324,35 @@ export default function HomePage() {
   const handleCommitChanges = async () => {
     if (!selectedSessionId || isRunning || isCommitting) return;
     setIsCommitting(true);
+    const tempTaskId = `agent-${selectedSessionId}-${Date.now()}`;
+    setTaskQueue((prev) => [
+      ...prev,
+      {
+        id: tempTaskId,
+        type: "agent",
+        name: `Agent: Commit changes`,
+        sessionId: selectedSessionId,
+        status: "running",
+        createdAt: Date.now(),
+      },
+    ]);
     try {
       const commitPrompt =
         "Please commit the changes with an appropriate commit message.";
       const res = await fetch(`/api/sessions/${selectedSessionId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: commitPrompt }),
+        body: JSON.stringify({ message: commitPrompt, type: "chat-system-defined" }),
       });
       if (!res.ok) {
         const data = await res.json();
         alert(data.error || "Failed to commit changes");
+        setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
       }
     } catch (err) {
       console.error(err);
       alert("An error occurred while calling the agent to commit changes.");
+      setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
     } finally {
       setIsCommitting(false);
     }
@@ -1124,7 +1409,10 @@ export default function HomePage() {
   const canSubmit =
     prompt.trim().length > 0 &&
     (isNewSession ? repoPath.trim().length > 0 : !!selectedSessionId) &&
-    !isRunning;
+    !isAgentRunning;
+
+  const activeLogMsg = messages.find((m) => m.id === activeLogMsgId);
+  const isScriptLog = activeLogMsg?.type === "script-run";
 
   // ── Render ──
   return (
@@ -1150,20 +1438,96 @@ export default function HomePage() {
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 6,
+            gap: 12,
             marginLeft: "auto",
+            position: "relative",
           }}
         >
-          <div
-            className={`status-dot ${connected ? "connected" : ""}`}
-            suppressHydrationWarning
-          />
-          <span
-            style={{ fontSize: 11, color: "var(--text-muted)" }}
-            suppressHydrationWarning
-          >
-            {connected ? "Live" : "Connecting…"}
-          </span>
+          <div className="task-queue-wrapper" ref={taskQueueRef}>
+            <button
+              className={`task-queue-btn ${taskQueue.length === 0 ? "disabled" : ""} ${taskQueueOpen ? "active" : ""}`}
+              onClick={() => {
+                if (taskQueue.length > 0) {
+                  setTaskQueueOpen(!taskQueueOpen);
+                }
+              }}
+              disabled={taskQueue.length === 0}
+              title="Task Queue"
+              aria-label="View running tasks"
+            >
+              <IconTaskQueue />
+              {taskQueue.length > 0 && (
+                <span className="task-queue-badge">{taskQueue.length}</span>
+              )}
+            </button>
+
+            {taskQueueOpen && taskQueue.length > 0 && (
+              <div className="task-queue-dropdown">
+                <div className="task-queue-dropdown-header">
+                  <span>Running Tasks</span>
+                  <span className="task-count">{taskQueue.length} active</span>
+                </div>
+                <div className="task-queue-dropdown-list">
+                  {taskQueue.map((task) => {
+                    const hasLog = !!task.messageId;
+                    const handleTaskClick = () => {
+                      if (hasLog && task.messageId) {
+                        setSelectedSessionId(task.sessionId);
+                        setSelectedProjectId(null);
+                        setActiveLogMsgId(task.messageId);
+                        setLogModalOpen(true);
+                        setTaskQueueOpen(false);
+                      }
+                    };
+
+                    return (
+                      <div
+                        key={task.id}
+                        className={`task-queue-item ${task.type} ${hasLog ? "clickable" : "pending"}`}
+                        onClick={handleTaskClick}
+                        title={hasLog ? "Click to view execution log" : "Initializing log..."}
+                      >
+                        <div className="task-queue-item-icon">
+                          {task.type === "script" ? (
+                            <span className="task-icon-script">⚙️</span>
+                          ) : (
+                            <span className="task-icon-agent">⚡</span>
+                          )}
+                        </div>
+                        <div className="task-queue-item-info">
+                          <div className="task-queue-item-name-row">
+                            <span className="task-queue-item-name" title={task.name}>
+                              {task.name}
+                            </span>
+                            <span className={`task-type-tag ${task.type}`}>
+                              {task.type}
+                            </span>
+                          </div>
+                          <div className="task-queue-item-status">
+                            <span className="task-spinner" />
+                            Running...
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div
+              className={`status-dot ${connected ? "connected" : ""}`}
+              suppressHydrationWarning
+            />
+            <span
+              style={{ fontSize: 11, color: "var(--text-muted)" }}
+              suppressHydrationWarning
+            >
+              {connected ? "Live" : "Connecting…"}
+            </span>
+          </div>
         </div>
       </header>
 
@@ -1899,6 +2263,7 @@ export default function HomePage() {
                 </div>
 
                 <div
+                  ref={menuRef}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -2009,7 +2374,7 @@ export default function HomePage() {
                         >
                           <button
                             className="menu-item"
-                            disabled={isRunning || isRunningScript}
+                            disabled={isAgentRunning}
                             id="menu-run-script"
                           >
                             <IconPlay /> Run Script
@@ -2022,6 +2387,7 @@ export default function HomePage() {
                                   key={s.name}
                                   className="menu-item"
                                   onClick={() => handleRunScript(s.name)}
+                                  disabled={selectedSession?.runningScripts?.includes(s.name)}
                                   id={`menu-run-script-${s.name.replace(/\s+/g, "-")}`}
                                   title={s.command}
                                 >
@@ -2133,8 +2499,12 @@ export default function HomePage() {
                           setLogModalOpen(true);
                         }}
                       >
-                        <IconBolt />
-                        <span>Agent Execution Log</span>
+                        {msg.type === "script-run" ? <IconPlay /> : <IconBolt />}
+                        <span>
+                          {msg.type === "script-run"
+                            ? "Script Execution Log"
+                            : "Agent Execution Log"}
+                        </span>
                         {isThisMsgRunning && (
                           <span className="console-badge-running">
                             ⟳ Streaming...
@@ -2146,7 +2516,7 @@ export default function HomePage() {
                 );
               })}
 
-              {isRunning && (
+              {isAgentRunning && (
                 <div className="typing-indicator">
                   <div
                     className="message-avatar"
@@ -2233,7 +2603,7 @@ export default function HomePage() {
                   ref={textareaRef}
                   className="chat-input"
                   placeholder={
-                    isRunning
+                    isAgentRunning
                       ? "Agent is working…"
                       : isNewSession
                         ? "Describe what you want the agent to build or fix in this project…"
@@ -2242,7 +2612,7 @@ export default function HomePage() {
                   value={prompt}
                   onChange={handlePromptChange}
                   onKeyDown={handleKeyDown}
-                  disabled={isRunning}
+                  disabled={isAgentRunning}
                   rows={1}
                   id="chat-input"
                 />
@@ -2365,8 +2735,13 @@ export default function HomePage() {
                 className="modal-title"
                 style={{ display: "flex", alignItems: "center", gap: 6 }}
               >
-                <IconBolt />
-                Agent Execution Log
+                {isScriptLog ? <IconPlay /> : <IconBolt />}
+                {isScriptLog ? "Script Execution Log" : "Agent Execution Log"}
+                {isRunning && activeLogMsgId === lastExecMsgId && (
+                  <span className="console-badge-running" style={{ marginLeft: 8 }}>
+                    ⟳ Streaming...
+                  </span>
+                )}
               </span>
               <button
                 className="modal-close-btn"
@@ -2380,7 +2755,7 @@ export default function HomePage() {
               </button>
             </div>
             <div className="modal-body">
-              <pre className="console-log-modal">{sessionLog}</pre>
+              <pre ref={logPreRef} className="console-log-modal">{sessionLog}</pre>
             </div>
             <div className="modal-footer">
               <button

@@ -18,7 +18,7 @@ export async function POST(
     return NextResponse.json({ error: "Agent is already running for this session" }, { status: 400 });
   }
 
-  const { message } = await req.json();
+  const { message, type } = await req.json();
   if (!message || !message.trim()) {
     return NextResponse.json({ error: "message is required" }, { status: 400 });
   }
@@ -31,6 +31,7 @@ export async function POST(
       sessionId: id,
       role: "user",
       content: trimmedMessage,
+      type: type || "chat-user",
     });
     eventBus.publish({ type: "message_added", payload: userMsg });
 
@@ -50,6 +51,7 @@ export async function POST(
       sessionId: id,
       role: "system",
       content: `⚙️ Executing command:\n\`\`\`bash\n${command}\n\`\`\``,
+      type: "agent-run",
     });
     eventBus.publish({ type: "message_added", payload: systemMsg });
 
@@ -98,7 +100,7 @@ async function runAgentInBackground(
       ? "✅ Done!"
       : `❌ Error: ${result.error}`;
 
-    const agentMsg = await addMsg({ sessionId, role: "agent", content });
+    const agentMsg = await addMsg({ sessionId, role: "agent", content, type: "agent-return" });
     eventBus.publish({ type: "message_added", payload: agentMsg });
     eventBus.publish({ type: "session_updated", payload: updated });
   } catch (err) {
@@ -109,6 +111,7 @@ async function runAgentInBackground(
       sessionId,
       role: "system",
       content: `❌ Internal error: ${errorMessage}`,
+      type: "agent-return",
     });
     eventBus.publish({ type: "message_added", payload: agentMsg });
     eventBus.publish({ type: "session_updated", payload: updated });

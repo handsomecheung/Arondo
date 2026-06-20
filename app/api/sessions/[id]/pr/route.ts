@@ -64,6 +64,7 @@ export async function POST(
       sessionId: id,
       role: "system",
       content: `🎉 Pull Request created successfully!\nURL: ${prUrl}`,
+      type: "system-info",
     });
     
     eventBus.publish({ type: "message_added", payload: msg });
@@ -77,6 +78,7 @@ export async function POST(
       sessionId: id,
       role: "system",
       content: `❌ Failed to create Pull Request: ${errorMessage}`,
+      type: "system-error",
     });
     eventBus.publish({ type: "message_added", payload: msg });
     

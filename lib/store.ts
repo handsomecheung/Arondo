@@ -6,7 +6,7 @@ const SESSIONS_DIR = path.join(DATA_DIR, "sessions");
 const DELETED_SESSIONS_DIR = path.join(DATA_DIR, "deleted-sessions");
 const PROJECTS_DIR = path.join(DATA_DIR, "projects");
 
-export type SessionStatus = "idle" | "running" | "done" | "error";
+export type SessionStatus = "idle" | "running" | "script-running" | "done" | "error";
 
 export interface Project {
   id: string;
@@ -26,13 +26,25 @@ export interface Session {
   command?: string;
   createdAt: string;
   updatedAt: string;
+  runningScripts?: string[];
 }
+
+export type MessageType =
+  | "chat-user"
+  | "chat-system-defined"
+  | "agent-run"
+  | "agent-return"
+  | "script-run"
+  | "script-return"
+  | "system-info"
+  | "system-error";
 
 export interface Message {
   id: string;
   sessionId: string;
   role: "user" | "agent" | "system";
   content: string;
+  type?: MessageType;
   createdAt: string;
 }
 

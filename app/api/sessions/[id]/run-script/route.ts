@@ -26,6 +26,14 @@ export async function POST(
     return NextResponse.json({ error: "scriptName is required" }, { status: 400 });
   }
 
+  const runningScripts = session.runningScripts || [];
+  if (runningScripts.includes(scriptName)) {
+    return NextResponse.json(
+      { error: `Script "${scriptName}" is already running` },
+      { status: 400 }
+    );
+  }
+
   // Look up the script command from project scripts
   const scripts = await getProjectScripts(session.projectId);
   const script = scripts.find((s) => s.name === scriptName);
@@ -38,15 +46,19 @@ export async function POST(
     sessionId: id,
     role: "system",
     content: `⚙️ Running script: **${script.name}**\n\`\`\`bash\n${script.command}\n\`\`\``,
+    type: "script-run",
   });
   eventBus.publish({ type: "message_added", payload: systemMsg });
 
-  // Update session status to running
-  const updatedSession = await updateSession(id, { status: "running" });
+  // Update session status to script-running and append to runningScripts
+  const updatedSession = await updateSession(id, {
+    status: "script-running",
+    runningScripts: [...runningScripts, scriptName],
+  });
   eventBus.publish({ type: "session_updated", payload: updatedSession });
 
   // Run the script in background
-  runScriptInBackground(id, systemMsg.id, script.command, session.repoPath);
+  runScriptInBackground(id, systemMsg.id, scriptName, script.command, session.repoPath);
 
   return NextResponse.json({ success: true });
 }
@@ -54,6 +66,7 @@ export async function POST(
 async function runScriptInBackground(
   sessionId: string,
   messageId: string,
+  scriptName: string,
   command: string,
   repoPath: string
 ) {
@@ -106,25 +119,44 @@ async function runScriptInBackground(
       proc.on("error", reject);
     });
 
-    const updated = await updateSession(sessionId, { status: "done" });
+    const store = await import("@/lib/store");
+    const currentSession = await store.getSession(sessionId);
+    const currentRunning = currentSession?.runningScripts || [];
+    const nextRunning = currentRunning.filter((name) => name !== scriptName);
+    const nextStatus = nextRunning.length > 0 ? "script-running" : "done";
+
+    const updated = await updateSession(sessionId, {
+      status: nextStatus,
+      runningScripts: nextRunning,
+    });
     const doneMsg = await addMsg({
       sessionId,
       role: "system",
       content: `✅ Script completed successfully.`,
+      type: "script-return",
     });
     eventBus.publish({ type: "message_added", payload: doneMsg });
     eventBus.publish({ type: "session_updated", payload: updated });
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     await appendLog(sessionId, messageId, `[Error] ${errorMessage}`);
+
+    const store = await import("@/lib/store");
+    const currentSession = await store.getSession(sessionId);
+    const currentRunning = currentSession?.runningScripts || [];
+    const nextRunning = currentRunning.filter((name) => name !== scriptName);
+    const nextStatus = nextRunning.length > 0 ? "script-running" : "error";
+
     const updated = await updateSession(sessionId, {
-      status: "error",
+      status: nextStatus,
+      runningScripts: nextRunning,
       errorMessage,
     });
     const errMsg = await addMsg({
       sessionId,
       role: "system",
       content: `❌ Error: ${errorMessage}`,
+      type: "script-return",
     });
     eventBus.publish({ type: "message_added", payload: errMsg });
     eventBus.publish({ type: "session_updated", payload: updated });
