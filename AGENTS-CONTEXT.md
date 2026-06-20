@@ -22,6 +22,8 @@ app/
           route.ts      # GET: generate and serve visual HTML diff output via diff2html
         log/
           route.ts      # GET: fetch run log for specific messageId
+        git-status/
+          route.ts      # GET: check if local git repository has any changes
         messages/
           route.ts      # POST: add user follow-up message & trigger agent (resume mode)
         pr/
@@ -65,6 +67,6 @@ npm run dev   # Start dev server on http://localhost:3250
 - **Message-specific execution logs**: Every agent execution creates a specific system message (`⚙️ Executing command...`). The resulting terminal outputs are streamed and stored in `data/sessions/[sessionId]/logs/[systemMsgId].log`. The UI displays a trigger button underneath each command run to open a modal for that execution log.
 - **Session Resumption**: Maintains task context on follow-ups. The `gemini` agent uses `gemini --resume <sessionId>`. The `antigravity` agent matches the Itero session ID with the internal agy conversation UUID using `agy-sessions.json` and runs `agy --conversation <agyId>`.
 - **Integrated Diff Viewer (diff2html)**: Renders a beautiful visual HTML diff of code modifications. The backend runs git and exports the output to `data/sessions/[sessionId]/diff.html` via `diff2html` and serves it on demand.
-- **Three-Dot Action Menu**: Compact dropdown menu in the header containing "Show Diff", "Create PR" (or "View PR"), and "Delete Session" to ensure mobile-friendly navigation.
+- **Three-Dot Action Menu**: Compact dropdown menu in the header containing "Show Diff", "Commit Changes", "Create PR" (or "View PR"), and "Delete Session" to ensure mobile-friendly navigation.
 - **Collapsible Errors**: When an agent call fails, the visual output (`❌ Error` or `❌ Internal error`) is wrapped in a native `<details>` accordion so users can expand the details manually.
 - **Session Deletion**: Relocates the session folder under `data/deleted-sessions/` for soft-deletion (accessed via the three-dot menu).

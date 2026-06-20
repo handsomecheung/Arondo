@@ -8,7 +8,7 @@ Itero is a mobile-first developer workspace interface that allows you to delegat
 - **Granular Execution Logging**: Outputs for every CLI command execution are logged separately under `data/sessions/[sessionId]/logs/[messageId].log`.
 - **Multiple AI Agents Support**: Supports **Gemini CLI** (using `--session-id`/`--resume`) and **Antigravity CLI (agy)** (using dynamic mapping with `--conversation`) for code generation tasks.
 - **Integrated Diff Viewer (diff2html)**: View visual code changes directly from the browser. Generates HTML diffs covering unstaged changes and the latest commit using `diff2html`.
-- **Streamlined Action Menu**: Actions like "Create PR", "Delete Session", and "Show Diff" are folded into a clean, mobile-friendly three-dot drop-down menu.
+- **Streamlined Action Menu**: Actions like "Commit Changes", "Create PR", "Delete Session", and "Show Diff" are folded into a clean, mobile-friendly three-dot drop-down menu.
 - **Mobile-Friendly UI**: Designed with collapsible panels, modal logs, responsive menus, and touch-friendly actions to enable reviewing PRs and steering agents from anywhere.
 - **Collapsible Errors**: When agent execution fails, large traceback logs are wrapped in an accordion details tag to keep the chat clean.
 - **Session Soft-Deletion**: Move unwanted sessions out of sight. Deleted sessions are moved to `data/deleted-sessions/` on the server.

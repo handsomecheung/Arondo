@@ -72,6 +72,17 @@ function IconGitPullRequest() {
   );
 }
 
+function IconGitCommit() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="4" />
+      <line x1="1.05" y1="12" x2="7" y2="12" />
+      <line x1="17" y1="12" x2="22.95" y2="12" />
+    </svg>
+  );
+}
+
+
 function IconInbox() {
   return (
     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -192,6 +203,9 @@ export default function HomePage() {
   // GitHub states
   const [githubConfigured, setGithubConfigured] = useState(false);
   const [isCreatingPr, setIsCreatingPr] = useState(false);
+  const [isCommitting, setIsCommitting] = useState(false);
+  const [isCheckingGitChanges, setIsCheckingGitChanges] = useState(false);
+  const [hasGitChanges, setHasGitChanges] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Console log state
@@ -290,6 +304,26 @@ export default function HomePage() {
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
   }, []);
+
+  // ── Fetch git changes status when menu is opened ──
+  useEffect(() => {
+    if (!menuOpen || !selectedSessionId) return;
+
+    setIsCheckingGitChanges(true);
+    fetch(`/api/sessions/${selectedSessionId}/git-status`)
+      .then((r) => r.json())
+      .then((data) => {
+        setHasGitChanges(!!data.hasChanges);
+      })
+      .catch((err) => {
+        console.error("Failed to check git status:", err);
+        // Default to true in case of error so the user can still attempt
+        setHasGitChanges(true);
+      })
+      .finally(() => {
+        setIsCheckingGitChanges(false);
+      });
+  }, [menuOpen, selectedSessionId]);
 
   // ── SSE connection ──
   useEffect(() => {
@@ -429,6 +463,28 @@ export default function HomePage() {
       alert("An error occurred while creating pull request.");
     } finally {
       setIsCreatingPr(false);
+    }
+  };
+
+  const handleCommitChanges = async () => {
+    if (!selectedSessionId || isRunning || isCommitting) return;
+    setIsCommitting(true);
+    try {
+      const commitPrompt = "Please commit the changes with an appropriate commit message.";
+      const res = await fetch(`/api/sessions/${selectedSessionId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: commitPrompt }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to commit changes");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("An error occurred while calling the agent to commit changes.");
+    } finally {
+      setIsCommitting(false);
     }
   };
 
@@ -592,6 +648,19 @@ export default function HomePage() {
                   >
                     🔍 Show Diff
                   </a>
+
+                  {/* Commit Changes */}
+                  <button
+                    className="menu-item"
+                    onClick={() => {
+                      handleCommitChanges();
+                      setMenuOpen(false);
+                    }}
+                    disabled={isRunning || isCommitting || isCheckingGitChanges || !hasGitChanges}
+                    id="menu-commit-changes"
+                  >
+                    <IconGitCommit /> {isCommitting ? "Committing Changes…" : "Commit Changes"}
+                  </button>
 
                   {/* Create PR / View PR */}
                   {selectedSession.prUrl ? (
