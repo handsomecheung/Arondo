@@ -279,6 +279,23 @@ function IconMoreVertical() {
   );
 }
 
+function IconPlay() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polygon points="5 3 19 12 5 21 5 3" />
+    </svg>
+  );
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatTime(iso: string) {
@@ -386,6 +403,11 @@ export default function HomePage() {
   const [hasGitChanges, setHasGitChanges] = useState(true);
   const [isGitRepo, setIsGitRepo] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scriptSubMenuOpen, setScriptSubMenuOpen] = useState(false);
+
+  // Scripts for the currently selected session's project
+  const [sessionScripts, setSessionScripts] = useState<ProjectScript[]>([]);
+  const [isRunningScript, setIsRunningScript] = useState(false);
 
   // Console log state
   const [sessionLog, setSessionLog] = useState("");
@@ -430,6 +452,18 @@ export default function HomePage() {
       setProjectScripts([]);
     }
   }, [selectedProjectId, loadProjectScripts]);
+
+  // Load scripts for the session's project whenever selected session changes
+  useEffect(() => {
+    if (selectedSession?.projectId) {
+      fetch(`/api/projects/${selectedSession.projectId}/scripts`)
+        .then((r) => r.json())
+        .then((data: ProjectScript[]) => setSessionScripts(data))
+        .catch(() => setSessionScripts([]));
+    } else {
+      setSessionScripts([]);
+    }
+  }, [selectedSession?.projectId]);
 
   // Toast automatic dismissal
   useEffect(() => {
@@ -740,6 +774,34 @@ export default function HomePage() {
     setLogModalOpen(false);
     setMenuOpen(false);
     setTimeout(() => textareaRef.current?.focus(), 50);
+  };
+
+  const handleRunScript = async (scriptName: string) => {
+    if (!selectedSessionId) return;
+    setMenuOpen(false);
+    setScriptSubMenuOpen(false);
+    setIsRunningScript(true);
+    try {
+      const res = await fetch(`/api/sessions/${selectedSessionId}/run-script`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scriptName }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setApiError({
+          title: "Run Script Error",
+          message: data.error || "Failed to run script",
+        });
+      }
+    } catch (err: any) {
+      setApiError({
+        title: "Run Script Error",
+        message: err.message || "An error occurred while running the script.",
+      });
+    } finally {
+      setIsRunningScript(false);
+    }
   };
 
   const handleSelectProject = (projectId: string) => {
@@ -1936,6 +1998,53 @@ export default function HomePage() {
                             {isCreatingPr ? "Creating PR…" : "Create PR"}
                           </button>
                         )
+                      )}
+
+                      {/* Run Script — submenu */}
+                      {sessionScripts.length > 0 && (
+                        <div
+                          className="menu-item-with-sub"
+                          onMouseEnter={() => setScriptSubMenuOpen(true)}
+                          onMouseLeave={() => setScriptSubMenuOpen(false)}
+                        >
+                          <button
+                            className="menu-item"
+                            disabled={isRunning || isRunningScript}
+                            id="menu-run-script"
+                          >
+                            <IconPlay /> Run Script
+                            <span className="menu-item-arrow">›</span>
+                          </button>
+                          {scriptSubMenuOpen && (
+                            <div className="script-submenu">
+                              {sessionScripts.map((s) => (
+                                <button
+                                  key={s.name}
+                                  className="menu-item"
+                                  onClick={() => handleRunScript(s.name)}
+                                  id={`menu-run-script-${s.name.replace(/\s+/g, "-")}`}
+                                  title={s.command}
+                                >
+                                  {s.name}
+                                </button>
+                              ))}
+                              <div className="script-submenu-divider" />
+                              <button
+                                className="menu-item script-submenu-manage"
+                                id="menu-manage-scripts"
+                                onClick={() => {
+                                  setMenuOpen(false);
+                                  setScriptSubMenuOpen(false);
+                                  setSelectedProjectId(selectedSession.projectId);
+                                  setSidebarMode("projects");
+                                  setSidebarOpen(true);
+                                }}
+                              >
+                                ⚙ Edit Scripts
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       )}
 
                       {/* Delete Session */}

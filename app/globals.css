@@ -1272,6 +1272,55 @@ html, body {
   background: rgba(255, 74, 74, 0.1);
 }
 
+/* ── Run Script submenu ────────────────────────────────────────────────────── */
+.menu-item-with-sub {
+  position: relative;
+}
+
+.menu-item-with-sub > .menu-item {
+  justify-content: space-between;
+}
+
+.menu-item-arrow {
+  margin-left: auto;
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+.script-submenu {
+  position: absolute;
+  top: 0;
+  right: calc(100% + 4px);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 101;
+  min-width: 160px;
+  max-width: 260px;
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.script-submenu .menu-item {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.script-submenu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+.script-submenu-manage {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .spinner {
   width: 40px;
   height: 40px;
