@@ -334,18 +334,40 @@ export default function HomePage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Project states
-  const [sidebarMode, setSidebarMode] = useState<"sessions" | "projects">("sessions");
+  const [sidebarMode, setSidebarMode] = useState<"sessions" | "projects">(
+    "sessions",
+  );
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    null,
+  );
   const [projectScripts, setProjectScripts] = useState<ProjectScript[]>([]);
   const [scriptModalOpen, setScriptModalOpen] = useState(false);
   const [scriptName, setScriptName] = useState("");
   const [scriptCommand, setScriptCommand] = useState("");
-  const [editingScriptName, setEditingScriptName] = useState<string | null>(null);
+  const [editingScriptName, setEditingScriptName] = useState<string | null>(
+    null,
+  );
   const [isAutoAnalyzing, setIsAutoAnalyzing] = useState(false);
   const [showAutoAnalyzeNotice, setShowAutoAnalyzeNotice] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: "success" | "info" | "error" } | null>(null);
-  const [apiError, setApiError] = useState<{ title: string; message: string } | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "info" | "error";
+  } | null>(null);
+  const [apiError, setApiError] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+  const [infoDialog, setInfoDialog] = useState<{
+    title: string;
+    body: React.ReactNode;
+    confirmLabel: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   // File browser states
   const [fsModalOpen, setFsModalOpen] = useState(false);
@@ -362,6 +384,7 @@ export default function HomePage() {
   const [isCommitting, setIsCommitting] = useState(false);
   const [isCheckingGitChanges, setIsCheckingGitChanges] = useState(false);
   const [hasGitChanges, setHasGitChanges] = useState(true);
+  const [isGitRepo, setIsGitRepo] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Console log state
@@ -430,14 +453,16 @@ export default function HomePage() {
         setIsAutoAnalyzing(false);
         setToast({
           message: "AI analysis background task timed out.",
-          type: "error"
+          type: "error",
         });
         clearInterval(interval);
         return;
       }
 
       try {
-        const res = await fetch(`/api/projects/${selectedProjectId}/auto-scripts`);
+        const res = await fetch(
+          `/api/projects/${selectedProjectId}/auto-scripts`,
+        );
         if (res.ok) {
           const data = await res.json();
           if (data.status === "done") {
@@ -445,18 +470,18 @@ export default function HomePage() {
             loadProjectScripts(selectedProjectId);
             setToast({
               message: "AI analysis completed! New scripts are now available.",
-              type: "success"
+              type: "success",
             });
             clearInterval(interval);
           } else if (data.status === "error") {
             setIsAutoAnalyzing(false);
             setToast({
               message: `AI analysis failed. Error log written to data/auto-script-error.log`,
-              type: "error"
+              type: "error",
             });
             setApiError({
               title: "AI Analysis Background Error",
-              message: `${data.error || "Unknown background process error"}\n\nThe error details have been logged in "data/auto-script-error.log".`
+              message: `${data.error || "Unknown background process error"}\n\nThe error details have been logged in "data/auto-script-error.log".`,
             });
             clearInterval(interval);
           }
@@ -564,11 +589,13 @@ export default function HomePage() {
       .then((r) => r.json())
       .then((data) => {
         setHasGitChanges(!!data.hasChanges);
+        setIsGitRepo(data.isGitRepo !== false); // default true if field absent
       })
       .catch((err) => {
         console.error("Failed to check git status:", err);
         // Default to true in case of error so the user can still attempt
         setHasGitChanges(true);
+        setIsGitRepo(true);
       })
       .finally(() => {
         setIsCheckingGitChanges(false);
@@ -686,7 +713,14 @@ export default function HomePage() {
     } catch (err) {
       console.error(err);
     }
-  }, [prompt, repoPath, agentType, isNewSession, selectedSessionId, loadProjects]);
+  }, [
+    prompt,
+    repoPath,
+    agentType,
+    isNewSession,
+    selectedSessionId,
+    loadProjects,
+  ]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -719,8 +753,9 @@ export default function HomePage() {
   };
 
   const handleSaveScript = async () => {
-    if (!selectedProjectId || !scriptName.trim() || !scriptCommand.trim()) return;
-    
+    if (!selectedProjectId || !scriptName.trim() || !scriptCommand.trim())
+      return;
+
     try {
       const res = await fetch(`/api/projects/${selectedProjectId}/scripts`, {
         method: "POST",
@@ -728,8 +763,8 @@ export default function HomePage() {
         body: JSON.stringify({
           name: scriptName.trim(),
           command: scriptCommand.trim(),
-          oldName: editingScriptName
-        })
+          oldName: editingScriptName,
+        }),
       });
       if (res.ok) {
         setScriptName("");
@@ -741,42 +776,51 @@ export default function HomePage() {
         const data = await res.json();
         setApiError({
           title: "Save Script Error",
-          message: data.error || "Failed to save script"
+          message: data.error || "Failed to save script",
         });
       }
     } catch (err: any) {
       console.error(err);
       setApiError({
         title: "Save Script Error",
-        message: err.message || "An error occurred while saving the script."
+        message: err.message || "An error occurred while saving the script.",
       });
     }
   };
 
   const handleDeleteScript = async (name: string) => {
     if (!selectedProjectId) return;
-    if (!confirm(`Are you sure you want to delete script "${name}"?`)) return;
+    setConfirmDialog({
+      message: `Delete script "${name}"? This action cannot be undone.`,
+      onConfirm: async () => {
+        setConfirmDialog(null);
 
-    try {
-      const res = await fetch(`/api/projects/${selectedProjectId}/scripts?name=${encodeURIComponent(name)}`, {
-        method: "DELETE"
-      });
-      if (res.ok) {
-        loadProjectScripts(selectedProjectId);
-      } else {
-        const data = await res.json();
-        setApiError({
-          title: "Delete Script Error",
-          message: data.error || "Failed to delete script"
-        });
-      }
-    } catch (err: any) {
-      console.error(err);
-      setApiError({
-        title: "Delete Script Error",
-        message: err.message || "An error occurred while deleting the script."
-      });
-    }
+        try {
+          const res = await fetch(
+            `/api/projects/${selectedProjectId}/scripts?name=${encodeURIComponent(name)}`,
+            {
+              method: "DELETE",
+            },
+          );
+          if (res.ok) {
+            loadProjectScripts(selectedProjectId);
+          } else {
+            const data = await res.json();
+            setApiError({
+              title: "Delete Script Error",
+              message: data.error || "Failed to delete script",
+            });
+          }
+        } catch (err: any) {
+          console.error(err);
+          setApiError({
+            title: "Delete Script Error",
+            message:
+              err.message || "An error occurred while deleting the script.",
+          });
+        }
+      },
+    });
   };
 
   const handleCloseScriptModal = () => {
@@ -788,44 +832,135 @@ export default function HomePage() {
 
   const handleAutoAddScripts = async () => {
     if (!selectedProjectId) return;
-    setIsAutoAnalyzing(true);
-    setShowAutoAnalyzeNotice(true);
-    try {
-      const res = await fetch(`/api/projects/${selectedProjectId}/auto-scripts`, {
-        method: "POST"
-      });
-      if (res.status === 202 || res.ok) {
-        setToast({
-          message: "AI analysis started in the background. Scripts will appear automatically once finished.",
-          type: "info"
-        });
-      } else {
-        let errorMessage = "Failed to start AI analysis.";
+    setInfoDialog({
+      title: "AI Auto Scripts",
+      body: (
+        <>
+          <p
+            style={{
+              fontSize: 13,
+              color: "var(--text-secondary)",
+              lineHeight: 1.6,
+              marginBottom: 14,
+            }}
+          >
+            Itero will automatically analyze your project and generate a set
+            of common scripts (e.g. build, test, lint).
+          </p>
+          <ul
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+              paddingLeft: 0,
+              listStyle: "none",
+              margin: 0,
+            }}
+          >
+            <li style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+              <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>
+                🔍
+              </span>
+              <span
+                style={{
+                  fontSize: 13,
+                  color: "var(--text-secondary)",
+                  lineHeight: 1.55,
+                }}
+              >
+                <strong style={{ color: "var(--text-primary)" }}>
+                  Scans your codebase
+                </strong>{" "}
+                — reads package.json, Makefile, pyproject.toml and other config
+                files to detect available commands.
+              </span>
+            </li>
+            <li style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+              <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>
+                ⚡
+              </span>
+              <span
+                style={{
+                  fontSize: 13,
+                  color: "var(--text-secondary)",
+                  lineHeight: 1.55,
+                }}
+              >
+                <strong style={{ color: "var(--text-primary)" }}>
+                  Runs in the background
+                </strong>{" "}
+                — analysis is asynchronous. You can keep working; scripts will
+                appear automatically once finished.
+              </span>
+            </li>
+            <li style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+              <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>
+                ✏️
+              </span>
+              <span
+                style={{
+                  fontSize: 13,
+                  color: "var(--text-secondary)",
+                  lineHeight: 1.55,
+                }}
+              >
+                <strong style={{ color: "var(--text-primary)" }}>
+                  Fully editable
+                </strong>{" "}
+                — any generated script can be renamed, edited, or deleted
+                afterwards.
+              </span>
+            </li>
+          </ul>
+        </>
+      ),
+      confirmLabel: "Start Analysis",
+      onConfirm: async () => {
+        setInfoDialog(null);
+        setIsAutoAnalyzing(true);
+        setShowAutoAnalyzeNotice(true);
         try {
-          const data = await res.json();
-          errorMessage = data.error || errorMessage;
-        } catch {
-          try {
-            const text = await res.text();
-            errorMessage = text || errorMessage;
-          } catch {}
+          const res = await fetch(
+            `/api/projects/${selectedProjectId}/auto-scripts`,
+            {
+              method: "POST",
+            },
+          );
+          if (res.status === 202 || res.ok) {
+            setToast({
+              message:
+                "AI analysis started in the background. Scripts will appear automatically once finished.",
+              type: "info",
+            });
+          } else {
+            let errorMessage = "Failed to start AI analysis.";
+            try {
+              const data = await res.json();
+              errorMessage = data.error || errorMessage;
+            } catch {
+              try {
+                const text = await res.text();
+                errorMessage = text || errorMessage;
+              } catch {}
+            }
+            setIsAutoAnalyzing(false);
+            setShowAutoAnalyzeNotice(false);
+            setApiError({
+              title: "AI Analysis Error",
+              message: errorMessage,
+            });
+          }
+        } catch (err: any) {
+          console.error(err);
+          setIsAutoAnalyzing(false);
+          setShowAutoAnalyzeNotice(false);
+          setApiError({
+            title: "System Error",
+            message: err.message || String(err),
+          });
         }
-        setIsAutoAnalyzing(false);
-        setShowAutoAnalyzeNotice(false);
-        setApiError({
-          title: "AI Analysis Error",
-          message: errorMessage
-        });
-      }
-    } catch (err: any) {
-      console.error(err);
-      setIsAutoAnalyzing(false);
-      setShowAutoAnalyzeNotice(false);
-      setApiError({
-        title: "System Error",
-        message: err.message || String(err)
-      });
-    }
+      },
+    });
   };
 
   const handleCreatePr = async () => {
@@ -887,28 +1022,41 @@ export default function HomePage() {
   };
 
   const handleDeleteSession = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this session?")) return;
-    try {
-      const res = await fetch(`/api/sessions/${id}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        setSessions((prev) => prev.filter((s) => s.id !== id));
-        if (selectedSessionId === id) {
-          setSelectedSessionId(null);
-          setMessages([]);
-          setSessionLog("");
-          setActiveLogMsgId(null);
-          setLogModalOpen(false);
+    setConfirmDialog({
+      message:
+        "Delete this session? All messages and logs will be permanently removed.",
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        try {
+          const res = await fetch(`/api/sessions/${id}`, {
+            method: "DELETE",
+          });
+          if (res.ok) {
+            setSessions((prev) => prev.filter((s) => s.id !== id));
+            if (selectedSessionId === id) {
+              setSelectedSessionId(null);
+              setMessages([]);
+              setSessionLog("");
+              setActiveLogMsgId(null);
+              setLogModalOpen(false);
+            }
+          } else {
+            const data = await res.json();
+            setApiError({
+              title: "Delete Session Error",
+              message: data.error || "Failed to delete session",
+            });
+          }
+        } catch (err: any) {
+          console.error(err);
+          setApiError({
+            title: "Delete Session Error",
+            message:
+              err.message || "An error occurred while deleting the session.",
+          });
         }
-      } else {
-        const data = await res.json();
-        alert(data.error || "Failed to delete session");
-      }
-    } catch (err) {
-      console.error(err);
-      alert("An error occurred while deleting the session.");
-    }
+      },
+    });
   };
 
   const canSubmit =
@@ -967,14 +1115,28 @@ export default function HomePage() {
       {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="sidebar-header">
-          <select
-            className="sidebar-mode-select"
-            value={sidebarMode}
-            onChange={(e) => setSidebarMode(e.target.value as "sessions" | "projects")}
+          <div
+            className="sidebar-mode-toggle"
+            role="tablist"
+            aria-label="View mode"
           >
-            <option value="sessions">Sessions</option>
-            <option value="projects">Projects</option>
-          </select>
+            <button
+              role="tab"
+              aria-selected={sidebarMode === "sessions"}
+              className={`sidebar-mode-tab${sidebarMode === "sessions" ? " active" : ""}`}
+              onClick={() => setSidebarMode("sessions")}
+            >
+              Sessions
+            </button>
+            <button
+              role="tab"
+              aria-selected={sidebarMode === "projects"}
+              className={`sidebar-mode-tab${sidebarMode === "projects" ? " active" : ""}`}
+              onClick={() => setSidebarMode("projects")}
+            >
+              Projects
+            </button>
+          </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button
               className="new-task-btn"
@@ -1048,9 +1210,12 @@ export default function HomePage() {
                 </div>
               )}
               {projects.map((project) => {
-                const projectSessions = sessions.filter((s) => s.projectId === project.id);
-                const folderName = project.repoPath.split("/").pop() || project.repoPath;
-                
+                const projectSessions = sessions.filter(
+                  (s) => s.projectId === project.id,
+                );
+                const folderName =
+                  project.repoPath.split("/").pop() || project.repoPath;
+
                 const handleSelectProjectItem = () => {
                   handleSelectProject(project.id);
                 };
@@ -1063,21 +1228,33 @@ export default function HomePage() {
                     id={`project-item-${project.id}`}
                   >
                     <div className="task-item-header">
-                      <span className="task-status-badge done" style={{ textTransform: "none" }}>
-                        Project
-                      </span>
                       <span
                         style={{
                           fontSize: 10,
                           color: "var(--text-muted)",
-                          marginLeft: "auto",
                         }}
                       >
-                        {projectSessions.length} session{projectSessions.length !== 1 && "s"}
+                        {projectSessions.length} session
+                        {projectSessions.length !== 1 && "s"}
                       </span>
                     </div>
-                    <div className="task-item-prompt" style={{ fontWeight: 600 }}>{folderName}</div>
-                    <div className="task-item-prompt" style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <div
+                      className="task-item-prompt"
+                      style={{ fontWeight: 600 }}
+                    >
+                      {folderName}
+                    </div>
+                    <div
+                      className="task-item-prompt"
+                      style={{
+                        fontSize: 11,
+                        color: "var(--text-muted)",
+                        marginTop: 2,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
                       {project.repoPath}
                     </div>
                     <div className="task-item-time">
@@ -1097,31 +1274,56 @@ export default function HomePage() {
           (() => {
             const project = projects.find((p) => p.id === selectedProjectId);
             if (!project) return null;
-            const projectSessions = sessions.filter((s) => s.projectId === project.id);
-            const folderName = project.repoPath.split("/").pop() || project.repoPath;
+            const projectSessions = sessions.filter(
+              (s) => s.projectId === project.id,
+            );
+            const folderName =
+              project.repoPath.split("/").pop() || project.repoPath;
 
             return (
-              <div className="project-detail-container" style={{ padding: 24, overflowY: "auto", height: "100%", display: "flex", flexDirection: "column", gap: 24 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--border)", paddingBottom: 16 }}>
+              <div
+                className="project-detail-container"
+                style={{
+                  padding: 24,
+                  overflowY: "auto",
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 24,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    borderBottom: "1px solid var(--border)",
+                    paddingBottom: 16,
+                  }}
+                >
                   <div>
-                    <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-primary)" }}>{folderName}</h2>
-                    <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Project details and session history</p>
+                    <h2
+                      style={{
+                        fontSize: 20,
+                        fontWeight: 600,
+                        color: "var(--text-primary)",
+                      }}
+                    >
+                      {folderName}
+                    </h2>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        color: "var(--text-muted)",
+                        marginTop: 4,
+                      }}
+                    >
+                      Project details and scripts
+                    </p>
                   </div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <button
-                      className="new-task-btn"
-                      onClick={() => setScriptModalOpen(true)}
-                      style={{ padding: "8px 16px", fontSize: 13, background: "transparent", border: "1px solid var(--border)", color: "var(--text-primary)" }}
-                    >
-                      <IconPlus /> Add Script
-                    </button>
-                    <button
-                      className="new-task-btn"
-                      onClick={handleAutoAddScripts}
-                      style={{ padding: "8px 16px", fontSize: 13, background: "transparent", border: "1px solid var(--border)", color: "var(--accent)" }}
-                    >
-                      🤖 AI Auto Scripts
-                    </button>
+                  <div
+                    style={{ display: "flex", gap: 8, alignItems: "center" }}
+                  >
                     <button
                       className="new-task-btn"
                       onClick={() => {
@@ -1136,168 +1338,445 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
-                  <div style={{ background: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: 16 }}>
-                    <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary)", marginBottom: 12 }}>Repository Info</h3>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      <div>
-                        <span style={{ fontSize: 11, color: "var(--text-muted)", display: "block" }}>PATH</span>
-                        <code style={{ fontSize: 12, color: "var(--accent)", wordBreak: "break-all" }}>{project.repoPath}</code>
-                      </div>
-                      <div>
-                        <span style={{ fontSize: 11, color: "var(--text-muted)", display: "block" }}>PROJECT ID</span>
-                        <code style={{ fontSize: 11, color: "var(--text-secondary)" }}>{project.id}</code>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ background: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: 16 }}>
-                    <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary)", marginBottom: 12 }}>Metadata</h3>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      <div>
-                        <span style={{ fontSize: 11, color: "var(--text-muted)", display: "block" }}>CREATED AT</span>
-                        <span style={{ fontSize: 13, color: "var(--text-primary)" }}>{new Date(project.createdAt).toLocaleString()}</span>
-                      </div>
-                      <div>
-                        <span style={{ fontSize: 11, color: "var(--text-muted)", display: "block" }}>SESSIONS</span>
-                        <span style={{ fontSize: 13, color: "var(--text-primary)" }}>{projectSessions.length} total sessions</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", marginBottom: 12 }}>Scripts</h3>
-                  {isAutoAnalyzing && (
-                    <div style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "10px 14px",
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                    gap: 16,
+                  }}
+                >
+                  <div
+                    style={{
                       background: "var(--bg-surface)",
                       border: "1px solid var(--border)",
-                      borderRadius: "var(--radius-sm)",
-                      color: "var(--text-secondary)",
-                      fontSize: 12,
-                      marginBottom: 12
-                    }}>
-                      <div className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
-                      <span>🤖 AI is analyzing files to automatically generate scripts in the background...</span>
-                    </div>
-                  )}
-                  {projectScripts.length === 0 ? (
-                    <div style={{ padding: "24px 16px", textAlign: "center", border: "1px dashed var(--border)", borderRadius: "var(--radius-md)", color: "var(--text-muted)", fontSize: 13 }}>
-                      No scripts added to settings yet.
-                    </div>
-                  ) : (
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-                      {projectScripts.map((script, sidx) => (
-                        <div
-                          key={sidx}
+                      borderRadius: "var(--radius-md)",
+                      padding: 16,
+                    }}
+                  >
+                    <h3
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                        color: "var(--text-secondary)",
+                        marginBottom: 12,
+                      }}
+                    >
+                      Project Info
+                    </h3>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                      }}
+                    >
+                      <div>
+                        <span
                           style={{
-                            padding: 12,
-                            background: "var(--bg-surface)",
-                            border: "1px solid var(--border)",
-                            borderRadius: "var(--radius-sm)",
+                            fontSize: 11,
+                            color: "var(--text-muted)",
+                            display: "block",
                           }}
                         >
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <div style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: 13 }}>{script.name}</div>
-                            <div style={{ display: "flex", gap: 4 }}>
-                              <button
-                                onClick={() => {
-                                  setScriptName(script.name);
-                                  setScriptCommand(script.command);
-                                  setEditingScriptName(script.name);
-                                  setScriptModalOpen(true);
-                                }}
-                                style={{
-                                  background: "transparent",
-                                  border: "none",
-                                  color: "var(--text-secondary)",
-                                  cursor: "pointer",
-                                  fontSize: 11,
-                                  padding: "2px 6px",
-                                  borderRadius: "var(--radius-sm)",
-                                  transition: "background 0.2s, color 0.2s"
-                                }}
-                                onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-primary)"; e.currentTarget.style.background = "var(--bg-elevated)"; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-secondary)"; e.currentTarget.style.background = "transparent"; }}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => handleDeleteScript(script.name)}
-                                style={{
-                                  background: "transparent",
-                                  border: "none",
-                                  color: "var(--error)",
-                                  cursor: "pointer",
-                                  fontSize: 11,
-                                  padding: "2px 6px",
-                                  borderRadius: "var(--radius-sm)",
-                                  transition: "background 0.2s"
-                                }}
-                                onMouseEnter={(e) => { e.currentTarget.style.background = "var(--error-bg)"; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                          <code style={{ display: "block", background: "var(--bg-base)", padding: "4px 8px", borderRadius: 4, fontSize: 11, color: "var(--text-secondary)", marginTop: 6, wordBreak: "break-all", fontFamily: "monospace" }}>
-                            {script.command}
-                          </code>
-                        </div>
-                      ))}
+                          PATH
+                        </span>
+                        <code
+                          style={{
+                            fontSize: 12,
+                            color: "var(--accent)",
+                            wordBreak: "break-all",
+                          }}
+                        >
+                          {project.repoPath}
+                        </code>
+                      </div>
+                      <div>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: "var(--text-muted)",
+                            display: "block",
+                          }}
+                        >
+                          PROJECT ID
+                        </span>
+                        <code
+                          style={{
+                            fontSize: 11,
+                            color: "var(--text-secondary)",
+                          }}
+                        >
+                          {project.id}
+                        </code>
+                      </div>
                     </div>
-                  )}
+                  </div>
+
+                  <div
+                    style={{
+                      background: "var(--bg-surface)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-md)",
+                      padding: 16,
+                    }}
+                  >
+                    <h3
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                        color: "var(--text-secondary)",
+                        marginBottom: 12,
+                      }}
+                    >
+                      Metadata
+                    </h3>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                      }}
+                    >
+                      <div>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: "var(--text-muted)",
+                            display: "block",
+                          }}
+                        >
+                          CREATED AT
+                        </span>
+                        <span
+                          style={{ fontSize: 13, color: "var(--text-primary)" }}
+                        >
+                          {new Date(project.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+                      <div>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: "var(--text-muted)",
+                            display: "block",
+                          }}
+                        >
+                          SESSIONS
+                        </span>
+                        <span
+                          style={{ fontSize: 13, color: "var(--text-primary)" }}
+                        >
+                          {projectSessions.length} total sessions
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div>
-                  <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", marginBottom: 12 }}>Session History</h3>
-                  {projectSessions.length === 0 ? (
-                    <div style={{ padding: "32px 16px", textAlign: "center", border: "1px dashed var(--border)", borderRadius: "var(--radius-md)", color: "var(--text-muted)" }}>
-                      No sessions created for this project yet.
+                {/* ── Scripts block ─────────────────────────────── */}
+                <div className="project-section-block">
+                  <div className="project-section-header">
+                    <h3 className="project-section-title">Scripts</h3>
+                    <div
+                      style={{ display: "flex", gap: 8, alignItems: "center" }}
+                    >
+                      <button
+                        className="new-task-btn"
+                        onClick={handleAutoAddScripts}
+                        style={{
+                          padding: "6px 14px",
+                          fontSize: 12,
+                          background: "transparent",
+                          border: "1px solid var(--border)",
+                          color: "var(--accent)",
+                        }}
+                      >
+                        🤖 AI Auto Scripts
+                      </button>
+                      <button
+                        className="new-task-btn"
+                        onClick={() => setScriptModalOpen(true)}
+                        style={{
+                          padding: "6px 14px",
+                          fontSize: 12,
+                          background: "transparent",
+                          border: "1px solid var(--border)",
+                          color: "var(--text-primary)",
+                        }}
+                      >
+                        <IconPlus /> Add Script
+                      </button>
                     </div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {projectSessions.map((session) => (
+                  </div>
+                  <div className="project-section-body">
+                    {isAutoAnalyzing && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          padding: "10px 14px",
+                          background: "var(--bg-elevated)",
+                          border: "1px solid var(--border)",
+                          borderRadius: "var(--radius-sm)",
+                          color: "var(--text-secondary)",
+                          fontSize: 12,
+                          marginBottom: 12,
+                        }}
+                      >
                         <div
-                          key={session.id}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            padding: 12,
-                            background: "var(--bg-surface)",
-                            border: "1px solid var(--border)",
-                            borderRadius: "var(--radius-sm)",
-                            cursor: "pointer",
-                            transition: "background 0.2s"
-                          }}
-                          onClick={() => handleSelectSession(session.id)}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-elevated)"; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = "var(--bg-surface)"; }}
-                        >
-                          <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0, flex: 1 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                              <span className={`task-status-badge ${session.status}`}>
-                                {session.status}
-                              </span>
-                              <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>{session.agentType}</span>
+                          className="spinner"
+                          style={{ width: 14, height: 14, borderWidth: 2 }}
+                        />
+                        <span>
+                          🤖 AI is analyzing files to automatically generate
+                          scripts in the background...
+                        </span>
+                      </div>
+                    )}
+                    {projectScripts.length === 0 ? (
+                      <div
+                        style={{
+                          padding: "24px 16px",
+                          textAlign: "center",
+                          border: "1px dashed var(--border)",
+                          borderRadius: "var(--radius-md)",
+                          color: "var(--text-muted)",
+                          fontSize: 13,
+                        }}
+                      >
+                        No scripts added yet.
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fit, minmax(220px, 1fr))",
+                          gap: 12,
+                        }}
+                      >
+                        {projectScripts.map((script, sidx) => (
+                          <div
+                            key={sidx}
+                            style={{
+                              padding: 12,
+                              background: "var(--bg-elevated)",
+                              border: "1px solid var(--border)",
+                              borderRadius: "var(--radius-sm)",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontWeight: 600,
+                                  color: "var(--text-primary)",
+                                  fontSize: 13,
+                                }}
+                              >
+                                {script.name}
+                              </div>
+                              <div style={{ display: "flex", gap: 4 }}>
+                                <button
+                                  onClick={() => {
+                                    setScriptName(script.name);
+                                    setScriptCommand(script.command);
+                                    setEditingScriptName(script.name);
+                                    setScriptModalOpen(true);
+                                  }}
+                                  style={{
+                                    background: "transparent",
+                                    border: "none",
+                                    color: "var(--text-secondary)",
+                                    cursor: "pointer",
+                                    fontSize: 11,
+                                    padding: "2px 6px",
+                                    borderRadius: "var(--radius-sm)",
+                                    transition: "background 0.2s, color 0.2s",
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.color =
+                                      "var(--text-primary)";
+                                    e.currentTarget.style.background =
+                                      "var(--bg-surface)";
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.color =
+                                      "var(--text-secondary)";
+                                    e.currentTarget.style.background =
+                                      "transparent";
+                                  }}
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleDeleteScript(script.name)
+                                  }
+                                  style={{
+                                    background: "transparent",
+                                    border: "none",
+                                    color: "var(--error)",
+                                    cursor: "pointer",
+                                    fontSize: 11,
+                                    padding: "2px 6px",
+                                    borderRadius: "var(--radius-sm)",
+                                    transition: "background 0.2s",
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background =
+                                      "var(--error-bg)";
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background =
+                                      "transparent";
+                                  }}
+                                >
+                                  Delete
+                                </button>
+                              </div>
                             </div>
-                            <span style={{ fontSize: 13, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                              {session.prompt}
+                            <code
+                              style={{
+                                display: "block",
+                                background: "var(--bg-base)",
+                                padding: "4px 8px",
+                                borderRadius: 4,
+                                fontSize: 11,
+                                color: "var(--text-secondary)",
+                                marginTop: 6,
+                                wordBreak: "break-all",
+                                fontFamily: "monospace",
+                              }}
+                            >
+                              {script.command}
+                            </code>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Sessions block ────────────────────────────── */}
+                <div className="project-section-block">
+                  <div className="project-section-header">
+                    <h3 className="project-section-title">Sessions</h3>
+                    <span className="project-section-count">
+                      {projectSessions.length}
+                    </span>
+                  </div>
+                  <div className="project-section-body">
+                    {projectSessions.length === 0 ? (
+                      <div
+                        style={{
+                          padding: "32px 16px",
+                          textAlign: "center",
+                          border: "1px dashed var(--border)",
+                          borderRadius: "var(--radius-md)",
+                          color: "var(--text-muted)",
+                        }}
+                      >
+                        No sessions created for this project yet.
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 8,
+                        }}
+                      >
+                        {projectSessions.map((session) => (
+                          <div
+                            key={session.id}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: 12,
+                              background: "var(--bg-elevated)",
+                              border: "1px solid var(--border)",
+                              borderRadius: "var(--radius-sm)",
+                              cursor: "pointer",
+                              transition: "background 0.2s",
+                            }}
+                            onClick={() => handleSelectSession(session.id)}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background =
+                                "var(--bg-surface)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background =
+                                "var(--bg-elevated)";
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 4,
+                                minWidth: 0,
+                                flex: 1,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 8,
+                                }}
+                              >
+                                <span
+                                  className={`task-status-badge ${session.status}`}
+                                >
+                                  {session.status}
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: 11,
+                                    color: "var(--text-secondary)",
+                                  }}
+                                >
+                                  {session.agentType}
+                                </span>
+                              </div>
+                              <span
+                                style={{
+                                  fontSize: 13,
+                                  color: "var(--text-primary)",
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                }}
+                              >
+                                {session.prompt}
+                              </span>
+                            </div>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                color: "var(--text-muted)",
+                                marginLeft: 16,
+                              }}
+                            >
+                              {new Date(session.createdAt).toLocaleDateString()}
                             </span>
                           </div>
-                          <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 16 }}>
-                            {new Date(session.createdAt).toLocaleDateString()}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -1352,7 +1831,8 @@ export default function HomePage() {
                       whiteSpace: "nowrap",
                     }}
                   >
-                    Repo: {selectedSession.repoPath} ({selectedSession.agentType})
+                    Project: {selectedSession.repoPath} (
+                    {selectedSession.agentType})
                   </span>
                 </div>
 
@@ -1374,8 +1854,17 @@ export default function HomePage() {
 
                   {menuOpen && (
                     <div className="session-dropdown-menu">
-                      {/* Show Diff */}
-                      {isRunning || isCheckingGitChanges || !hasGitChanges ? (
+                      {/* Show Diff — requires git repo */}
+                      {!isGitRepo ? (
+                        <button
+                          className="menu-item"
+                          disabled={true}
+                          id="menu-show-diff"
+                          title="Not a git repository"
+                        >
+                          🔍 Show Diff
+                        </button>
+                      ) : isRunning || isCheckingGitChanges || !hasGitChanges ? (
                         <button
                           className="menu-item"
                           disabled={true}
@@ -1396,7 +1885,7 @@ export default function HomePage() {
                         </a>
                       )}
 
-                      {/* Commit Changes */}
+                      {/* Commit Changes — requires git repo */}
                       <button
                         className="menu-item"
                         onClick={() => {
@@ -1404,18 +1893,22 @@ export default function HomePage() {
                           setMenuOpen(false);
                         }}
                         disabled={
+                          !isGitRepo ||
                           isRunning ||
                           isCommitting ||
                           isCheckingGitChanges ||
                           !hasGitChanges
                         }
+                        title={!isGitRepo ? "Not a git repository" : undefined}
                         id="menu-commit-changes"
                       >
                         <IconGitCommit />{" "}
-                        {isCommitting ? "Committing Changes…" : "Commit Changes"}
+                        {isCommitting
+                          ? "Committing Changes…"
+                          : "Commit Changes"}
                       </button>
 
-                      {/* Create PR / View PR */}
+                      {/* Create PR / View PR — requires git repo */}
                       {selectedSession.prUrl ? (
                         <a
                           href={selectedSession.prUrl}
@@ -1435,7 +1928,8 @@ export default function HomePage() {
                               handleCreatePr();
                               setMenuOpen(false);
                             }}
-                            disabled={!githubConfigured || isCreatingPr}
+                            disabled={!isGitRepo || !githubConfigured || isCreatingPr}
+                            title={!isGitRepo ? "Not a git repository" : !githubConfigured ? "GitHub not configured" : undefined}
                             id="menu-create-pr"
                           >
                             <IconGitPullRequest />{" "}
@@ -1471,8 +1965,9 @@ export default function HomePage() {
                   </div>
                   <h1 className="welcome-title">Welcome to Itero</h1>
                   <p className="welcome-desc">
-                    Delegate coding tasks to AI agents, review GitHub PRs on your
-                    phone, and ship software from anywhere — no laptop required.
+                    Delegate coding tasks to AI agents, review GitHub PRs on
+                    your phone, and ship software from anywhere — no laptop
+                    required.
                   </p>
                   <button
                     className="new-task-btn"
@@ -1578,12 +2073,14 @@ export default function HomePage() {
             <div className="input-area">
               {isNewSession && (
                 <div className="input-meta">
-                  <span className="input-label">Repo:</span>
-                  <div style={{ display: "flex", flex: 1, gap: 6, minWidth: 0 }}>
+                  <span className="input-label">Project:</span>
+                  <div
+                    style={{ display: "flex", flex: 1, gap: 6, minWidth: 0 }}
+                  >
                     <input
                       className="input-field-sm"
                       type="text"
-                      placeholder="Click to select repository directory…"
+                      placeholder="Click to select project directory…"
                       value={repoPath}
                       readOnly
                       onClick={() => {
@@ -1630,7 +2127,7 @@ export default function HomePage() {
                     isRunning
                       ? "Agent is working…"
                       : isNewSession
-                        ? "Describe what you want the agent to build or fix in this repo…"
+                        ? "Describe what you want the agent to build or fix in this project…"
                         : "Send a message or follow-up feedback to the agent…"
                   }
                   value={prompt}
@@ -1660,7 +2157,7 @@ export default function HomePage() {
         <div className="modal-backdrop" onClick={() => setFsModalOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <span className="modal-title">Select Repository Directory</span>
+              <span className="modal-title">Select Project Directory</span>
               <button
                 className="modal-close-btn"
                 onClick={() => setFsModalOpen(false)}
@@ -1794,9 +2291,15 @@ export default function HomePage() {
       {/* Add Script Modal */}
       {scriptModalOpen && (
         <div className="modal-backdrop" onClick={handleCloseScriptModal}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "480px" }}>
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "480px" }}
+          >
             <div className="modal-header">
-              <span className="modal-title">{editingScriptName ? "Edit Script" : "Add Script"}</span>
+              <span className="modal-title">
+                {editingScriptName ? "Edit Script" : "Add Script"}
+              </span>
               <button
                 className="modal-close-btn"
                 onClick={handleCloseScriptModal}
@@ -1805,9 +2308,25 @@ export default function HomePage() {
                 <IconX />
               </button>
             </div>
-            <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 16, padding: "20px 16px" }}>
+            <div
+              className="modal-body"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 16,
+                padding: "20px 16px",
+              }}
+            >
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Name</label>
+                <label
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  Name
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. build, test, lint"
@@ -1821,13 +2340,21 @@ export default function HomePage() {
                     borderRadius: "var(--radius-sm)",
                     color: "var(--text-primary)",
                     fontSize: 14,
-                    outline: "none"
+                    outline: "none",
                   }}
                   id="script-name-input"
                 />
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Command</label>
+                <label
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  Command
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. npm run build, pytest"
@@ -1841,13 +2368,22 @@ export default function HomePage() {
                     borderRadius: "var(--radius-sm)",
                     color: "var(--text-primary)",
                     fontSize: 14,
-                    outline: "none"
+                    outline: "none",
                   }}
                   id="script-command-input"
                 />
               </div>
             </div>
-            <div className="modal-footer" style={{ display: "flex", justifyContent: "flex-end", gap: 12, padding: "12px 16px", borderTop: "1px solid var(--border)" }}>
+            <div
+              className="modal-footer"
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 12,
+                padding: "12px 16px",
+                borderTop: "1px solid var(--border)",
+              }}
+            >
               <button
                 type="button"
                 onClick={handleCloseScriptModal}
@@ -1858,7 +2394,7 @@ export default function HomePage() {
                   borderRadius: "var(--radius-sm)",
                   color: "var(--text-secondary)",
                   fontSize: 13,
-                  cursor: "pointer"
+                  cursor: "pointer",
                 }}
               >
                 Cancel
@@ -1875,7 +2411,8 @@ export default function HomePage() {
                   color: "#ffffff",
                   fontSize: 13,
                   cursor: "pointer",
-                  opacity: (!scriptName.trim() || !scriptCommand.trim()) ? 0.5 : 1
+                  opacity:
+                    !scriptName.trim() || !scriptCommand.trim() ? 0.5 : 1,
                 }}
               >
                 Save
@@ -1887,17 +2424,48 @@ export default function HomePage() {
 
       {/* AI Auto Analyzing Notice Modal */}
       {showAutoAnalyzeNotice && (
-        <div className="modal-backdrop" onClick={() => setShowAutoAnalyzeNotice(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "380px", padding: 24, textAlign: "center" }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+        <div
+          className="modal-backdrop"
+          onClick={() => setShowAutoAnalyzeNotice(false)}
+        >
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "380px", padding: 24, textAlign: "center" }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 16,
+              }}
+            >
               <div className="spinner" />
               <div>
-                <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)" }}>AI Background Analysis</h3>
-                <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 8, lineHeight: "1.5" }}>
-                  Analyzing repository structure in the background. 
-                  New scripts will appear automatically on this page once finished.
+                <h3
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 600,
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  AI Background Analysis
+                </h3>
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "var(--text-muted)",
+                    marginTop: 8,
+                    lineHeight: "1.5",
+                  }}
+                >
+                  Analyzing project structure in the background. New scripts
+                  will appear automatically on this page once finished.
                 </p>
-                <p style={{ fontSize: 11, color: "var(--accent)", marginTop: 4 }}>
+                <p
+                  style={{ fontSize: 11, color: "var(--accent)", marginTop: 4 }}
+                >
                   You can safely close this notification now.
                 </p>
               </div>
@@ -1912,7 +2480,7 @@ export default function HomePage() {
                   color: "#ffffff",
                   fontSize: 13,
                   cursor: "pointer",
-                  width: "100%"
+                  width: "100%",
                 }}
               >
                 Got It
@@ -1924,38 +2492,58 @@ export default function HomePage() {
 
       {/* Toast Notification */}
       {toast && (
-        <div style={{
-          position: "fixed",
-          bottom: 24,
-          right: 24,
-          background: toast.type === "error" ? "var(--error)" : toast.type === "success" ? "#10b981" : "var(--bg-elevated)",
-          color: toast.type === "error" || toast.type === "success" ? "#ffffff" : "var(--text-primary)",
-          border: toast.type === "info" ? "1px solid var(--border)" : "none",
-          borderRadius: "var(--radius-md)",
-          padding: "12px 20px",
-          boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.3)",
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          zIndex: 9999,
-          maxWidth: "380px"
-        }}>
+        <div
+          style={{
+            position: "fixed",
+            bottom: 24,
+            right: 24,
+            background:
+              toast.type === "error"
+                ? "var(--error)"
+                : toast.type === "success"
+                  ? "#10b981"
+                  : "var(--bg-elevated)",
+            color:
+              toast.type === "error" || toast.type === "success"
+                ? "#ffffff"
+                : "var(--text-primary)",
+            border: toast.type === "info" ? "1px solid var(--border)" : "none",
+            borderRadius: "var(--radius-md)",
+            padding: "12px 20px",
+            boxShadow:
+              "0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.3)",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            zIndex: 9999,
+            maxWidth: "380px",
+          }}
+        >
           <span style={{ fontSize: 16 }}>
-            {toast.type === "success" ? "✅" : toast.type === "error" ? "❌" : "ℹ️"}
+            {toast.type === "success"
+              ? "✅"
+              : toast.type === "error"
+                ? "❌"
+                : "ℹ️"}
           </span>
-          <span style={{ fontSize: 13, fontWeight: 500, flex: 1 }}>{toast.message}</span>
+          <span style={{ fontSize: 13, fontWeight: 500, flex: 1 }}>
+            {toast.message}
+          </span>
           <button
             onClick={() => setToast(null)}
             style={{
               background: "transparent",
               border: "none",
-              color: toast.type === "error" || toast.type === "success" ? "rgba(255, 255, 255, 0.8)" : "var(--text-secondary)",
+              color:
+                toast.type === "error" || toast.type === "success"
+                  ? "rgba(255, 255, 255, 0.8)"
+                  : "var(--text-secondary)",
               cursor: "pointer",
               fontSize: 12,
               padding: 0,
               marginLeft: 8,
               display: "flex",
-              alignItems: "center"
+              alignItems: "center",
             }}
           >
             ✕
@@ -1966,9 +2554,21 @@ export default function HomePage() {
       {/* API Error Details Modal */}
       {apiError && (
         <div className="modal-backdrop" onClick={() => setApiError(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "540px" }}>
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "540px" }}
+          >
             <div className="modal-header">
-              <span className="modal-title" style={{ color: "var(--error)", display: "flex", alignItems: "center", gap: 6 }}>
+              <span
+                className="modal-title"
+                style={{
+                  color: "var(--error)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
                 ⚠️ {apiError.title}
               </span>
               <button
@@ -1980,26 +2580,42 @@ export default function HomePage() {
               </button>
             </div>
             <div className="modal-body" style={{ padding: "20px 16px" }}>
-              <p style={{ fontSize: 14, color: "var(--text-primary)", marginBottom: 12 }}>
+              <p
+                style={{
+                  fontSize: 14,
+                  color: "var(--text-primary)",
+                  marginBottom: 12,
+                }}
+              >
                 An error occurred during the operations:
               </p>
-              <pre style={{
-                background: "var(--bg-base)",
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius-sm)",
-                padding: 12,
-                fontSize: 12,
-                color: "var(--text-secondary)",
-                maxHeight: "260px",
-                overflowY: "auto",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-all",
-                fontFamily: "monospace"
-              }}>
+              <pre
+                style={{
+                  background: "var(--bg-base)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-sm)",
+                  padding: 12,
+                  fontSize: 12,
+                  color: "var(--text-secondary)",
+                  maxHeight: "260px",
+                  overflowY: "auto",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-all",
+                  fontFamily: "monospace",
+                }}
+              >
                 {apiError.message}
               </pre>
             </div>
-            <div className="modal-footer" style={{ display: "flex", justifyContent: "flex-end", padding: "12px 16px", borderTop: "1px solid var(--border)" }}>
+            <div
+              className="modal-footer"
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                padding: "12px 16px",
+                borderTop: "1px solid var(--border)",
+              }}
+            >
               <button
                 className="new-task-btn"
                 onClick={() => setApiError(null)}
@@ -2010,10 +2626,103 @@ export default function HomePage() {
                   borderRadius: "var(--radius-sm)",
                   color: "#ffffff",
                   fontSize: 13,
-                  cursor: "pointer"
+                  cursor: "pointer",
                 }}
               >
                 Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Dialog */}
+      {confirmDialog && (
+        <div className="modal-backdrop" onClick={() => setConfirmDialog(null)}>
+          <div
+            className="modal confirm-dialog"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "400px" }}
+          >
+            <div className="confirm-dialog-body">
+              <div className="confirm-dialog-icon">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1 14H6L5 6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                  <path d="M9 6V4h6v2" />
+                </svg>
+              </div>
+              <div className="confirm-dialog-content">
+                <p className="confirm-dialog-title">Confirm Delete</p>
+                <p className="confirm-dialog-message">
+                  {confirmDialog.message}
+                </p>
+              </div>
+            </div>
+            <div className="confirm-dialog-footer">
+              <button
+                className="modal-btn-secondary"
+                onClick={() => setConfirmDialog(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="modal-btn-danger"
+                onClick={confirmDialog.onConfirm}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Info / Action Dialog (e.g. AI Auto Scripts) */}
+      {infoDialog && (
+        <div className="modal-backdrop" onClick={() => setInfoDialog(null)}>
+          <div
+            className="modal info-dialog"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="info-dialog-header">
+              <div className="info-dialog-icon-wrap">
+                <span style={{ fontSize: 22 }}>🤖</span>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p className="info-dialog-title">{infoDialog.title}</p>
+              </div>
+              <button
+                className="modal-close-btn"
+                onClick={() => setInfoDialog(null)}
+                aria-label="Close"
+              >
+                <IconX />
+              </button>
+            </div>
+            <div className="info-dialog-body">{infoDialog.body}</div>
+            <div className="info-dialog-footer">
+              <button
+                className="modal-btn-secondary"
+                onClick={() => setInfoDialog(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="modal-btn-primary"
+                onClick={infoDialog.onConfirm}
+              >
+                {infoDialog.confirmLabel}
               </button>
             </div>
           </div>

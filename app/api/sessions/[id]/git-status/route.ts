@@ -21,12 +21,19 @@ export async function GET(
     const { stdout } = await execAsync("git status --porcelain", {
       cwd: session.repoPath,
     });
-    
+
     const hasChanges = stdout.trim().length > 0;
-    return NextResponse.json({ hasChanges });
+    return NextResponse.json({ hasChanges, isGitRepo: true });
   } catch (error: any) {
     console.error("Failed to check git status:", error);
-    // If the path is not a git repo or git fails, default to false or return error
-    return NextResponse.json({ hasChanges: false, error: error.message }, { status: 200 });
+    // If the path is not a git repo or git fails, isGitRepo is false
+    const isNotGitRepo = error.message?.includes("not a git repository") ||
+      error.message?.includes("fatal:") ||
+      error.code === 128;
+    return NextResponse.json({
+      hasChanges: false,
+      isGitRepo: !isNotGitRepo,
+      error: error.message,
+    }, { status: 200 });
   }
 }

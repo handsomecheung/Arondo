@@ -229,32 +229,41 @@ html, body {
   color: var(--text-muted);
 }
 
-.sidebar-mode-select {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 4px 8px;
-  margin-left: -8px;
-  border-radius: var(--radius-sm);
-  outline: none;
-  font-family: inherit;
-  transition: background 0.2s, color 0.2s;
+.sidebar-mode-toggle {
+  display: flex;
+  align-items: center;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  gap: 2px;
 }
 
-.sidebar-mode-select:hover {
+.sidebar-mode-tab {
+  position: relative;
+  padding: 5px 14px;
+  border-radius: calc(var(--radius-md) - 2px);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: color 0.18s ease, background 0.18s ease;
+  white-space: nowrap;
+}
+
+.sidebar-mode-tab:hover:not(.active) {
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+}
+
+.sidebar-mode-tab.active {
   background: var(--bg-elevated);
   color: var(--text-primary);
-}
-
-.sidebar-mode-select option {
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  text-transform: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 
@@ -938,6 +947,78 @@ html, body {
   box-shadow: 0 0 16px rgba(99, 102, 241, 0.3);
 }
 
+.modal-btn-danger {
+  padding: 8px 20px;
+  background: var(--error);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 38px;
+}
+.modal-btn-danger:hover {
+  background: #e11d48;
+  box-shadow: 0 0 16px rgba(244, 63, 94, 0.35);
+}
+
+/* Confirm / Destructive action dialog */
+.confirm-dialog {
+  max-width: 400px !important;
+}
+
+.confirm-dialog-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 24px 24px 20px;
+}
+
+.confirm-dialog-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--error-bg);
+  color: var(--error);
+  border: 1px solid rgba(244, 63, 94, 0.2);
+}
+
+.confirm-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.confirm-dialog-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.confirm-dialog-message {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.confirm-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.01);
+}
+
 /* Browse Folder Button adjacent to Repo input */
 .browse-btn {
   display: flex;
@@ -1205,6 +1286,91 @@ html, body {
   100% { transform: rotate(360deg); }
 }
 
+/* ── Project page section blocks ─────────────────────────────────────────── */
+.project-section-block {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
 
+.project-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.015);
+}
 
+.project-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.01em;
+}
+
+.project-section-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.project-section-body {
+  padding: 16px 18px;
+}
+
+/* ── Info / Action dialog ─────────────────────────────────────────────────── */
+.info-dialog {
+  max-width: 480px;
+}
+
+.info-dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.info-dialog-icon-wrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--accent-glow);
+  border: 1px solid var(--border-accent);
+}
+
+.info-dialog-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.info-dialog-body {
+  padding: 20px;
+}
+
+.info-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.01);
+}
 
