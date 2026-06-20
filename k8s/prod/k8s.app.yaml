@@ -1,0 +1,130 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: itero
+  namespace: default
+  labels:
+    app: itero
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: itero
+  template:
+    metadata:
+      labels:
+        app: itero
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: nur
+      volumes:
+        - name: data
+          hostPath:
+            path: /mnt/coder-sharepoint/itero/data
+            type: DirectoryOrCreate
+        - name: coder-workspaces
+          hostPath:
+            path: /mnt/coder-workspaces
+            type: Directory
+      containers:
+        - name: app
+          image: cloudpublic/default/itero:latest
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: coder-workspaces
+              subPath: private-workspace/workspace/encrypted-configs/.gemini
+              mountPath: /home/node/.gemini
+            - name: coder-workspaces
+              subPath: private-workspace/workspace/encrypted-configs/.codex
+              mountPath: /home/node/.codex
+            - name: coder-workspaces
+              subPath: private-workspace/workspace/encrypted-configs/.claude
+              mountPath: /home/node/.claude
+            - name: coder-workspaces
+              subPath: private-workspace/workspace/encrypted-configs/.claude.json
+              mountPath: /home/node/.claude.json
+            - name: coder-workspaces
+              subPath: private-workspace/repos
+              mountPath: /mnt/coder-workspaces/private-workspace/repos
+          env:
+            - name: ALLOWED_DEV_ORIGINS
+              value: itero.__{{infra.domains:f:x}}__
+            - name: DATA_DIR
+              value: /data
+          ports:
+            - name: default
+              containerPort: 3250
+          startupProbe:
+            httpGet:
+              path: /ping
+              port: default
+            failureThreshold: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: default
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: default
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: itero
+  namespace: default
+  labels:
+    app: itero
+spec:
+  type: ClusterIP
+  selector:
+    app: itero
+  ports:
+    - name: default
+      port: 80
+      protocol: TCP
+      targetPort: default
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: itero
+  namespace: default
+  annotations:
+    cert-manager.io/cluster-issuer: cluster-letsencrypt-dns-cloudflare
+    traefik.ingress.kubernetes.io/router.middlewares: middleware-playonjan@kubernetescrd,middleware-antimitm@kubernetescrd,sso-domainx@kubernetescrd
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/group: AI
+    gethomepage.dev/name: Itero
+    gethomepage.dev/href: https://itero.__{{infra.domains:f:x}}__/
+    gethomepage.dev/weight: "5"
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: itero.__{{infra.domains:f:x}}__
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: itero
+                port:
+                  name: default
+  tls:
+    - hosts:
+        - itero.__{{infra.domains:f:x}}__
+      secretName: itero-domainx

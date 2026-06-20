@@ -1,7 +1,9 @@
 import fs from "fs/promises";
 import path from "path";
 
-const DATA_DIR = path.join(process.cwd(), "data");
+const DATA_DIR = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : path.join(process.cwd(), "data");
 const SESSIONS_DIR = path.join(DATA_DIR, "sessions");
 const DELETED_SESSIONS_DIR = path.join(DATA_DIR, "deleted-sessions");
 const PROJECTS_DIR = path.join(DATA_DIR, "projects");

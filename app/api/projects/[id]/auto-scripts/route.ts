@@ -28,7 +28,10 @@ async function runAutoScriptsInBackground(projectId: string, repoPath: string) {
   const fs = await import("fs/promises");
   const os = await import("os");
 
-  const logDir = path.join(process.cwd(), "data");
+  const DATA_DIR = process.env.DATA_DIR
+    ? path.resolve(process.env.DATA_DIR)
+    : path.join(process.cwd(), "data");
+  const logDir = DATA_DIR;
   const errorLogPath = path.join(logDir, "auto-script-error.log");
 
   const timestamp = Date.now();

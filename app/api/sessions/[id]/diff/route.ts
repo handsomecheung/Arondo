@@ -18,7 +18,10 @@ export async function GET(
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
 
-  const sessionDir = path.join(process.cwd(), "data", "sessions", id);
+  const DATA_DIR = process.env.DATA_DIR
+    ? path.resolve(process.env.DATA_DIR)
+    : path.join(process.cwd(), "data");
+  const sessionDir = path.join(DATA_DIR, "sessions", id);
 
   try {
     // Ensure session directory exists

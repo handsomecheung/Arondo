@@ -5,7 +5,10 @@ import path from "path";
 import os from "os";
 import { BaseAgent, AgentRunOptions, AgentResult } from "./base";
 
-const AGY_SESSION_MAP_FILE = path.join(process.cwd(), "data", "agy-sessions.json");
+const DATA_DIR = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : path.join(process.cwd(), "data");
+const AGY_SESSION_MAP_FILE = path.join(DATA_DIR, "agy-sessions.json");
 
 // Helper to load session mapping asynchronously
 async function getAgySessionId(sessionId: string): Promise<string | undefined> {
