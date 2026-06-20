@@ -638,16 +638,26 @@ export default function HomePage() {
               {menuOpen && (
                 <div className="session-dropdown-menu">
                   {/* Show Diff */}
-                  <a
-                    href={`/api/sessions/${selectedSessionId}/diff`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="menu-item"
-                    onClick={() => setMenuOpen(false)}
-                    id="menu-show-diff"
-                  >
-                    🔍 Show Diff
-                  </a>
+                  {isRunning || isCheckingGitChanges || !hasGitChanges ? (
+                    <button
+                      className="menu-item"
+                      disabled={true}
+                      id="menu-show-diff"
+                    >
+                      🔍 Show Diff
+                    </button>
+                  ) : (
+                    <a
+                      href={`/api/sessions/${selectedSessionId}/diff`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="menu-item"
+                      onClick={() => setMenuOpen(false)}
+                      id="menu-show-diff"
+                    >
+                      🔍 Show Diff
+                    </a>
+                  )}
 
                   {/* Commit Changes */}
                   <button

@@ -19,19 +19,55 @@ export async function GET(
   }
 
   const sessionDir = path.join(process.cwd(), "data", "sessions", id);
-  const diffHtmlPath = path.join(sessionDir, "diff.html");
 
   try {
     // Ensure session directory exists
     await fs.mkdir(sessionDir, { recursive: true });
 
-    // Generate diff.html using git and diff2html
-    // We capture both unstaged changes (git diff) and the latest commit (git diff HEAD~1)
-    const cmd = `(git diff HEAD~1 2>/dev/null || true; git diff) | diff2html -i stdin -f html --file "${diffHtmlPath}"`;
-    
-    await execAsync(cmd, {
-      cwd: session.repoPath,
-    });
+    // Get current commit ID of HEAD
+    let commitId = "initial";
+    try {
+      const { stdout } = await execAsync("git rev-parse HEAD", {
+        cwd: session.repoPath,
+      });
+      commitId = stdout.trim();
+    } catch (e) {
+      console.warn("Failed to get HEAD commit ID, using fallback 'initial'", e);
+    }
+
+    const diffHtmlPath = path.join(sessionDir, `${commitId}.html`);
+
+    // Check if the file already exists
+    let fileExists = false;
+    try {
+      await fs.access(diffHtmlPath);
+      fileExists = true;
+    } catch {
+      // File does not exist
+    }
+
+    // If file does not exist, generate it
+    if (!fileExists) {
+      // Generate diff.html using git and diff2html
+      // We capture both unstaged changes (git diff) and the latest commit (git diff HEAD~1)
+      const cmd = `(git diff HEAD~1 2>/dev/null || true; git diff) | diff2html -i stdin -f html --file "${diffHtmlPath}"`;
+      
+      await execAsync(cmd, {
+        cwd: session.repoPath,
+      });
+
+      // Clean up old diff HTML files
+      try {
+        const files = await fs.readdir(sessionDir);
+        for (const file of files) {
+          if (file.endsWith(".html") && file !== `${commitId}.html`) {
+            await fs.unlink(path.join(sessionDir, file));
+          }
+        }
+      } catch (cleanupError) {
+        console.warn("Failed to clean up old diff HTML files:", cleanupError);
+      }
+    }
 
     // Read the generated HTML file
     const htmlContent = await fs.readFile(diffHtmlPath, "utf-8");
