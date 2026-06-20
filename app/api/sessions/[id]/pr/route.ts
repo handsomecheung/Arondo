@@ -59,9 +59,6 @@ export async function POST(
       throw new Error(`Failed to create PR. Command output was: ${prStdout}`);
     }
 
-    // 5. Update session metadata with the PR URL
-    const updated = await updateSession(id, { prUrl });
-    
     // Add system notification message
     const msg = await addMessage({
       sessionId: id,
@@ -70,7 +67,6 @@ export async function POST(
     });
     
     eventBus.publish({ type: "message_added", payload: msg });
-    eventBus.publish({ type: "session_updated", payload: updated });
 
     return NextResponse.json({ success: true, prUrl });
   } catch (error: any) {

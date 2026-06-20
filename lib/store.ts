@@ -22,7 +22,6 @@ export interface Session {
   agentType: string;
   repoPath: string;
   projectId: string;
-  prUrl?: string;
   errorMessage?: string;
   command?: string;
   createdAt: string;

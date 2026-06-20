@@ -22,8 +22,6 @@ export interface AgentResult {
   output: string;
   /** Error message if success is false */
   error?: string;
-  /** Extracted PR URL from output, if found */
-  prUrl?: string;
   /** The command that was executed */
   command?: string;
 }
@@ -41,13 +39,5 @@ export abstract class BaseAgent {
     // const systemConstraint = "\n\n[IMPORTANT: Do NOT create any pull requests, push to remote repositories, or commit the changes. Only make the required code changes directly on the filesystem.]";
     const systemConstraint = "";
     return prompt + systemConstraint;
-  }
-
-  /** Extract a GitHub PR URL from agent output */
-  protected extractPrUrl(output: string): string | undefined {
-    const match = output.match(
-      /https:\/\/github\.com\/[^\s/]+\/[^\s/]+\/pull\/\d+/,
-    );
-    return match?.[0];
   }
 }

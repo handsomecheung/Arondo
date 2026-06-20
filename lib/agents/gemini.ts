@@ -74,7 +74,6 @@ export class GeminiAgent extends BaseAgent {
           success,
           output,
           error: success ? undefined : errorOutput || `Process exited with code ${code}`,
-          prUrl: this.extractPrUrl(output),
           command: this.getCommand({ prompt, repoPath, sessionId, isResume }),
         });
       });

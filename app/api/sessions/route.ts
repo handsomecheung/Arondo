@@ -83,15 +83,12 @@ async function runAgentInBackground(
 
     const updated = await updateSession(sessionId, {
       status: result.success ? "done" : "error",
-      prUrl: result.prUrl,
       errorMessage: result.error,
     });
 
     // Add agent summary message
     const content = result.success
-      ? result.prUrl
-        ? `✅ Done! PR created: ${result.prUrl}`
-        : "✅ Done! (No PR URL found in output)"
+      ? "✅ Done!"
       : `❌ Error: ${result.error}`;
 
     const agentMsg = await addMsg({ sessionId, role: "agent", content });
