@@ -31,7 +31,16 @@ interface Message {
 
 function IconSend() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <line x1="22" y1="2" x2="11" y2="13" />
       <polygon points="22 2 15 22 11 13 2 9 22 2" />
     </svg>
@@ -40,15 +49,33 @@ function IconSend() {
 
 function IconPlus() {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+    >
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
     </svg>
   );
 }
 
 function IconBolt() {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
     </svg>
   );
@@ -56,25 +83,55 @@ function IconBolt() {
 
 function IconExternalLink() {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-      <polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+      <polyline points="15 3 21 3 21 9" />
+      <line x1="10" y1="14" x2="21" y2="3" />
     </svg>
   );
 }
 
 function IconGitPullRequest() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="18" cy="18" r="3" /><circle cx="6" cy="6" r="3" />
-      <path d="M13 6h3a2 2 0 012 2v7" /><line x1="6" y1="9" x2="6" y2="21" />
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="18" cy="18" r="3" />
+      <circle cx="6" cy="6" r="3" />
+      <path d="M13 6h3a2 2 0 012 2v7" />
+      <line x1="6" y1="9" x2="6" y2="21" />
     </svg>
   );
 }
 
 function IconGitCommit() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <circle cx="12" cy="12" r="4" />
       <line x1="1.05" y1="12" x2="7" y2="12" />
       <line x1="17" y1="12" x2="22.95" y2="12" />
@@ -82,10 +139,18 @@ function IconGitCommit() {
   );
 }
 
-
 function IconInbox() {
   return (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="32"
+      height="32"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
       <path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z" />
     </svg>
@@ -94,7 +159,15 @@ function IconInbox() {
 
 function IconMenu() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    >
       <line x1="3" y1="6" x2="21" y2="6" />
       <line x1="3" y1="12" x2="21" y2="12" />
       <line x1="3" y1="18" x2="21" y2="18" />
@@ -104,7 +177,15 @@ function IconMenu() {
 
 function IconX() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+    >
       <line x1="18" y1="6" x2="6" y2="18" />
       <line x1="6" y1="6" x2="18" y2="18" />
     </svg>
@@ -113,7 +194,16 @@ function IconX() {
 
 function IconFolder() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
     </svg>
   );
@@ -121,7 +211,16 @@ function IconFolder() {
 
 function IconCornerLeftUp() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <polyline points="9 14 4 9 9 4" />
       <path d="M20 20v-7a4 4 0 00-4-4H4" />
     </svg>
@@ -130,17 +229,36 @@ function IconCornerLeftUp() {
 
 function IconTrash() {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <polyline points="3 6 5 6 21 6" />
       <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-      <line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" />
+      <line x1="10" y1="11" x2="10" y2="17" />
+      <line x1="14" y1="11" x2="14" y2="17" />
     </svg>
   );
 }
 
 function IconMoreVertical() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <circle cx="12" cy="12" r="1" />
       <circle cx="12" cy="5" r="1" />
       <circle cx="12" cy="19" r="1" />
@@ -151,7 +269,10 @@ function IconMoreVertical() {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function formatRelative(iso: string) {
@@ -163,15 +284,19 @@ function formatRelative(iso: string) {
 }
 
 function renderMessageContent(content: string) {
-  if (content.startsWith("❌ Error:") || content.startsWith("❌ Internal error:")) {
+  if (
+    content.startsWith("❌ Error:") ||
+    content.startsWith("❌ Internal error:")
+  ) {
     const isInternal = content.startsWith("❌ Internal error:");
     const prefix = isInternal ? "❌ Internal error:" : "❌ Error:";
     const errorDetail = content.substring(prefix.length).trim();
-    
+
     return (
       <details className="error-details">
         <summary className="error-summary">
-          {prefix} <span className="click-to-expand">(Click to show details)</span>
+          {prefix}{" "}
+          <span className="click-to-expand">(Click to show details)</span>
         </summary>
         <pre className="error-body">{errorDetail}</pre>
       </details>
@@ -184,11 +309,13 @@ function renderMessageContent(content: string) {
 
 export default function HomePage() {
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
+    null,
+  );
   const [messages, setMessages] = useState<Message[]>([]);
   const [prompt, setPrompt] = useState("");
   const [repoPath, setRepoPath] = useState("");
-  const [agentType, setAgentType] = useState("gemini");
+  const [agentType, setAgentType] = useState("antigravity");
   const [connected, setConnected] = useState(false);
   const [isNewSession, setIsNewSession] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -196,7 +323,9 @@ export default function HomePage() {
   // File browser states
   const [fsModalOpen, setFsModalOpen] = useState(false);
   const [fsCurrentPath, setFsCurrentPath] = useState("/");
-  const [fsDirectories, setFsDirectories] = useState<{ name: string; path: string }[]>([]);
+  const [fsDirectories, setFsDirectories] = useState<
+    { name: string; path: string }[]
+  >([]);
   const [fsParentPath, setFsParentPath] = useState<string | null>(null);
   const [fsLoading, setFsLoading] = useState(false);
 
@@ -221,7 +350,8 @@ export default function HomePage() {
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const selectedSession = sessions.find((s) => s.id === selectedSessionId) ?? null;
+  const selectedSession =
+    sessions.find((s) => s.id === selectedSessionId) ?? null;
   const isRunning = selectedSession?.status === "running";
 
   // Find the ID of the last command execution system message in the list
@@ -249,7 +379,10 @@ export default function HomePage() {
 
   // ── Load messages for selected session ──
   useEffect(() => {
-    if (!selectedSessionId) { setMessages([]); return; }
+    if (!selectedSessionId) {
+      setMessages([]);
+      return;
+    }
     fetch(`/api/messages?sessionId=${selectedSessionId}`)
       .then((r) => r.json())
       .then((data: Message[]) => setMessages(data))
@@ -258,7 +391,10 @@ export default function HomePage() {
 
   // ── Load execution log for selected session and message ──
   useEffect(() => {
-    if (!selectedSessionId || !activeLogMsgId) { setSessionLog(""); return; }
+    if (!selectedSessionId || !activeLogMsgId) {
+      setSessionLog("");
+      return;
+    }
     fetch(`/api/sessions/${selectedSessionId}/log?messageId=${activeLogMsgId}`)
       .then((r) => r.json())
       .then((data: { log: string }) => setSessionLog(data.log || ""))
@@ -300,7 +436,9 @@ export default function HomePage() {
   // ── Close sidebar on resize to desktop ──
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 768px)");
-    const handler = (e: MediaQueryListEvent) => { if (e.matches) setSidebarOpen(false); };
+    const handler = (e: MediaQueryListEvent) => {
+      if (e.matches) setSidebarOpen(false);
+    };
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
   }, []);
@@ -339,7 +477,7 @@ export default function HomePage() {
         if (event.type === "session_updated") {
           const updated = event.payload as Session;
           setSessions((prev) =>
-            prev.map((s) => (s.id === updated.id ? updated : s))
+            prev.map((s) => (s.id === updated.id ? updated : s)),
           );
         }
 
@@ -366,12 +504,21 @@ export default function HomePage() {
         }
 
         if (event.type === "agent_output") {
-          const payload = event.payload as { sessionId: string; messageId: string; line: string };
-          if (payload.sessionId === selectedSessionId && payload.messageId === activeLogMsgIdRef.current) {
+          const payload = event.payload as {
+            sessionId: string;
+            messageId: string;
+            line: string;
+          };
+          if (
+            payload.sessionId === selectedSessionId &&
+            payload.messageId === activeLogMsgIdRef.current
+          ) {
             setSessionLog((prev) => prev + payload.line + "\n");
           }
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     };
 
     return () => es.close();
@@ -399,7 +546,11 @@ export default function HomePage() {
         const res = await fetch("/api/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: trimmed, repoPath: repoPath.trim(), agentType }),
+          body: JSON.stringify({
+            prompt: trimmed,
+            repoPath: repoPath.trim(),
+            agentType,
+          }),
         });
         const newSession: Session = await res.json();
         setSessions((prev) => [newSession, ...prev]);
@@ -453,7 +604,9 @@ export default function HomePage() {
       const data = await res.json();
       if (res.ok && data.success && data.prUrl) {
         setSessions((prev) =>
-          prev.map((s) => (s.id === selectedSessionId ? { ...s, prUrl: data.prUrl } : s))
+          prev.map((s) =>
+            s.id === selectedSessionId ? { ...s, prUrl: data.prUrl } : s,
+          ),
         );
       } else {
         alert(data.error || "Failed to create pull request");
@@ -470,7 +623,8 @@ export default function HomePage() {
     if (!selectedSessionId || isRunning || isCommitting) return;
     setIsCommitting(true);
     try {
-      const commitPrompt = "Please commit the changes with an appropriate commit message.";
+      const commitPrompt =
+        "Please commit the changes with an appropriate commit message.";
       const res = await fetch(`/api/sessions/${selectedSessionId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -522,7 +676,10 @@ export default function HomePage() {
     }
   };
 
-  const canSubmit = prompt.trim().length > 0 && (isNewSession ? repoPath.trim().length > 0 : !!selectedSessionId) && !isRunning;
+  const canSubmit =
+    prompt.trim().length > 0 &&
+    (isNewSession ? repoPath.trim().length > 0 : !!selectedSessionId) &&
+    !isRunning;
 
   // ── Render ──
   return (
@@ -544,9 +701,22 @@ export default function HomePage() {
           <span className="header-title">Itero</span>
         </div>
         <span className="header-subtitle">AI-powered dev · anywhere</span>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
-          <div className={`status-dot ${connected ? "connected" : ""}`} suppressHydrationWarning />
-          <span style={{ fontSize: 11, color: "var(--text-muted)" }} suppressHydrationWarning>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            marginLeft: "auto",
+          }}
+        >
+          <div
+            className={`status-dot ${connected ? "connected" : ""}`}
+            suppressHydrationWarning
+          />
+          <span
+            style={{ fontSize: 11, color: "var(--text-muted)" }}
+            suppressHydrationWarning
+          >
             {connected ? "Live" : "Connecting…"}
           </span>
         </div>
@@ -564,7 +734,11 @@ export default function HomePage() {
         <div className="sidebar-header">
           <span className="sidebar-title">Sessions</span>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button className="new-task-btn" onClick={handleNewSession} id="new-session-btn">
+            <button
+              className="new-task-btn"
+              onClick={handleNewSession}
+              id="new-session-btn"
+            >
               <IconPlus /> New
             </button>
             {/* Close button: mobile only */}
@@ -581,7 +755,11 @@ export default function HomePage() {
           {sessions.length === 0 && (
             <div className="empty-state">
               <IconInbox />
-              <p>No sessions yet.<br />Start by creating a new session.</p>
+              <p>
+                No sessions yet.
+                <br />
+                Start by creating a new session.
+              </p>
             </div>
           )}
           {sessions.map((session) => (
@@ -596,12 +774,20 @@ export default function HomePage() {
                   {session.status === "running" && "⟳ "}
                   {session.status}
                 </span>
-                <span style={{ fontSize: 10, color: "var(--text-muted)", marginLeft: "auto" }}>
+                <span
+                  style={{
+                    fontSize: 10,
+                    color: "var(--text-muted)",
+                    marginLeft: "auto",
+                  }}
+                >
                   {session.agentType}
                 </span>
               </div>
               <div className="task-item-prompt">{session.prompt}</div>
-              <div className="task-item-time">{formatRelative(session.createdAt)}</div>
+              <div className="task-item-time">
+                {formatRelative(session.createdAt)}
+              </div>
             </div>
           ))}
         </div>
@@ -611,21 +797,63 @@ export default function HomePage() {
       <main className="main">
         {/* Session info bar */}
         {selectedSession && (
-          <div className="task-info-bar" style={{ gap: 12, flexWrap: "wrap", padding: "10px 16px", minHeight: "56px" }}>
+          <div
+            className="task-info-bar"
+            style={{
+              gap: 12,
+              flexWrap: "wrap",
+              padding: "10px 16px",
+              minHeight: "56px",
+            }}
+          >
             <span className={`task-status-badge ${selectedSession.status}`}>
               {selectedSession.status === "running" && "⟳ "}
-              {selectedSession.status === "running" ? "Agent working…" : selectedSession.status}
+              {selectedSession.status === "running"
+                ? "Agent working…"
+                : selectedSession.status}
             </span>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1, minWidth: 0 }}>
-              <span className="task-info-prompt" style={{ fontWeight: 500, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+                flex: 1,
+                minWidth: 0,
+              }}
+            >
+              <span
+                className="task-info-prompt"
+                style={{
+                  fontWeight: 500,
+                  color: "var(--text-primary)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
                 {selectedSession.prompt}
               </span>
-              <span style={{ fontSize: 11, color: "var(--text-secondary)", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "var(--text-secondary)",
+                  fontFamily: "monospace",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
                 Repo: {selectedSession.repoPath} ({selectedSession.agentType})
               </span>
             </div>
-            
-            <div style={{ display: "flex", alignItems: "center", position: "relative" }}>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                position: "relative",
+              }}
+            >
               <button
                 className="menu-trigger-btn"
                 onClick={() => setMenuOpen(!menuOpen)}
@@ -634,7 +862,7 @@ export default function HomePage() {
               >
                 <IconMoreVertical />
               </button>
-              
+
               {menuOpen && (
                 <div className="session-dropdown-menu">
                   {/* Show Diff */}
@@ -666,10 +894,16 @@ export default function HomePage() {
                       handleCommitChanges();
                       setMenuOpen(false);
                     }}
-                    disabled={isRunning || isCommitting || isCheckingGitChanges || !hasGitChanges}
+                    disabled={
+                      isRunning ||
+                      isCommitting ||
+                      isCheckingGitChanges ||
+                      !hasGitChanges
+                    }
                     id="menu-commit-changes"
                   >
-                    <IconGitCommit /> {isCommitting ? "Committing Changes…" : "Commit Changes"}
+                    <IconGitCommit />{" "}
+                    {isCommitting ? "Committing Changes…" : "Commit Changes"}
                   </button>
 
                   {/* Create PR / View PR */}
@@ -695,7 +929,8 @@ export default function HomePage() {
                         disabled={!githubConfigured || isCreatingPr}
                         id="menu-create-pr"
                       >
-                        <IconGitPullRequest /> {isCreatingPr ? "Creating PR…" : "Create PR"}
+                        <IconGitPullRequest />{" "}
+                        {isCreatingPr ? "Creating PR…" : "Create PR"}
                       </button>
                     )
                   )}
@@ -727,8 +962,8 @@ export default function HomePage() {
               </div>
               <h1 className="welcome-title">Welcome to Itero</h1>
               <p className="welcome-desc">
-                Delegate coding tasks to AI agents, review GitHub PRs on your phone,
-                and ship software from anywhere — no laptop required.
+                Delegate coding tasks to AI agents, review GitHub PRs on your
+                phone, and ship software from anywhere — no laptop required.
               </p>
               <button
                 className="new-task-btn"
@@ -740,27 +975,41 @@ export default function HomePage() {
             </div>
           )}
 
-          {(selectedSession || isNewSession) && messages.length === 0 && !isRunning && (
-            <div className="welcome-screen">
-              <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
-                {isNewSession ? "Describe what you want the agent to do…" : "No messages yet."}
-              </p>
-            </div>
-          )}
+          {(selectedSession || isNewSession) &&
+            messages.length === 0 &&
+            !isRunning && (
+              <div className="welcome-screen">
+                <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
+                  {isNewSession
+                    ? "Describe what you want the agent to do…"
+                    : "No messages yet."}
+                </p>
+              </div>
+            )}
 
           {messages.map((msg, idx) => {
-            const isCommandExec = msg.role === "system" && msg.content.includes("⚙️");
-            const isThisMsgRunning = isRunning && isCommandExec && msg.id === lastExecMsgId;
+            const isCommandExec =
+              msg.role === "system" && msg.content.includes("⚙️");
+            const isThisMsgRunning =
+              isRunning && isCommandExec && msg.id === lastExecMsgId;
 
             return (
               <div key={msg.id} style={{ display: "contents" }}>
                 <div className={`message ${msg.role}`}>
                   <div className="message-avatar">
-                    {msg.role === "user" ? "U" : msg.role === "agent" ? "AI" : "⚙"}
+                    {msg.role === "user"
+                      ? "U"
+                      : msg.role === "agent"
+                        ? "AI"
+                        : "⚙"}
                   </div>
                   <div>
-                    <div className="message-bubble">{renderMessageContent(msg.content)}</div>
-                    <div className="message-time">{formatTime(msg.createdAt)}</div>
+                    <div className="message-bubble">
+                      {renderMessageContent(msg.content)}
+                    </div>
+                    <div className="message-time">
+                      {formatTime(msg.createdAt)}
+                    </div>
                   </div>
                 </div>
                 {isCommandExec && (
@@ -773,7 +1022,11 @@ export default function HomePage() {
                   >
                     <IconBolt />
                     <span>Agent Execution Log</span>
-                    {isThisMsgRunning && <span className="console-badge-running">⟳ Streaming...</span>}
+                    {isThisMsgRunning && (
+                      <span className="console-badge-running">
+                        ⟳ Streaming...
+                      </span>
+                    )}
                   </button>
                 )}
               </div>
@@ -782,14 +1035,23 @@ export default function HomePage() {
 
           {isRunning && (
             <div className="typing-indicator">
-              <div className="message-avatar" style={{
-                background: "var(--success-bg)",
-                border: "1px solid rgba(34, 211, 165, 0.2)",
-                color: "var(--success)",
-                width: 28, height: 28, borderRadius: "50%",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 11, fontWeight: 600, flexShrink: 0
-              }}>
+              <div
+                className="message-avatar"
+                style={{
+                  background: "var(--success-bg)",
+                  border: "1px solid rgba(34, 211, 165, 0.2)",
+                  color: "var(--success)",
+                  width: 28,
+                  height: 28,
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  flexShrink: 0,
+                }}
+              >
                 AI
               </div>
               <div className="typing-bubble">
@@ -846,8 +1108,8 @@ export default function HomePage() {
                 disabled={isRunning}
                 id="agent-select"
               >
-                <option value="gemini">Gemini</option>
-                <option value="antigravity">Antigravity (agy)</option>
+                <option value="antigravity">Antigravity CLI</option>
+                <option value="gemini">Gemini CLI</option>
               </select>
             </div>
           )}
@@ -855,7 +1117,13 @@ export default function HomePage() {
             <textarea
               ref={textareaRef}
               className="chat-input"
-              placeholder={isRunning ? "Agent is working…" : isNewSession ? "Describe what you want the agent to build or fix in this repo…" : "Send a message or follow-up feedback to the agent…"}
+              placeholder={
+                isRunning
+                  ? "Agent is working…"
+                  : isNewSession
+                    ? "Describe what you want the agent to build or fix in this repo…"
+                    : "Send a message or follow-up feedback to the agent…"
+              }
               value={prompt}
               onChange={handlePromptChange}
               onKeyDown={handleKeyDown}
@@ -882,41 +1150,73 @@ export default function HomePage() {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <span className="modal-title">Select Repository Directory</span>
-              <button className="modal-close-btn" onClick={() => setFsModalOpen(false)} aria-label="Close modal">
+              <button
+                className="modal-close-btn"
+                onClick={() => setFsModalOpen(false)}
+                aria-label="Close modal"
+              >
                 <IconX />
               </button>
             </div>
             <div className="modal-body">
-              <div className="fs-current-path">
-                {fsCurrentPath}
-              </div>
+              <div className="fs-current-path">{fsCurrentPath}</div>
               <div className="fs-list">
                 {fsParentPath !== null && (
-                  <div className="fs-item fs-parent" onClick={() => setFsCurrentPath(fsParentPath)}>
-                    <span className="fs-item-icon"><IconCornerLeftUp /></span>
+                  <div
+                    className="fs-item fs-parent"
+                    onClick={() => setFsCurrentPath(fsParentPath)}
+                  >
+                    <span className="fs-item-icon">
+                      <IconCornerLeftUp />
+                    </span>
                     <span className="fs-item-name">.. (Go Up)</span>
                   </div>
                 )}
                 {fsLoading ? (
-                  <div style={{ padding: "20px 0", textAlign: "center", color: "var(--text-secondary)", fontSize: 13 }}>
+                  <div
+                    style={{
+                      padding: "20px 0",
+                      textAlign: "center",
+                      color: "var(--text-secondary)",
+                      fontSize: 13,
+                    }}
+                  >
                     Loading directories…
                   </div>
                 ) : fsDirectories.length === 0 ? (
-                  <div style={{ padding: "20px 0", textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
+                  <div
+                    style={{
+                      padding: "20px 0",
+                      textAlign: "center",
+                      color: "var(--text-muted)",
+                      fontSize: 13,
+                    }}
+                  >
                     No directories found.
                   </div>
                 ) : (
                   fsDirectories.map((dir) => (
-                    <div key={dir.path} className="fs-item" onClick={() => setFsCurrentPath(dir.path)}>
-                      <span className="fs-item-icon"><IconFolder /></span>
-                      <span className="fs-item-name" title={dir.name}>{dir.name}</span>
+                    <div
+                      key={dir.path}
+                      className="fs-item"
+                      onClick={() => setFsCurrentPath(dir.path)}
+                    >
+                      <span className="fs-item-icon">
+                        <IconFolder />
+                      </span>
+                      <span className="fs-item-name" title={dir.name}>
+                        {dir.name}
+                      </span>
                     </div>
                   ))
                 )}
               </div>
             </div>
             <div className="modal-footer">
-              <button className="modal-btn-secondary" onClick={() => setFsModalOpen(false)}>
+              <button
+                className="modal-btn-secondary"
+                onClick={() => setFsModalOpen(false)}
+              >
                 Cancel
               </button>
               <button
@@ -935,24 +1235,44 @@ export default function HomePage() {
 
       {/* Log Console Modal */}
       {logModalOpen && (
-        <div className="modal-backdrop" onClick={() => { setLogModalOpen(false); setActiveLogMsgId(null); }}>
+        <div
+          className="modal-backdrop"
+          onClick={() => {
+            setLogModalOpen(false);
+            setActiveLogMsgId(null);
+          }}
+        >
           <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <span className="modal-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span
+                className="modal-title"
+                style={{ display: "flex", alignItems: "center", gap: 6 }}
+              >
                 <IconBolt />
                 Agent Execution Log
               </span>
-              <button className="modal-close-btn" onClick={() => { setLogModalOpen(false); setActiveLogMsgId(null); }} aria-label="Close modal">
+              <button
+                className="modal-close-btn"
+                onClick={() => {
+                  setLogModalOpen(false);
+                  setActiveLogMsgId(null);
+                }}
+                aria-label="Close modal"
+              >
                 <IconX />
               </button>
             </div>
             <div className="modal-body">
-              <pre className="console-log-modal">
-                {sessionLog}
-              </pre>
+              <pre className="console-log-modal">{sessionLog}</pre>
             </div>
             <div className="modal-footer">
-              <button className="modal-btn-secondary" onClick={() => { setLogModalOpen(false); setActiveLogMsgId(null); }}>
+              <button
+                className="modal-btn-secondary"
+                onClick={() => {
+                  setLogModalOpen(false);
+                  setActiveLogMsgId(null);
+                }}
+              >
                 Close
               </button>
             </div>

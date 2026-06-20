@@ -10,7 +10,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { prompt, repoPath, agentType = "gemini" } = body as {
+  const { prompt, repoPath, agentType = "antigravity" } = body as {
     prompt: string;
     repoPath: string;
     agentType?: string;
