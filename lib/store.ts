@@ -247,6 +247,18 @@ export async function deleteProjectScript(projectId: string, scriptName: string)
   return filtered;
 }
 
+export async function saveProjectScripts(
+  projectId: string,
+  scripts: ProjectScript[]
+): Promise<ProjectScript[]> {
+  const settingsDir = getProjectSettingsDir(projectId);
+  await ensureDir(settingsDir);
+  const filePath = path.join(settingsDir, "scripts.json");
+  await writeJson(filePath, scripts);
+  return scripts;
+}
+
+
 export async function createSession(
   data: Omit<Session, "id" | "projectId" | "createdAt" | "updatedAt">
 ): Promise<Session> {

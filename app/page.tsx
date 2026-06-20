@@ -398,6 +398,26 @@ export default function HomePage() {
     null,
   );
   const [projectScripts, setProjectScripts] = useState<ProjectScript[]>([]);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const wasDraggingRef = useRef(false);
+
+  useEffect(() => {
+    if (draggedIndex !== null) {
+      wasDraggingRef.current = true;
+    } else if (wasDraggingRef.current) {
+      wasDraggingRef.current = false;
+      if (selectedProjectId) {
+        fetch(`/api/projects/${selectedProjectId}/scripts`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scripts: projectScripts }),
+        }).catch((err) => {
+          console.error("Failed to save reordered scripts:", err);
+        });
+      }
+    }
+  }, [draggedIndex, projectScripts, selectedProjectId]);
+
   const [scriptModalOpen, setScriptModalOpen] = useState(false);
   const [scriptName, setScriptName] = useState("");
   const [scriptCommand, setScriptCommand] = useState("");
@@ -1162,6 +1182,58 @@ export default function HomePage() {
     setEditingScriptName(null);
     setScriptModalOpen(false);
   };
+
+  const handlePointerDown = (e: React.PointerEvent, index: number) => {
+    const target = e.target as HTMLElement;
+    if (!target.closest(".drag-handle")) return;
+
+    e.preventDefault();
+    setDraggedIndex(index);
+
+    const cardElement = e.currentTarget.closest(".script-card") as HTMLElement;
+    if (cardElement) {
+      cardElement.setPointerCapture(e.pointerId);
+    }
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (draggedIndex === null) return;
+
+    const element = document.elementFromPoint(e.clientX, e.clientY);
+    const card = element?.closest(".script-card") as HTMLElement;
+    if (card) {
+      const cardIndexStr = card.getAttribute("data-index");
+      if (cardIndexStr !== null) {
+        const targetIndex = parseInt(cardIndexStr, 10);
+        if (!isNaN(targetIndex) && targetIndex !== draggedIndex) {
+          setProjectScripts((prev) => {
+            const updated = [...prev];
+            const [movedItem] = updated.splice(draggedIndex, 1);
+            updated.splice(targetIndex, 0, movedItem);
+            return updated;
+          });
+          setDraggedIndex(targetIndex);
+        }
+      }
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (draggedIndex === null) return;
+
+    const cardElement = e.currentTarget.closest(".script-card") as HTMLElement;
+    if (cardElement) {
+      try {
+        cardElement.releasePointerCapture(e.pointerId);
+      } catch {
+        // Pointer capture might have already been released
+      }
+    }
+
+    setDraggedIndex(null);
+  };
+
+
 
   const handleAutoAddScripts = async () => {
     if (!selectedProjectId) return;
@@ -1988,13 +2060,24 @@ export default function HomePage() {
                       >
                         {projectScripts.map((script, sidx) => (
                           <div
-                            key={sidx}
+                            key={script.name}
+                            className="script-card"
+                            data-index={sidx}
                             style={{
                               padding: 12,
-                              background: "var(--bg-elevated)",
-                              border: "1px solid var(--border)",
+                              background: draggedIndex === sidx ? "var(--bg-surface)" : "var(--bg-elevated)",
+                              border: draggedIndex === sidx ? "1px dashed var(--accent)" : "1px solid var(--border)",
                               borderRadius: "var(--radius-sm)",
+                              opacity: draggedIndex === sidx ? 0.6 : 1,
+                              transform: draggedIndex === sidx ? "scale(1.02)" : "scale(1)",
+                              transition: "transform 0.1s, opacity 0.1s, background 0.1s, border 0.1s",
+                              touchAction: "none",
+                              position: "relative",
+                              zIndex: draggedIndex === sidx ? 10 : 1,
                             }}
+                            onPointerMove={handlePointerMove}
+                            onPointerUp={handlePointerUp}
+                            onPointerCancel={handlePointerUp}
                           >
                             <div
                               style={{
@@ -2005,12 +2088,60 @@ export default function HomePage() {
                             >
                               <div
                                 style={{
-                                  fontWeight: 600,
-                                  color: "var(--text-primary)",
-                                  fontSize: 13,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                  flex: 1,
+                                  marginRight: 8,
                                 }}
                               >
-                                {script.name}
+                                <div
+                                  className="drag-handle"
+                                  onPointerDown={(e) => handlePointerDown(e, sidx)}
+                                  style={{
+                                    cursor: draggedIndex === sidx ? "grabbing" : "grab",
+                                    userSelect: "none",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    paddingRight: 6,
+                                    color: draggedIndex === sidx ? "var(--accent)" : "var(--text-muted)",
+                                    transition: "color 0.2s",
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (draggedIndex !== sidx) {
+                                      e.currentTarget.style.color = "var(--text-secondary)";
+                                    }
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (draggedIndex !== sidx) {
+                                      e.currentTarget.style.color = "var(--text-muted)";
+                                    }
+                                  }}
+                                >
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="9" cy="5" r="1.5" />
+                                    <circle cx="9" cy="12" r="1.5" />
+                                    <circle cx="9" cy="19" r="1.5" />
+                                    <circle cx="15" cy="5" r="1.5" />
+                                    <circle cx="15" cy="12" r="1.5" />
+                                    <circle cx="15" cy="19" r="1.5" />
+                                  </svg>
+                                </div>
+                                <div
+                                  style={{
+                                    fontWeight: 600,
+                                    color: "var(--text-primary)",
+                                    fontSize: 13,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                  title={script.name}
+                                >
+                                  {script.name}
+                                </div>
                               </div>
                               <div style={{ display: "flex", gap: 4 }}>
                                 <button
