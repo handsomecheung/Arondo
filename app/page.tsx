@@ -12,11 +12,24 @@ interface Session {
   prompt: string;
   agentType: string;
   repoPath: string;
+  projectId: string;
   prUrl?: string;
   errorMessage?: string;
   command?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+interface Project {
+  id: string;
+  repoPath: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ProjectScript {
+  name: string;
+  command: string;
 }
 
 interface Message {
@@ -320,6 +333,20 @@ export default function HomePage() {
   const [isNewSession, setIsNewSession] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Project states
+  const [sidebarMode, setSidebarMode] = useState<"sessions" | "projects">("sessions");
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [projectScripts, setProjectScripts] = useState<ProjectScript[]>([]);
+  const [scriptModalOpen, setScriptModalOpen] = useState(false);
+  const [scriptName, setScriptName] = useState("");
+  const [scriptCommand, setScriptCommand] = useState("");
+  const [editingScriptName, setEditingScriptName] = useState<string | null>(null);
+  const [isAutoAnalyzing, setIsAutoAnalyzing] = useState(false);
+  const [showAutoAnalyzeNotice, setShowAutoAnalyzeNotice] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "info" | "error" } | null>(null);
+  const [apiError, setApiError] = useState<{ title: string; message: string } | null>(null);
+
   // File browser states
   const [fsModalOpen, setFsModalOpen] = useState(false);
   const [fsCurrentPath, setFsCurrentPath] = useState("/");
@@ -359,6 +386,89 @@ export default function HomePage() {
     .reverse()
     .find((m) => m.role === "system" && m.content.includes("⚙️"))?.id;
 
+  const loadProjects = useCallback(() => {
+    fetch("/api/projects")
+      .then((r) => r.json())
+      .then((data: Project[]) => setProjects(data))
+      .catch(console.error);
+  }, []);
+
+  const loadProjectScripts = useCallback((projectId: string) => {
+    fetch(`/api/projects/${projectId}/scripts`)
+      .then((r) => r.json())
+      .then((data: ProjectScript[]) => setProjectScripts(data))
+      .catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    if (selectedProjectId) {
+      loadProjectScripts(selectedProjectId);
+    } else {
+      setProjectScripts([]);
+    }
+  }, [selectedProjectId, loadProjectScripts]);
+
+  // Toast automatic dismissal
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => {
+        setToast(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  // Poll project auto-script status while isAutoAnalyzing is active
+  useEffect(() => {
+    if (!isAutoAnalyzing || !selectedProjectId) return;
+
+    let attempts = 0;
+    const maxAttempts = 30; // ~2 minutes maximum polling
+    const interval = setInterval(async () => {
+      attempts++;
+      if (attempts > maxAttempts) {
+        setIsAutoAnalyzing(false);
+        setToast({
+          message: "AI analysis background task timed out.",
+          type: "error"
+        });
+        clearInterval(interval);
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/projects/${selectedProjectId}/auto-scripts`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === "done") {
+            setIsAutoAnalyzing(false);
+            loadProjectScripts(selectedProjectId);
+            setToast({
+              message: "AI analysis completed! New scripts are now available.",
+              type: "success"
+            });
+            clearInterval(interval);
+          } else if (data.status === "error") {
+            setIsAutoAnalyzing(false);
+            setToast({
+              message: `AI analysis failed. Error log written to data/auto-script-error.log`,
+              type: "error"
+            });
+            setApiError({
+              title: "AI Analysis Background Error",
+              message: `${data.error || "Unknown background process error"}\n\nThe error details have been logged in "data/auto-script-error.log".`
+            });
+            clearInterval(interval);
+          }
+        }
+      } catch (err) {
+        console.error("Error polling auto script status:", err);
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [isAutoAnalyzing, selectedProjectId, loadProjectScripts]);
+
   // ── Initial load ──
   useEffect(() => {
     fetch("/api/sessions")
@@ -369,13 +479,15 @@ export default function HomePage() {
       })
       .catch(console.error);
 
+    loadProjects();
+
     fetch("/api/config")
       .then((r) => r.json())
       .then((data: { githubConfigured: boolean }) => {
         setGithubConfigured(data.githubConfigured);
       })
       .catch(console.error);
-  }, []);
+  }, [loadProjects]);
 
   // ── Load messages for selected session ──
   useEffect(() => {
@@ -559,6 +671,7 @@ export default function HomePage() {
         setSessionLog(""); // Clear log
         setActiveLogMsgId(null);
         setLogModalOpen(false);
+        loadProjects();
       } else {
         const res = await fetch(`/api/sessions/${selectedSessionId}/messages`, {
           method: "POST",
@@ -573,7 +686,7 @@ export default function HomePage() {
     } catch (err) {
       console.error(err);
     }
-  }, [prompt, repoPath, agentType, isNewSession, selectedSessionId]);
+  }, [prompt, repoPath, agentType, isNewSession, selectedSessionId, loadProjects]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -584,6 +697,7 @@ export default function HomePage() {
 
   const handleNewSession = () => {
     setSelectedSessionId(null);
+    setSelectedProjectId(null);
     setIsNewSession(true);
     setMessages([]);
     setSidebarOpen(false);
@@ -592,6 +706,126 @@ export default function HomePage() {
     setLogModalOpen(false);
     setMenuOpen(false);
     setTimeout(() => textareaRef.current?.focus(), 50);
+  };
+
+  const handleSelectProject = (projectId: string) => {
+    setSelectedProjectId(projectId);
+    setSelectedSessionId(null);
+    setIsNewSession(false);
+    setSidebarOpen(false);
+    setActiveLogMsgId(null);
+    setLogModalOpen(false);
+    setMenuOpen(false);
+  };
+
+  const handleSaveScript = async () => {
+    if (!selectedProjectId || !scriptName.trim() || !scriptCommand.trim()) return;
+    
+    try {
+      const res = await fetch(`/api/projects/${selectedProjectId}/scripts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: scriptName.trim(),
+          command: scriptCommand.trim(),
+          oldName: editingScriptName
+        })
+      });
+      if (res.ok) {
+        setScriptName("");
+        setScriptCommand("");
+        setEditingScriptName(null);
+        setScriptModalOpen(false);
+        loadProjectScripts(selectedProjectId);
+      } else {
+        const data = await res.json();
+        setApiError({
+          title: "Save Script Error",
+          message: data.error || "Failed to save script"
+        });
+      }
+    } catch (err: any) {
+      console.error(err);
+      setApiError({
+        title: "Save Script Error",
+        message: err.message || "An error occurred while saving the script."
+      });
+    }
+  };
+
+  const handleDeleteScript = async (name: string) => {
+    if (!selectedProjectId) return;
+    if (!confirm(`Are you sure you want to delete script "${name}"?`)) return;
+
+    try {
+      const res = await fetch(`/api/projects/${selectedProjectId}/scripts?name=${encodeURIComponent(name)}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        loadProjectScripts(selectedProjectId);
+      } else {
+        const data = await res.json();
+        setApiError({
+          title: "Delete Script Error",
+          message: data.error || "Failed to delete script"
+        });
+      }
+    } catch (err: any) {
+      console.error(err);
+      setApiError({
+        title: "Delete Script Error",
+        message: err.message || "An error occurred while deleting the script."
+      });
+    }
+  };
+
+  const handleCloseScriptModal = () => {
+    setScriptName("");
+    setScriptCommand("");
+    setEditingScriptName(null);
+    setScriptModalOpen(false);
+  };
+
+  const handleAutoAddScripts = async () => {
+    if (!selectedProjectId) return;
+    setIsAutoAnalyzing(true);
+    setShowAutoAnalyzeNotice(true);
+    try {
+      const res = await fetch(`/api/projects/${selectedProjectId}/auto-scripts`, {
+        method: "POST"
+      });
+      if (res.status === 202 || res.ok) {
+        setToast({
+          message: "AI analysis started in the background. Scripts will appear automatically once finished.",
+          type: "info"
+        });
+      } else {
+        let errorMessage = "Failed to start AI analysis.";
+        try {
+          const data = await res.json();
+          errorMessage = data.error || errorMessage;
+        } catch {
+          try {
+            const text = await res.text();
+            errorMessage = text || errorMessage;
+          } catch {}
+        }
+        setIsAutoAnalyzing(false);
+        setShowAutoAnalyzeNotice(false);
+        setApiError({
+          title: "AI Analysis Error",
+          message: errorMessage
+        });
+      }
+    } catch (err: any) {
+      console.error(err);
+      setIsAutoAnalyzing(false);
+      setShowAutoAnalyzeNotice(false);
+      setApiError({
+        title: "System Error",
+        message: err.message || String(err)
+      });
+    }
   };
 
   const handleCreatePr = async () => {
@@ -644,6 +878,7 @@ export default function HomePage() {
 
   const handleSelectSession = (id: string) => {
     setSelectedSessionId(id);
+    setSelectedProjectId(null);
     setIsNewSession(false);
     setSidebarOpen(false);
     setActiveLogMsgId(null);
@@ -732,7 +967,14 @@ export default function HomePage() {
       {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="sidebar-header">
-          <span className="sidebar-title">Sessions</span>
+          <select
+            className="sidebar-mode-select"
+            value={sidebarMode}
+            onChange={(e) => setSidebarMode(e.target.value as "sessions" | "projects")}
+          >
+            <option value="sessions">Sessions</option>
+            <option value="projects">Projects</option>
+          </select>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button
               className="new-task-btn"
@@ -752,396 +994,665 @@ export default function HomePage() {
           </div>
         </div>
         <div className="task-list">
-          {sessions.length === 0 && (
-            <div className="empty-state">
-              <IconInbox />
-              <p>
-                No sessions yet.
-                <br />
-                Start by creating a new session.
-              </p>
-            </div>
-          )}
-          {sessions.map((session) => (
-            <div
-              key={session.id}
-              className={`task-item ${selectedSessionId === session.id ? "active" : ""}`}
-              onClick={() => handleSelectSession(session.id)}
-              id={`session-item-${session.id}`}
-            >
-              <div className="task-item-header">
-                <span className={`task-status-badge ${session.status}`}>
-                  {session.status === "running" && "⟳ "}
-                  {session.status}
-                </span>
-                <span
-                  style={{
-                    fontSize: 10,
-                    color: "var(--text-muted)",
-                    marginLeft: "auto",
-                  }}
+          {sidebarMode === "sessions" ? (
+            <>
+              {sessions.length === 0 && (
+                <div className="empty-state">
+                  <IconInbox />
+                  <p>
+                    No sessions yet.
+                    <br />
+                    Start by creating a new session.
+                  </p>
+                </div>
+              )}
+              {sessions.map((session) => (
+                <div
+                  key={session.id}
+                  className={`task-item ${selectedSessionId === session.id ? "active" : ""}`}
+                  onClick={() => handleSelectSession(session.id)}
+                  id={`session-item-${session.id}`}
                 >
-                  {session.agentType}
-                </span>
-              </div>
-              <div className="task-item-prompt">{session.prompt}</div>
-              <div className="task-item-time">
-                {formatRelative(session.createdAt)}
-              </div>
-            </div>
-          ))}
+                  <div className="task-item-header">
+                    <span className={`task-status-badge ${session.status}`}>
+                      {session.status === "running" && "⟳ "}
+                      {session.status}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        color: "var(--text-muted)",
+                        marginLeft: "auto",
+                      }}
+                    >
+                      {session.agentType}
+                    </span>
+                  </div>
+                  <div className="task-item-prompt">{session.prompt}</div>
+                  <div className="task-item-time">
+                    {formatRelative(session.createdAt)}
+                  </div>
+                </div>
+              ))}
+            </>
+          ) : (
+            <>
+              {projects.length === 0 && (
+                <div className="empty-state">
+                  <IconInbox />
+                  <p>
+                    No projects yet.
+                    <br />
+                    Create a session to initialize a project.
+                  </p>
+                </div>
+              )}
+              {projects.map((project) => {
+                const projectSessions = sessions.filter((s) => s.projectId === project.id);
+                const folderName = project.repoPath.split("/").pop() || project.repoPath;
+                
+                const handleSelectProjectItem = () => {
+                  handleSelectProject(project.id);
+                };
+
+                return (
+                  <div
+                    key={project.id}
+                    className={`task-item ${selectedProjectId === project.id ? "active" : ""}`}
+                    onClick={handleSelectProjectItem}
+                    id={`project-item-${project.id}`}
+                  >
+                    <div className="task-item-header">
+                      <span className="task-status-badge done" style={{ textTransform: "none" }}>
+                        Project
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          color: "var(--text-muted)",
+                          marginLeft: "auto",
+                        }}
+                      >
+                        {projectSessions.length} session{projectSessions.length !== 1 && "s"}
+                      </span>
+                    </div>
+                    <div className="task-item-prompt" style={{ fontWeight: 600 }}>{folderName}</div>
+                    <div className="task-item-prompt" style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {project.repoPath}
+                    </div>
+                    <div className="task-item-time">
+                      {formatRelative(project.createdAt)}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
         </div>
       </aside>
 
       {/* Main */}
       <main className="main">
-        {/* Session info bar */}
-        {selectedSession && (
-          <div
-            className="task-info-bar"
-            style={{
-              gap: 12,
-              flexWrap: "wrap",
-              padding: "10px 16px",
-              minHeight: "56px",
-            }}
-          >
-            <span className={`task-status-badge ${selectedSession.status}`}>
-              {selectedSession.status === "running" && "⟳ "}
-              {selectedSession.status === "running"
-                ? "Agent working…"
-                : selectedSession.status}
-            </span>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 2,
-                flex: 1,
-                minWidth: 0,
-              }}
-            >
-              <span
-                className="task-info-prompt"
-                style={{
-                  fontWeight: 500,
-                  color: "var(--text-primary)",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {selectedSession.prompt}
-              </span>
-              <span
-                style={{
-                  fontSize: 11,
-                  color: "var(--text-secondary)",
-                  fontFamily: "monospace",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Repo: {selectedSession.repoPath} ({selectedSession.agentType})
-              </span>
-            </div>
+        {selectedProjectId ? (
+          (() => {
+            const project = projects.find((p) => p.id === selectedProjectId);
+            if (!project) return null;
+            const projectSessions = sessions.filter((s) => s.projectId === project.id);
+            const folderName = project.repoPath.split("/").pop() || project.repoPath;
 
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                position: "relative",
-              }}
-            >
-              <button
-                className="menu-trigger-btn"
-                onClick={() => setMenuOpen(!menuOpen)}
-                id="session-menu-btn"
-                title="Session Menu"
-              >
-                <IconMoreVertical />
-              </button>
-
-              {menuOpen && (
-                <div className="session-dropdown-menu">
-                  {/* Show Diff */}
-                  {isRunning || isCheckingGitChanges || !hasGitChanges ? (
+            return (
+              <div className="project-detail-container" style={{ padding: 24, overflowY: "auto", height: "100%", display: "flex", flexDirection: "column", gap: 24 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--border)", paddingBottom: 16 }}>
+                  <div>
+                    <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-primary)" }}>{folderName}</h2>
+                    <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Project details and session history</p>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     <button
-                      className="menu-item"
-                      disabled={true}
-                      id="menu-show-diff"
+                      className="new-task-btn"
+                      onClick={() => setScriptModalOpen(true)}
+                      style={{ padding: "8px 16px", fontSize: 13, background: "transparent", border: "1px solid var(--border)", color: "var(--text-primary)" }}
                     >
-                      🔍 Show Diff
+                      <IconPlus /> Add Script
                     </button>
-                  ) : (
-                    <a
-                      href={`/api/sessions/${selectedSessionId}/diff`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="menu-item"
-                      onClick={() => setMenuOpen(false)}
-                      id="menu-show-diff"
+                    <button
+                      className="new-task-btn"
+                      onClick={handleAutoAddScripts}
+                      style={{ padding: "8px 16px", fontSize: 13, background: "transparent", border: "1px solid var(--border)", color: "var(--accent)" }}
                     >
-                      🔍 Show Diff
-                    </a>
-                  )}
+                      🤖 AI Auto Scripts
+                    </button>
+                    <button
+                      className="new-task-btn"
+                      onClick={() => {
+                        setRepoPath(project.repoPath);
+                        handleNewSession();
+                        setSidebarMode("sessions");
+                      }}
+                      style={{ padding: "8px 16px", fontSize: 13 }}
+                    >
+                      <IconPlus /> New Session
+                    </button>
+                  </div>
+                </div>
 
-                  {/* Commit Changes */}
-                  <button
-                    className="menu-item"
-                    onClick={() => {
-                      handleCommitChanges();
-                      setMenuOpen(false);
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+                  <div style={{ background: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: 16 }}>
+                    <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary)", marginBottom: 12 }}>Repository Info</h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div>
+                        <span style={{ fontSize: 11, color: "var(--text-muted)", display: "block" }}>PATH</span>
+                        <code style={{ fontSize: 12, color: "var(--accent)", wordBreak: "break-all" }}>{project.repoPath}</code>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: 11, color: "var(--text-muted)", display: "block" }}>PROJECT ID</span>
+                        <code style={{ fontSize: 11, color: "var(--text-secondary)" }}>{project.id}</code>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ background: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: 16 }}>
+                    <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary)", marginBottom: 12 }}>Metadata</h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div>
+                        <span style={{ fontSize: 11, color: "var(--text-muted)", display: "block" }}>CREATED AT</span>
+                        <span style={{ fontSize: 13, color: "var(--text-primary)" }}>{new Date(project.createdAt).toLocaleString()}</span>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: 11, color: "var(--text-muted)", display: "block" }}>SESSIONS</span>
+                        <span style={{ fontSize: 13, color: "var(--text-primary)" }}>{projectSessions.length} total sessions</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", marginBottom: 12 }}>Scripts</h3>
+                  {isAutoAnalyzing && (
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "10px 14px",
+                      background: "var(--bg-surface)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-sm)",
+                      color: "var(--text-secondary)",
+                      fontSize: 12,
+                      marginBottom: 12
+                    }}>
+                      <div className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
+                      <span>🤖 AI is analyzing files to automatically generate scripts in the background...</span>
+                    </div>
+                  )}
+                  {projectScripts.length === 0 ? (
+                    <div style={{ padding: "24px 16px", textAlign: "center", border: "1px dashed var(--border)", borderRadius: "var(--radius-md)", color: "var(--text-muted)", fontSize: 13 }}>
+                      No scripts added to settings yet.
+                    </div>
+                  ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+                      {projectScripts.map((script, sidx) => (
+                        <div
+                          key={sidx}
+                          style={{
+                            padding: 12,
+                            background: "var(--bg-surface)",
+                            border: "1px solid var(--border)",
+                            borderRadius: "var(--radius-sm)",
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: 13 }}>{script.name}</div>
+                            <div style={{ display: "flex", gap: 4 }}>
+                              <button
+                                onClick={() => {
+                                  setScriptName(script.name);
+                                  setScriptCommand(script.command);
+                                  setEditingScriptName(script.name);
+                                  setScriptModalOpen(true);
+                                }}
+                                style={{
+                                  background: "transparent",
+                                  border: "none",
+                                  color: "var(--text-secondary)",
+                                  cursor: "pointer",
+                                  fontSize: 11,
+                                  padding: "2px 6px",
+                                  borderRadius: "var(--radius-sm)",
+                                  transition: "background 0.2s, color 0.2s"
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-primary)"; e.currentTarget.style.background = "var(--bg-elevated)"; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-secondary)"; e.currentTarget.style.background = "transparent"; }}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteScript(script.name)}
+                                style={{
+                                  background: "transparent",
+                                  border: "none",
+                                  color: "var(--error)",
+                                  cursor: "pointer",
+                                  fontSize: 11,
+                                  padding: "2px 6px",
+                                  borderRadius: "var(--radius-sm)",
+                                  transition: "background 0.2s"
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = "var(--error-bg)"; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                          <code style={{ display: "block", background: "var(--bg-base)", padding: "4px 8px", borderRadius: 4, fontSize: 11, color: "var(--text-secondary)", marginTop: 6, wordBreak: "break-all", fontFamily: "monospace" }}>
+                            {script.command}
+                          </code>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", marginBottom: 12 }}>Session History</h3>
+                  {projectSessions.length === 0 ? (
+                    <div style={{ padding: "32px 16px", textAlign: "center", border: "1px dashed var(--border)", borderRadius: "var(--radius-md)", color: "var(--text-muted)" }}>
+                      No sessions created for this project yet.
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {projectSessions.map((session) => (
+                        <div
+                          key={session.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: 12,
+                            background: "var(--bg-surface)",
+                            border: "1px solid var(--border)",
+                            borderRadius: "var(--radius-sm)",
+                            cursor: "pointer",
+                            transition: "background 0.2s"
+                          }}
+                          onClick={() => handleSelectSession(session.id)}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-elevated)"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "var(--bg-surface)"; }}
+                        >
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0, flex: 1 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <span className={`task-status-badge ${session.status}`}>
+                                {session.status}
+                              </span>
+                              <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>{session.agentType}</span>
+                            </div>
+                            <span style={{ fontSize: 13, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {session.prompt}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 16 }}>
+                            {new Date(session.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()
+        ) : (
+          <>
+            {/* Session info bar */}
+            {selectedSession && (
+              <div
+                className="task-info-bar"
+                style={{
+                  gap: 12,
+                  flexWrap: "wrap",
+                  padding: "10px 16px",
+                  minHeight: "56px",
+                }}
+              >
+                <span className={`task-status-badge ${selectedSession.status}`}>
+                  {selectedSession.status === "running" && "⟳ "}
+                  {selectedSession.status === "running"
+                    ? "Agent working…"
+                    : selectedSession.status}
+                </span>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
+                    flex: 1,
+                    minWidth: 0,
+                  }}
+                >
+                  <span
+                    className="task-info-prompt"
+                    style={{
+                      fontWeight: 500,
+                      color: "var(--text-primary)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
                     }}
-                    disabled={
-                      isRunning ||
-                      isCommitting ||
-                      isCheckingGitChanges ||
-                      !hasGitChanges
-                    }
-                    id="menu-commit-changes"
                   >
-                    <IconGitCommit />{" "}
-                    {isCommitting ? "Committing Changes…" : "Commit Changes"}
+                    {selectedSession.prompt}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: "var(--text-secondary)",
+                      fontFamily: "monospace",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Repo: {selectedSession.repoPath} ({selectedSession.agentType})
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    position: "relative",
+                  }}
+                >
+                  <button
+                    className="menu-trigger-btn"
+                    onClick={() => setMenuOpen(!menuOpen)}
+                    id="session-menu-btn"
+                    title="Session Menu"
+                  >
+                    <IconMoreVertical />
                   </button>
 
-                  {/* Create PR / View PR */}
-                  {selectedSession.prUrl ? (
-                    <a
-                      href={selectedSession.prUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="menu-item"
-                      onClick={() => setMenuOpen(false)}
-                      id="menu-view-pr"
-                    >
-                      <IconGitPullRequest /> View PR
-                    </a>
-                  ) : (
-                    selectedSession.status === "done" && (
+                  {menuOpen && (
+                    <div className="session-dropdown-menu">
+                      {/* Show Diff */}
+                      {isRunning || isCheckingGitChanges || !hasGitChanges ? (
+                        <button
+                          className="menu-item"
+                          disabled={true}
+                          id="menu-show-diff"
+                        >
+                          🔍 Show Diff
+                        </button>
+                      ) : (
+                        <a
+                          href={`/api/sessions/${selectedSessionId}/diff`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="menu-item"
+                          onClick={() => setMenuOpen(false)}
+                          id="menu-show-diff"
+                        >
+                          🔍 Show Diff
+                        </a>
+                      )}
+
+                      {/* Commit Changes */}
                       <button
                         className="menu-item"
                         onClick={() => {
-                          handleCreatePr();
+                          handleCommitChanges();
                           setMenuOpen(false);
                         }}
-                        disabled={!githubConfigured || isCreatingPr}
-                        id="menu-create-pr"
+                        disabled={
+                          isRunning ||
+                          isCommitting ||
+                          isCheckingGitChanges ||
+                          !hasGitChanges
+                        }
+                        id="menu-commit-changes"
                       >
-                        <IconGitPullRequest />{" "}
-                        {isCreatingPr ? "Creating PR…" : "Create PR"}
+                        <IconGitCommit />{" "}
+                        {isCommitting ? "Committing Changes…" : "Commit Changes"}
                       </button>
-                    )
+
+                      {/* Create PR / View PR */}
+                      {selectedSession.prUrl ? (
+                        <a
+                          href={selectedSession.prUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="menu-item"
+                          onClick={() => setMenuOpen(false)}
+                          id="menu-view-pr"
+                        >
+                          <IconGitPullRequest /> View PR
+                        </a>
+                      ) : (
+                        selectedSession.status === "done" && (
+                          <button
+                            className="menu-item"
+                            onClick={() => {
+                              handleCreatePr();
+                              setMenuOpen(false);
+                            }}
+                            disabled={!githubConfigured || isCreatingPr}
+                            id="menu-create-pr"
+                          >
+                            <IconGitPullRequest />{" "}
+                            {isCreatingPr ? "Creating PR…" : "Create PR"}
+                          </button>
+                        )
+                      )}
+
+                      {/* Delete Session */}
+                      <button
+                        className="menu-item delete"
+                        onClick={() => {
+                          handleDeleteSession(selectedSessionId!);
+                          setMenuOpen(false);
+                        }}
+                        disabled={selectedSession.status === "running"}
+                        id="menu-delete-session"
+                      >
+                        <IconTrash /> Delete Session
+                      </button>
+                    </div>
                   )}
-
-                  {/* Delete Session */}
-                  <button
-                    className="menu-item delete"
-                    onClick={() => {
-                      handleDeleteSession(selectedSessionId!);
-                      setMenuOpen(false);
-                    }}
-                    disabled={selectedSession.status === "running"}
-                    id="menu-delete-session"
-                  >
-                    <IconTrash /> Delete Session
-                  </button>
                 </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Chat area */}
-        <div className="chat-area" id="chat-area">
-          {!selectedSession && !isNewSession && (
-            <div className="welcome-screen">
-              <div className="welcome-icon">
-                <IconBolt />
-              </div>
-              <h1 className="welcome-title">Welcome to Itero</h1>
-              <p className="welcome-desc">
-                Delegate coding tasks to AI agents, review GitHub PRs on your
-                phone, and ship software from anywhere — no laptop required.
-              </p>
-              <button
-                className="new-task-btn"
-                onClick={handleNewSession}
-                style={{ padding: "8px 16px", fontSize: 13 }}
-              >
-                <IconPlus /> Create your first session
-              </button>
-            </div>
-          )}
-
-          {(selectedSession || isNewSession) &&
-            messages.length === 0 &&
-            !isRunning && (
-              <div className="welcome-screen">
-                <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
-                  {isNewSession
-                    ? "Describe what you want the agent to do…"
-                    : "No messages yet."}
-                </p>
               </div>
             )}
 
-          {messages.map((msg, idx) => {
-            const isCommandExec =
-              msg.role === "system" && msg.content.includes("⚙️");
-            const isThisMsgRunning =
-              isRunning && isCommandExec && msg.id === lastExecMsgId;
-
-            return (
-              <div key={msg.id} style={{ display: "contents" }}>
-                <div className={`message ${msg.role}`}>
-                  <div className="message-avatar">
-                    {msg.role === "user"
-                      ? "U"
-                      : msg.role === "agent"
-                        ? "AI"
-                        : "⚙"}
+            {/* Chat area */}
+            <div className="chat-area" id="chat-area">
+              {!selectedSession && !isNewSession && (
+                <div className="welcome-screen">
+                  <div className="welcome-icon">
+                    <IconBolt />
                   </div>
-                  <div>
-                    <div className="message-bubble">
-                      {renderMessageContent(msg.content)}
-                    </div>
-                    <div className="message-time">
-                      {formatTime(msg.createdAt)}
-                    </div>
-                  </div>
-                </div>
-                {isCommandExec && (
+                  <h1 className="welcome-title">Welcome to Itero</h1>
+                  <p className="welcome-desc">
+                    Delegate coding tasks to AI agents, review GitHub PRs on your
+                    phone, and ship software from anywhere — no laptop required.
+                  </p>
                   <button
-                    className="console-trigger-btn"
-                    onClick={() => {
-                      setActiveLogMsgId(msg.id);
-                      setLogModalOpen(true);
+                    className="new-task-btn"
+                    onClick={handleNewSession}
+                    style={{ padding: "8px 16px", fontSize: 13 }}
+                  >
+                    <IconPlus /> Create your first session
+                  </button>
+                </div>
+              )}
+
+              {(selectedSession || isNewSession) &&
+                messages.length === 0 &&
+                !isRunning && (
+                  <div className="welcome-screen">
+                    <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
+                      {isNewSession
+                        ? "Describe what you want the agent to do…"
+                        : "No messages yet."}
+                    </p>
+                  </div>
+                )}
+
+              {messages.map((msg, idx) => {
+                const isCommandExec =
+                  msg.role === "system" && msg.content.includes("⚙️");
+                const isThisMsgRunning =
+                  isRunning && isCommandExec && msg.id === lastExecMsgId;
+
+                return (
+                  <div key={msg.id} style={{ display: "contents" }}>
+                    <div className={`message ${msg.role}`}>
+                      <div className="message-avatar">
+                        {msg.role === "user"
+                          ? "U"
+                          : msg.role === "agent"
+                            ? "AI"
+                            : "⚙"}
+                      </div>
+                      <div>
+                        <div className="message-bubble">
+                          {renderMessageContent(msg.content)}
+                        </div>
+                        <div className="message-time">
+                          {formatTime(msg.createdAt)}
+                        </div>
+                      </div>
+                    </div>
+                    {isCommandExec && (
+                      <button
+                        className="console-trigger-btn"
+                        onClick={() => {
+                          setActiveLogMsgId(msg.id);
+                          setLogModalOpen(true);
+                        }}
+                      >
+                        <IconBolt />
+                        <span>Agent Execution Log</span>
+                        {isThisMsgRunning && (
+                          <span className="console-badge-running">
+                            ⟳ Streaming...
+                          </span>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+
+              {isRunning && (
+                <div className="typing-indicator">
+                  <div
+                    className="message-avatar"
+                    style={{
+                      background: "var(--success-bg)",
+                      border: "1px solid rgba(34, 211, 165, 0.2)",
+                      color: "var(--success)",
+                      width: 28,
+                      height: 28,
+                      borderRadius: "50%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      flexShrink: 0,
                     }}
                   >
-                    <IconBolt />
-                    <span>Agent Execution Log</span>
-                    {isThisMsgRunning && (
-                      <span className="console-badge-running">
-                        ⟳ Streaming...
-                      </span>
-                    )}
-                  </button>
-                )}
-              </div>
-            );
-          })}
+                    AI
+                  </div>
+                  <div className="typing-bubble">
+                    <div className="typing-dot" />
+                    <div className="typing-dot" />
+                    <div className="typing-dot" />
+                  </div>
+                </div>
+              )}
 
-          {isRunning && (
-            <div className="typing-indicator">
-              <div
-                className="message-avatar"
-                style={{
-                  background: "var(--success-bg)",
-                  border: "1px solid rgba(34, 211, 165, 0.2)",
-                  color: "var(--success)",
-                  width: 28,
-                  height: 28,
-                  borderRadius: "50%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 11,
-                  fontWeight: 600,
-                  flexShrink: 0,
-                }}
-              >
-                AI
-              </div>
-              <div className="typing-bubble">
-                <div className="typing-dot" />
-                <div className="typing-dot" />
-                <div className="typing-dot" />
-              </div>
+              <div ref={chatBottomRef} />
             </div>
-          )}
 
-          <div ref={chatBottomRef} />
-        </div>
-
-        {/* Input area */}
-        <div className="input-area">
-          {isNewSession && (
-            <div className="input-meta">
-              <span className="input-label">Repo:</span>
-              <div style={{ display: "flex", flex: 1, gap: 6, minWidth: 0 }}>
-                <input
-                  className="input-field-sm"
-                  type="text"
-                  placeholder="Click to select repository directory…"
-                  value={repoPath}
-                  readOnly
-                  onClick={() => {
-                    const startingPath = repoPath.trim() || "/";
-                    setFsCurrentPath(startingPath);
-                    setFsModalOpen(true);
-                  }}
-                  style={{ cursor: "pointer" }}
+            {/* Input area */}
+            <div className="input-area">
+              {isNewSession && (
+                <div className="input-meta">
+                  <span className="input-label">Repo:</span>
+                  <div style={{ display: "flex", flex: 1, gap: 6, minWidth: 0 }}>
+                    <input
+                      className="input-field-sm"
+                      type="text"
+                      placeholder="Click to select repository directory…"
+                      value={repoPath}
+                      readOnly
+                      onClick={() => {
+                        const startingPath = repoPath.trim() || "/";
+                        setFsCurrentPath(startingPath);
+                        setFsModalOpen(true);
+                      }}
+                      style={{ cursor: "pointer" }}
+                      disabled={isRunning}
+                      id="repo-path-input"
+                    />
+                    <button
+                      type="button"
+                      className="browse-btn"
+                      onClick={() => {
+                        const startingPath = repoPath.trim() || "/";
+                        setFsCurrentPath(startingPath);
+                        setFsModalOpen(true);
+                      }}
+                      disabled={isRunning}
+                      title="Browse Directory"
+                      id="browse-repo-btn"
+                    >
+                      <IconFolder />
+                    </button>
+                  </div>
+                  <select
+                    className="agent-select"
+                    value={agentType}
+                    onChange={(e) => setAgentType(e.target.value)}
+                    disabled={isRunning}
+                    id="agent-select"
+                  >
+                    <option value="antigravity">Antigravity CLI</option>
+                    <option value="gemini">Gemini CLI</option>
+                  </select>
+                </div>
+              )}
+              <div className="input-row">
+                <textarea
+                  ref={textareaRef}
+                  className="chat-input"
+                  placeholder={
+                    isRunning
+                      ? "Agent is working…"
+                      : isNewSession
+                        ? "Describe what you want the agent to build or fix in this repo…"
+                        : "Send a message or follow-up feedback to the agent…"
+                  }
+                  value={prompt}
+                  onChange={handlePromptChange}
+                  onKeyDown={handleKeyDown}
                   disabled={isRunning}
-                  id="repo-path-input"
+                  rows={1}
+                  id="chat-input"
                 />
                 <button
-                  type="button"
-                  className="browse-btn"
-                  onClick={() => {
-                    const startingPath = repoPath.trim() || "/";
-                    setFsCurrentPath(startingPath);
-                    setFsModalOpen(true);
-                  }}
-                  disabled={isRunning}
-                  title="Browse Directory"
-                  id="browse-repo-btn"
+                  className="send-btn"
+                  onClick={handleSubmit}
+                  disabled={!canSubmit}
+                  title="Send (⌘+Enter)"
+                  id="send-btn"
                 >
-                  <IconFolder />
+                  <IconSend />
                 </button>
               </div>
-              <select
-                className="agent-select"
-                value={agentType}
-                onChange={(e) => setAgentType(e.target.value)}
-                disabled={isRunning}
-                id="agent-select"
-              >
-                <option value="antigravity">Antigravity CLI</option>
-                <option value="gemini">Gemini CLI</option>
-              </select>
             </div>
-          )}
-          <div className="input-row">
-            <textarea
-              ref={textareaRef}
-              className="chat-input"
-              placeholder={
-                isRunning
-                  ? "Agent is working…"
-                  : isNewSession
-                    ? "Describe what you want the agent to build or fix in this repo…"
-                    : "Send a message or follow-up feedback to the agent…"
-              }
-              value={prompt}
-              onChange={handlePromptChange}
-              onKeyDown={handleKeyDown}
-              disabled={isRunning}
-              rows={1}
-              id="chat-input"
-            />
-            <button
-              className="send-btn"
-              onClick={handleSubmit}
-              disabled={!canSubmit}
-              title="Send (⌘+Enter)"
-              id="send-btn"
-            >
-              <IconSend />
-            </button>
-          </div>
-        </div>
+          </>
+        )}
       </main>
 
       {/* File Explorer Modal */}
@@ -1274,6 +1785,235 @@ export default function HomePage() {
                 }}
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Script Modal */}
+      {scriptModalOpen && (
+        <div className="modal-backdrop" onClick={handleCloseScriptModal}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "480px" }}>
+            <div className="modal-header">
+              <span className="modal-title">{editingScriptName ? "Edit Script" : "Add Script"}</span>
+              <button
+                className="modal-close-btn"
+                onClick={handleCloseScriptModal}
+                aria-label="Close modal"
+              >
+                <IconX />
+              </button>
+            </div>
+            <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 16, padding: "20px 16px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. build, test, lint"
+                  value={scriptName}
+                  onChange={(e) => setScriptName(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    background: "var(--bg-input)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius-sm)",
+                    color: "var(--text-primary)",
+                    fontSize: 14,
+                    outline: "none"
+                  }}
+                  id="script-name-input"
+                />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Command</label>
+                <input
+                  type="text"
+                  placeholder="e.g. npm run build, pytest"
+                  value={scriptCommand}
+                  onChange={(e) => setScriptCommand(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    background: "var(--bg-input)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius-sm)",
+                    color: "var(--text-primary)",
+                    fontSize: 14,
+                    outline: "none"
+                  }}
+                  id="script-command-input"
+                />
+              </div>
+            </div>
+            <div className="modal-footer" style={{ display: "flex", justifyContent: "flex-end", gap: 12, padding: "12px 16px", borderTop: "1px solid var(--border)" }}>
+              <button
+                type="button"
+                onClick={handleCloseScriptModal}
+                style={{
+                  padding: "8px 16px",
+                  background: "transparent",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-sm)",
+                  color: "var(--text-secondary)",
+                  fontSize: 13,
+                  cursor: "pointer"
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveScript}
+                disabled={!scriptName.trim() || !scriptCommand.trim()}
+                style={{
+                  padding: "8px 16px",
+                  background: "var(--accent)",
+                  border: "none",
+                  borderRadius: "var(--radius-sm)",
+                  color: "#ffffff",
+                  fontSize: 13,
+                  cursor: "pointer",
+                  opacity: (!scriptName.trim() || !scriptCommand.trim()) ? 0.5 : 1
+                }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Auto Analyzing Notice Modal */}
+      {showAutoAnalyzeNotice && (
+        <div className="modal-backdrop" onClick={() => setShowAutoAnalyzeNotice(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "380px", padding: 24, textAlign: "center" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+              <div className="spinner" />
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)" }}>AI Background Analysis</h3>
+                <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 8, lineHeight: "1.5" }}>
+                  Analyzing repository structure in the background. 
+                  New scripts will appear automatically on this page once finished.
+                </p>
+                <p style={{ fontSize: 11, color: "var(--accent)", marginTop: 4 }}>
+                  You can safely close this notification now.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAutoAnalyzeNotice(false)}
+                style={{
+                  marginTop: 8,
+                  padding: "8px 16px",
+                  background: "var(--accent)",
+                  border: "none",
+                  borderRadius: "var(--radius-sm)",
+                  color: "#ffffff",
+                  fontSize: 13,
+                  cursor: "pointer",
+                  width: "100%"
+                }}
+              >
+                Got It
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div style={{
+          position: "fixed",
+          bottom: 24,
+          right: 24,
+          background: toast.type === "error" ? "var(--error)" : toast.type === "success" ? "#10b981" : "var(--bg-elevated)",
+          color: toast.type === "error" || toast.type === "success" ? "#ffffff" : "var(--text-primary)",
+          border: toast.type === "info" ? "1px solid var(--border)" : "none",
+          borderRadius: "var(--radius-md)",
+          padding: "12px 20px",
+          boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.3)",
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          zIndex: 9999,
+          maxWidth: "380px"
+        }}>
+          <span style={{ fontSize: 16 }}>
+            {toast.type === "success" ? "✅" : toast.type === "error" ? "❌" : "ℹ️"}
+          </span>
+          <span style={{ fontSize: 13, fontWeight: 500, flex: 1 }}>{toast.message}</span>
+          <button
+            onClick={() => setToast(null)}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: toast.type === "error" || toast.type === "success" ? "rgba(255, 255, 255, 0.8)" : "var(--text-secondary)",
+              cursor: "pointer",
+              fontSize: 12,
+              padding: 0,
+              marginLeft: 8,
+              display: "flex",
+              alignItems: "center"
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* API Error Details Modal */}
+      {apiError && (
+        <div className="modal-backdrop" onClick={() => setApiError(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "540px" }}>
+            <div className="modal-header">
+              <span className="modal-title" style={{ color: "var(--error)", display: "flex", alignItems: "center", gap: 6 }}>
+                ⚠️ {apiError.title}
+              </span>
+              <button
+                className="modal-close-btn"
+                onClick={() => setApiError(null)}
+                aria-label="Close modal"
+              >
+                <IconX />
+              </button>
+            </div>
+            <div className="modal-body" style={{ padding: "20px 16px" }}>
+              <p style={{ fontSize: 14, color: "var(--text-primary)", marginBottom: 12 }}>
+                An error occurred during the operations:
+              </p>
+              <pre style={{
+                background: "var(--bg-base)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                padding: 12,
+                fontSize: 12,
+                color: "var(--text-secondary)",
+                maxHeight: "260px",
+                overflowY: "auto",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-all",
+                fontFamily: "monospace"
+              }}>
+                {apiError.message}
+              </pre>
+            </div>
+            <div className="modal-footer" style={{ display: "flex", justifyContent: "flex-end", padding: "12px 16px", borderTop: "1px solid var(--border)" }}>
+              <button
+                className="new-task-btn"
+                onClick={() => setApiError(null)}
+                style={{
+                  padding: "8px 16px",
+                  background: "var(--accent)",
+                  border: "none",
+                  borderRadius: "var(--radius-sm)",
+                  color: "#ffffff",
+                  fontSize: 13,
+                  cursor: "pointer"
+                }}
+              >
+                Dismiss
               </button>
             </div>
           </div>

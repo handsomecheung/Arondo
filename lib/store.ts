@@ -4,8 +4,16 @@ import path from "path";
 const DATA_DIR = path.join(process.cwd(), "data");
 const SESSIONS_DIR = path.join(DATA_DIR, "sessions");
 const DELETED_SESSIONS_DIR = path.join(DATA_DIR, "deleted-sessions");
+const PROJECTS_DIR = path.join(DATA_DIR, "projects");
 
 export type SessionStatus = "idle" | "running" | "done" | "error";
+
+export interface Project {
+  id: string;
+  repoPath: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface Session {
   id: string;
@@ -13,6 +21,7 @@ export interface Session {
   prompt: string;
   agentType: string;
   repoPath: string;
+  projectId: string;
   prUrl?: string;
   errorMessage?: string;
   command?: string;
@@ -40,6 +49,18 @@ function getSessionFilePath(id: string): string {
 
 function getMessagesFilePath(id: string): string {
   return path.join(getSessionDir(id), "messages.json");
+}
+
+function getProjectDir(id: string): string {
+  return path.join(PROJECTS_DIR, id);
+}
+
+function getProjectFilePath(id: string): string {
+  return path.join(getProjectDir(id), "project.json");
+}
+
+function getProjectSettingsDir(id: string): string {
+  return path.join(getProjectDir(id), "settings");
 }
 
 async function ensureDir(dirPath: string): Promise<void> {
@@ -95,13 +116,133 @@ export async function getSession(id: string): Promise<Session | undefined> {
   return session || undefined;
 }
 
+// ─── Projects ─────────────────────────────────────────────────────────────────
+
+export interface ProjectScript {
+  name: string;
+  command: string;
+}
+
+// ─── Projects ─────────────────────────────────────────────────────────────────
+
+export async function getOrCreateProject(repoPath: string): Promise<Project> {
+  await ensureDir(PROJECTS_DIR);
+  
+  const resolvedRepoPath = path.resolve(repoPath);
+
+  try {
+    const entries = await fs.readdir(PROJECTS_DIR, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const filePath = getProjectFilePath(entry.name);
+        try {
+          const project = await readJson<Project | null>(filePath, null);
+          if (project && path.resolve(project.repoPath) === resolvedRepoPath) {
+            return project;
+          }
+        } catch {
+          // Ignore corrupt project config
+        }
+      }
+    }
+  } catch {
+    // Ignore read errors
+  }
+
+  const projectId = crypto.randomUUID();
+  const project: Project = {
+    id: projectId,
+    repoPath: resolvedRepoPath,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  await writeJson(getProjectFilePath(projectId), project);
+  return project;
+}
+
+export async function getProjects(): Promise<Project[]> {
+  try {
+    await ensureDir(PROJECTS_DIR);
+    const entries = await fs.readdir(PROJECTS_DIR, { withFileTypes: true });
+    const projects: Project[] = [];
+    
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const filePath = getProjectFilePath(entry.name);
+        try {
+          const project = await readJson<Project | null>(filePath, null);
+          if (project) {
+            projects.push(project);
+          }
+        } catch {
+          // Ignore corrupt project config
+        }
+      }
+    }
+    
+    return projects.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  } catch {
+    return [];
+  }
+}
+
+export async function getProject(id: string): Promise<Project | undefined> {
+  const filePath = getProjectFilePath(id);
+  const project = await readJson<Project | null>(filePath, null);
+  return project || undefined;
+}
+
+export async function getProjectScripts(projectId: string): Promise<ProjectScript[]> {
+  const settingsDir = getProjectSettingsDir(projectId);
+  const filePath = path.join(settingsDir, "scripts.json");
+  return readJson<ProjectScript[]>(filePath, []);
+}
+
+export async function addProjectScript(
+  projectId: string,
+  script: ProjectScript,
+  oldName?: string
+): Promise<ProjectScript[]> {
+  const settingsDir = getProjectSettingsDir(projectId);
+  await ensureDir(settingsDir);
+  let scripts = await getProjectScripts(projectId);
+  
+  if (oldName && oldName !== script.name) {
+    scripts = scripts.filter((s) => s.name !== oldName);
+  }
+  
+  const index = scripts.findIndex((s) => s.name === script.name);
+  if (index >= 0) {
+    scripts[index] = script;
+  } else {
+    scripts.push(script);
+  }
+  
+  const filePath = path.join(settingsDir, "scripts.json");
+  await writeJson(filePath, scripts);
+  return scripts;
+}
+
+export async function deleteProjectScript(projectId: string, scriptName: string): Promise<ProjectScript[]> {
+  const settingsDir = getProjectSettingsDir(projectId);
+  const scripts = await getProjectScripts(projectId);
+  const filtered = scripts.filter((s) => s.name !== scriptName);
+  
+  const filePath = path.join(settingsDir, "scripts.json");
+  await writeJson(filePath, filtered);
+  return filtered;
+}
+
 export async function createSession(
-  data: Omit<Session, "id" | "createdAt" | "updatedAt">
+  data: Omit<Session, "id" | "projectId" | "createdAt" | "updatedAt">
 ): Promise<Session> {
   const id = crypto.randomUUID();
+  const project = await getOrCreateProject(data.repoPath);
   const session: Session = {
     ...data,
     id,
+    projectId: project.id,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

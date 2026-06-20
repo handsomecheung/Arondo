@@ -12,6 +12,9 @@ Itero is a mobile-first developer workspace interface that allows you to delegat
 - **Mobile-Friendly UI**: Designed with collapsible panels, modal logs, responsive menus, and touch-friendly actions to enable reviewing PRs and steering agents from anywhere.
 - **Collapsible Errors**: When agent execution fails, large traceback logs are wrapped in an accordion details tag to keep the chat clean.
 - **Session Soft-Deletion**: Move unwanted sessions out of sight. Deleted sessions are moved to `data/deleted-sessions/` on the server.
+- **Project Management**: Scopes and tracks sessions within resolved local repository paths (`data/projects/[projectId]/`).
+- **Custom Project Scripts**: Define, edit, and delete execution commands (e.g., build, test, deploy) scoped to specific projects.
+- **AI Auto-Script Discovery**: Uses the **Antigravity CLI (agy)** in a background process to automatically inspect repository configurations and documentation, registering valid test, build, and deploy scripts.
 
 ## Getting Started
 
