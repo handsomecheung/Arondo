@@ -17,8 +17,8 @@ export async function GET(
   }
 
   try {
-    // Check for any changes (staged, unstaged, untracked)
-    const { stdout } = await execAsync("git status --porcelain", {
+    // Check for any changes (staged, unstaged, untracked) in the project directory
+    const { stdout } = await execAsync("git status --porcelain .", {
       cwd: session.repoPath,
     });
 

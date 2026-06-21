@@ -1413,7 +1413,7 @@ export default function HomePage() {
     ]);
     try {
       const commitPrompt =
-        "Please commit the changes with an appropriate commit message.";
+        "Please commit only the changes within the current project directory with an appropriate commit message. Make sure to only stage and commit modifications under this directory, and avoid committing changes outside of it (for example, avoid using `git commit -a` which might include changes from the entire repository).";
       const res = await fetch(`/api/sessions/${selectedSessionId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

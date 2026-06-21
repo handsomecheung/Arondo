@@ -41,10 +41,11 @@ export async function GET(
     const diffHtmlPath = path.join(sessionDir, `${commitId}.html`);
 
     // We check git diff HEAD output first (or fallback to git diff if HEAD doesn't exist)
+    // We append "-- ." to restrict changes to the project directory (session.repoPath)
     let hasChanges = false;
-    let diffCmd = "git diff HEAD";
+    let diffCmd = "git diff HEAD -- .";
     try {
-      const { stdout } = await execAsync("git diff HEAD", {
+      const { stdout } = await execAsync("git diff HEAD -- .", {
         cwd: session.repoPath,
       });
       if (stdout.trim().length > 0) {
@@ -52,9 +53,9 @@ export async function GET(
       }
     } catch (e) {
       console.warn("Failed to check git diff HEAD, falling back to git diff", e);
-      diffCmd = "git diff";
+      diffCmd = "git diff -- .";
       try {
-        const { stdout } = await execAsync("git diff", {
+        const { stdout } = await execAsync("git diff -- .", {
           cwd: session.repoPath,
         });
         if (stdout.trim().length > 0) {
