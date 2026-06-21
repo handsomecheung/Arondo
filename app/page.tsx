@@ -386,6 +386,7 @@ export default function HomePage() {
   // Task Queue states
   const [taskQueue, setTaskQueue] = useState<TaskItem[]>([]);
   const [taskQueueOpen, setTaskQueueOpen] = useState(false);
+  const [taskTimeTicker, setTaskTimeTicker] = useState(Date.now());
   const taskQueueRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -535,6 +536,15 @@ export default function HomePage() {
       setTaskQueueOpen(false);
     }
   }, [taskQueue.length]);
+
+  // Update task queue elapsed times dynamically
+  useEffect(() => {
+    if (!taskQueueOpen || taskQueue.length === 0) return;
+    const interval = setInterval(() => {
+      setTaskTimeTicker(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [taskQueueOpen, taskQueue.length]);
 
 
   // Find the ID of the last command execution system message in the list
@@ -1555,6 +1565,9 @@ export default function HomePage() {
                       }
                     };
 
+                    const elapsedMs = taskTimeTicker - task.createdAt;
+                    const durationStr = formatDuration(elapsedMs);
+
                     return (
                       <div
                         key={task.id}
@@ -1580,7 +1593,7 @@ export default function HomePage() {
                           </div>
                           <div className="task-queue-item-status">
                             <span className="task-spinner" />
-                            Running...
+                            Running ({durationStr})...
                           </div>
                         </div>
                       </div>
@@ -3403,4 +3416,19 @@ export default function HomePage() {
       )}
     </div>
   );
+}
+
+function formatDuration(ms: number): string {
+  if (ms < 0) return "0s";
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes % 60}m`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${seconds % 60}s`;
+  }
+  return `${seconds}s`;
 }
