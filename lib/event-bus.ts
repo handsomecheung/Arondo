@@ -6,7 +6,7 @@
 type Listener = (event: SseEvent) => void;
 
 export interface SseEvent {
-  type: "session_updated" | "message_added" | "agent_output" | "session_deleted";
+  type: "session_updated" | "message_added" | "agent_output" | "session_deleted" | "terminal_output" | "terminal_exit";
   payload: any;
 }
 
@@ -25,10 +25,12 @@ class SseEventBus {
   }
 }
 
-// Singleton instance shared across all API routes in the same server process
-const globalWithBus = global as typeof global & { __iteroBus?: SseEventBus };
-if (!globalWithBus.__iteroBus) {
-  globalWithBus.__iteroBus = new SseEventBus();
+// Use `process` instead of `global` for the singleton — tsx (server.ts) and
+// Turbopack (API routes) run in different module contexts with separate `global`
+// objects, but share the same `process` object within one Node.js process.
+const p = process as typeof process & { __iteroBus?: SseEventBus };
+if (!p.__iteroBus) {
+  p.__iteroBus = new SseEventBus();
 }
 
-export const eventBus = globalWithBus.__iteroBus;
+export const eventBus = p.__iteroBus;

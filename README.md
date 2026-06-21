@@ -11,6 +11,7 @@ Itero is a mobile-first developer workspace interface that allows you to delegat
 - **Streamlined Action Menu**: Actions like "Commit Changes", "Create PR", "Delete Session", and "Show Diff" are folded into a clean, mobile-friendly three-dot drop-down menu.
 - **Task Queue & Live Tracking**: Displays an active task queue icon in the header next to the "Live" indicator. Clicking the queue shows currently running agents and background scripts with clear visual type tagging.
 - **Direct Log Inspection**: Clicking an active task in the task queue automatically switches to its session and pops up its dedicated live console log modal. Running logs display a pulsating "Streaming..." badge and auto-scroll to the latest terminal outputs.
+- **Interactive Terminal (PTY)**: Script execution runs in a full pseudo-terminal via `node-pty`, rendered in the browser with `xterm.js`. Supports interactive stdin, ANSI colors, and cursor control. Output is buffered for reconnection replay.
 - **Concurrent Script Execution**: Allows running multiple scripts simultaneously within a single session (only duplicate executions of the same script are restricted). The user can continue chatting while background scripts are running.
 - **Enhanced Dropdowns**: Interaction dropdowns, such as the three-dot action menu and the task queue dropdown, automatically close when clicking outside their area.
 - **Mobile-Friendly UI**: Designed with collapsible panels, modal logs, responsive menus, and touch-friendly actions to enable reviewing PRs and steering agents from anywhere.
@@ -39,3 +40,4 @@ Open [http://localhost:3250](http://localhost:3250) (or the port specified in te
 ## Configuration & Environment Variables
 
 - `GITHUB_TOKEN` – (Optional) Personal access token used to automatically create/submit PRs from the browser.
+- `PORT` – (Optional) Server port. Defaults to `3251` in development, `3250` in production.

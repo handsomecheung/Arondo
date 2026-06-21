@@ -9,8 +9,9 @@ by delegating coding tasks to AI agents (starting with Gemini CLI).
 ## Key Architecture
 
 ```
+server.ts               # Custom HTTP server wrapping Next.js with WebSocket upgrade at /ws
 app/
-  page.tsx              # Main UI (chat, status tracking, PR management, log modals, 3-dot dropdown)
+  page.tsx              # Main UI (chat, status tracking, PR management, terminal modals, 3-dot dropdown)
   layout.tsx            # Root layout
   globals.css           # Design system (dropdown styling, collapsible error styling, animations)
   api/
@@ -26,6 +27,8 @@ app/
           route.ts      # GET: check if local git repository has any changes
         messages/
           route.ts      # POST: add user follow-up message & trigger agent (resume mode)
+        run-script/
+          route.ts      # POST: run a project script in a PTY (node-pty)
         pr/
           route.ts      # POST: trigger GitHub Pull Request creation
     projects/
@@ -36,10 +39,13 @@ app/
         auto-scripts/
           route.ts      # GET: check status of auto-script analysis; POST: start AI analysis in background
     messages/route.ts   # GET: list messages for a session
-    stream/route.ts     # SSE endpoint for real-time updates (session_updated, message_added, session_deleted, agent_output)
+components/
+  Terminal.tsx          # xterm.js terminal component (live WS mode + history replay mode)
 lib/
   store.ts              # File-based JSON storage (sessions, messages, logs, projects, scripts)
-  event-bus.ts          # In-memory SSE pub/sub (singleton)
+  event-bus.ts          # In-memory pub/sub (singleton on `process` for cross-context sharing)
+  ws-server.ts          # WebSocket handler: event bus broadcast + PTY I/O bridging
+  pty-manager.ts        # PTY instance manager (node-pty) with output buffering for reconnection
   agents/
     base.ts             # Abstract BaseAgent interface
     gemini.ts           # Gemini CLI adapter (handles --session-id and --resume options)
@@ -68,13 +74,24 @@ data/                   # Runtime data (gitignored)
 
 ## Development
 ```bash
-npm run dev   # Start dev server on http://localhost:3250
+npm run dev   # Start custom server via tsx (dev: port 3251, prod: port 3250)
 ```
+
+## Real-time Communication
+
+All real-time communication uses a single **WebSocket** connection at `/ws` (no SSE). The custom server (`server.ts`) wraps Next.js and handles WebSocket upgrade requests.
+
+**Message protocol:**
+- Server → Client: `session:updated`, `message:added`, `session:deleted`, `agent:output` (event bus forwarding), `terminal:output`, `terminal:exit` (PTY I/O)
+- Client → Server: `terminal:input`, `terminal:resize`, `terminal:attach` (buffer replay)
+
+**Cross-context singleton pattern:** The event bus and PTY manager use `process` (not `global`) as the singleton carrier. This is required because `server.ts` runs via `tsx` while API routes run via Next.js Turbopack — they share the same `process` object but have separate `global` scopes.
 
 ## Core Logging & Session Lifecycle Features
 - **Message-specific execution logs**: Every agent or script execution creates a specific system message (e.g. `⚙️ Executing command...`). The resulting terminal outputs are streamed and stored in `data/sessions/[sessionId]/logs/[systemMsgId].log`. The UI displays a trigger button (e.g., "Agent Execution Log" or "Script Execution Log") underneath each command run to open a modal for that execution log.
+- **Interactive Terminal (PTY)**: Script execution uses `node-pty` for full pseudo-terminal support (stdin, ANSI colors, cursor control). The frontend renders output via `xterm.js` (`components/Terminal.tsx`) in two modes: live (WebSocket-connected for running scripts) and history (loads saved log data for completed scripts). The PTY manager buffers recent output (~100KB) for reconnection replay via `terminal:attach`.
 - **Task Queue & Log Popup**: Active tasks are tracked in a global header queue. Clicking any running task in the queue automatically switches the workspace to the corresponding session, retrieves its `messageId`, and opens the log modal.
-- **Real-time Streaming & Auto-scroll**: If the log modal represents an active command execution, it displays a pulsating `⟳ Streaming...` badge, and new log lines appended via SSE automatically scroll the modal console output to the bottom.
+- **Real-time Streaming & Auto-scroll**: If the log modal represents an active command execution, it displays a pulsating `⟳ Streaming...` badge. Script output streams via WebSocket; agent output streams via the event bus.
 - **Concurrency & Responsiveness**: The chat prompt remains open during script execution. Multiple background scripts can be run concurrently in a single session (concurrency is restricted only on multiple calls to the exact same script).
 - **Auto-Closing Dropdowns**: Both the Task Queue dropdown and the Three-Dot Action Menu are equipped with outside-click detection, closing automatically when the user clicks elsewhere.
 - **Session Resumption**: Maintains task context on follow-ups. The `gemini` agent uses `gemini --resume <sessionId>`. The `antigravity` agent matches the Itero session ID with the internal agy conversation UUID using `agy-sessions.json` and runs `agy --conversation <agyId>`.

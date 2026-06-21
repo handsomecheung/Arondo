@@ -327,10 +327,10 @@ export async function clearSessionLog(sessionId: string, messageId: string): Pro
   await fs.writeFile(logPath, "", "utf-8");
 }
 
-export async function appendSessionLog(sessionId: string, messageId: string, text: string): Promise<void> {
+export async function appendSessionLog(sessionId: string, messageId: string, text: string, raw = false): Promise<void> {
   const logPath = getLogFilePath(sessionId, messageId);
   await ensureDir(path.dirname(logPath));
-  await fs.appendFile(logPath, text + "\n", "utf-8");
+  await fs.appendFile(logPath, raw ? text : text + "\n", "utf-8");
 }
 
 export async function getSessionLog(sessionId: string, messageId: string): Promise<string> {

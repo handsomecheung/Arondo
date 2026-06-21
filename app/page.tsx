@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import dynamic from "next/dynamic";
+
+const Terminal = dynamic(() => import("@/components/Terminal"), { ssr: false });
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -479,6 +482,9 @@ export default function HomePage() {
     activeLogMsgIdRef.current = activeLogMsgId;
   }, [activeLogMsgId]);
 
+  const wsRef = useRef<WebSocket | null>(null);
+  const [wsInstance, setWsInstance] = useState<WebSocket | null>(null);
+
   const logPreRef = useRef<HTMLPreElement>(null);
   useEffect(() => {
     if (logModalOpen && logPreRef.current) {
@@ -858,127 +864,158 @@ export default function HomePage() {
       });
   }, [menuOpen, selectedSessionId]);
 
-  // ── SSE connection ──
+  // ── WebSocket connection ──
   useEffect(() => {
-    const es = new EventSource("/api/stream");
+    let ws: WebSocket;
+    let reconnectTimer: ReturnType<typeof setTimeout>;
+    let reconnectDelay = 1000;
+    let disposed = false;
 
-    es.onopen = () => setConnected(true);
-    es.onerror = () => setConnected(false);
+    function connect() {
+      const proto = location.protocol === "https:" ? "wss:" : "ws:";
+      ws = new WebSocket(`${proto}//${location.host}/ws`);
+      wsRef.current = ws;
 
-    es.onmessage = (e) => {
-      try {
-        const event = JSON.parse(e.data) as { type: string; payload: any };
+      ws.onopen = () => {
+        setConnected(true);
+        setWsInstance(ws);
+        reconnectDelay = 1000;
+      };
 
-        if (event.type === "session_updated") {
-          const updated = event.payload as Session;
-          setSessions((prev) =>
-            prev.map((s) => (s.id === updated.id ? updated : s)),
-          );
-          if (updated.status === "script-running") {
-            setTaskQueue((prev) =>
-              prev.filter((t) => {
-                if (t.sessionId !== updated.id) return true;
-                if (t.type === "agent") return false;
-                const running = updated.runningScripts || [];
-                const scriptName = t.name.startsWith("Script: ") ? t.name.substring(8) : t.name;
-                return running.includes(scriptName);
-              })
-            );
-          } else if (
-            updated.status === "done" ||
-            updated.status === "error" ||
-            updated.status === "idle"
-          ) {
-            setTaskQueue((prev) =>
-              prev.filter((t) => t.sessionId !== updated.id),
-            );
-          }
+      ws.onclose = () => {
+        setConnected(false);
+        wsRef.current = null;
+        setWsInstance(null);
+        if (!disposed) {
+          reconnectTimer = setTimeout(() => {
+            reconnectDelay = Math.min(reconnectDelay * 2, 10000);
+            connect();
+          }, reconnectDelay);
         }
+      };
 
-        if (event.type === "session_deleted") {
-          const { id } = event.payload as { id: string };
-          setSessions((prev) => prev.filter((s) => s.id !== id));
-          if (selectedSessionId === id) {
-            setSelectedSessionId(null);
-            setMessages([]);
-            setSessionLog("");
-            setActiveLogMsgId(null);
-            setLogModalOpen(false);
-          }
-        }
+      ws.onmessage = (e) => {
+        try {
+          const event = JSON.parse(e.data) as { type: string; payload: any };
 
-        if (event.type === "message_added") {
-          const msg = event.payload as Message;
-          if (msg.sessionId === selectedSessionId) {
-            setMessages((prev) => {
-              if (prev.find((m) => m.id === msg.id)) return prev;
-              return [...prev, msg];
-            });
-          }
-
-          // Map messageId to the corresponding task in taskQueue
-          if (msg.role === "system") {
-            if (msg.type === "agent-run") {
-              setTaskQueue((prev) => {
-                const idx = prev.findIndex(
-                  (t) => t.sessionId === msg.sessionId && t.type === "agent" && !t.messageId
-                );
-                if (idx !== -1) {
-                  const next = [...prev];
-                  next[idx] = { ...next[idx], messageId: msg.id };
-                  return next;
-                }
-                return prev;
-              });
-            } else if (msg.type === "script-run") {
-              setTaskQueue((prev) => {
-                let idx = -1;
-                const match = msg.content.match(/Running script:\s*\*\*([^*]+)\*\*/i);
-                if (match) {
-                  const sName = match[1].trim();
-                  idx = prev.findIndex(
-                    (t) =>
-                      t.sessionId === msg.sessionId &&
-                      t.type === "script" &&
-                      !t.messageId &&
-                      (t.name === `Script: ${sName}` || t.name === sName)
-                  );
-                }
-                if (idx === -1) {
-                  idx = prev.findIndex(
-                    (t) => t.sessionId === msg.sessionId && t.type === "script" && !t.messageId
-                  );
-                }
-                if (idx !== -1) {
-                  const next = [...prev];
-                  next[idx] = { ...next[idx], messageId: msg.id };
-                  return next;
-                }
-                return prev;
-              });
+          if (event.type === "session:updated") {
+            const updated = event.payload as Session;
+            setSessions((prev) =>
+              prev.map((s) => (s.id === updated.id ? updated : s)),
+            );
+            if (updated.status === "script-running") {
+              setTaskQueue((prev) =>
+                prev.filter((t) => {
+                  if (t.sessionId !== updated.id) return true;
+                  if (t.type === "agent") return false;
+                  const running = updated.runningScripts || [];
+                  const scriptName = t.name.startsWith("Script: ") ? t.name.substring(8) : t.name;
+                  return running.includes(scriptName);
+                })
+              );
+            } else if (
+              updated.status === "done" ||
+              updated.status === "error" ||
+              updated.status === "idle"
+            ) {
+              setTaskQueue((prev) =>
+                prev.filter((t) => t.sessionId !== updated.id),
+              );
             }
           }
-        }
 
-        if (event.type === "agent_output") {
-          const payload = event.payload as {
-            sessionId: string;
-            messageId: string;
-            line: string;
-          };
-          if (
-            payload.sessionId === selectedSessionId &&
-            payload.messageId === activeLogMsgIdRef.current
-          ) {
-            setSessionLog((prev) => prev + payload.line + "\n");
+          if (event.type === "session:deleted") {
+            const { id } = event.payload as { id: string };
+            setSessions((prev) => prev.filter((s) => s.id !== id));
+            if (selectedSessionId === id) {
+              setSelectedSessionId(null);
+              setMessages([]);
+              setSessionLog("");
+              setActiveLogMsgId(null);
+              setLogModalOpen(false);
+            }
           }
-        }
-      } catch {
-        /* ignore */
-      }
-    };
 
-    return () => es.close();
+          if (event.type === "message:added") {
+            const msg = event.payload as Message;
+            if (msg.sessionId === selectedSessionId) {
+              setMessages((prev) => {
+                if (prev.find((m) => m.id === msg.id)) return prev;
+                return [...prev, msg];
+              });
+            }
+
+            if (msg.role === "system") {
+              if (msg.type === "agent-run") {
+                setTaskQueue((prev) => {
+                  const idx = prev.findIndex(
+                    (t) => t.sessionId === msg.sessionId && t.type === "agent" && !t.messageId
+                  );
+                  if (idx !== -1) {
+                    const next = [...prev];
+                    next[idx] = { ...next[idx], messageId: msg.id };
+                    return next;
+                  }
+                  return prev;
+                });
+              } else if (msg.type === "script-run") {
+                setTaskQueue((prev) => {
+                  let idx = -1;
+                  const match = msg.content.match(/Running script:\s*\*\*([^*]+)\*\*/i);
+                  if (match) {
+                    const sName = match[1].trim();
+                    idx = prev.findIndex(
+                      (t) =>
+                        t.sessionId === msg.sessionId &&
+                        t.type === "script" &&
+                        !t.messageId &&
+                        (t.name === `Script: ${sName}` || t.name === sName)
+                    );
+                  }
+                  if (idx === -1) {
+                    idx = prev.findIndex(
+                      (t) => t.sessionId === msg.sessionId && t.type === "script" && !t.messageId
+                    );
+                  }
+                  if (idx !== -1) {
+                    const next = [...prev];
+                    next[idx] = { ...next[idx], messageId: msg.id };
+                    return next;
+                  }
+                  return prev;
+                });
+              }
+            }
+          }
+
+          if (event.type === "agent:output") {
+            const payload = event.payload as {
+              sessionId: string;
+              messageId: string;
+              line: string;
+            };
+            if (
+              payload.sessionId === selectedSessionId &&
+              payload.messageId === activeLogMsgIdRef.current
+            ) {
+              setSessionLog((prev) => prev + payload.line + "\n");
+            }
+          }
+        } catch {
+          /* ignore */
+        }
+      };
+    }
+
+    connect();
+
+    return () => {
+      disposed = true;
+      clearTimeout(reconnectTimer);
+      ws?.close();
+      wsRef.current = null;
+      setWsInstance(null);
+    };
   }, [selectedSessionId]);
 
   // ── Auto-resize textarea ──
@@ -3000,8 +3037,18 @@ export default function HomePage() {
                 <IconX />
               </button>
             </div>
-            <div className="modal-body">
-              <pre ref={logPreRef} className="console-log-modal">{sessionLog}</pre>
+            <div className="modal-body" style={isScriptLog ? { padding: 0, overflow: "hidden" } : undefined}>
+              {isScriptLog && activeLogMsgId ? (
+                <Terminal
+                  sessionId={selectedSessionId!}
+                  messageId={activeLogMsgId}
+                  ws={wsInstance}
+                  mode={isRunning && activeLogMsgId === lastExecMsgId ? "live" : "history"}
+                  historyLog={isRunning && activeLogMsgId === lastExecMsgId ? undefined : sessionLog}
+                />
+              ) : (
+                <pre ref={logPreRef} className="console-log-modal">{sessionLog}</pre>
+              )}
             </div>
             <div className="modal-footer">
               <button

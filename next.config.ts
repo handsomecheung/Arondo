@@ -8,6 +8,7 @@ const allowedDevOrigins = process.env.ALLOWED_DEV_ORIGINS
 
 const nextConfig: NextConfig = {
   ...(allowedDevOrigins.length > 0 && { allowedDevOrigins }),
+  serverExternalPackages: ["node-pty"],
 };
 
 export default nextConfig;
