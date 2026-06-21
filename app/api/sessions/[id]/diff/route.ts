@@ -40,36 +40,85 @@ export async function GET(
 
     const diffHtmlPath = path.join(sessionDir, `${commitId}.html`);
 
-    // Check if the file already exists
-    let fileExists = false;
+    // We check git diff HEAD output first (or fallback to git diff if HEAD doesn't exist)
+    let hasChanges = false;
+    let diffCmd = "git diff HEAD";
     try {
-      await fs.access(diffHtmlPath);
-      fileExists = true;
-    } catch {
-      // File does not exist
+      const { stdout } = await execAsync("git diff HEAD", {
+        cwd: session.repoPath,
+      });
+      if (stdout.trim().length > 0) {
+        hasChanges = true;
+      }
+    } catch (e) {
+      console.warn("Failed to check git diff HEAD, falling back to git diff", e);
+      diffCmd = "git diff";
+      try {
+        const { stdout } = await execAsync("git diff", {
+          cwd: session.repoPath,
+        });
+        if (stdout.trim().length > 0) {
+          hasChanges = true;
+        }
+      } catch (e2) {
+        console.warn("Failed to check fallback git diff", e2);
+      }
     }
 
-    // If file does not exist, generate it
-    if (!fileExists) {
+    if (hasChanges) {
       // Generate diff.html using git and diff2html
-      // We capture both unstaged changes (git diff) and the latest commit (git diff HEAD~1)
-      const cmd = `(git diff HEAD~1 2>/dev/null || true; git diff) | diff2html -i stdin -f html --file "${diffHtmlPath}"`;
-      
+      const cmd = `${diffCmd} | diff2html -i stdin -f html --file "${diffHtmlPath}"`;
       await execAsync(cmd, {
         cwd: session.repoPath,
       });
+    } else {
+      // Generate simple empty HTML
+      const emptyHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>No Changes</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #f6f8fa;
+      color: #57606a;
+    }
+    .container {
+      text-align: center;
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+      color: #24292f;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>No changes detected</h1>
+    <p>All changes have been committed or there are no modifications.</p>
+  </div>
+</body>
+</html>`;
+      await fs.writeFile(diffHtmlPath, emptyHtml, "utf-8");
+    }
 
-      // Clean up old diff HTML files
-      try {
-        const files = await fs.readdir(sessionDir);
-        for (const file of files) {
-          if (file.endsWith(".html") && file !== `${commitId}.html`) {
-            await fs.unlink(path.join(sessionDir, file));
-          }
+    // Clean up old diff HTML files
+    try {
+      const files = await fs.readdir(sessionDir);
+      for (const file of files) {
+        if (file.endsWith(".html") && file !== `${commitId}.html`) {
+          await fs.unlink(path.join(sessionDir, file));
         }
-      } catch (cleanupError) {
-        console.warn("Failed to clean up old diff HTML files:", cleanupError);
       }
+    } catch (cleanupError) {
+      console.warn("Failed to clean up old diff HTML files:", cleanupError);
     }
 
     // Read the generated HTML file
