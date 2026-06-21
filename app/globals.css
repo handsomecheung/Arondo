@@ -1336,6 +1336,26 @@ html, body {
   100% { transform: rotate(360deg); }
 }
 
+
+/* ── Project details container ───────────────────────────────────────────── */
+.project-detail-container {
+  padding: 16px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 768px) {
+  .project-detail-container {
+    padding: 24px;
+    gap: 24px;
+  }
+}
+
 /* ── Project page section blocks ─────────────────────────────────────────── */
 .project-section-block {
   background: var(--bg-surface);

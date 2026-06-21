@@ -1782,17 +1782,7 @@ export default function HomePage() {
               project.repoPath.split("/").pop() || project.repoPath;
 
             return (
-              <div
-                className="project-detail-container"
-                style={{
-                  padding: 24,
-                  overflowY: "auto",
-                  height: "100%",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 24,
-                }}
-              >
+              <div className="project-detail-container">
                 <div
                   style={{
                     display: "flex",
@@ -2074,7 +2064,6 @@ export default function HomePage() {
                               opacity: draggedIndex === sidx ? 0.6 : 1,
                               transform: draggedIndex === sidx ? "scale(1.02)" : "scale(1)",
                               transition: "transform 0.1s, opacity 0.1s, background 0.1s, border 0.1s",
-                              touchAction: "none",
                               position: "relative",
                               zIndex: draggedIndex === sidx ? 10 : 1,
                             }}
@@ -2111,6 +2100,7 @@ export default function HomePage() {
                                     paddingRight: 6,
                                     color: draggedIndex === sidx ? "var(--accent)" : "var(--text-muted)",
                                     transition: "color 0.2s",
+                                    touchAction: "none",
                                   }}
                                   onMouseEnter={(e) => {
                                     if (draggedIndex !== sidx) {
