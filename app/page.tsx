@@ -569,10 +569,34 @@ export default function HomePage() {
   useEffect(() => {
     if (selectedProjectId) {
       loadProjectScripts(selectedProjectId);
+      // Check if auto-script is currently running
+      fetch(`/api/projects/${selectedProjectId}/auto-scripts`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.status === "running") {
+            setIsAutoAnalyzing(true);
+            const tempTaskId = `auto-script-${selectedProjectId}`;
+            setTaskQueue((prev) => {
+              if (prev.some((t) => t.id === tempTaskId)) return prev;
+              return [
+                ...prev,
+                {
+                  id: tempTaskId,
+                  type: "agent",
+                  name: "Agent: Auto Scripts Analysis",
+                  sessionId: "",
+                  status: "running",
+                  createdAt: Date.now(),
+                },
+              ];
+            });
+          }
+        })
+        .catch(console.error);
     } else {
       setProjectScripts([]);
     }
-  }, [selectedProjectId, loadProjectScripts]);
+  }, [selectedProjectId, loadProjectScripts, setTaskQueue]);
 
   // Load scripts for the session's project whenever selected session changes
   useEffect(() => {
@@ -606,6 +630,7 @@ export default function HomePage() {
       attempts++;
       if (attempts > maxAttempts) {
         setIsAutoAnalyzing(false);
+        setTaskQueue((prev) => prev.filter((t) => t.id !== `auto-script-${selectedProjectId}`));
         setToast({
           message: "AI analysis background task timed out.",
           type: "error",
@@ -623,6 +648,7 @@ export default function HomePage() {
           if (data.status === "done") {
             setIsAutoAnalyzing(false);
             loadProjectScripts(selectedProjectId);
+            setTaskQueue((prev) => prev.filter((t) => t.id !== `auto-script-${selectedProjectId}`));
             setToast({
               message: "AI analysis completed! New scripts are now available.",
               type: "success",
@@ -630,6 +656,7 @@ export default function HomePage() {
             clearInterval(interval);
           } else if (data.status === "error") {
             setIsAutoAnalyzing(false);
+            setTaskQueue((prev) => prev.filter((t) => t.id !== `auto-script-${selectedProjectId}`));
             setToast({
               message: `AI analysis failed. Error log written to data/auto-script-error.log`,
               type: "error",
@@ -647,7 +674,7 @@ export default function HomePage() {
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [isAutoAnalyzing, selectedProjectId, loadProjectScripts]);
+  }, [isAutoAnalyzing, selectedProjectId, loadProjectScripts, setTaskQueue]);
 
   // ── Initial load ──
   useEffect(() => {
@@ -1337,6 +1364,21 @@ export default function HomePage() {
         setInfoDialog(null);
         setIsAutoAnalyzing(true);
         setShowAutoAnalyzeNotice(true);
+        const tempTaskId = `auto-script-${selectedProjectId}`;
+        setTaskQueue((prev) => {
+          if (prev.some((t) => t.id === tempTaskId)) return prev;
+          return [
+            ...prev,
+            {
+              id: tempTaskId,
+              type: "agent",
+              name: "Agent: Auto Scripts Analysis",
+              sessionId: "",
+              status: "running",
+              createdAt: Date.now(),
+            },
+          ];
+        });
         try {
           const res = await fetch(
             `/api/projects/${selectedProjectId}/auto-scripts`,
@@ -1363,6 +1405,7 @@ export default function HomePage() {
             }
             setIsAutoAnalyzing(false);
             setShowAutoAnalyzeNotice(false);
+            setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
             setApiError({
               title: "AI Analysis Error",
               message: errorMessage,
@@ -1372,6 +1415,7 @@ export default function HomePage() {
           console.error(err);
           setIsAutoAnalyzing(false);
           setShowAutoAnalyzeNotice(false);
+          setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
           setApiError({
             title: "System Error",
             message: err.message || String(err),
