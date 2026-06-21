@@ -1034,6 +1034,9 @@ export default function HomePage() {
   ]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Prevent sending message during IME composition
+    if (e.nativeEvent.isComposing) return;
+
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       handleSubmit();
@@ -2788,7 +2791,7 @@ export default function HomePage() {
                   className="send-btn"
                   onClick={handleSubmit}
                   disabled={!canSubmit}
-                  title="Send (⌘+Enter)"
+                  title="Send (Ctrl+Enter / ⌘+Enter)"
                   id="send-btn"
                 >
                   <IconSend />
