@@ -1669,34 +1669,62 @@ export default function HomePage() {
                   </p>
                 </div>
               )}
-              {sessions.map((session) => (
-                <div
-                  key={session.id}
-                  className={`task-item ${selectedSessionId === session.id ? "active" : ""}`}
-                  onClick={() => handleSelectSession(session.id)}
-                  id={`session-item-${session.id}`}
-                >
-                  <div className="task-item-header">
-                    <span className={`task-status-badge ${session.status}`}>
-                      {session.status === "running" && "⟳ "}
-                      {session.status}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        color: "var(--text-muted)",
-                        marginLeft: "auto",
-                      }}
-                    >
-                      {session.agentType}
-                    </span>
+              {sessions.map((session) => {
+                const project = projects.find((p) => p.id === session.projectId);
+                const projectName = project
+                  ? (project.repoPath.split("/").pop() || project.repoPath)
+                  : "";
+
+                return (
+                  <div
+                    key={session.id}
+                    className={`task-item ${selectedSessionId === session.id ? "active" : ""}`}
+                    onClick={() => handleSelectSession(session.id)}
+                    id={`session-item-${session.id}`}
+                  >
+                    <div className="task-item-header">
+                      <span className={`task-status-badge ${session.status}`}>
+                        {session.status === "running" && "⟳ "}
+                        {session.status}
+                      </span>
+                      {projectName && (
+                        <span
+                          className="task-item-project-badge"
+                          title={project?.repoPath}
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 500,
+                            color: "var(--text-secondary)",
+                            backgroundColor: "rgba(255, 255, 255, 0.06)",
+                            border: "1px solid var(--border)",
+                            padding: "1px 6px",
+                            borderRadius: "4px",
+                            maxWidth: "120px",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {projectName}
+                        </span>
+                      )}
+                      <span
+                        style={{
+                          fontSize: 10,
+                          color: "var(--text-muted)",
+                          marginLeft: "auto",
+                        }}
+                      >
+                        {session.agentType}
+                      </span>
+                    </div>
+                    <div className="task-item-prompt">{session.prompt}</div>
+                    <div className="task-item-time">
+                      {formatRelative(session.createdAt)}
+                    </div>
                   </div>
-                  <div className="task-item-prompt">{session.prompt}</div>
-                  <div className="task-item-time">
-                    {formatRelative(session.createdAt)}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </>
           ) : (
             <>
