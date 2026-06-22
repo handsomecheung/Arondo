@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession, getProjectScripts, addMessage, updateSession, clearSessionLog, appendSessionLog } from "@/lib/store";
+import { getSession, getProjectScripts, addMessage, updateSession, clearSessionLog } from "@/lib/store";
 import { eventBus } from "@/lib/event-bus";
-import { ptyManager } from "@/lib/pty-manager";
+import { controllerManager } from "@/lib/controller-manager";
 
 export async function POST(
   req: NextRequest,
@@ -54,112 +54,52 @@ export async function POST(
   });
   eventBus.publish({ type: "session_updated", payload: updatedSession });
 
-  runScriptWithPty(id, systemMsg.id, scriptName, script.command, session.repoPath);
+  // Run script via controller
+  const controllerId = controllerManager.resolveControllerId(session.controllerId);
+  if (!controllerId) {
+    return NextResponse.json({ error: "No connected controller available" }, { status: 503 });
+  }
+
+  const taskId = `task_${crypto.randomUUID().slice(0, 8)}`;
+  controllerManager.registerTask({
+    taskId,
+    controllerId,
+    sessionId: id,
+    messageId: systemMsg.id,
+    type: "script",
+    scriptName,
+  });
+
+  await clearSessionLog(id, systemMsg.id);
+
+  controllerManager
+    .sendRequest(controllerId, "exec.script", {
+      taskId,
+      command: script.command,
+      workDir: session.repoPath,
+      cols: 120,
+      rows: 30,
+    }, 10_000)
+    .catch(async (err) => {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      const nextRunning = runningScripts.filter((n) => n !== scriptName);
+      const nextStatus = nextRunning.length > 0 ? "script-running" : "error";
+      const updated = await updateSession(id, {
+        status: nextStatus as any,
+        runningScripts: nextRunning,
+        errorMessage,
+      });
+      const errMsg = await addMessage({
+        sessionId: id,
+        role: "system",
+        content: `❌ Error: ${errorMessage}`,
+        type: "script-return",
+      });
+      eventBus.publish({ type: "message_added", payload: errMsg });
+      eventBus.publish({ type: "session_updated", payload: updated });
+    });
 
   return NextResponse.json({ success: true });
-}
-
-async function runScriptWithPty(
-  sessionId: string,
-  messageId: string,
-  scriptName: string,
-  command: string,
-  repoPath: string
-) {
-  const {
-    updateSession,
-    addMessage: addMsg,
-    clearSessionLog: clearLog,
-    appendSessionLog: appendLog,
-  } = await import("@/lib/store");
-
-  const ptyId = `${sessionId}:${messageId}`;
-
-  try {
-    await clearLog(sessionId, messageId);
-
-    ptyManager.create(ptyId, {
-      command: "bash",
-      args: ["-c", command],
-      cwd: repoPath,
-      onData: (data) => {
-        appendLog(sessionId, messageId, data, true);
-        eventBus.publish({
-          type: "terminal_output",
-          payload: { sessionId, messageId, data },
-        });
-      },
-      onExit: async (exitCode) => {
-        eventBus.publish({
-          type: "terminal_exit",
-          payload: { sessionId, messageId, code: exitCode },
-        });
-        try {
-          const store = await import("@/lib/store");
-          const currentSession = await store.getSession(sessionId);
-          const currentRunning = currentSession?.runningScripts || [];
-          const nextRunning = currentRunning.filter((name) => name !== scriptName);
-
-          if (exitCode === 0) {
-            const nextStatus = nextRunning.length > 0 ? "script-running" : "done";
-            const updated = await updateSession(sessionId, {
-              status: nextStatus,
-              runningScripts: nextRunning,
-            });
-            const doneMsg = await addMsg({
-              sessionId,
-              role: "system",
-              content: `✅ Script completed successfully.`,
-              type: "script-return",
-            });
-            eventBus.publish({ type: "message_added", payload: doneMsg });
-            eventBus.publish({ type: "session_updated", payload: updated });
-          } else {
-            const errorMessage = `Script exited with code ${exitCode}`;
-            const nextStatus = nextRunning.length > 0 ? "script-running" : "error";
-            const updated = await updateSession(sessionId, {
-              status: nextStatus,
-              runningScripts: nextRunning,
-              errorMessage,
-            });
-            const errMsg = await addMsg({
-              sessionId,
-              role: "system",
-              content: `❌ Error: ${errorMessage}`,
-              type: "script-return",
-            });
-            eventBus.publish({ type: "message_added", payload: errMsg });
-            eventBus.publish({ type: "session_updated", payload: updated });
-          }
-        } catch (err) {
-          console.error("Error handling PTY exit:", err);
-        }
-      },
-    });
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    await appendLog(sessionId, messageId, `[Error] ${errorMessage}`);
-
-    const store = await import("@/lib/store");
-    const currentSession = await store.getSession(sessionId);
-    const currentRunning = currentSession?.runningScripts || [];
-    const nextRunning = currentRunning.filter((name) => name !== scriptName);
-    const nextStatus = nextRunning.length > 0 ? "script-running" : "error";
-
-    const updated = await updateSession(sessionId, {
-      status: nextStatus,
-      runningScripts: nextRunning,
-      errorMessage,
-    });
-    const errMsg = await addMsg({
-      sessionId,
-      role: "system",
-      content: `❌ Error: ${errorMessage}`,
-      type: "script-return",
-    });
-    eventBus.publish({ type: "message_added", payload: errMsg });
-    eventBus.publish({ type: "session_updated", payload: updated });
-  }
 }
 
 export const dynamic = "force-dynamic";

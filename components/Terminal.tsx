@@ -33,6 +33,7 @@ export default function Terminal({ sessionId, messageId, ws, mode, historyLog }:
     };
   }, [ws]);
 
+  // Create terminal and load initial content
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -64,6 +65,18 @@ export default function Terminal({ sessionId, messageId, ws, mode, historyLog }:
       term.write(historyLog);
     }
 
+    // In live mode, fetch existing log so output that arrived before modal opened is visible
+    if (mode === "live") {
+      fetch(`/api/sessions/${sessionId}/log?messageId=${messageId}`)
+        .then((r) => r.json())
+        .then((data: { log: string }) => {
+          if (termRef.current === term && data.log) {
+            term.write(data.log);
+          }
+        })
+        .catch(() => {});
+    }
+
     const resizeObserver = new ResizeObserver(() => {
       requestAnimationFrame(() => fit.fit());
     });
@@ -75,8 +88,9 @@ export default function Terminal({ sessionId, messageId, ws, mode, historyLog }:
       termRef.current = null;
       fitRef.current = null;
     };
-  }, [messageId, mode, historyLog]);
+  }, [messageId, mode, historyLog, sessionId]);
 
+  // Live mode: WebSocket listener for real-time output
   useEffect(() => {
     if (mode !== "live" || !ws || !wsReady) return;
     const term = termRef.current;

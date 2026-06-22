@@ -1,46 +1,29 @@
-import { readdir, stat } from "fs/promises";
-import path from "path";
 import { NextRequest, NextResponse } from "next/server";
+import { controllerManager } from "@/lib/controller-manager";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const requestedPath = searchParams.get("path") || "/";
+  const controllerId = searchParams.get("controller");
 
-  // Resolve to absolute path
-  const currentPath = path.resolve(requestedPath);
+  if (!controllerId) {
+    return NextResponse.json(
+      { error: "controller query parameter is required" },
+      { status: 400 }
+    );
+  }
 
   try {
-    const files = await readdir(currentPath, { withFileTypes: true });
-    
-    const dirs = [];
-    for (const file of files) {
-      // Skip hidden directories (dotfiles) like .git, .next, etc. to keep list clean,
-      // but allow users to navigate them if they are typing manually.
-      if (file.name.startsWith(".")) {
-        continue;
-      }
-      
-      try {
-        const fullPath = path.join(currentPath, file.name);
-        const s = await stat(fullPath);
-        if (s.isDirectory()) {
-          dirs.push({
-            name: file.name,
-            path: fullPath,
-          });
-        }
-      } catch {
-        // Skip directories that we don't have permission to access
-      }
-    }
-
-    // Sort case-insensitively
-    dirs.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+    const result = await controllerManager.sendRequest(
+      controllerId,
+      "fs.list",
+      { path: requestedPath }
+    );
 
     return NextResponse.json({
-      currentPath,
-      parentPath: currentPath === "/" ? null : path.dirname(currentPath),
-      directories: dirs,
+      currentPath: result.currentPath,
+      parentPath: result.parentPath,
+      directories: result.directories,
     });
   } catch (error: any) {
     return NextResponse.json(

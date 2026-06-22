@@ -1,43 +1,75 @@
 # Itero
 
-Itero is a mobile-first developer workspace interface that allows you to delegate coding tasks to local AI agents (e.g., Gemini CLI) and monitor executions, view run logs, and manage PRs directly from your browser.
+Itero is a mobile-first developer workspace that delegates coding tasks to AI agents and monitors executions across multiple machines. It follows a **Frontend + Server + Controller** architecture where lightweight Go-based Controllers are installed on development machines and the central Server coordinates all operations.
+
+## Architecture
+
+```
+Browser (Next.js UI)  <--ws-->  Server (Next.js)  <--ws-->  Controller A (Go, machine-1)
+                                                  <--ws-->  Controller B (Go, machine-2)
+```
+
+- **Controller** (`controller/`): A Go binary that connects to the Server via WebSocket. Executes commands, manages PTY sessions, runs git/filesystem operations. Minimal config — just a server URL and optional name.
+- **Server**: Routes operations to Controllers. Manages all persistent state (sessions, projects, messages, logs). Serves the frontend.
+- **Frontend**: Single-page React UI with controller selection, file browsing, chat, terminal modals, and task queue.
+
+All execution goes through a Controller — there is no local fallback on the server.
 
 ## Features
 
+- **Multi-Machine Controllers**: Install Go controllers on any development machine. The UI lets you pick which controller runs each session.
 - **Session-Based Workspaces**: Each task is encapsulated inside a self-contained session under `data/sessions/[sessionId]/`, tracking history, settings, and outputs.
 - **Granular Execution Logging**: Outputs for every CLI command execution are logged separately under `data/sessions/[sessionId]/logs/[messageId].log`.
-- **Multiple AI Agents Support**: Supports **Gemini CLI** (using `--session-id`/`--resume`) and **Antigravity CLI (agy)** (using dynamic mapping with `--conversation`) for code generation tasks.
-- **Integrated Diff Viewer (diff2html)**: View visual code changes directly from the browser. Generates HTML diffs covering unstaged changes and the latest commit using `diff2html`.
-- **Streamlined Action Menu**: Actions like "Commit Changes", "Create PR", "Delete Session", and "Show Diff" are folded into a clean, mobile-friendly three-dot drop-down menu.
-- **Task Queue & Live Tracking**: Displays an active task queue icon in the header next to the "Live" indicator. Clicking the queue shows currently running agents and background scripts with clear visual type tagging.
-- **Direct Log Inspection**: Clicking an active task in the task queue automatically switches to its session and pops up its dedicated live console log modal. Running logs display a pulsating "Streaming..." badge and auto-scroll to the latest terminal outputs.
-- **Interactive Terminal (PTY)**: Script execution runs in a full pseudo-terminal via `node-pty`, rendered in the browser with `xterm.js`. Supports interactive stdin, ANSI colors, and cursor control. Output is buffered for reconnection replay.
-- **Concurrent Script Execution**: Allows running multiple scripts simultaneously within a single session (only duplicate executions of the same script are restricted). The user can continue chatting while background scripts are running.
-- **Enhanced Dropdowns**: Interaction dropdowns, such as the three-dot action menu and the task queue dropdown, automatically close when clicking outside their area.
-- **Mobile-Friendly UI**: Designed with collapsible panels, modal logs, responsive menus, and touch-friendly actions to enable reviewing PRs and steering agents from anywhere.
-- **Collapsible Errors**: When agent execution fails, large traceback logs are wrapped in an accordion details tag to keep the chat clean.
-- **Session Soft-Deletion**: Move unwanted sessions out of sight. Deleted sessions are moved to `data/deleted-sessions/` on the server.
-- **Project Management**: Scopes and tracks sessions within resolved local repository paths (`data/projects/[projectId]/`).
-- **Custom Project Scripts**: Define, edit, and delete execution commands (e.g., build, test, deploy) scoped to specific projects.
-- **AI Auto-Script Discovery**: Uses the **Antigravity CLI (agy)** in a background process to automatically inspect repository configurations and documentation, registering valid test, build, and deploy scripts.
+- **Multiple AI Agents Support**: Supports **Gemini CLI** and **Antigravity CLI (agy)** for code generation tasks.
+- **Interactive Terminal (PTY)**: Script execution runs in a full pseudo-terminal via Go's `creack/pty`, rendered in the browser with `xterm.js`. Supports interactive stdin, ANSI colors, and cursor control.
+- **Concurrent Script Execution**: Allows running multiple scripts simultaneously within a single session. The user can continue chatting while background scripts are running.
+- **Remote File Browsing**: Browse directories on any connected controller directly from the UI when selecting a project path.
+- **Integrated Diff Viewer (diff2html)**: View visual code changes directly from the browser.
+- **Task Queue & Live Tracking**: Active task queue in the header with live log inspection. Clicking a task opens its dedicated console log modal.
+- **Task Persistence**: Active task contexts are persisted to disk (`data/active-tasks.json`) and restored on server restart. Controller IDs are stable across reconnections.
+- **Mobile-Friendly UI**: Designed with collapsible panels, modal logs, responsive menus, and touch-friendly actions.
+- **Project Management**: Scopes and tracks sessions within resolved repository paths. Supports custom project scripts and AI auto-script discovery.
 
 ## Getting Started
 
-First, install dependencies:
+### 1. Install dependencies and start the server
 
 ```bash
 npm install
-```
-
-Start the development server:
-
-```bash
 npm run dev
 ```
 
-Open [http://localhost:3250](http://localhost:3250) (or the port specified in terminal) in your browser.
+### 2. Build and start a controller
+
+```bash
+cd controller
+go build -o itero-controller .
+./itero-controller --server ws://localhost:3251/controller --name my-dev-machine
+```
+
+Or use the convenience script:
+
+```bash
+./scripts/run.controller.sh
+```
+
+### 3. Open the UI
+
+Open [http://localhost:3251](http://localhost:3251) in your browser. Select the connected controller, choose a project directory, and start a session.
 
 ## Configuration & Environment Variables
 
 - `GITHUB_TOKEN` – (Optional) Personal access token used to automatically create/submit PRs from the browser.
 - `PORT` – (Optional) Server port. Defaults to `3251` in development, `3250` in production.
+
+## Controller CLI
+
+```
+itero-controller [flags]
+
+Flags:
+  --server string   Server WebSocket URL (default "ws://localhost:3251/controller")
+  --name string     Controller display name (default: hostname)
+```
+
+The controller auto-reconnects with exponential backoff if the server connection drops.

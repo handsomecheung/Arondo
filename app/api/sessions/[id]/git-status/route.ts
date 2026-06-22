@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/store";
-import { exec } from "child_process";
-import { promisify } from "util";
-
-const execAsync = promisify(exec);
+import { controllerManager } from "@/lib/controller-manager";
 
 export async function GET(
   req: NextRequest,
@@ -17,22 +14,26 @@ export async function GET(
   }
 
   try {
-    // Check for any changes (staged, unstaged, untracked) in the project directory
-    const { stdout } = await execAsync("git status --porcelain .", {
-      cwd: session.repoPath,
-    });
+    const controllerId = controllerManager.resolveControllerId(session.controllerId);
+    if (!controllerId) {
+      return NextResponse.json({ hasChanges: false, isGitRepo: false, error: "No controller" }, { status: 200 });
+    }
 
-    const hasChanges = stdout.trim().length > 0;
-    return NextResponse.json({ hasChanges, isGitRepo: true });
+    const result = await controllerManager.sendRequest(
+      controllerId,
+      "git.status",
+      { workDir: session.repoPath }
+    );
+
+    return NextResponse.json({
+      hasChanges: result.hasChanges,
+      isGitRepo: result.isGitRepo,
+    });
   } catch (error: any) {
     console.error("Failed to check git status:", error);
-    // If the path is not a git repo or git fails, isGitRepo is false
-    const isNotGitRepo = error.message?.includes("not a git repository") ||
-      error.message?.includes("fatal:") ||
-      error.code === 128;
     return NextResponse.json({
       hasChanges: false,
-      isGitRepo: !isNotGitRepo,
+      isGitRepo: false,
       error: error.message,
     }, { status: 200 });
   }

@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Itero runtime data (tasks, messages stored as JSON)
 /data/
+
+# Go controller binary
+/controller/itero-controller

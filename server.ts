@@ -2,6 +2,7 @@ import { createServer } from "http";
 import next from "next";
 import { WebSocketServer } from "ws";
 import { setupWebSocketServer } from "./lib/ws-server";
+import { setupControllerServer } from "./lib/controller-server";
 
 const port = parseInt(process.env.PORT || (process.env.NODE_ENV === "production" ? "3250" : "3251"), 10);
 const dev = process.env.NODE_ENV !== "production";
@@ -16,14 +17,19 @@ app.prepare().then(() => {
   const wss = new WebSocketServer({ noServer: true });
   setupWebSocketServer(wss);
 
+  const controllerWss = new WebSocketServer({ noServer: true });
+  setupControllerServer(controllerWss);
+
   server.on("upgrade", (req, socket, head) => {
-    if (req.url?.startsWith("/ws")) {
+    if (req.url?.startsWith("/controller")) {
+      controllerWss.handleUpgrade(req, socket, head, (ws) => {
+        controllerWss.emit("connection", ws, req);
+      });
+    } else if (req.url?.startsWith("/ws")) {
       wss.handleUpgrade(req, socket, head, (ws) => {
         wss.emit("connection", ws, req);
       });
     }
-    // Non-/ws upgrades (e.g. Next.js HMR at /_next/webpack-hmr) are left
-    // for Next.js's own upgrade handler — do NOT destroy the socket.
   });
 
   server.listen(port, () => {

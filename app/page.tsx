@@ -16,6 +16,7 @@ interface Session {
   agentType: string;
   repoPath: string;
   projectId: string;
+  controllerId: string;
   prUrl?: string;
   errorMessage?: string;
   command?: string;
@@ -27,8 +28,18 @@ interface Session {
 interface Project {
   id: string;
   repoPath: string;
+  controllerId: string;
   createdAt: string;
   updatedAt: string;
+}
+
+interface Controller {
+  id: string;
+  name: string;
+  hostname: string;
+  os: string;
+  arch: string;
+  connected: boolean;
 }
 
 interface ProjectScript {
@@ -382,6 +393,8 @@ export default function HomePage() {
   const [prompt, setPrompt] = useState("");
   const [repoPath, setRepoPath] = useState("");
   const [agentType, setAgentType] = useState("antigravity");
+  const [controllerId, setControllerId] = useState("");
+  const [controllers, setControllers] = useState<Controller[]>([]);
   const [connected, setConnected] = useState(false);
   const [isNewSession, setIsNewSession] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -557,6 +570,18 @@ export default function HomePage() {
   const lastExecMsgId = [...messages]
     .reverse()
     .find((m) => m.role === "system" && m.content.includes("⚙️"))?.id;
+
+  const loadControllers = useCallback(() => {
+    fetch("/api/controllers")
+      .then((r) => r.json())
+      .then((data: Controller[]) => {
+        setControllers(data);
+        if (data.length > 0 && !controllerId) {
+          setControllerId(data[0].id);
+        }
+      })
+      .catch(console.error);
+  }, [controllerId]);
 
   const loadProjects = useCallback(() => {
     fetch("/api/projects")
@@ -767,6 +792,9 @@ export default function HomePage() {
       .catch(console.error);
 
     loadProjects();
+    loadControllers();
+
+    const controllerPoll = setInterval(loadControllers, 10_000);
 
     fetch("/api/config")
       .then((r) => r.json())
@@ -774,7 +802,9 @@ export default function HomePage() {
         setGithubConfigured(data.githubConfigured);
       })
       .catch(console.error);
-  }, [loadProjects]);
+
+    return () => clearInterval(controllerPoll);
+  }, [loadProjects, loadControllers]);
 
   // ── Load messages for selected session ──
   useEffect(() => {
@@ -807,10 +837,10 @@ export default function HomePage() {
 
   // ── Load directories for file browser ──
   useEffect(() => {
-    if (!fsModalOpen) return;
+    if (!fsModalOpen || !controllerId) return;
 
     setFsLoading(true);
-    fetch(`/api/fs?path=${encodeURIComponent(fsCurrentPath)}`)
+    fetch(`/api/fs?controller=${encodeURIComponent(controllerId)}&path=${encodeURIComponent(fsCurrentPath)}`)
       .then((r) => {
         if (!r.ok) throw new Error("Failed to load directories");
         return r.json();
@@ -830,7 +860,7 @@ export default function HomePage() {
       .finally(() => {
         setFsLoading(false);
       });
-  }, [fsCurrentPath, fsModalOpen]);
+  }, [fsCurrentPath, fsModalOpen, controllerId]);
 
   // ── Close sidebar on resize to desktop ──
   useEffect(() => {
@@ -1036,7 +1066,7 @@ export default function HomePage() {
 
     try {
       if (isNewSession || !selectedSessionId) {
-        if (!repoPath.trim()) return;
+        if (!repoPath.trim() || !controllerId) return;
         const res = await fetch("/api/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1044,6 +1074,7 @@ export default function HomePage() {
             prompt: trimmed,
             repoPath: repoPath.trim(),
             agentType,
+            controllerId,
           }),
         });
         const newSession: Session = await res.json();
@@ -1101,6 +1132,7 @@ export default function HomePage() {
     prompt,
     repoPath,
     agentType,
+    controllerId,
     isNewSession,
     selectedSessionId,
     loadProjects,
@@ -1574,7 +1606,7 @@ export default function HomePage() {
 
   const canSubmit =
     prompt.trim().length > 0 &&
-    (isNewSession ? repoPath.trim().length > 0 : !!selectedSessionId) &&
+    (isNewSession ? repoPath.trim().length > 0 && !!controllerId : !!selectedSessionId) &&
     !isAgentRunning;
 
   const activeLogMsg = messages.find((m) => m.id === activeLogMsgId);
@@ -2835,6 +2867,26 @@ export default function HomePage() {
             <div className="input-area">
               {isNewSession && (
                 <div className="input-meta">
+                  <span className="input-label">Controller:</span>
+                  <select
+                    className="agent-select"
+                    value={controllerId}
+                    onChange={(e) => {
+                      setControllerId(e.target.value);
+                      setRepoPath("");
+                    }}
+                    disabled={isRunning}
+                    id="controller-select"
+                  >
+                    {controllers.length === 0 && (
+                      <option value="">No controllers connected</option>
+                    )}
+                    {controllers.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.hostname})
+                      </option>
+                    ))}
+                  </select>
                   <span className="input-label">Project:</span>
                   <div
                     style={{ display: "flex", flex: 1, gap: 6, minWidth: 0 }}
@@ -2842,27 +2894,29 @@ export default function HomePage() {
                     <input
                       className="input-field-sm"
                       type="text"
-                      placeholder="Click to select project directory…"
+                      placeholder={controllerId ? "Click to select project directory…" : "Select a controller first"}
                       value={repoPath}
                       readOnly
                       onClick={() => {
+                        if (!controllerId) return;
                         const startingPath = repoPath.trim() || "/";
                         setFsCurrentPath(startingPath);
                         setFsModalOpen(true);
                       }}
                       style={{ cursor: "pointer" }}
-                      disabled={isRunning}
+                      disabled={isRunning || !controllerId}
                       id="repo-path-input"
                     />
                     <button
                       type="button"
                       className="browse-btn"
                       onClick={() => {
+                        if (!controllerId) return;
                         const startingPath = repoPath.trim() || "/";
                         setFsCurrentPath(startingPath);
                         setFsModalOpen(true);
                       }}
-                      disabled={isRunning}
+                      disabled={isRunning || !controllerId}
                       title="Browse Directory"
                       id="browse-repo-btn"
                     >

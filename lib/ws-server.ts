@@ -1,6 +1,6 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { eventBus, SseEvent } from "./event-bus";
-import { ptyManager } from "./pty-manager";
+import { controllerManager } from "./controller-manager";
 
 const EVENT_TYPE_MAP: Record<string, string> = {
   session_updated: "session:updated",
@@ -19,19 +19,20 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
   eventBus.subscribe((event: SseEvent) => {
     const wsType = EVENT_TYPE_MAP[event.type];
     if (!wsType) return;
-    // Terminal events use flat structure { type, sessionId, messageId, data/code }
-    // to match the format used by terminal:attach responses.
-    // Session/message events keep the { type, payload } envelope.
     const isTerminalEvent = wsType.startsWith("terminal:");
     const msg = JSON.stringify(
       isTerminalEvent
         ? { type: wsType, ...event.payload }
         : { type: wsType, payload: event.payload }
     );
-    for (const ws of clients) {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(msg);
+    const openClients = Array.from(clients).filter((ws) => ws.readyState === WebSocket.OPEN);
+    if (wsType === "agent:output" || wsType === "terminal:output") {
+      if (openClients.length === 0) {
+        console.warn(`[ws-server] ${wsType} event but no connected browser clients`);
       }
+    }
+    for (const ws of openClients) {
+      ws.send(msg);
     }
   });
 
@@ -58,25 +59,42 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
       }
 
       const { type, sessionId, messageId } = msg;
-      const ptyId = `${sessionId}:${messageId}`;
 
       switch (type) {
-        case "terminal:input":
-          ptyManager.write(ptyId, msg.data);
-          break;
-        case "terminal:resize":
-          ptyManager.resize(ptyId, msg.cols, msg.rows);
-          break;
-        case "terminal:attach": {
-          const buffer = ptyManager.getBuffer(ptyId);
-          if (buffer) {
-            ws.send(JSON.stringify({
-              type: "terminal:output",
-              sessionId,
-              messageId,
-              data: buffer,
-            }));
+        case "terminal:input": {
+          const taskId = controllerManager.getTaskIdByPtyKey(sessionId, messageId);
+          if (!taskId) {
+            console.warn(`[ws-server] terminal:input: no task for ptyKey ${sessionId}:${messageId}`);
+            break;
           }
+          const controllerId = controllerManager.getControllerForTask(taskId);
+          if (!controllerId) {
+            console.warn(`[ws-server] terminal:input: no controller for task ${taskId}`);
+            break;
+          }
+          controllerManager.sendFire(controllerId, "pty.input", {
+            taskId,
+            data: msg.data,
+          });
+          break;
+        }
+        case "terminal:resize": {
+          const taskId = controllerManager.getTaskIdByPtyKey(sessionId, messageId);
+          if (taskId) {
+            const controllerId = controllerManager.getControllerForTask(taskId);
+            if (controllerId) {
+              controllerManager.sendFire(controllerId, "pty.resize", {
+                taskId,
+                cols: msg.cols,
+                rows: msg.rows,
+              });
+            }
+          }
+          break;
+        }
+        case "terminal:attach": {
+          // Buffer replay is not available via controller in this version.
+          // The terminal will receive live output from the stream.
           break;
         }
       }

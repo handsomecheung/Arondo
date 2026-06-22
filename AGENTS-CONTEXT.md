@@ -4,69 +4,137 @@ Before starting work, ensure you have read the `README.md` in current directory 
 
 ## Overview
 Itero is a Next.js full-stack application that enables mobile-first software development
-by delegating coding tasks to AI agents (starting with Gemini CLI).
+by delegating coding tasks to AI agents across multiple machines via Go-based Controllers.
+
+## Architecture
+
+```
+Browser (Next.js UI)  <--ws /ws-->  Server (Next.js + tsx)  <--ws /controller-->  Controller (Go binary)
+```
+
+- **Controller** (`controller/`): Go binary connecting to the server via WebSocket. Handles all execution: agent commands, PTY scripts, filesystem browsing, git operations. Stateless — all persistent state lives on the server.
+- **Server**: Coordinates Controllers, routes operations, manages state. Two WebSocket endpoints: `/ws` (browser) and `/controller` (controllers).
+- **Frontend**: React SPA with controller selection, remote file browsing, chat, terminal modals, and task queue.
+
+All execution goes through a Controller — there is no local fallback on the server.
 
 ## Key Architecture
 
 ```
-server.ts               # Custom HTTP server wrapping Next.js with WebSocket upgrade at /ws
+server.ts               # Custom HTTP server wrapping Next.js with WebSocket upgrade at /ws and /controller
+controller/             # Go controller binary
+  main.go               # Entry point: --server and --name flags, signal handling
+  client.go             # WebSocket client: connect, reconnect (exponential backoff), heartbeat
+  protocol.go           # Message envelope struct (id, type, method, payload), constructors
+  handler.go            # Request dispatcher by method string, response helpers
+  handler_exec.go       # exec.agent (pipe mode), exec.script (PTY mode), exec.cancel
+  handler_fs.go         # fs.list: directory listing
+  handler_git.go        # git.status, git.diff, git.pr.create
+  handler_pty.go        # pty.input (write to PTY), pty.resize
+  pty.go                # TaskManager: spawn processes with PTY or pipes, scrollback buffer
 app/
-  page.tsx              # Main UI (chat, status tracking, PR management, terminal modals, 3-dot dropdown)
+  page.tsx              # Main UI (controller selector, chat, status tracking, terminal modals, 3-dot dropdown)
   layout.tsx            # Root layout
-  globals.css           # Design system (dropdown styling, collapsible error styling, animations)
+  globals.css           # Design system
   api/
+    controllers/
+      route.ts          # GET: list connected controllers
     sessions/
-      route.ts          # POST: create session & run agent; GET: list sessions
+      route.ts          # POST: create session & run agent via controller; GET: list sessions
       [id]/
         route.ts        # DELETE: delete session (moves to data/deleted-sessions/)
         diff/
-          route.ts      # GET: generate and serve visual HTML diff output via diff2html
+          route.ts      # GET: generate and serve visual HTML diff via controller + diff2html
         log/
           route.ts      # GET: fetch run log for specific messageId
         git-status/
-          route.ts      # GET: check if local git repository has any changes
+          route.ts      # GET: check git changes via controller
         messages/
-          route.ts      # POST: add user follow-up message & trigger agent (resume mode)
+          route.ts      # POST: add user follow-up message & trigger agent via controller
         run-script/
-          route.ts      # POST: run a project script in a PTY (node-pty)
+          route.ts      # POST: run a project script via controller PTY
         pr/
-          route.ts      # POST: trigger GitHub Pull Request creation
+          route.ts      # POST: trigger GitHub Pull Request creation via controller
     projects/
       route.ts          # GET: list all projects
       [id]/
         scripts/
-          route.ts      # GET: list project scripts; POST: add/update script; DELETE: delete script
+          route.ts      # GET/POST/DELETE: manage project scripts
         auto-scripts/
-          route.ts      # GET: check status of auto-script analysis; POST: start AI analysis in background
+          route.ts      # GET/POST: AI auto-script analysis
     messages/route.ts   # GET: list messages for a session
+    fs/route.ts         # GET: browse directories on a controller
 components/
   Terminal.tsx          # xterm.js terminal component (live WS mode + history replay mode)
 lib/
   store.ts              # File-based JSON storage (sessions, messages, logs, projects, scripts)
   event-bus.ts          # In-memory pub/sub (singleton on `process` for cross-context sharing)
-  ws-server.ts          # WebSocket handler: event bus broadcast + PTY I/O bridging
-  pty-manager.ts        # PTY instance manager (node-pty) with output buffering for reconnection
+  controller-manager.ts # Manages controller connections, task routing, and task persistence
+  controller-server.ts  # WebSocket handler for /controller endpoint (registration, heartbeat)
+  ws-server.ts          # WebSocket handler for /ws endpoint: event bus broadcast + PTY I/O bridging
   agents/
     base.ts             # Abstract BaseAgent interface
-    gemini.ts           # Gemini CLI adapter (handles --session-id and --resume options)
-    antigravity.ts      # Antigravity CLI (agy) adapter (resolves & persists internal conversation UUIDs)
+    gemini.ts           # Gemini CLI adapter
+    antigravity.ts      # Antigravity CLI (agy) adapter
     index.ts            # AgentFactory (add new agents here)
+scripts/
+  run.controller.sh     # Convenience script to build and start the Go controller
 data/                   # Runtime data (gitignored)
+  active-tasks.json     # Persisted active task contexts (survives server restart)
   agy-sessions.json     # Map file matching Itero sessionIds with agy conversation UUIDs
   sessions/
     [sessionId]/
-      session.json      # Session metadata (status, prompt, agent, repoPath)
+      session.json      # Session metadata (status, prompt, agent, repoPath, controllerId)
       messages.json     # Message history within the session
-      diff.html         # Local HTML diff page generated by diff2html
       logs/
-        [messageId].log # Executing run output logs bound to specific system message ID
+        [messageId].log # Execution output logs bound to specific system message ID
   projects/
     [projectId]/
-      project.json      # Project metadata (id, repoPath, createdAt, updatedAt)
+      project.json      # Project metadata (id, repoPath, controllerId, createdAt, updatedAt)
       settings/
         scripts.json    # Configured custom scripts list for the project
   deleted-sessions/     # Soft-deleted sessions moved here upon deletion
 ```
+
+## Controller Protocol
+
+All messages use a JSON envelope: `{ id, type, method, payload }`.
+
+**Message types:**
+- `request` (Server → Controller): expects a `response` with the same `id`
+- `response` (Controller → Server): correlates with a request by `id`
+- `stream` (Controller → Server): continuous data (e.g., `exec.output`)
+- `event` (Controller → Server): one-shot notifications (e.g., `exec.exit`, `register`, `task.status`)
+
+**Methods:**
+| Method | Direction | Description |
+|---|---|---|
+| `register` | C→S event | Controller registration on connect |
+| `task.status` | C→S event | Report running/exited tasks (used on reconnect) |
+| `exec.agent` | S→C request | Start agent command (pipe mode, no PTY) |
+| `exec.script` | S→C request | Start script with PTY |
+| `exec.cancel` | S→C request | Kill a running task |
+| `exec.output` | C→S stream | Stdout/stderr data (base64 for PTY, plain for agent) |
+| `exec.exit` | C→S event | Process exited with exit code |
+| `pty.input` | S→C request | Write stdin data to PTY |
+| `pty.resize` | S→C request | Resize PTY terminal |
+| `fs.list` | S→C request | List directories at a path |
+| `git.status` | S→C request | Run `git status --porcelain` |
+| `git.diff` | S→C request | Run `git diff HEAD` |
+| `git.pr.create` | S→C request | Push branch and create PR via `gh` |
+
+## Controller Manager
+
+`lib/controller-manager.ts` is the central coordinator. Key responsibilities:
+
+- **Connection management**: Tracks connected controllers. Controller IDs are stable across reconnections (derived from `name@hostname`).
+- **Task routing**: Maps `taskId` → `TaskContext` (sessionId, messageId, controllerId, type). Maps `sessionId:messageId` → `taskId` for PTY input routing.
+- **Task persistence**: Active tasks are saved to `data/active-tasks.json` on register/exit. On server restart, tasks are restored and re-associated to the reconnecting controller.
+- **Controller resolution**: `resolveControllerId()` falls back to any connected controller when a session's stored controllerId is stale.
+- **Stream/event handling**: Routes `exec.output` streams to the correct session's log file and event bus. Handles `exec.exit` to update session status and add completion messages.
+- **Disconnect cleanup**: Fails orphaned tasks when a controller disconnects.
+
+Uses the `process` singleton pattern (shared across tsx and Turbopack contexts).
 
 ## Adding a New Agent
 1. Create `lib/agents/<name>.ts` implementing `BaseAgent`
@@ -74,34 +142,32 @@ data/                   # Runtime data (gitignored)
 
 ## Development
 ```bash
-npm run dev   # Start custom server via tsx (dev: port 3251, prod: port 3250)
+npm run dev                    # Start server via tsx watch (dev: port 3251, prod: port 3250)
+cd controller && go run .      # Start controller connecting to local server
 ```
 
 ## Real-time Communication
 
-All real-time communication uses a single **WebSocket** connection at `/ws` (no SSE). The custom server (`server.ts`) wraps Next.js and handles WebSocket upgrade requests.
+Two WebSocket endpoints:
+- `/ws` — Browser ↔ Server (UI events, terminal I/O)
+- `/controller` — Controller ↔ Server (execution protocol)
 
-**Message protocol:**
-- Server → Client: `session:updated`, `message:added`, `session:deleted`, `agent:output` (event bus forwarding), `terminal:output`, `terminal:exit` (PTY I/O)
-- Client → Server: `terminal:input`, `terminal:resize`, `terminal:attach` (buffer replay)
+**Browser WebSocket protocol (`/ws`):**
+- Server → Client: `session:updated`, `message:added`, `session:deleted`, `agent:output`, `terminal:output`, `terminal:exit`
+- Client → Server: `terminal:input`, `terminal:resize`, `terminal:attach`
 
-**Cross-context singleton pattern:** The event bus and PTY manager use `process` (not `global`) as the singleton carrier. This is required because `server.ts` runs via `tsx` while API routes run via Next.js Turbopack — they share the same `process` object but have separate `global` scopes.
+**Cross-context singleton pattern:** The event bus and controller manager use `process` (not `global`) as the singleton carrier. This is required because `server.ts` runs via `tsx` while API routes run via Next.js Turbopack — they share the same `process` object but have separate `global` scopes.
 
 ## Core Logging & Session Lifecycle Features
-- **Message-specific execution logs**: Every agent or script execution creates a specific system message (e.g. `⚙️ Executing command...`). The resulting terminal outputs are streamed and stored in `data/sessions/[sessionId]/logs/[systemMsgId].log`. The UI displays a trigger button (e.g., "Agent Execution Log" or "Script Execution Log") underneath each command run to open a modal for that execution log.
-- **Interactive Terminal (PTY)**: Script execution uses `node-pty` for full pseudo-terminal support (stdin, ANSI colors, cursor control). The frontend renders output via `xterm.js` (`components/Terminal.tsx`) in two modes: live (WebSocket-connected for running scripts) and history (loads saved log data for completed scripts). The PTY manager buffers recent output (~100KB) for reconnection replay via `terminal:attach`.
-- **Task Queue & Log Popup**: Active tasks are tracked in a global header queue. Clicking any running task in the queue automatically switches the workspace to the corresponding session, retrieves its `messageId`, and opens the log modal.
-- **Real-time Streaming & Auto-scroll**: If the log modal represents an active command execution, it displays a pulsating `⟳ Streaming...` badge. Script output streams via WebSocket; agent output streams via the event bus.
-- **Concurrency & Responsiveness**: The chat prompt remains open during script execution. Multiple background scripts can be run concurrently in a single session (concurrency is restricted only on multiple calls to the exact same script).
-- **Auto-Closing Dropdowns**: Both the Task Queue dropdown and the Three-Dot Action Menu are equipped with outside-click detection, closing automatically when the user clicks elsewhere.
-- **Session Resumption**: Maintains task context on follow-ups. The `gemini` agent uses `gemini --resume <sessionId>`. The `antigravity` agent matches the Itero session ID with the internal agy conversation UUID using `agy-sessions.json` and runs `agy --conversation <agyId>`.
-- **Integrated Diff Viewer (diff2html)**: Renders a beautiful visual HTML diff of code modifications. The backend runs git and exports the output to `data/sessions/[sessionId]/diff.html` via `diff2html` and serves it on demand.
-- **Three-Dot Action Menu**: Compact dropdown menu in the header containing "Show Diff", "Commit Changes", "Create PR" (or "View PR"), and "Delete Session" to ensure mobile-friendly navigation.
-- **Collapsible Errors**: When an agent call fails, the visual output (`❌ Error` or `❌ Internal error`) is wrapped in a native `<details>` accordion so users can expand the details manually.
-- **Session Deletion**: Relocates the session folder under `data/deleted-sessions/` for soft-deletion (accessed via the three-dot menu).
+- **Message-specific execution logs**: Every agent or script execution creates a specific system message (e.g. `⚙️ Executing command...`). The resulting terminal outputs are streamed via the controller and stored in `data/sessions/[sessionId]/logs/[systemMsgId].log`.
+- **Interactive Terminal (PTY)**: Script execution uses Go's `creack/pty` on the controller for full pseudo-terminal support (stdin, ANSI colors, cursor control). The frontend renders output via `xterm.js` (`components/Terminal.tsx`) in two modes: live (WebSocket-connected for running scripts, with historical log pre-loaded) and history (loads saved log data for completed scripts).
+- **Task Queue & Log Popup**: Active tasks are tracked in a global header queue. Clicking any running task switches to its session and opens the log modal.
+- **Real-time Streaming**: Script output streams via WebSocket `terminal:output`; agent output streams via `agent:output`. Both are forwarded through the event bus.
+- **Concurrency**: Multiple background scripts can run concurrently in a single session. The chat prompt stays active during execution.
+- **Task Persistence**: Active task contexts survive server restarts via `data/active-tasks.json`. On controller reconnect, the `task.status` event reconciles running vs exited tasks.
+- **Controller Disconnect Handling**: When a controller disconnects, orphaned tasks are automatically failed with exit code -1, updating session status and notifying the UI.
 
 ## Project & Custom Scripts Management
-- **Project Scoping**: Sessions are automatically mapped to projects by resolving their repository paths. Projects are defined with UUIDs and mapped to metadata at `data/projects/[projectId]/project.json`.
-- **Custom Project Scripts**: Allows defining commands (e.g., build, test, deploy) tailored for specific repositories. These are managed dynamically through the browser UI and stored under `data/projects/[projectId]/settings/scripts.json`.
-- **AI Auto-Script Discovery**: Users can trigger automated script configuration, initiating a background process that spawns the Antigravity CLI (`agy`) inside the repository path. It auto-detects configuration scripts (from packages/READMEs) and adds them directly as custom project scripts.
-
+- **Project Scoping**: Sessions are mapped to projects by repository path + controllerId. Projects store metadata at `data/projects/[projectId]/project.json`.
+- **Custom Project Scripts**: Commands (build, test, deploy) scoped to repositories, stored under `data/projects/[projectId]/settings/scripts.json`.
+- **AI Auto-Script Discovery**: Background process using `agy` to auto-detect and register project scripts.

@@ -13,6 +13,7 @@ export type SessionStatus = "idle" | "running" | "script-running" | "done" | "er
 export interface Project {
   id: string;
   repoPath: string;
+  controllerId: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -24,6 +25,7 @@ export interface Session {
   agentType: string;
   repoPath: string;
   projectId: string;
+  controllerId: string;
   errorMessage?: string;
   command?: string;
   createdAt: string;
@@ -138,9 +140,9 @@ export interface ProjectScript {
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
 
-export async function getOrCreateProject(repoPath: string): Promise<Project> {
+export async function getOrCreateProject(repoPath: string, controllerId: string): Promise<Project> {
   await ensureDir(PROJECTS_DIR);
-  
+
   const resolvedRepoPath = path.resolve(repoPath);
 
   try {
@@ -150,7 +152,7 @@ export async function getOrCreateProject(repoPath: string): Promise<Project> {
         const filePath = getProjectFilePath(entry.name);
         try {
           const project = await readJson<Project | null>(filePath, null);
-          if (project && path.resolve(project.repoPath) === resolvedRepoPath) {
+          if (project && path.resolve(project.repoPath) === resolvedRepoPath && project.controllerId === controllerId) {
             return project;
           }
         } catch {
@@ -166,6 +168,7 @@ export async function getOrCreateProject(repoPath: string): Promise<Project> {
   const project: Project = {
     id: projectId,
     repoPath: resolvedRepoPath,
+    controllerId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -263,7 +266,7 @@ export async function createSession(
   data: Omit<Session, "id" | "projectId" | "createdAt" | "updatedAt">
 ): Promise<Session> {
   const id = crypto.randomUUID();
-  const project = await getOrCreateProject(data.repoPath);
+  const project = await getOrCreateProject(data.repoPath, data.controllerId);
   const session: Session = {
     ...data,
     id,
@@ -271,7 +274,7 @@ export async function createSession(
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
-  
+
   // Save session metadata inside its own folder
   await writeJson(getSessionFilePath(id), session);
   return session;
