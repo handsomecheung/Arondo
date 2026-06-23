@@ -11,6 +11,7 @@ type SessionStatus = "idle" | "running" | "script-running" | "done" | "error";
 
 interface Session {
   id: string;
+  name?: string;
   status: SessionStatus;
   prompt: string;
   agentType: string;
@@ -309,6 +310,24 @@ function IconTrash() {
   );
 }
 
+function IconEdit() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
+    </svg>
+  );
+}
+
 function IconMoreVertical() {
   return (
     <svg
@@ -457,6 +476,11 @@ export default function HomePage() {
     message: string;
     onConfirm: () => void;
   } | null>(null);
+  const [renameModal, setRenameModal] = useState<{
+    sessionId: string;
+    currentName: string;
+  } | null>(null);
+  const [renameInput, setRenameInput] = useState("");
   const [infoDialog, setInfoDialog] = useState<{
     title: string;
     body: React.ReactNode;
@@ -1644,6 +1668,38 @@ export default function HomePage() {
     });
   };
 
+  const handleRenameSession = async (id: string, newName: string) => {
+    if (!newName.trim()) return;
+    try {
+      const res = await fetch(`/api/sessions/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name: newName.trim() }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setSessions((prev) =>
+          prev.map((s) => (s.id === id ? updated : s))
+        );
+        setRenameModal(null);
+      } else {
+        const data = await res.json();
+        setApiError({
+          title: "Rename Session Error",
+          message: data.error || "Failed to rename session",
+        });
+      }
+    } catch (err: any) {
+      console.error(err);
+      setApiError({
+        title: "Rename Session Error",
+        message: err.message || "An error occurred while renaming the session.",
+      });
+    }
+  };
+
   const canSubmit =
     prompt.trim().length > 0 &&
     (isNewSession ? repoPath.trim().length > 0 && !!runnerId : !!selectedSessionId) &&
@@ -1935,7 +1991,7 @@ export default function HomePage() {
                         </span>
                       )}
                     </div>
-                    <div className="task-item-prompt">{session.prompt}</div>
+                    <div className="task-item-prompt">{session.name || session.prompt}</div>
                     <div className="task-item-time">
                       {formatRelative(session.createdAt)}
                     </div>
@@ -2781,7 +2837,7 @@ export default function HomePage() {
                                   textOverflow: "ellipsis",
                                 }}
                               >
-                                {session.prompt}
+                                {session.name || session.prompt}
                               </span>
                             </div>
                             <span
@@ -2840,7 +2896,7 @@ export default function HomePage() {
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {selectedSession.prompt}
+                    {selectedSession.name || selectedSession.prompt}
                   </span>
                   <span
                     style={{
@@ -3037,6 +3093,22 @@ export default function HomePage() {
                           )}
                         </div>
                       )}
+
+                      {/* Rename Session */}
+                      <button
+                        className="menu-item"
+                        onClick={() => {
+                          setRenameModal({
+                            sessionId: selectedSessionId!,
+                            currentName: selectedSession.name || selectedSession.prompt,
+                          });
+                          setRenameInput(selectedSession.name || selectedSession.prompt);
+                          setMenuOpen(false);
+                        }}
+                        id="menu-rename-session"
+                      >
+                        <IconEdit /> Rename Session
+                      </button>
 
                       {/* Delete Session */}
                       <button
@@ -3774,6 +3846,80 @@ export default function HomePage() {
                 }}
               >
                 Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rename Session Dialog */}
+      {renameModal && (
+        <div className="modal-backdrop" onClick={() => setRenameModal(null)}>
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "450px" }}
+          >
+            <div className="modal-header">
+              <span className="modal-title">Rename Session</span>
+              <button
+                className="modal-close-btn"
+                onClick={() => setRenameModal(null)}
+                aria-label="Close"
+              >
+                <IconX />
+              </button>
+            </div>
+            <div className="modal-body" style={{ padding: "20px 16px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <label
+                  htmlFor="rename-session-input"
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  Session Name
+                </label>
+                <input
+                  id="rename-session-input"
+                  type="text"
+                  value={renameInput}
+                  onChange={(e) => setRenameInput(e.target.value)}
+                  placeholder="Enter session name..."
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && renameInput.trim()) {
+                      handleRenameSession(renameModal.sessionId, renameInput.trim());
+                    }
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    background: "var(--bg-surface)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius-sm)",
+                    color: "var(--text-primary)",
+                    fontSize: 14,
+                    outline: "none",
+                  }}
+                />
+              </div>
+            </div>
+            <div className="modal-footer" style={{ justifyContent: "flex-end", gap: "8px" }}>
+              <button
+                className="modal-btn-secondary"
+                onClick={() => setRenameModal(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="modal-btn-primary"
+                onClick={() => handleRenameSession(renameModal.sessionId, renameInput.trim())}
+                disabled={!renameInput.trim()}
+              >
+                Save
               </button>
             </div>
           </div>
