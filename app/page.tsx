@@ -2888,15 +2888,13 @@ export default function HomePage() {
                         >
                           🔍 Show Diff
                         </button>
-                      ) : isRunning || isCheckingGitChanges || !hasGitChanges ? (
+                      ) : isCheckingGitChanges || !hasGitChanges ? (
                         <button
                           className="menu-item"
                           disabled={true}
                           id="menu-show-diff"
                           title={
-                            isRunning
-                              ? "Agent is running"
-                              : isCheckingGitChanges
+                            isCheckingGitChanges
                               ? "Checking git changes..."
                               : "No changes detected in git repository"
                           }
