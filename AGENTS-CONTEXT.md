@@ -27,11 +27,11 @@ controller/             # Go controller binary
   client.go             # WebSocket client: connect, reconnect (exponential backoff), heartbeat
   protocol.go           # Message envelope struct (id, type, method, payload), constructors
   handler.go            # Request dispatcher by method string, response helpers
-  handler_exec.go       # exec.agent (pipe mode), exec.script (PTY mode), exec.cancel
+  handler_exec.go       # exec.agent, exec.script, exec.cancel (all PTY-based)
   handler_fs.go         # fs.list: directory listing
   handler_git.go        # git.status, git.diff, git.pr.create
   handler_pty.go        # pty.input (write to PTY), pty.resize
-  pty.go                # TaskManager: spawn processes with PTY or pipes, scrollback buffer
+  pty.go                # TaskManager: spawn processes with PTY, scrollback buffer, auto-cleanup on exit
 app/
   page.tsx              # Main UI (controller selector, chat, status tracking, terminal modals, 3-dot dropdown)
   layout.tsx            # Root layout
@@ -62,6 +62,9 @@ app/
           route.ts      # GET/POST/DELETE: manage project scripts
         auto-scripts/
           route.ts      # GET/POST: AI auto-script analysis
+    tasks/
+      kill/
+        route.ts        # POST: kill a running task by sessionId + messageId
     messages/route.ts   # GET: list messages for a session
     fs/route.ts         # GET: browse directories on a controller
 components/
@@ -78,7 +81,8 @@ lib/
     antigravity.ts      # Antigravity CLI (agy) adapter
     index.ts            # AgentFactory (add new agents here)
 scripts/
-  run.controller.sh     # Convenience script to build and start the Go controller
+  run.dev.server.sh     # Start the Next.js dev server
+  run.dev.controller.sh # Start the Go controller in dev mode (connects to localhost:3251)
 data/                   # Runtime data (gitignored)
   active-tasks.json     # Persisted active task contexts (survives server restart)
   agy-sessions.json     # Map file matching Itero sessionIds with agy conversation UUIDs
@@ -111,10 +115,10 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 |---|---|---|
 | `register` | C→S event | Controller registration on connect |
 | `task.status` | C→S event | Report running/exited tasks (used on reconnect) |
-| `exec.agent` | S→C request | Start agent command (pipe mode, no PTY) |
-| `exec.script` | S→C request | Start script with PTY |
-| `exec.cancel` | S→C request | Kill a running task |
-| `exec.output` | C→S stream | Stdout/stderr data (base64 for PTY, plain for agent) |
+| `exec.agent` | S→C request | Start agent command (PTY mode) |
+| `exec.script` | S→C request | Start script (PTY mode) |
+| `exec.cancel` | S→C request | Kill a running task (SIGTERM/SIGKILL) |
+| `exec.output` | C→S stream | Stdout/stderr data (base64-encoded) |
 | `exec.exit` | C→S event | Process exited with exit code |
 | `pty.input` | S→C request | Write stdin data to PTY |
 | `pty.resize` | S→C request | Resize PTY terminal |
@@ -128,7 +132,7 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 `lib/controller-manager.ts` is the central coordinator. Key responsibilities:
 
 - **Connection management**: Tracks connected controllers. Controller IDs are stable across reconnections (derived from `name@hostname`).
-- **Task routing**: Maps `taskId` → `TaskContext` (sessionId, messageId, controllerId, type). Maps `sessionId:messageId` → `taskId` for PTY input routing.
+- **Task routing**: Maps `taskId` → `TaskContext` (sessionId, messageId, controllerId, type, pid). Maps `sessionId:messageId` → `taskId` for PTY input routing.
 - **Task persistence**: Active tasks are saved to `data/active-tasks.json` on register/exit. On server restart, tasks are restored and re-associated to the reconnecting controller.
 - **Controller resolution**: `resolveControllerId()` falls back to any connected controller when a session's stored controllerId is stale.
 - **Stream/event handling**: Routes `exec.output` streams to the correct session's log file and event bus. Handles `exec.exit` to update session status and add completion messages.
@@ -142,8 +146,8 @@ Uses the `process` singleton pattern (shared across tsx and Turbopack contexts).
 
 ## Development
 ```bash
-npm run dev                    # Start server via tsx watch (dev: port 3251, prod: port 3250)
-cd controller && go run .      # Start controller connecting to local server
+./scripts/run.dev.server.sh      # Start server via tsx watch (dev: port 3251, prod: port 3250)
+./scripts/run.dev.controller.sh  # Start controller connecting to localhost:3251
 ```
 
 ## Real-time Communication
@@ -153,7 +157,7 @@ Two WebSocket endpoints:
 - `/controller` — Controller ↔ Server (execution protocol)
 
 **Browser WebSocket protocol (`/ws`):**
-- Server → Client: `session:updated`, `message:added`, `session:deleted`, `agent:output`, `terminal:output`, `terminal:exit`
+- Server → Client: `session:updated`, `message:added`, `session:deleted`, `terminal:output`, `terminal:exit`
 - Client → Server: `terminal:input`, `terminal:resize`, `terminal:attach`
 
 **Cross-context singleton pattern:** The event bus and controller manager use `process` (not `global`) as the singleton carrier. This is required because `server.ts` runs via `tsx` while API routes run via Next.js Turbopack — they share the same `process` object but have separate `global` scopes.
@@ -161,8 +165,8 @@ Two WebSocket endpoints:
 ## Core Logging & Session Lifecycle Features
 - **Message-specific execution logs**: Every agent or script execution creates a specific system message (e.g. `⚙️ Executing command...`). The resulting terminal outputs are streamed via the controller and stored in `data/sessions/[sessionId]/logs/[systemMsgId].log`.
 - **Interactive Terminal (PTY)**: Script execution uses Go's `creack/pty` on the controller for full pseudo-terminal support (stdin, ANSI colors, cursor control). The frontend renders output via `xterm.js` (`components/Terminal.tsx`) in two modes: live (WebSocket-connected for running scripts, with historical log pre-loaded) and history (loads saved log data for completed scripts).
-- **Task Queue & Log Popup**: Active tasks are tracked in a global header queue. Clicking any running task switches to its session and opens the log modal.
-- **Real-time Streaming**: Script output streams via WebSocket `terminal:output`; agent output streams via `agent:output`. Both are forwarded through the event bus.
+- **Task Queue & Log Popup**: Active tasks are tracked in a global header queue with PID tracking. Clicking any running task switches to its session and opens the log modal. Each task has a kill button that sends SIGTERM via the controller.
+- **Real-time Streaming**: Both agent and script output stream via WebSocket `terminal:output` (base64-encoded PTY data), forwarded through the event bus. The frontend renders all logs via the xterm.js Terminal component.
 - **Concurrency**: Multiple background scripts can run concurrently in a single session. The chat prompt stays active during execution.
 - **Task Persistence**: Active task contexts survive server restarts via `data/active-tasks.json`. On controller reconnect, the `task.status` event reconciles running vs exited tasks.
 - **Controller Disconnect Handling**: When a controller disconnects, orphaned tasks are automatically failed with exit code -1, updating session status and notifying the UI.

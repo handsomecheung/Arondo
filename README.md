@@ -21,11 +21,11 @@ All execution goes through a Controller — there is no local fallback on the se
 - **Session-Based Workspaces**: Each task is encapsulated inside a self-contained session under `data/sessions/[sessionId]/`, tracking history, settings, and outputs.
 - **Granular Execution Logging**: Outputs for every CLI command execution are logged separately under `data/sessions/[sessionId]/logs/[messageId].log`.
 - **Multiple AI Agents Support**: Supports **Gemini CLI** and **Antigravity CLI (agy)** for code generation tasks.
-- **Interactive Terminal (PTY)**: Script execution runs in a full pseudo-terminal via Go's `creack/pty`, rendered in the browser with `xterm.js`. Supports interactive stdin, ANSI colors, and cursor control.
+- **Interactive Terminal (PTY)**: Both agent and script execution run in a full pseudo-terminal via Go's `creack/pty`, rendered in the browser with `xterm.js`. Supports interactive stdin, ANSI colors, and cursor control. PTY ensures reliable process cleanup on controller exit (SIGHUP).
 - **Concurrent Script Execution**: Allows running multiple scripts simultaneously within a single session. The user can continue chatting while background scripts are running.
 - **Remote File Browsing**: Browse directories on any connected controller directly from the UI when selecting a project path.
 - **Integrated Diff Viewer (diff2html)**: View visual code changes directly from the browser.
-- **Task Queue & Live Tracking**: Active task queue in the header with live log inspection. Clicking a task opens its dedicated console log modal.
+- **Task Queue & Live Tracking**: Active task queue in the header with PID tracking and live log inspection. Clicking a task opens its dedicated console log modal. Each task can be killed from the queue.
 - **Task Persistence**: Active task contexts are persisted to disk (`data/active-tasks.json`) and restored on server restart. Controller IDs are stable across reconnections.
 - **Mobile-Friendly UI**: Designed with collapsible panels, modal logs, responsive menus, and touch-friendly actions.
 - **Project Management**: Scopes and tracks sessions within resolved repository paths. Supports custom project scripts and AI auto-script discovery.
@@ -50,7 +50,7 @@ go build -o itero-controller .
 Or use the convenience script:
 
 ```bash
-./scripts/run.controller.sh
+./scripts/run.dev.controller.sh
 ```
 
 ### 3. Open the UI
