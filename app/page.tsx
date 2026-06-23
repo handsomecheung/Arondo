@@ -40,6 +40,8 @@ interface Controller {
   os: string;
   arch: string;
   connected: boolean;
+  version?: string;
+  capabilities?: string[];
 }
 
 interface ProjectScript {
@@ -407,7 +409,7 @@ export default function HomePage() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Project states
-  const [sidebarMode, setSidebarMode] = useState<"sessions" | "projects">(
+  const [sidebarMode, setSidebarMode] = useState<"sessions" | "projects" | "controllers">(
     "sessions",
   );
   const [projects, setProjects] = useState<Project[]>([]);
@@ -502,6 +504,7 @@ export default function HomePage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [viewportStyles, setViewportStyles] = useState<React.CSSProperties>({});
+  const [selectedControllerId, setSelectedControllerId] = useState<string | null>(null);
 
   // Handle mobile keyboard overlay by listening to visualViewport changes
   useEffect(() => {
@@ -1177,6 +1180,7 @@ export default function HomePage() {
   const handleNewSession = () => {
     setSelectedSessionId(null);
     setSelectedProjectId(null);
+    setSelectedControllerId(null);
     setIsNewSession(true);
     setMessages([]);
     setSidebarOpen(false);
@@ -1231,6 +1235,18 @@ export default function HomePage() {
 
   const handleSelectProject = (projectId: string) => {
     setSelectedProjectId(projectId);
+    setSelectedSessionId(null);
+    setSelectedControllerId(null);
+    setIsNewSession(false);
+    setSidebarOpen(false);
+    setActiveLogMsgId(null);
+    setLogModalOpen(false);
+    setMenuOpen(false);
+  };
+
+  const handleSelectController = (controllerId: string) => {
+    setSelectedControllerId(controllerId);
+    setSelectedProjectId(null);
     setSelectedSessionId(null);
     setIsNewSession(false);
     setSidebarOpen(false);
@@ -1584,6 +1600,7 @@ export default function HomePage() {
   const handleSelectSession = (id: string) => {
     setSelectedSessionId(id);
     setSelectedProjectId(null);
+    setSelectedControllerId(null);
     setIsNewSession(false);
     setSidebarOpen(false);
     setActiveLogMsgId(null);
@@ -1792,7 +1809,27 @@ export default function HomePage() {
 
       {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
-        <div className="sidebar-header">
+        <div className="sidebar-header" style={{ flexDirection: "column", gap: 12, alignItems: "stretch" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span className="sidebar-title">Menu</span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <button
+                className="new-task-btn"
+                onClick={handleNewSession}
+                id="new-session-btn"
+              >
+                <IconPlus /> New
+              </button>
+              {/* Close button: mobile only */}
+              <button
+                className="sidebar-close-btn"
+                onClick={() => setSidebarOpen(false)}
+                aria-label="Close session list"
+              >
+                <IconX />
+              </button>
+            </div>
+          </div>
           <div
             className="sidebar-mode-toggle"
             role="tablist"
@@ -1814,22 +1851,13 @@ export default function HomePage() {
             >
               Projects
             </button>
-          </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button
-              className="new-task-btn"
-              onClick={handleNewSession}
-              id="new-session-btn"
+              role="tab"
+              aria-selected={sidebarMode === "controllers"}
+              className={`sidebar-mode-tab${sidebarMode === "controllers" ? " active" : ""}`}
+              onClick={() => setSidebarMode("controllers")}
             >
-              <IconPlus /> New
-            </button>
-            {/* Close button: mobile only */}
-            <button
-              className="sidebar-close-btn"
-              onClick={() => setSidebarOpen(false)}
-              aria-label="Close session list"
-            >
-              <IconX />
+              Nodes
             </button>
           </div>
         </div>
@@ -1903,7 +1931,7 @@ export default function HomePage() {
                 );
               })}
             </>
-          ) : (
+          ) : sidebarMode === "projects" ? (
             <>
               {projects.length === 0 && (
                 <div className="empty-state">
@@ -1970,13 +1998,247 @@ export default function HomePage() {
                 );
               })}
             </>
+          ) : (
+            <>
+              {controllers.length === 0 && (
+                <div className="empty-state">
+                  <IconInbox />
+                  <p>
+                    No controllers connected.
+                  </p>
+                </div>
+              )}
+              {controllers.map((c) => (
+                <div
+                  key={c.id}
+                  className={`task-item ${selectedControllerId === c.id ? "active" : ""}`}
+                  onClick={() => handleSelectController(c.id)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <div className="task-item-header">
+                    <span className={`task-status-badge ${c.connected ? "running" : "idle"}`}>
+                      {c.connected ? "connected" : "disconnected"}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        color: "var(--text-muted)",
+                        marginLeft: "auto",
+                      }}
+                    >
+                      {c.os} ({c.arch})
+                    </span>
+                  </div>
+                  <div
+                    className="task-item-prompt"
+                    style={{ fontWeight: 600 }}
+                  >
+                    {c.name}
+                  </div>
+                  <div
+                    className="task-item-prompt"
+                    style={{
+                      fontSize: 11,
+                      color: "var(--text-secondary)",
+                      marginTop: 2,
+                    }}
+                  >
+                    Host: {c.hostname}
+                  </div>
+                </div>
+              ))}
+            </>
           )}
         </div>
       </aside>
 
       {/* Main */}
       <main className="main">
-        {selectedProjectId ? (
+        {selectedControllerId ? (
+          (() => {
+            const controller = controllers.find((c) => c.id === selectedControllerId);
+            if (!controller) return null;
+
+            // Find all projects that use this controller
+            const controllerProjects = projects.filter((p) => p.controllerId === controller.id);
+
+            return (
+              <div className="project-detail-container" style={{ padding: 24, overflowY: "auto", height: "100%" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    borderBottom: "1px solid var(--border)",
+                    paddingBottom: 16,
+                    marginBottom: 20,
+                  }}
+                >
+                  <div>
+                    <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-primary)" }}>
+                      Node: {controller.name}
+                    </h2>
+                    <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
+                      Controller system details and script configurations
+                    </p>
+                  </div>
+                  <span className={`task-status-badge ${controller.connected ? "running" : "idle"}`} style={{ padding: "4px 10px", fontSize: 12 }}>
+                    {controller.connected ? "Active / Connected" : "Disconnected"}
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                    gap: 16,
+                    marginBottom: 24,
+                  }}
+                >
+                  {/* Node Info Box */}
+                  <div
+                    style={{
+                      background: "var(--bg-surface)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-md)",
+                      padding: 16,
+                    }}
+                  >
+                    <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary)", marginBottom: 12 }}>
+                      System Information
+                    </h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Host Name</span>
+                        <code style={{ fontSize: 12, color: "var(--text-primary)" }}>{controller.hostname || "N/A"}</code>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>OS / Platform</span>
+                        <span style={{ fontSize: 12, color: "var(--text-primary)" }}>{controller.os} ({controller.arch})</span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Agent Version</span>
+                        <span style={{ fontSize: 12, color: "var(--text-primary)" }}>{controller.version || "0.1.0"}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Capabilities Box */}
+                  <div
+                    style={{
+                      background: "var(--bg-surface)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-md)",
+                      padding: 16,
+                    }}
+                  >
+                    <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary)", marginBottom: 12 }}>
+                      Capabilities
+                    </h3>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {controller.capabilities && controller.capabilities.length > 0 ? (
+                        controller.capabilities.map((cap) => (
+                          <span
+                            key={cap}
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 500,
+                              color: "var(--accent)",
+                              background: "var(--accent-glow)",
+                              border: "1px solid var(--border-accent)",
+                              padding: "2px 8px",
+                              borderRadius: "4px",
+                            }}
+                          >
+                            {cap}
+                          </span>
+                        ))
+                      ) : (
+                        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Standard terminal execution</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Projects & Scripts Section */}
+                <div className="project-section-block">
+                  <div className="project-section-header" style={{ marginBottom: 16 }}>
+                    <h3 className="project-section-title">Associated Projects & Scripts</h3>
+                  </div>
+                  
+                  {controllerProjects.length === 0 ? (
+                    <div
+                      style={{
+                        padding: "40px 16px",
+                        textAlign: "center",
+                        border: "1px dashed var(--border)",
+                        borderRadius: "var(--radius-md)",
+                        color: "var(--text-muted)",
+                        fontSize: 13,
+                      }}
+                    >
+                      No active projects are configured for this node.
+                      <br />
+                      Create a new project session selecting this controller node.
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                      {controllerProjects.map((project) => {
+                        const projSessions = sessions.filter((s) => s.projectId === project.id);
+                        const folderName = project.repoPath.split("/").pop() || project.repoPath;
+
+                        return (
+                          <div
+                            key={project.id}
+                            style={{
+                              background: "var(--bg-surface)",
+                              border: "1px solid var(--border)",
+                              borderRadius: "var(--radius-md)",
+                              padding: 16,
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                borderBottom: "1px solid var(--border)",
+                                paddingBottom: 10,
+                                marginBottom: 12,
+                              }}
+                            >
+                              <div>
+                                <h4 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
+                                  {folderName}
+                                </h4>
+                                <code style={{ fontSize: 11, color: "var(--text-muted)" }}>{project.repoPath}</code>
+                              </div>
+                              <button
+                                className="new-task-btn"
+                                onClick={() => handleSelectProject(project.id)}
+                                style={{ padding: "4px 10px", fontSize: 11, background: "transparent", border: "1px solid var(--border)" }}
+                              >
+                                View Project Scripts
+                              </button>
+                            </div>
+                            <div style={{ display: "flex", gap: 16 }}>
+                              <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                                <strong>Sessions:</strong> {projSessions.length} total
+                              </span>
+                              <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                                <strong>Status:</strong> Active
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()
+        ) : selectedProjectId ? (
           (() => {
             const project = projects.find((p) => p.id === selectedProjectId);
             if (!project) return null;

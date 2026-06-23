@@ -273,11 +273,12 @@ body {
   border-radius: var(--radius-md);
   padding: 3px;
   gap: 2px;
+  width: 100%;
 }
 
 .sidebar-mode-tab {
   position: relative;
-  padding: 5px 14px;
+  padding: 5px 8px; /* Slightly reduced padding to comfortably fit 3 buttons on small screens */
   border-radius: calc(var(--radius-md) - 2px);
   border: none;
   background: transparent;
@@ -291,6 +292,8 @@ body {
     color 0.18s ease,
     background 0.18s ease;
   white-space: nowrap;
+  flex: 1;
+  text-align: center;
 }
 
 .sidebar-mode-tab:hover:not(.active) {
