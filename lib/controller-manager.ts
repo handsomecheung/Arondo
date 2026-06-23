@@ -10,10 +10,9 @@ import {
 import fs from "fs/promises";
 import path from "path";
 
-const TASKS_FILE = path.join(
-  process.env.DATA_DIR || path.join(process.cwd(), "data"),
-  "active-tasks.json"
-);
+const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
+const TASKS_FILE = path.join(DATA_DIR, "active-tasks.json");
+const CONTROLLERS_DIR = path.join(DATA_DIR, "controllers");
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -60,6 +59,7 @@ interface MessageEnvelope {
 
 class ControllerManager {
   private controllers = new Map<string, ControllerConnection>();
+  private knownIds = new Map<string, string>();
   private tasks = new Map<string, TaskContext>();
   private ptyKeyToTaskId = new Map<string, string>();
   private pending = new Map<string, PendingRequest>();
@@ -67,6 +67,46 @@ class ControllerManager {
 
   private nextId(): string {
     return `srv_${++this.idCounter}_${Date.now().toString(36)}`;
+  }
+
+  // ─── Controller persistence ─────────────────────────────────────────────
+
+  private controllerFilePath(id: string): string {
+    return path.join(CONTROLLERS_DIR, id, "controller.json");
+  }
+
+  private async persistController(info: ControllerInfo): Promise<void> {
+    const filePath = this.controllerFilePath(info.id);
+    try {
+      await fs.mkdir(path.dirname(filePath), { recursive: true });
+      await fs.writeFile(filePath, JSON.stringify(info, null, 2), "utf-8");
+    } catch (err) {
+      console.error("[controller-manager] failed to persist controller:", err);
+    }
+  }
+
+  async restoreControllers(): Promise<void> {
+    try {
+      await fs.mkdir(CONTROLLERS_DIR, { recursive: true });
+      const entries = await fs.readdir(CONTROLLERS_DIR, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        const filePath = path.join(CONTROLLERS_DIR, entry.name, "controller.json");
+        try {
+          const raw = await fs.readFile(filePath, "utf-8");
+          const info: ControllerInfo = JSON.parse(raw);
+          const stableKey = `${info.name}@${info.hostname}`;
+          this.knownIds.set(stableKey, info.id);
+        } catch {
+          // Ignore corrupt controller files
+        }
+      }
+      if (this.knownIds.size > 0) {
+        console.log(`[controller-manager] restored ${this.knownIds.size} known controller(s) from disk`);
+      }
+    } catch {
+      // Directory doesn't exist yet — fine on first run
+    }
   }
 
   // ─── Task persistence ──────────────────────────────────────────────────
@@ -104,19 +144,17 @@ class ControllerManager {
     const name: string = registerPayload.name || "unknown";
     const hostname: string = registerPayload.hostname || "";
 
-    // Stable ID: derived from name+hostname so it survives reconnections.
-    // Sessions store this ID, so it must not change between connects.
     const stableKey = `${name}@${hostname}`;
-    let id: string | undefined;
-    for (const [existingId, conn] of this.controllers) {
-      if (`${conn.info.name}@${conn.info.hostname}` === stableKey) {
-        id = existingId;
-        try { conn.ws.close(); } catch {}
-        break;
+    let id = this.knownIds.get(stableKey);
+
+    if (id) {
+      const existing = this.controllers.get(id);
+      if (existing) {
+        try { existing.ws.close(); } catch {}
       }
-    }
-    if (!id) {
-      id = `ctrl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    } else {
+      id = crypto.randomUUID();
+      this.knownIds.set(stableKey, id);
     }
 
     const info: ControllerInfo = {
@@ -130,6 +168,7 @@ class ControllerManager {
       connected: true,
     };
     this.controllers.set(id, { id, ws, info });
+    this.persistController(info).catch(() => {});
     console.log(`[controller-manager] controller registered: ${info.name} (${id})`);
 
     // Re-associate persisted tasks whose controllerId matches no connected controller
@@ -148,6 +187,7 @@ class ControllerManager {
     const ctrl = this.controllers.get(controllerId);
     if (ctrl) {
       ctrl.info.connected = false;
+      this.persistController(ctrl.info).catch(() => {});
       this.controllers.delete(controllerId);
       console.log(`[controller-manager] controller disconnected: ${ctrl.info.name} (${controllerId})`);
 
@@ -491,6 +531,9 @@ class ControllerManager {
 const p = process as typeof process & { __iteroCtrlMgr?: ControllerManager };
 if (!p.__iteroCtrlMgr) {
   p.__iteroCtrlMgr = new ControllerManager();
+  p.__iteroCtrlMgr.restoreControllers().catch((err) => {
+    console.error("[controller-manager] failed to restore controllers:", err);
+  });
   p.__iteroCtrlMgr.restoreTasks().catch((err) => {
     console.error("[controller-manager] failed to restore tasks:", err);
   });
