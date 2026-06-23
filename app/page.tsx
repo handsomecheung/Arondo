@@ -1879,6 +1879,8 @@ export default function HomePage() {
                 const projectName = project
                   ? (project.repoPath.split("/").pop() || project.repoPath)
                   : "";
+                const controller = controllers.find((c) => c.id === session.controllerId);
+                const nodeName = controller ? controller.name : (session.controllerId || "");
 
                 return (
                   <div
@@ -1913,15 +1915,27 @@ export default function HomePage() {
                           {projectName}
                         </span>
                       )}
-                      <span
-                        style={{
-                          fontSize: 10,
-                          color: "var(--text-muted)",
-                          marginLeft: "auto",
-                        }}
-                      >
-                        {session.agentType}
-                      </span>
+                      {nodeName && (
+                        <span
+                          className="task-item-node-badge"
+                          title={controller ? `Node: ${controller.name} (${controller.hostname})` : `Node: ${session.controllerId}`}
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 500,
+                            color: "var(--text-secondary)",
+                            backgroundColor: "rgba(255, 255, 255, 0.06)",
+                            border: "1px solid var(--border)",
+                            padding: "1px 6px",
+                            borderRadius: "4px",
+                            maxWidth: "120px",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {nodeName}
+                        </span>
+                      )}
                     </div>
                     <div className="task-item-prompt">{session.prompt}</div>
                     <div className="task-item-time">
@@ -2758,14 +2772,6 @@ export default function HomePage() {
                                   className={`task-status-badge ${session.status}`}
                                 >
                                   {session.status}
-                                </span>
-                                <span
-                                  style={{
-                                    fontSize: 11,
-                                    color: "var(--text-secondary)",
-                                  }}
-                                >
-                                  {session.agentType}
                                 </span>
                               </div>
                               <span
