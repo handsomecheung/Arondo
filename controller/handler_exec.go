@@ -53,11 +53,11 @@ func (h *Handler) handleExecAgent(msg *Message) {
 		Args:    args,
 		WorkDir: req.WorkDir,
 		Env:     req.Env,
-		UsePTY:  false,
 		OnData: func(data []byte) {
 			h.sendStream("exec.output", map[string]string{
-				"taskId": req.TaskID,
-				"data":   string(data),
+				"taskId":   req.TaskID,
+				"data":     base64.StdEncoding.EncodeToString(data),
+				"encoding": "base64",
 			})
 		},
 		OnExit: func(exitCode int) {
@@ -89,7 +89,6 @@ func (h *Handler) handleExecScript(msg *Message) {
 		Command: "bash",
 		Args:    []string{"-c", req.Command},
 		WorkDir: req.WorkDir,
-		UsePTY:  true,
 		Cols:    req.Cols,
 		Rows:    req.Rows,
 		OnData: func(data []byte) {

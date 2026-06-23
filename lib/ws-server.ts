@@ -6,7 +6,6 @@ const EVENT_TYPE_MAP: Record<string, string> = {
   session_updated: "session:updated",
   message_added: "message:added",
   session_deleted: "session:deleted",
-  agent_output: "agent:output",
   terminal_output: "terminal:output",
   terminal_exit: "terminal:exit",
 };
@@ -26,7 +25,7 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
         : { type: wsType, payload: event.payload }
     );
     const openClients = Array.from(clients).filter((ws) => ws.readyState === WebSocket.OPEN);
-    if (wsType === "agent:output" || wsType === "terminal:output") {
+    if (wsType === "terminal:output") {
       if (openClients.length === 0) {
         console.warn(`[ws-server] ${wsType} event but no connected browser clients`);
       }

@@ -498,13 +498,6 @@ export default function HomePage() {
   const wsRef = useRef<WebSocket | null>(null);
   const [wsInstance, setWsInstance] = useState<WebSocket | null>(null);
 
-  const logPreRef = useRef<HTMLPreElement>(null);
-  useEffect(() => {
-    if (logModalOpen && logPreRef.current) {
-      logPreRef.current.scrollTop = logPreRef.current.scrollHeight;
-    }
-  }, [sessionLog, logModalOpen]);
-
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -1018,19 +1011,6 @@ export default function HomePage() {
             }
           }
 
-          if (event.type === "agent:output") {
-            const payload = event.payload as {
-              sessionId: string;
-              messageId: string;
-              line: string;
-            };
-            if (
-              payload.sessionId === selectedSessionId &&
-              payload.messageId === activeLogMsgIdRef.current
-            ) {
-              setSessionLog((prev) => prev + payload.line + "\n");
-            }
-          }
         } catch {
           /* ignore */
         }
@@ -3091,8 +3071,8 @@ export default function HomePage() {
                 <IconX />
               </button>
             </div>
-            <div className="modal-body" style={isScriptLog ? { padding: 0, overflow: "hidden" } : undefined}>
-              {isScriptLog && activeLogMsgId ? (
+            <div className="modal-body" style={{ padding: 0, overflow: "hidden" }}>
+              {activeLogMsgId ? (
                 <Terminal
                   sessionId={selectedSessionId!}
                   messageId={activeLogMsgId}
@@ -3100,9 +3080,7 @@ export default function HomePage() {
                   mode={isRunning && activeLogMsgId === lastExecMsgId ? "live" : "history"}
                   historyLog={isRunning && activeLogMsgId === lastExecMsgId ? undefined : sessionLog}
                 />
-              ) : (
-                <pre ref={logPreRef} className="console-log-modal">{sessionLog}</pre>
-              )}
+              ) : null}
             </div>
             <div className="modal-footer">
               <button

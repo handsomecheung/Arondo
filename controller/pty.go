@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"sync"
@@ -46,7 +45,6 @@ type SpawnOptions struct {
 	Args    []string
 	WorkDir string
 	Env     []string
-	UsePTY  bool
 	Cols    uint16
 	Rows    uint16
 	OnData  func(data []byte)
@@ -72,10 +70,7 @@ func (tm *TaskManager) Spawn(opts SpawnOptions) error {
 	tm.tasks[opts.TaskID] = t
 	tm.mu.Unlock()
 
-	if opts.UsePTY {
-		return tm.startWithPTY(t, opts)
-	}
-	return tm.startWithPipes(t, opts)
+	return tm.startWithPTY(t, opts)
 }
 
 func (tm *TaskManager) startWithPTY(t *task, opts SpawnOptions) error {
@@ -123,75 +118,6 @@ func (tm *TaskManager) startWithPTY(t *task, opts SpawnOptions) error {
 			}
 		}
 
-		exitCode := 0
-		if err := t.cmd.Wait(); err != nil {
-			if exitErr, ok := err.(*exec.ExitError); ok {
-				exitCode = exitErr.ExitCode()
-			} else {
-				exitCode = 1
-			}
-		}
-
-		t.mu.Lock()
-		t.done = true
-		t.exitCode = exitCode
-		t.mu.Unlock()
-
-		if opts.OnExit != nil {
-			opts.OnExit(exitCode)
-		}
-	}()
-
-	return nil
-}
-
-func (tm *TaskManager) startWithPipes(t *task, opts SpawnOptions) error {
-	stdout, err := t.cmd.StdoutPipe()
-	if err != nil {
-		tm.mu.Lock()
-		delete(tm.tasks, t.id)
-		tm.mu.Unlock()
-		return fmt.Errorf("stdout pipe: %w", err)
-	}
-	stderr, err := t.cmd.StderrPipe()
-	if err != nil {
-		tm.mu.Lock()
-		delete(tm.tasks, t.id)
-		tm.mu.Unlock()
-		return fmt.Errorf("stderr pipe: %w", err)
-	}
-
-	if err := t.cmd.Start(); err != nil {
-		tm.mu.Lock()
-		delete(tm.tasks, t.id)
-		tm.mu.Unlock()
-		return fmt.Errorf("start: %w", err)
-	}
-
-	readStream := func(r io.Reader) {
-		buf := make([]byte, 4096)
-		for {
-			n, err := r.Read(buf)
-			if n > 0 {
-				data := make([]byte, n)
-				copy(data, buf[:n])
-				if opts.OnData != nil {
-					opts.OnData(data)
-				}
-			}
-			if err != nil {
-				break
-			}
-		}
-	}
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() { defer wg.Done(); readStream(stdout) }()
-	go func() { defer wg.Done(); readStream(stderr) }()
-
-	go func() {
-		wg.Wait()
 		exitCode := 0
 		if err := t.cmd.Wait(); err != nil {
 			if exitErr, ok := err.(*exec.ExitError); ok {

@@ -376,32 +376,15 @@ class ControllerManager {
       data = Buffer.from(payload.data, "base64").toString("utf-8");
     }
 
-    if (ctx.type === "agent") {
-      for (const line of data.split("\n")) {
-        const trimmed = line.trim();
-        if (trimmed) {
-          await appendSessionLog(ctx.sessionId, ctx.messageId, line);
-          eventBus.publish({
-            type: "agent_output",
-            payload: {
-              sessionId: ctx.sessionId,
-              messageId: ctx.messageId,
-              line,
-            },
-          });
-        }
-      }
-    } else {
-      await appendSessionLog(ctx.sessionId, ctx.messageId, data, true);
-      eventBus.publish({
-        type: "terminal_output",
-        payload: {
-          sessionId: ctx.sessionId,
-          messageId: ctx.messageId,
-          data,
-        },
-      });
-    }
+    await appendSessionLog(ctx.sessionId, ctx.messageId, data, true);
+    eventBus.publish({
+      type: "terminal_output",
+      payload: {
+        sessionId: ctx.sessionId,
+        messageId: ctx.messageId,
+        data,
+      },
+    });
   }
 
   private async onExecExit(payload: {
