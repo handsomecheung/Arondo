@@ -328,6 +328,24 @@ function IconTrash() {
   );
 }
 
+function IconChevronDown({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
+
 function IconEdit() {
   return (
     <svg
@@ -444,6 +462,12 @@ export default function HomePage() {
   const [connected, setConnected] = useState(false);
   const [isNewSession, setIsNewSession] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Custom dropdown states & refs
+  const [runnerDropdownOpen, setRunnerDropdownOpen] = useState(false);
+  const [agentDropdownOpen, setAgentDropdownOpen] = useState(false);
+  const runnerSelectRef = useRef<HTMLDivElement>(null);
+  const agentSelectRef = useRef<HTMLDivElement>(null);
 
   // Task Queue states
   const [taskQueue, setTaskQueue] = useState<TaskItem[]>([]);
@@ -631,6 +655,28 @@ export default function HomePage() {
         !menuRef.current.contains(event.target as Node)
       ) {
         setMenuOpen(false);
+      }
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => {
+      document.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  // Close custom dropdowns on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        runnerSelectRef.current &&
+        !runnerSelectRef.current.contains(event.target as Node)
+      ) {
+        setRunnerDropdownOpen(false);
+      }
+      if (
+        agentSelectRef.current &&
+        !agentSelectRef.current.contains(event.target as Node)
+      ) {
+        setAgentDropdownOpen(false);
       }
     };
     document.addEventListener("click", handleClickOutside);
@@ -1748,6 +1794,32 @@ export default function HomePage() {
     (isNewSession
       ? repoPath.trim().length > 0 && !!runnerId
       : prompt.trim().length > 0 && !!selectedSessionId);
+
+  const getSendTooltip = () => {
+    if (isAgentRunning) {
+      return "Agent is working…";
+    }
+    if (isNewSession) {
+      if (!runnerId) {
+        return "Please select a runner first";
+      }
+      if (repoPath.trim().length === 0) {
+        return "Please select a project path";
+      }
+      if (!prompt.trim()) {
+        return "Create Blank Session";
+      }
+      return "Send (Ctrl+Enter / ⌘+Enter)";
+    } else {
+      if (!selectedSessionId) {
+        return "No active session selected";
+      }
+      if (prompt.trim().length === 0) {
+        return "Please enter a message";
+      }
+      return "Send (Ctrl+Enter / ⌘+Enter)";
+    }
+  };
 
   const activeLogMsg = messages.find((m) => m.id === activeLogMsgId);
   const isScriptLog = activeLogMsg?.type === "script-run";
@@ -3339,25 +3411,51 @@ export default function HomePage() {
             <div className="input-area">
               {isNewSession && (
                 <div className="input-meta">
-                  <select
-                    className="agent-select"
-                    value={runnerId}
-                    onChange={(e) => {
-                      setRunnerId(e.target.value);
-                      setRepoPath("");
-                    }}
-                    disabled={isRunning}
-                    id="runner-select"
+                  <div
+                    className="custom-dropdown-container"
+                    ref={runnerSelectRef}
                   >
-                    {runners.length === 0 && (
-                      <option value="">No runners connected</option>
+                    <button
+                      type="button"
+                      className="custom-dropdown-trigger"
+                      onClick={() => !isRunning && setRunnerDropdownOpen(!runnerDropdownOpen)}
+                      disabled={isRunning}
+                      style={{
+                        ...(isNewSession && !runnerId ? { borderColor: "var(--error)" } : {}),
+                      }}
+                      id="runner-select-trigger"
+                    >
+                      <span>
+                        {runners.find((r) => r.id === runnerId)
+                          ? `${runners.find((r) => r.id === runnerId)?.name} (${runners.find((r) => r.id === runnerId)?.hostname})`
+                          : "Select Runner"}
+                      </span>
+                      <IconChevronDown className={`arrow-icon ${runnerDropdownOpen ? "open" : ""}`} />
+                    </button>
+                    {runnerDropdownOpen && (
+                      <div className="custom-dropdown-menu">
+                        {runners.length === 0 ? (
+                          <div className="custom-dropdown-item disabled">No runners connected</div>
+                        ) : (
+                          runners.map((r) => (
+                            <button
+                              key={r.id}
+                              type="button"
+                              className={`custom-dropdown-item ${r.id === runnerId ? "active" : ""}`}
+                              onClick={() => {
+                                setRunnerId(r.id);
+                                setRepoPath("");
+                                setRunnerDropdownOpen(false);
+                              }}
+                            >
+                              {r.name} ({r.hostname})
+                            </button>
+                          ))
+                        )}
+                      </div>
                     )}
-                    {runners.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name} ({r.hostname})
-                      </option>
-                    ))}
-                  </select>
+                  </div>
+
                   <button
                     type="button"
                     className="browse-btn"
@@ -3370,21 +3468,58 @@ export default function HomePage() {
                     disabled={isRunning || !runnerId}
                     title={repoPath ? `Selected: ${repoPath}` : "Browse Directory"}
                     id="browse-repo-btn"
+                    style={isNewSession && !repoPath.trim() ? { borderColor: "var(--error)" } : {}}
                   >
                     <IconFolder />
                   </button>
-                  <select
-                    className="agent-select"
-                    value={agentType}
-                    onChange={(e) => setAgentType(e.target.value)}
-                    disabled={isRunning}
-                    id="agent-select"
+
+                  <div
+                    className="custom-dropdown-container"
+                    ref={agentSelectRef}
                   >
-                    <option value="antigravity">Antigravity</option>
-                    <option value="gemini">Gemini</option>
-                  </select>
+                    <button
+                      type="button"
+                      className="custom-dropdown-trigger"
+                      onClick={() => !isRunning && setAgentDropdownOpen(!agentDropdownOpen)}
+                      disabled={isRunning}
+                      style={{
+                        ...(isNewSession && !agentType ? { borderColor: "var(--error)" } : {}),
+                      }}
+                      id="agent-select-trigger"
+                    >
+                      <span>
+                        {agentType === "antigravity" ? "Antigravity" : "Gemini"}
+                      </span>
+                      <IconChevronDown className={`arrow-icon ${agentDropdownOpen ? "open" : ""}`} />
+                    </button>
+                    {agentDropdownOpen && (
+                      <div className="custom-dropdown-menu">
+                        <button
+                          type="button"
+                          className={`custom-dropdown-item ${agentType === "antigravity" ? "active" : ""}`}
+                          onClick={() => {
+                            setAgentType("antigravity");
+                            setAgentDropdownOpen(false);
+                          }}
+                        >
+                          Antigravity
+                        </button>
+                        <button
+                          type="button"
+                          className={`custom-dropdown-item ${agentType === "gemini" ? "active" : ""}`}
+                          onClick={() => {
+                            setAgentType("gemini");
+                            setAgentDropdownOpen(false);
+                          }}
+                        >
+                          Gemini
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
+
               <div className="input-row">
                 <textarea
                   ref={textareaRef}
@@ -3407,7 +3542,7 @@ export default function HomePage() {
                   className="send-btn"
                   onClick={handleSubmit}
                   disabled={!canSubmit}
-                  title={isNewSession && !prompt.trim() ? "Create Blank Session" : "Send (Ctrl+Enter / ⌘+Enter)"}
+                  title={getSendTooltip()}
                   id="send-btn"
                 >
                   {isNewSession && !prompt.trim() ? <IconCheck /> : <IconSend />}
