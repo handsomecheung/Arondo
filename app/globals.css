@@ -834,7 +834,7 @@ body {
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 12px 14px;
+  padding: 10px 14px; /* Reduced vertical padding slightly for better fit on mobile */
   color: var(--text-primary);
   font-size: 15px; /* Slightly larger on mobile to prevent iOS zoom */
   font-family: "Inter", sans-serif;
@@ -845,7 +845,7 @@ body {
     box-shadow 0.2s;
   line-height: 1.6;
   max-height: 120px;
-  min-height: 48px;
+  min-height: 68px; /* Increased min-height to fit 2-line placeholders without text clipping */
 }
 @media (min-width: 768px) {
   .chat-input {

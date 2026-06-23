@@ -501,6 +501,51 @@ export default function HomePage() {
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const [viewportStyles, setViewportStyles] = useState<React.CSSProperties>({});
+
+  // Handle mobile keyboard overlay by listening to visualViewport changes
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.visualViewport) return;
+
+    const handleResize = () => {
+      const vv = window.visualViewport;
+      if (vv) {
+        if (window.innerWidth < 768) {
+          // Adjust top and height relative to the visual viewport to prevent layout shifting
+          setViewportStyles({
+            height: `${vv.height}px`,
+            top: `${vv.offsetTop}px`,
+            position: "fixed",
+            left: 0,
+            right: 0,
+          });
+        } else {
+          setViewportStyles({});
+        }
+
+        // Scroll to bottom of chat if keyboard popped up
+        if (vv.height < window.innerHeight - 100) {
+          setTimeout(() => {
+            chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+          }, 150);
+        }
+      }
+    };
+
+    const vv = window.visualViewport;
+    vv.addEventListener("resize", handleResize);
+    vv.addEventListener("scroll", handleResize);
+    window.addEventListener("resize", handleResize);
+    
+    handleResize();
+
+    return () => {
+      vv.removeEventListener("resize", handleResize);
+      vv.removeEventListener("scroll", handleResize);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
   const selectedSession =
     sessions.find((s) => s.id === selectedSessionId) ?? null;
   const isRunning =
@@ -1594,7 +1639,7 @@ export default function HomePage() {
 
   // ── Render ──
   return (
-    <div className="app">
+    <div className="app" style={viewportStyles}>
       {/* Header */}
       <header className="header">
         {/* Hamburger: mobile only */}
