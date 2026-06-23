@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os/exec"
 	"strings"
 )
 
@@ -20,6 +19,7 @@ type gitDiffResponse struct {
 	OK         bool   `json:"ok"`
 	HasChanges bool   `json:"hasChanges"`
 	Diff       string `json:"diff"`
+	HTML       string `json:"html,omitempty"`
 }
 
 type gitPrCreateRequest struct {
@@ -40,7 +40,7 @@ func (h *Handler) handleGitStatus(msg *Message) {
 		return
 	}
 
-	cmd := exec.Command("git", "status", "--porcelain", ".")
+	cmd := execCommand("git", "status", "--porcelain", ".")
 	cmd.Dir = req.WorkDir
 	out, err := cmd.CombinedOutput()
 
@@ -70,13 +70,13 @@ func (h *Handler) handleGitDiff(msg *Message) {
 		return
 	}
 
-	cmd := exec.Command("git", "diff", "HEAD", "--", ".")
+	cmd := execCommand("git", "diff", "HEAD", "--", ".")
 	cmd.Dir = req.WorkDir
 	out, err := cmd.Output()
 
 	if err != nil {
 		// Fallback: try git diff without HEAD (for repos with no commits)
-		cmd2 := exec.Command("git", "diff", "--", ".")
+		cmd2 := execCommand("git", "diff", "--", ".")
 		cmd2.Dir = req.WorkDir
 		out2, err2 := cmd2.Output()
 		if err2 != nil {
@@ -87,10 +87,22 @@ func (h *Handler) handleGitDiff(msg *Message) {
 	}
 
 	diff := string(out)
+	var html string
+	if len(out) > 0 {
+		diff2htmlCmd := execCommand("diff2html", "-i", "stdin", "-o", "stdout")
+		diff2htmlCmd.Dir = req.WorkDir
+		diff2htmlCmd.Stdin = strings.NewReader(diff)
+		htmlOut, err := diff2htmlCmd.Output()
+		if err == nil {
+			html = string(htmlOut)
+		}
+	}
+
 	h.sendResponse(msg.ID, gitDiffResponse{
 		OK:         true,
 		HasChanges: strings.TrimSpace(diff) != "",
 		Diff:       diff,
+		HTML:       html,
 	})
 }
 
@@ -102,7 +114,7 @@ func (h *Handler) handleGitPrCreate(msg *Message) {
 	}
 
 	// Get current branch
-	branchCmd := exec.Command("git", "branch", "--show-current")
+	branchCmd := execCommand("git", "branch", "--show-current")
 	branchCmd.Dir = req.WorkDir
 	branchOut, err := branchCmd.Output()
 	if err != nil {
@@ -116,7 +128,7 @@ func (h *Handler) handleGitPrCreate(msg *Message) {
 	}
 
 	// Push branch
-	pushCmd := exec.Command("git", "push", "-u", "origin", branchName)
+	pushCmd := execCommand("git", "push", "-u", "origin", branchName)
 	pushCmd.Dir = req.WorkDir
 	if out, err := pushCmd.CombinedOutput(); err != nil {
 		h.sendError(msg.ID, "INTERNAL", "git push failed: "+string(out)+err.Error())
@@ -124,7 +136,7 @@ func (h *Handler) handleGitPrCreate(msg *Message) {
 	}
 
 	// Create PR
-	prCmd := exec.Command("gh", "pr", "create",
+	prCmd := execCommand("gh", "pr", "create",
 		"--title", req.Title,
 		"--body", req.Body,
 		"--head", branchName,

@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/store";
 import { runnerManager } from "@/lib/runner-manager";
-import { exec } from "child_process";
-import { promisify } from "util";
-import fs from "fs/promises";
-import path from "path";
 
-const execAsync = promisify(exec);
 
 export async function GET(
   req: NextRequest,
@@ -64,38 +59,20 @@ export async function GET(
       });
     }
 
-    // Write raw diff to temp file, pipe through diff2html
-    const DATA_DIR = process.env.DATA_DIR
-      ? path.resolve(process.env.DATA_DIR)
-      : path.join(process.cwd(), "data");
-    const sessionDir = path.join(DATA_DIR, "sessions", id);
-    await fs.mkdir(sessionDir, { recursive: true });
-
-    const diffPath = path.join(sessionDir, "tmp.diff");
-    const htmlPath = path.join(sessionDir, "diff.html");
-    await fs.writeFile(diffPath, result.diff, "utf-8");
-
-    try {
-      await execAsync(`diff2html -i file --file "${htmlPath}" -- "${diffPath}"`, {
-        cwd: sessionDir,
-      });
-      const html = await fs.readFile(htmlPath, "utf-8");
-      return new NextResponse(html, {
+    if (result.html) {
+      return new NextResponse(result.html, {
         headers: { "Content-Type": "text/html; charset=utf-8" },
       });
-    } catch {
-      // diff2html not available — return raw diff as preformatted HTML
-      const rawHtml = `<!DOCTYPE html>
+    }
+
+    // diff2html not available on runner — return raw diff as preformatted HTML
+    const rawHtml = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Diff</title>
 <style>body{font-family:monospace;white-space:pre-wrap;padding:1em;background:#1e1e1e;color:#d4d4d4;}</style>
 </head><body>${result.diff.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</body></html>`;
-      return new NextResponse(rawHtml, {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      });
-    } finally {
-      fs.unlink(diffPath).catch(() => {});
-      fs.unlink(htmlPath).catch(() => {});
-    }
+    return new NextResponse(rawHtml, {
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
   } catch (error: any) {
     console.error("Failed to generate diff:", error);
     return NextResponse.json(

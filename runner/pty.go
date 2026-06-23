@@ -58,7 +58,7 @@ func (tm *TaskManager) Spawn(opts SpawnOptions) (int, error) {
 		return 0, fmt.Errorf("task %s already exists", opts.TaskID)
 	}
 
-	cmd := exec.Command(opts.Command, opts.Args...)
+	cmd := execCommand(opts.Command, opts.Args...)
 	cmd.Dir = opts.WorkDir
 	if len(opts.Env) > 0 {
 		cmd.Env = append(os.Environ(), opts.Env...)
