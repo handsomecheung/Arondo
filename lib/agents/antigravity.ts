@@ -49,7 +49,7 @@ async function saveAgySessionId(sessionId: string, agyId: string): Promise<void>
 }
 
 /**
- * Adapter for Antigravity CLI (agy).
+ * Adapter for Antigravity (agy).
  */
 export class AntigravityAgent extends BaseAgent {
   readonly name = "antigravity";

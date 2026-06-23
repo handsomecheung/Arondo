@@ -50,9 +50,10 @@ async function runAutoScriptsInBackground(projectId: string, repoPath: string) {
 Do NOT generate or create any new scripts. Only search for and extract the existing commands defined in the project (e.g., npm scripts, makefiles, shell files, configurations, etc.) for testing, building, and deploying.
 
 Requirements:
-1. The script "name" MUST be unique. If there are multiple scripts with the same name (for example, in different subdirectories or contexts), you MUST prefix or suffix the script name with the directory name or context to distinguish them (e.g., "frontend-build" vs "backend-build").
-2. You MUST write your final output to the file "${outputJsonPathFormatted}" as a raw valid JSON array of objects where each object has "name" (string) and "command" (string). Example format: [{"name": "test", "command": "npm run test"}].
-3. Ensure that only the valid JSON array is written to that file, without any markdown formatting wrappers (like \`\`\`json).`;
+1. Strictly restrict your search and analysis to the current working directory and its subdirectories. Do NOT search, read, or analyze any parent or upper-level directories outside the current directory.
+2. The script "name" MUST be unique. If there are multiple scripts with the same name (for example, in different subdirectories or contexts), you MUST prefix or suffix the script name with the directory name or context to distinguish them (e.g., "frontend-build" vs "backend-build").
+3. You MUST write your final output to the file "${outputJsonPathFormatted}" as a raw valid JSON array of objects where each object has "name" (string) and "command" (string). Example format: [{"name": "test", "command": "npm run test"}].
+4. Ensure that only the valid JSON array is written to that file, without any markdown formatting wrappers (like \`\`\`json).`;
 
     // Write prompt instructions to a temporary file
     await fs.writeFile(tempPromptPath, promptInstructions, "utf-8");

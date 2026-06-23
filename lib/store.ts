@@ -5,7 +5,6 @@ const DATA_DIR = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
   : path.join(process.cwd(), "data");
 const SESSIONS_DIR = path.join(DATA_DIR, "sessions");
-const DELETED_SESSIONS_DIR = path.join(DATA_DIR, "deleted-sessions");
 const PROJECTS_DIR = path.join(DATA_DIR, "projects");
 
 export type SessionStatus = "idle" | "running" | "script-running" | "done" | "error";
@@ -347,14 +346,12 @@ export async function getSessionLog(sessionId: string, messageId: string): Promi
 
 export async function deleteSession(id: string): Promise<void> {
   const sessionDir = getSessionDir(id);
-  const deletedDir = path.join(DELETED_SESSIONS_DIR, id);
-  await ensureDir(DELETED_SESSIONS_DIR);
-  try {
-    await fs.rename(sessionDir, deletedDir);
-  } catch {
-    // Fallback: Copy and Delete
-    await fs.cp(sessionDir, deletedDir, { recursive: true });
-    await fs.rm(sessionDir, { recursive: true, force: true });
-  }
+  await fs.rm(sessionDir, { recursive: true, force: true });
 }
+
+export async function deleteProject(id: string): Promise<void> {
+  const projectDir = getProjectDir(id);
+  await fs.rm(projectDir, { recursive: true, force: true });
+}
+
 

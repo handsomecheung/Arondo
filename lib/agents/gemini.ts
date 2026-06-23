@@ -2,7 +2,7 @@ import { spawn } from "child_process";
 import { BaseAgent, AgentRunOptions, AgentResult } from "./base";
 
 /**
- * Adapter for Gemini CLI (https://github.com/google-gemini/gemini-cli).
+ * Adapter for Gemini (https://github.com/google-gemini/gemini-cli).
  *
  * Invokes: gemini --prompt "<prompt>" --yolo --output-format text --skip-trust
  * in the target repository directory.

@@ -18,8 +18,10 @@ export async function POST(req: NextRequest) {
     runnerId: string;
   };
 
-  if (!prompt || !repoPath) {
-    return NextResponse.json({ error: "prompt and repoPath are required" }, { status: 400 });
+  const isBlank = !prompt || !prompt.trim();
+
+  if (!repoPath) {
+    return NextResponse.json({ error: "repoPath is required" }, { status: 400 });
   }
   if (!runnerId) {
     return NextResponse.json({ error: "runnerId is required" }, { status: 400 });
@@ -28,6 +30,18 @@ export async function POST(req: NextRequest) {
   const run = runnerManager.getRunner(runnerId);
   if (!run) {
     return NextResponse.json({ error: "Runner not found or disconnected" }, { status: 400 });
+  }
+
+  if (isBlank) {
+    const session = await createSession({
+      status: "idle",
+      prompt: "",
+      agentType,
+      repoPath,
+      runnerId,
+    });
+    eventBus.publish({ type: "session_updated", payload: session });
+    return NextResponse.json(session, { status: 201 });
   }
 
   const session = await createSession({

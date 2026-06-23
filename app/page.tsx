@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 
 const Terminal = dynamic(() => import("@/components/Terminal"), { ssr: false });
@@ -87,6 +87,24 @@ function IconTaskQueue() {
       <line x1="9" y1="9" x2="15" y2="9" />
       <line x1="9" y1="13" x2="15" y2="13" />
       <line x1="9" y1="17" x2="15" y2="17" />
+    </svg>
+  );
+}
+
+
+function IconCheck() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="20 6 9 17 4 12" />
     </svg>
   );
 }
@@ -407,6 +425,13 @@ function renderMessageContent(content: string) {
 
 export default function HomePage() {
   const [sessions, setSessions] = useState<Session[]>([]);
+  const sortedSessions = useMemo(() => {
+    return [...sessions].sort((a, b) => {
+      const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
+      return bTime - aTime;
+    });
+  }, [sessions]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     null,
   );
@@ -1109,7 +1134,9 @@ export default function HomePage() {
   // ── Submit session ──
   const handleSubmit = useCallback(async () => {
     const trimmed = prompt.trim();
-    if (!trimmed) return;
+    const isBlankSession = (isNewSession || !selectedSessionId) && !trimmed;
+
+    if (!trimmed && !isBlankSession) return;
 
     setPrompt("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
@@ -1128,17 +1155,19 @@ export default function HomePage() {
           }),
         });
         const newSession: Session = await res.json();
-        setTaskQueue((prev) => [
-          ...prev,
-          {
-            id: `agent-${newSession.id}-${Date.now()}`,
-            type: "agent",
-            name: `Agent: ${trimmed}`,
-            sessionId: newSession.id,
-            status: "running",
-            createdAt: Date.now(),
-          },
-        ]);
+        if (!isBlankSession) {
+          setTaskQueue((prev) => [
+            ...prev,
+            {
+              id: `agent-${newSession.id}-${Date.now()}`,
+              type: "agent",
+              name: `Agent: ${trimmed}`,
+              sessionId: newSession.id,
+              status: "running",
+              createdAt: Date.now(),
+            },
+          ]);
+        }
         setSessions((prev) => [newSession, ...prev]);
         setSelectedSessionId(newSession.id);
         setIsNewSession(false);
@@ -1167,10 +1196,13 @@ export default function HomePage() {
           });
           if (!res.ok) {
             const data = await res.json();
-            alert(data.error || "Failed to send message");
+            setApiError({
+              title: "Send Message Error",
+              message: data.error || "Failed to send message",
+            });
             setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error(err);
           setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
         }
@@ -1210,7 +1242,6 @@ export default function HomePage() {
     setActiveLogMsgId(null);
     setLogModalOpen(false);
     setMenuOpen(false);
-    setTimeout(() => textareaRef.current?.focus(), 50);
   };
 
   const handleRunScript = async (scriptName: string) => {
@@ -1572,11 +1603,17 @@ export default function HomePage() {
           ),
         );
       } else {
-        alert(data.error || "Failed to create pull request");
+        setApiError({
+          title: "Create Pull Request Error",
+          message: data.error || "Failed to create pull request",
+        });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("An error occurred while creating pull request.");
+      setApiError({
+        title: "Create Pull Request Error",
+        message: err.message || "An error occurred while creating pull request.",
+      });
     } finally {
       setIsCreatingPr(false);
     }
@@ -1607,12 +1644,18 @@ export default function HomePage() {
       });
       if (!res.ok) {
         const data = await res.json();
-        alert(data.error || "Failed to commit changes");
+        setApiError({
+          title: "Commit Changes Error",
+          message: data.error || "Failed to commit changes",
+        });
         setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("An error occurred while calling the agent to commit changes.");
+      setApiError({
+        title: "Commit Changes Error",
+        message: err.message || "An error occurred while calling the agent to commit changes.",
+      });
       setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
     } finally {
       setIsCommitting(false);
@@ -1701,9 +1744,10 @@ export default function HomePage() {
   };
 
   const canSubmit =
-    prompt.trim().length > 0 &&
-    (isNewSession ? repoPath.trim().length > 0 && !!runnerId : !!selectedSessionId) &&
-    !isAgentRunning;
+    !isAgentRunning &&
+    (isNewSession
+      ? repoPath.trim().length > 0 && !!runnerId
+      : prompt.trim().length > 0 && !!selectedSessionId);
 
   const activeLogMsg = messages.find((m) => m.id === activeLogMsgId);
   const isScriptLog = activeLogMsg?.type === "script-run";
@@ -1872,7 +1916,7 @@ export default function HomePage() {
                 onClick={handleNewSession}
                 id="new-session-btn"
               >
-                <IconPlus /> New
+                <IconPlus /> New Session
               </button>
               {/* Close button: mobile only */}
               <button
@@ -1918,7 +1962,7 @@ export default function HomePage() {
         <div className="task-list">
           {sidebarMode === "sessions" ? (
             <>
-              {sessions.length === 0 && (
+              {sortedSessions.length === 0 && (
                 <div className="empty-state">
                   <IconInbox />
                   <p>
@@ -1928,7 +1972,7 @@ export default function HomePage() {
                   </p>
                 </div>
               )}
-              {sessions.map((session) => {
+              {sortedSessions.map((session) => {
                 const project = projects.find((p) => p.id === session.projectId);
                 const projectName = project
                   ? (project.repoPath.split("/").pop() || project.repoPath)
@@ -2012,7 +2056,7 @@ export default function HomePage() {
                 </div>
               )}
               {projects.map((project) => {
-                const projectSessions = sessions.filter(
+                const projectSessions = sortedSessions.filter(
                   (s) => s.projectId === project.id,
                 );
                 const folderName =
@@ -2252,7 +2296,7 @@ export default function HomePage() {
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                       {runnerProjects.map((project) => {
-                        const projSessions = sessions.filter((s) => s.projectId === project.id);
+                        const projSessions = sortedSessions.filter((s) => s.projectId === project.id);
                         const folderName = project.repoPath.split("/").pop() || project.repoPath;
 
                         return (
@@ -2310,7 +2354,7 @@ export default function HomePage() {
           (() => {
             const project = projects.find((p) => p.id === selectedProjectId);
             if (!project) return null;
-            const projectSessions = sessions.filter(
+            const projectSessions = sortedSessions.filter(
               (s) => s.projectId === project.id,
             );
             const folderName =
@@ -2360,6 +2404,47 @@ export default function HomePage() {
                       style={{ padding: "8px 16px", fontSize: 13 }}
                     >
                       <IconPlus /> New Session
+                    </button>
+                    <button
+                      className="delete-project-btn"
+                      disabled={projectSessions.length > 0}
+                      style={{ padding: "8px 16px", fontSize: 13 }}
+                      onClick={() => {
+                        setConfirmDialog({
+                          message: `Are you sure you want to delete project "${folderName}"?`,
+                          onConfirm: async () => {
+                            setConfirmDialog(null);
+                            try {
+                              const res = await fetch(
+                                `/api/projects/${project.id}`,
+                                { method: "DELETE" }
+                              );
+                              if (res.ok) {
+                                setSelectedProjectId(null);
+                                loadProjects();
+                              } else {
+                                const err = await res.json();
+                                setApiError({
+                                  title: "Delete Project Error",
+                                  message: err.error || "Failed to delete project",
+                                });
+                              }
+                            } catch (e: any) {
+                              setApiError({
+                                title: "Delete Project Error",
+                                message: e.message || "Failed to delete project",
+                              });
+                            }
+                          },
+                        });
+                      }}
+                      title={
+                        projectSessions.length > 0
+                          ? "Cannot delete project with associated sessions"
+                          : "Delete project"
+                      }
+                    >
+                      <IconTrash /> Delete Project
                     </button>
                   </div>
                 </div>
@@ -2908,7 +2993,7 @@ export default function HomePage() {
                       whiteSpace: "nowrap",
                     }}
                   >
-                    Project: {selectedSession.repoPath} (
+                    Project: {selectedSession.repoPath.split("/").pop() || selectedSession.repoPath} (
                     {selectedSession.agentType})
                   </span>
                 </div>
@@ -3254,7 +3339,6 @@ export default function HomePage() {
             <div className="input-area">
               {isNewSession && (
                 <div className="input-meta">
-                  <span className="input-label">Runner:</span>
                   <select
                     className="agent-select"
                     value={runnerId}
@@ -3274,42 +3358,21 @@ export default function HomePage() {
                       </option>
                     ))}
                   </select>
-                  <span className="input-label">Project:</span>
-                  <div
-                    style={{ display: "flex", flex: 1, gap: 6, minWidth: 0 }}
+                  <button
+                    type="button"
+                    className="browse-btn"
+                    onClick={() => {
+                      if (!runnerId) return;
+                      const startingPath = repoPath.trim() || "/";
+                      setFsCurrentPath(startingPath);
+                      setFsModalOpen(true);
+                    }}
+                    disabled={isRunning || !runnerId}
+                    title={repoPath ? `Selected: ${repoPath}` : "Browse Directory"}
+                    id="browse-repo-btn"
                   >
-                    <input
-                      className="input-field-sm"
-                      type="text"
-                      placeholder={runnerId ? "Click to select project directory…" : "Select a runner first"}
-                      value={repoPath}
-                      readOnly
-                      onClick={() => {
-                        if (!runnerId) return;
-                        const startingPath = repoPath.trim() || "/";
-                        setFsCurrentPath(startingPath);
-                        setFsModalOpen(true);
-                      }}
-                      style={{ cursor: "pointer" }}
-                      disabled={isRunning || !runnerId}
-                      id="repo-path-input"
-                    />
-                    <button
-                      type="button"
-                      className="browse-btn"
-                      onClick={() => {
-                        if (!runnerId) return;
-                        const startingPath = repoPath.trim() || "/";
-                        setFsCurrentPath(startingPath);
-                        setFsModalOpen(true);
-                      }}
-                      disabled={isRunning || !runnerId}
-                      title="Browse Directory"
-                      id="browse-repo-btn"
-                    >
-                      <IconFolder />
-                    </button>
-                  </div>
+                    <IconFolder />
+                  </button>
                   <select
                     className="agent-select"
                     value={agentType}
@@ -3317,8 +3380,8 @@ export default function HomePage() {
                     disabled={isRunning}
                     id="agent-select"
                   >
-                    <option value="antigravity">Antigravity CLI</option>
-                    <option value="gemini">Gemini CLI</option>
+                    <option value="antigravity">Antigravity</option>
+                    <option value="gemini">Gemini</option>
                   </select>
                 </div>
               )}
@@ -3344,10 +3407,10 @@ export default function HomePage() {
                   className="send-btn"
                   onClick={handleSubmit}
                   disabled={!canSubmit}
-                  title="Send (Ctrl+Enter / ⌘+Enter)"
+                  title={isNewSession && !prompt.trim() ? "Create Blank Session" : "Send (Ctrl+Enter / ⌘+Enter)"}
                   id="send-btn"
                 >
-                  <IconSend />
+                  {isNewSession && !prompt.trim() ? <IconCheck /> : <IconSend />}
                 </button>
               </div>
             </div>

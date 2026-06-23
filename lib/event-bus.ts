@@ -6,7 +6,7 @@
 type Listener = (event: SseEvent) => void;
 
 export interface SseEvent {
-  type: "session_updated" | "message_added" | "session_deleted" | "terminal_output" | "terminal_exit";
+  type: "session_updated" | "message_added" | "session_deleted" | "terminal_output" | "terminal_exit" | "project_deleted";
   payload: any;
 }
 
