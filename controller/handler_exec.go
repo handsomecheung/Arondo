@@ -31,6 +31,7 @@ type execCancelRequest struct {
 type execStartResponse struct {
 	OK     bool   `json:"ok"`
 	TaskID string `json:"taskId"`
+	PID    int    `json:"pid"`
 }
 
 func (h *Handler) handleExecAgent(msg *Message) {
@@ -47,7 +48,7 @@ func (h *Handler) handleExecAgent(msg *Message) {
 		command = "bash"
 	}
 
-	err = h.taskManager.Spawn(SpawnOptions{
+	pid, err := h.taskManager.Spawn(SpawnOptions{
 		TaskID:  req.TaskID,
 		Command: command,
 		Args:    args,
@@ -73,8 +74,8 @@ func (h *Handler) handleExecAgent(msg *Message) {
 		return
 	}
 
-	log.Printf("started agent task %s: %s", req.TaskID, req.Command)
-	h.sendResponse(msg.ID, execStartResponse{OK: true, TaskID: req.TaskID})
+	log.Printf("started agent task %s (pid=%d): %s", req.TaskID, pid, req.Command)
+	h.sendResponse(msg.ID, execStartResponse{OK: true, TaskID: req.TaskID, PID: pid})
 }
 
 func (h *Handler) handleExecScript(msg *Message) {
@@ -84,7 +85,7 @@ func (h *Handler) handleExecScript(msg *Message) {
 		return
 	}
 
-	err = h.taskManager.Spawn(SpawnOptions{
+	pid, err := h.taskManager.Spawn(SpawnOptions{
 		TaskID:  req.TaskID,
 		Command: "bash",
 		Args:    []string{"-c", req.Command},
@@ -93,8 +94,8 @@ func (h *Handler) handleExecScript(msg *Message) {
 		Rows:    req.Rows,
 		OnData: func(data []byte) {
 			h.sendStream("exec.output", map[string]string{
-				"taskId": req.TaskID,
-				"data":   base64.StdEncoding.EncodeToString(data),
+				"taskId":   req.TaskID,
+				"data":     base64.StdEncoding.EncodeToString(data),
 				"encoding": "base64",
 			})
 		},
@@ -111,8 +112,8 @@ func (h *Handler) handleExecScript(msg *Message) {
 		return
 	}
 
-	log.Printf("started script task %s: %s", req.TaskID, req.Command)
-	h.sendResponse(msg.ID, execStartResponse{OK: true, TaskID: req.TaskID})
+	log.Printf("started script task %s (pid=%d): %s", req.TaskID, pid, req.Command)
+	h.sendResponse(msg.ID, execStartResponse{OK: true, TaskID: req.TaskID, PID: pid})
 }
 
 func (h *Handler) handleExecCancel(msg *Message) {

@@ -1800,6 +1800,37 @@ body {
   animation: task-spin 0.8s linear infinite;
 }
 
+.task-kill-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.task-kill-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.task-queue-item:hover .task-kill-btn {
+  opacity: 1;
+}
+
+.task-kill-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
 @keyframes task-spin {
   to {
     transform: rotate(360deg);

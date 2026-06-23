@@ -80,6 +80,9 @@ export async function POST(
       cols: 120,
       rows: 30,
     }, 10_000)
+    .then((res: any) => {
+      if (res?.pid) controllerManager.updateTaskPid(taskId, res.pid);
+    })
     .catch(async (err) => {
       const errorMessage = err instanceof Error ? err.message : String(err);
       const nextRunning = runningScripts.filter((n) => n !== scriptName);

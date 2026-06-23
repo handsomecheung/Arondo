@@ -1658,6 +1658,23 @@ export default function HomePage() {
                       }
                     };
 
+                    const handleKillTask = async (e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      if (!task.messageId) return;
+                      try {
+                        await fetch("/api/tasks/kill", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            sessionId: task.sessionId,
+                            messageId: task.messageId,
+                          }),
+                        });
+                      } catch (err) {
+                        console.error("Failed to kill task:", err);
+                      }
+                    };
+
                     const elapsedMs = taskTimeTicker - task.createdAt;
                     const durationStr = formatDuration(elapsedMs);
 
@@ -1689,6 +1706,15 @@ export default function HomePage() {
                             Running ({durationStr})...
                           </div>
                         </div>
+                        {hasLog && (
+                          <button
+                            className="task-kill-btn"
+                            onClick={handleKillTask}
+                            title="Kill task"
+                          >
+                            <IconX />
+                          </button>
+                        )}
                       </div>
                     );
                   })}

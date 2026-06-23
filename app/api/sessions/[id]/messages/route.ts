@@ -72,6 +72,9 @@ export async function POST(
         command,
         workDir: session.repoPath,
       }, 10_000)
+      .then((res: any) => {
+        if (res?.pid) controllerManager.updateTaskPid(taskId, res.pid);
+      })
       .catch(async (err) => {
         const errorMessage = err instanceof Error ? err.message : String(err);
         const updated = await updateSession(id, { status: "error", errorMessage });

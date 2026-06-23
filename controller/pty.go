@@ -51,11 +51,11 @@ type SpawnOptions struct {
 	OnExit  func(exitCode int)
 }
 
-func (tm *TaskManager) Spawn(opts SpawnOptions) error {
+func (tm *TaskManager) Spawn(opts SpawnOptions) (int, error) {
 	tm.mu.Lock()
 	if _, exists := tm.tasks[opts.TaskID]; exists {
 		tm.mu.Unlock()
-		return fmt.Errorf("task %s already exists", opts.TaskID)
+		return 0, fmt.Errorf("task %s already exists", opts.TaskID)
 	}
 
 	cmd := exec.Command(opts.Command, opts.Args...)
@@ -70,7 +70,10 @@ func (tm *TaskManager) Spawn(opts SpawnOptions) error {
 	tm.tasks[opts.TaskID] = t
 	tm.mu.Unlock()
 
-	return tm.startWithPTY(t, opts)
+	if err := tm.startWithPTY(t, opts); err != nil {
+		return 0, err
+	}
+	return t.cmd.Process.Pid, nil
 }
 
 func (tm *TaskManager) startWithPTY(t *task, opts SpawnOptions) error {
@@ -132,9 +135,17 @@ func (tm *TaskManager) startWithPTY(t *task, opts SpawnOptions) error {
 		t.exitCode = exitCode
 		t.mu.Unlock()
 
+		if t.ptyFile != nil {
+			t.ptyFile.Close()
+		}
+
 		if opts.OnExit != nil {
 			opts.OnExit(exitCode)
 		}
+
+		tm.mu.Lock()
+		delete(tm.tasks, t.id)
+		tm.mu.Unlock()
 	}()
 
 	return nil
@@ -173,6 +184,12 @@ func (tm *TaskManager) Kill(taskID string, signal syscall.Signal) error {
 	tm.mu.RUnlock()
 	if !ok {
 		return fmt.Errorf("task %s not found", taskID)
+	}
+	t.mu.Lock()
+	done := t.done
+	t.mu.Unlock()
+	if done {
+		return fmt.Errorf("task %s already exited", taskID)
 	}
 	if t.cmd.Process == nil {
 		return fmt.Errorf("task %s process not started", taskID)

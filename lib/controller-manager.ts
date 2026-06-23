@@ -40,6 +40,7 @@ export interface TaskContext {
   messageId: string;
   type: "agent" | "script";
   scriptName?: string;
+  pid?: number;
 }
 
 interface PendingRequest {
@@ -283,6 +284,37 @@ class ControllerManager {
 
   getControllerForTask(taskId: string): string | undefined {
     return this.tasks.get(taskId)?.controllerId;
+  }
+
+  updateTaskPid(taskId: string, pid: number): void {
+    const ctx = this.tasks.get(taskId);
+    if (ctx) {
+      ctx.pid = pid;
+      console.log(`[controller-manager] task ${taskId} pid=${pid}`);
+      this.persistTasks().catch(() => {});
+    }
+  }
+
+  async killTask(sessionId: string, messageId: string): Promise<boolean> {
+    const taskId = this.ptyKeyToTaskId.get(`${sessionId}:${messageId}`);
+    if (!taskId) return false;
+
+    const ctx = this.tasks.get(taskId);
+    if (!ctx) return false;
+
+    const controllerId = this.resolveControllerId(ctx.controllerId);
+    if (!controllerId) return false;
+
+    try {
+      await this.sendRequest(controllerId, "exec.cancel", {
+        taskId,
+        signal: "SIGTERM",
+      });
+      return true;
+    } catch (err) {
+      console.error(`[controller-manager] failed to kill task ${taskId}:`, err);
+      return false;
+    }
   }
 
   // ─── Incoming message handler ─────────────────────────────────────────
