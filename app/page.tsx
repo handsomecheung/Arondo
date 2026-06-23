@@ -16,7 +16,7 @@ interface Session {
   agentType: string;
   repoPath: string;
   projectId: string;
-  controllerId: string;
+  runnerId: string;
   prUrl?: string;
   errorMessage?: string;
   command?: string;
@@ -28,12 +28,12 @@ interface Session {
 interface Project {
   id: string;
   repoPath: string;
-  controllerId: string;
+  runnerId: string;
   createdAt: string;
   updatedAt: string;
 }
 
-interface Controller {
+interface Runner {
   id: string;
   name: string;
   hostname: string;
@@ -395,8 +395,8 @@ export default function HomePage() {
   const [prompt, setPrompt] = useState("");
   const [repoPath, setRepoPath] = useState("");
   const [agentType, setAgentType] = useState("antigravity");
-  const [controllerId, setControllerId] = useState("");
-  const [controllers, setControllers] = useState<Controller[]>([]);
+  const [runnerId, setRunnerId] = useState("");
+  const [runners, setRunners] = useState<Runner[]>([]);
   const [connected, setConnected] = useState(false);
   const [isNewSession, setIsNewSession] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -409,7 +409,7 @@ export default function HomePage() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Project states
-  const [sidebarMode, setSidebarMode] = useState<"sessions" | "projects" | "controllers">(
+  const [sidebarMode, setSidebarMode] = useState<"sessions" | "projects" | "runners">(
     "sessions",
   );
   const [projects, setProjects] = useState<Project[]>([]);
@@ -504,7 +504,7 @@ export default function HomePage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [viewportStyles, setViewportStyles] = useState<React.CSSProperties>({});
-  const [selectedControllerId, setSelectedControllerId] = useState<string | null>(null);
+  const [selectedRunnerId, setSelectedRunnerId] = useState<string | null>(null);
 
   // Handle mobile keyboard overlay by listening to visualViewport changes
   useEffect(() => {
@@ -612,17 +612,17 @@ export default function HomePage() {
     .reverse()
     .find((m) => m.role === "system" && m.content.includes("⚙️"))?.id;
 
-  const loadControllers = useCallback(() => {
-    fetch("/api/controllers")
+  const loadRunners = useCallback(() => {
+    fetch("/api/runners")
       .then((r) => r.json())
-      .then((data: Controller[]) => {
-        setControllers(data);
-        if (data.length > 0 && !controllerId) {
-          setControllerId(data[0].id);
+      .then((data: Runner[]) => {
+        setRunners(data);
+        if (data.length > 0 && !runnerId) {
+          setRunnerId(data[0].id);
         }
       })
       .catch(console.error);
-  }, [controllerId]);
+  }, [runnerId]);
 
   const loadProjects = useCallback(() => {
     fetch("/api/projects")
@@ -833,19 +833,17 @@ export default function HomePage() {
       .catch(console.error);
 
     loadProjects();
-    loadControllers();
+    loadRunners();
 
-    const controllerPoll = setInterval(loadControllers, 10_000);
+    const runnerPoll = setInterval(loadRunners, 10_000);
 
     fetch("/api/config")
       .then((r) => r.json())
-      .then((data: { githubConfigured: boolean }) => {
-        setGithubConfigured(data.githubConfigured);
-      })
+      .then((data) => setGithubConfigured(!!data.githubToken))
       .catch(console.error);
 
-    return () => clearInterval(controllerPoll);
-  }, [loadProjects, loadControllers]);
+    return () => clearInterval(runnerPoll);
+  }, [loadProjects, loadRunners]);
 
   // ── Load messages for selected session ──
   useEffect(() => {
@@ -878,10 +876,10 @@ export default function HomePage() {
 
   // ── Load directories for file browser ──
   useEffect(() => {
-    if (!fsModalOpen || !controllerId) return;
+    if (!fsModalOpen || !runnerId) return;
 
     setFsLoading(true);
-    fetch(`/api/fs?controller=${encodeURIComponent(controllerId)}&path=${encodeURIComponent(fsCurrentPath)}`)
+    fetch(`/api/fs?runner=${encodeURIComponent(runnerId)}&path=${encodeURIComponent(fsCurrentPath)}`)
       .then((r) => {
         if (!r.ok) throw new Error("Failed to load directories");
         return r.json();
@@ -901,7 +899,7 @@ export default function HomePage() {
       .finally(() => {
         setFsLoading(false);
       });
-  }, [fsCurrentPath, fsModalOpen, controllerId]);
+  }, [fsCurrentPath, fsModalOpen, runnerId]);
 
   // ── Close sidebar on resize to desktop ──
   useEffect(() => {
@@ -1094,7 +1092,7 @@ export default function HomePage() {
 
     try {
       if (isNewSession || !selectedSessionId) {
-        if (!repoPath.trim() || !controllerId) return;
+        if (!repoPath.trim() || !runnerId) return;
         const res = await fetch("/api/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1102,7 +1100,7 @@ export default function HomePage() {
             prompt: trimmed,
             repoPath: repoPath.trim(),
             agentType,
-            controllerId,
+            runnerId,
           }),
         });
         const newSession: Session = await res.json();
@@ -1160,7 +1158,7 @@ export default function HomePage() {
     prompt,
     repoPath,
     agentType,
-    controllerId,
+    runnerId,
     isNewSession,
     selectedSessionId,
     loadProjects,
@@ -1180,7 +1178,7 @@ export default function HomePage() {
   const handleNewSession = () => {
     setSelectedSessionId(null);
     setSelectedProjectId(null);
-    setSelectedControllerId(null);
+    setSelectedRunnerId(null);
     setIsNewSession(true);
     setMessages([]);
     setSidebarOpen(false);
@@ -1236,7 +1234,7 @@ export default function HomePage() {
   const handleSelectProject = (projectId: string) => {
     setSelectedProjectId(projectId);
     setSelectedSessionId(null);
-    setSelectedControllerId(null);
+    setSelectedRunnerId(null);
     setIsNewSession(false);
     setSidebarOpen(false);
     setActiveLogMsgId(null);
@@ -1244,8 +1242,8 @@ export default function HomePage() {
     setMenuOpen(false);
   };
 
-  const handleSelectController = (controllerId: string) => {
-    setSelectedControllerId(controllerId);
+  const handleSelectRunner = (runnerId: string) => {
+    setSelectedRunnerId(runnerId);
     setSelectedProjectId(null);
     setSelectedSessionId(null);
     setIsNewSession(false);
@@ -1600,7 +1598,7 @@ export default function HomePage() {
   const handleSelectSession = (id: string) => {
     setSelectedSessionId(id);
     setSelectedProjectId(null);
-    setSelectedControllerId(null);
+    setSelectedRunnerId(null);
     setIsNewSession(false);
     setSidebarOpen(false);
     setActiveLogMsgId(null);
@@ -1648,7 +1646,7 @@ export default function HomePage() {
 
   const canSubmit =
     prompt.trim().length > 0 &&
-    (isNewSession ? repoPath.trim().length > 0 && !!controllerId : !!selectedSessionId) &&
+    (isNewSession ? repoPath.trim().length > 0 && !!runnerId : !!selectedSessionId) &&
     !isAgentRunning;
 
   const activeLogMsg = messages.find((m) => m.id === activeLogMsgId);
@@ -1853,9 +1851,9 @@ export default function HomePage() {
             </button>
             <button
               role="tab"
-              aria-selected={sidebarMode === "controllers"}
-              className={`sidebar-mode-tab${sidebarMode === "controllers" ? " active" : ""}`}
-              onClick={() => setSidebarMode("controllers")}
+              aria-selected={sidebarMode === "runners"}
+              className={`sidebar-mode-tab${sidebarMode === "runners" ? " active" : ""}`}
+              onClick={() => setSidebarMode("runners")}
             >
               Nodes
             </button>
@@ -1879,8 +1877,8 @@ export default function HomePage() {
                 const projectName = project
                   ? (project.repoPath.split("/").pop() || project.repoPath)
                   : "";
-                const controller = controllers.find((c) => c.id === session.controllerId);
-                const nodeName = controller ? controller.name : (session.controllerId || "");
+                const runner = runners.find((r) => r.id === session.runnerId);
+                const nodeName = runner ? runner.name : (session.runnerId || "");
 
                 return (
                   <div
@@ -1918,7 +1916,7 @@ export default function HomePage() {
                       {nodeName && (
                         <span
                           className="task-item-node-badge"
-                          title={controller ? `Node: ${controller.name} (${controller.hostname})` : `Node: ${session.controllerId}`}
+                          title={runner ? `Node: ${runner.name} (${runner.hostname})` : `Node: ${session.runnerId}`}
                           style={{
                             fontSize: 10,
                             fontWeight: 500,
@@ -2014,24 +2012,24 @@ export default function HomePage() {
             </>
           ) : (
             <>
-              {controllers.length === 0 && (
+              {runners.length === 0 && (
                 <div className="empty-state">
                   <IconInbox />
                   <p>
-                    No controllers connected.
+                    No runners connected.
                   </p>
                 </div>
               )}
-              {controllers.map((c) => (
+              {runners.map((r) => (
                 <div
-                  key={c.id}
-                  className={`task-item ${selectedControllerId === c.id ? "active" : ""}`}
-                  onClick={() => handleSelectController(c.id)}
+                  key={r.id}
+                  className={`task-item ${selectedRunnerId === r.id ? "active" : ""}`}
+                  onClick={() => handleSelectRunner(r.id)}
                   style={{ cursor: "pointer" }}
                 >
                   <div className="task-item-header">
-                    <span className={`task-status-badge ${c.connected ? "running" : "idle"}`}>
-                      {c.connected ? "connected" : "disconnected"}
+                    <span className={`task-status-badge ${r.connected ? "running" : "idle"}`}>
+                      {r.connected ? "connected" : "disconnected"}
                     </span>
                     <span
                       style={{
@@ -2040,14 +2038,14 @@ export default function HomePage() {
                         marginLeft: "auto",
                       }}
                     >
-                      {c.os} ({c.arch})
+                      {r.os} ({r.arch})
                     </span>
                   </div>
                   <div
                     className="task-item-prompt"
                     style={{ fontWeight: 600 }}
                   >
-                    {c.name}
+                    {r.name}
                   </div>
                   <div
                     className="task-item-prompt"
@@ -2057,7 +2055,7 @@ export default function HomePage() {
                       marginTop: 2,
                     }}
                   >
-                    Host: {c.hostname}
+                    Host: {r.hostname}
                   </div>
                 </div>
               ))}
@@ -2068,13 +2066,13 @@ export default function HomePage() {
 
       {/* Main */}
       <main className="main">
-        {selectedControllerId ? (
+        {selectedRunnerId ? (
           (() => {
-            const controller = controllers.find((c) => c.id === selectedControllerId);
-            if (!controller) return null;
+            const runner = runners.find((r) => r.id === selectedRunnerId);
+            if (!runner) return null;
 
-            // Find all projects that use this controller
-            const controllerProjects = projects.filter((p) => p.controllerId === controller.id);
+            // Find all projects that use this runner
+            const runnerProjects = projects.filter((p) => p.runnerId === runner.id);
 
             return (
               <div className="project-detail-container" style={{ padding: 24, overflowY: "auto", height: "100%" }}>
@@ -2090,14 +2088,14 @@ export default function HomePage() {
                 >
                   <div>
                     <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-primary)" }}>
-                      Node: {controller.name}
+                      Node: {runner.name}
                     </h2>
                     <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
-                      Controller system details and script configurations
+                      Runner system details and script configurations
                     </p>
                   </div>
-                  <span className={`task-status-badge ${controller.connected ? "running" : "idle"}`} style={{ padding: "4px 10px", fontSize: 12 }}>
-                    {controller.connected ? "Active / Connected" : "Disconnected"}
+                  <span className={`task-status-badge ${runner.connected ? "running" : "idle"}`} style={{ padding: "4px 10px", fontSize: 12 }}>
+                    {runner.connected ? "Active / Connected" : "Disconnected"}
                   </span>
                 </div>
 
@@ -2124,15 +2122,15 @@ export default function HomePage() {
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                       <div style={{ display: "flex", justifyContent: "space-between" }}>
                         <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Host Name</span>
-                        <code style={{ fontSize: 12, color: "var(--text-primary)" }}>{controller.hostname || "N/A"}</code>
+                        <code style={{ fontSize: 12, color: "var(--text-primary)" }}>{runner.hostname || "N/A"}</code>
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between" }}>
                         <span style={{ fontSize: 12, color: "var(--text-muted)" }}>OS / Platform</span>
-                        <span style={{ fontSize: 12, color: "var(--text-primary)" }}>{controller.os} ({controller.arch})</span>
+                        <span style={{ fontSize: 12, color: "var(--text-primary)" }}>{runner.os} ({runner.arch})</span>
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between" }}>
                         <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Agent Version</span>
-                        <span style={{ fontSize: 12, color: "var(--text-primary)" }}>{controller.version || "0.1.0"}</span>
+                        <span style={{ fontSize: 12, color: "var(--text-primary)" }}>{runner.version || "0.1.0"}</span>
                       </div>
                     </div>
                   </div>
@@ -2150,8 +2148,8 @@ export default function HomePage() {
                       Capabilities
                     </h3>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {controller.capabilities && controller.capabilities.length > 0 ? (
-                        controller.capabilities.map((cap) => (
+                      {runner.capabilities && runner.capabilities.length > 0 ? (
+                        runner.capabilities.map((cap) => (
                           <span
                             key={cap}
                             style={{
@@ -2180,7 +2178,7 @@ export default function HomePage() {
                     <h3 className="project-section-title">Associated Projects & Scripts</h3>
                   </div>
                   
-                  {controllerProjects.length === 0 ? (
+                  {runnerProjects.length === 0 ? (
                     <div
                       style={{
                         padding: "40px 16px",
@@ -2193,11 +2191,11 @@ export default function HomePage() {
                     >
                       No active projects are configured for this node.
                       <br />
-                      Create a new project session selecting this controller node.
+                      Create a new project session selecting this runner node.
                     </div>
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                      {controllerProjects.map((project) => {
+                      {runnerProjects.map((project) => {
                         const projSessions = sessions.filter((s) => s.projectId === project.id);
                         const folderName = project.repoPath.split("/").pop() || project.repoPath;
 
@@ -3184,23 +3182,23 @@ export default function HomePage() {
             <div className="input-area">
               {isNewSession && (
                 <div className="input-meta">
-                  <span className="input-label">Controller:</span>
+                  <span className="input-label">Runner:</span>
                   <select
                     className="agent-select"
-                    value={controllerId}
+                    value={runnerId}
                     onChange={(e) => {
-                      setControllerId(e.target.value);
+                      setRunnerId(e.target.value);
                       setRepoPath("");
                     }}
                     disabled={isRunning}
-                    id="controller-select"
+                    id="runner-select"
                   >
-                    {controllers.length === 0 && (
-                      <option value="">No controllers connected</option>
+                    {runners.length === 0 && (
+                      <option value="">No runners connected</option>
                     )}
-                    {controllers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} ({c.hostname})
+                    {runners.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name} ({r.hostname})
                       </option>
                     ))}
                   </select>
@@ -3211,29 +3209,29 @@ export default function HomePage() {
                     <input
                       className="input-field-sm"
                       type="text"
-                      placeholder={controllerId ? "Click to select project directory…" : "Select a controller first"}
+                      placeholder={runnerId ? "Click to select project directory…" : "Select a runner first"}
                       value={repoPath}
                       readOnly
                       onClick={() => {
-                        if (!controllerId) return;
+                        if (!runnerId) return;
                         const startingPath = repoPath.trim() || "/";
                         setFsCurrentPath(startingPath);
                         setFsModalOpen(true);
                       }}
                       style={{ cursor: "pointer" }}
-                      disabled={isRunning || !controllerId}
+                      disabled={isRunning || !runnerId}
                       id="repo-path-input"
                     />
                     <button
                       type="button"
                       className="browse-btn"
                       onClick={() => {
-                        if (!controllerId) return;
+                        if (!runnerId) return;
                         const startingPath = repoPath.trim() || "/";
                         setFsCurrentPath(startingPath);
                         setFsModalOpen(true);
                       }}
-                      disabled={isRunning || !controllerId}
+                      disabled={isRunning || !runnerId}
                       title="Browse Directory"
                       id="browse-repo-btn"
                     >

@@ -1,4 +1,4 @@
-module github.com/nicholasgasior/itero/controller
+module github.com/nicholasgasior/itero/runner
 
 go 1.25.4
 

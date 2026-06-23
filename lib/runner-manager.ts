@@ -12,11 +12,11 @@ import path from "path";
 
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
 const TASKS_FILE = path.join(DATA_DIR, "active-tasks.json");
-const CONTROLLERS_DIR = path.join(DATA_DIR, "controllers");
+const RUNNERS_DIR = path.join(DATA_DIR, "runners");
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface ControllerInfo {
+export interface RunnerInfo {
   id: string;
   name: string;
   hostname: string;
@@ -27,15 +27,15 @@ export interface ControllerInfo {
   connected: boolean;
 }
 
-interface ControllerConnection {
+interface RunnerConnection {
   id: string;
   ws: WebSocket;
-  info: ControllerInfo;
+  info: RunnerInfo;
 }
 
 export interface TaskContext {
   taskId: string;
-  controllerId: string;
+  runnerId: string;
   sessionId: string;
   messageId: string;
   type: "agent" | "script";
@@ -58,8 +58,8 @@ interface MessageEnvelope {
 
 // ─── Manager ──────────────────────────────────────────────────────────────────
 
-class ControllerManager {
-  private controllers = new Map<string, ControllerConnection>();
+class RunnerManager {
+  private runners = new Map<string, RunnerConnection>();
   private knownIds = new Map<string, string>();
   private tasks = new Map<string, TaskContext>();
   private ptyKeyToTaskId = new Map<string, string>();
@@ -70,40 +70,40 @@ class ControllerManager {
     return `srv_${++this.idCounter}_${Date.now().toString(36)}`;
   }
 
-  // ─── Controller persistence ─────────────────────────────────────────────
+  // ─── Runner persistence ─────────────────────────────────────────────
 
-  private controllerFilePath(id: string): string {
-    return path.join(CONTROLLERS_DIR, id, "controller.json");
+  private runnerFilePath(id: string): string {
+    return path.join(RUNNERS_DIR, id, "runner.json");
   }
 
-  private async persistController(info: ControllerInfo): Promise<void> {
-    const filePath = this.controllerFilePath(info.id);
+  private async persistRunner(info: RunnerInfo): Promise<void> {
+    const filePath = this.runnerFilePath(info.id);
     try {
       await fs.mkdir(path.dirname(filePath), { recursive: true });
       await fs.writeFile(filePath, JSON.stringify(info, null, 2), "utf-8");
     } catch (err) {
-      console.error("[controller-manager] failed to persist controller:", err);
+      console.error("[runner-manager] failed to persist runner:", err);
     }
   }
 
-  async restoreControllers(): Promise<void> {
+  async restoreRunners(): Promise<void> {
     try {
-      await fs.mkdir(CONTROLLERS_DIR, { recursive: true });
-      const entries = await fs.readdir(CONTROLLERS_DIR, { withFileTypes: true });
+      await fs.mkdir(RUNNERS_DIR, { recursive: true });
+      const entries = await fs.readdir(RUNNERS_DIR, { withFileTypes: true });
       for (const entry of entries) {
         if (!entry.isDirectory()) continue;
-        const filePath = path.join(CONTROLLERS_DIR, entry.name, "controller.json");
+        const filePath = path.join(RUNNERS_DIR, entry.name, "runner.json");
         try {
           const raw = await fs.readFile(filePath, "utf-8");
-          const info: ControllerInfo = JSON.parse(raw);
+          const info: RunnerInfo = JSON.parse(raw);
           const stableKey = `${info.name}@${info.hostname}`;
           this.knownIds.set(stableKey, info.id);
         } catch {
-          // Ignore corrupt controller files
+          // Ignore corrupt runner files
         }
       }
       if (this.knownIds.size > 0) {
-        console.log(`[controller-manager] restored ${this.knownIds.size} known controller(s) from disk`);
+        console.log(`[runner-manager] restored ${this.knownIds.size} known runner(s) from disk`);
       }
     } catch {
       // Directory doesn't exist yet — fine on first run
@@ -118,7 +118,7 @@ class ControllerManager {
       await fs.mkdir(path.dirname(TASKS_FILE), { recursive: true });
       await fs.writeFile(TASKS_FILE, JSON.stringify(data), "utf-8");
     } catch (err) {
-      console.error("[controller-manager] failed to persist tasks:", err);
+      console.error("[runner-manager] failed to persist tasks:", err);
     }
   }
 
@@ -132,7 +132,7 @@ class ControllerManager {
         this.ptyKeyToTaskId.set(ptyKey, ctx.taskId);
       }
       if (data.length > 0) {
-        console.log(`[controller-manager] restored ${data.length} task(s) from disk`);
+        console.log(`[runner-manager] restored ${data.length} task(s) from disk`);
       }
     } catch {
       // File doesn't exist or is invalid — that's fine on first run
@@ -141,7 +141,7 @@ class ControllerManager {
 
   // ─── Connection lifecycle ─────────────────────────────────────────────
 
-  addController(ws: WebSocket, registerPayload: any): string {
+  addRunner(ws: WebSocket, registerPayload: any): string {
     const name: string = registerPayload.name || "unknown";
     const hostname: string = registerPayload.hostname || "";
 
@@ -149,7 +149,7 @@ class ControllerManager {
     let id = this.knownIds.get(stableKey);
 
     if (id) {
-      const existing = this.controllers.get(id);
+      const existing = this.runners.get(id);
       if (existing) {
         try { existing.ws.close(); } catch {}
       }
@@ -158,7 +158,7 @@ class ControllerManager {
       this.knownIds.set(stableKey, id);
     }
 
-    const info: ControllerInfo = {
+    const info: RunnerInfo = {
       id,
       name,
       hostname,
@@ -168,15 +168,15 @@ class ControllerManager {
       capabilities: registerPayload.capabilities || [],
       connected: true,
     };
-    this.controllers.set(id, { id, ws, info });
-    this.persistController(info).catch(() => {});
-    console.log(`[controller-manager] controller registered: ${info.name} (${id})`);
+    this.runners.set(id, { id, ws, info });
+    this.persistRunner(info).catch(() => {});
+    console.log(`[runner-manager] runner registered: ${info.name} (${id})`);
 
-    // Re-associate persisted tasks whose controllerId matches no connected controller
+    // Re-associate persisted tasks whose runnerId matches no connected runner
     for (const [taskId, ctx] of this.tasks) {
-      if (!this.controllers.has(ctx.controllerId)) {
-        console.log(`[controller-manager] re-associating task ${taskId} from ${ctx.controllerId} → ${id}`);
-        ctx.controllerId = id;
+      if (!this.runners.has(ctx.runnerId)) {
+        console.log(`[runner-manager] re-associating task ${taskId} from ${ctx.runnerId} → ${id}`);
+        ctx.runnerId = id;
       }
     }
     this.persistTasks().catch(() => {});
@@ -184,58 +184,58 @@ class ControllerManager {
     return id;
   }
 
-  removeController(controllerId: string): void {
-    const ctrl = this.controllers.get(controllerId);
+  removeRunner(runnerId: string): void {
+    const ctrl = this.runners.get(runnerId);
     if (ctrl) {
       ctrl.info.connected = false;
-      this.persistController(ctrl.info).catch(() => {});
-      this.controllers.delete(controllerId);
-      console.log(`[controller-manager] controller disconnected: ${ctrl.info.name} (${controllerId})`);
+      this.persistRunner(ctrl.info).catch(() => {});
+      this.runners.delete(runnerId);
+      console.log(`[runner-manager] runner disconnected: ${ctrl.info.name} (${runnerId})`);
 
       for (const [reqId, pending] of this.pending) {
-        pending.reject(new Error("Controller disconnected"));
+        pending.reject(new Error("Runner disconnected"));
         clearTimeout(pending.timer);
         this.pending.delete(reqId);
       }
 
-      // Fail all active tasks on this controller
+      // Fail all active tasks on this runner
       for (const [taskId, ctx] of this.tasks) {
-        if (ctx.controllerId === controllerId) {
-          console.log(`[controller-manager] failing orphaned task: ${taskId}`);
+        if (ctx.runnerId === runnerId) {
+          console.log(`[runner-manager] failing orphaned task: ${taskId}`);
           this.onExecExit({ taskId, exitCode: -1 }).catch((err) => {
-            console.error("[controller-manager] failed to clean up task:", err);
+            console.error("[runner-manager] failed to clean up task:", err);
           });
         }
       }
     }
   }
 
-  getControllers(): ControllerInfo[] {
-    return Array.from(this.controllers.values()).map((c) => ({ ...c.info }));
+  getRunners(): RunnerInfo[] {
+    return Array.from(this.runners.values()).map((c) => ({ ...c.info }));
   }
 
-  getController(id: string): ControllerConnection | undefined {
-    return this.controllers.get(id);
+  getRunner(id: string): RunnerConnection | undefined {
+    return this.runners.get(id);
   }
 
-  resolveControllerId(storedId: string): string | undefined {
-    if (this.controllers.has(storedId)) return storedId;
-    // Stored ID is stale — fall back to any connected controller
-    for (const [id] of this.controllers) return id;
+  resolveRunnerId(storedId: string): string | undefined {
+    if (this.runners.has(storedId)) return storedId;
+    // Stored ID is stale — fall back to any connected runner
+    for (const [id] of this.runners) return id;
     return undefined;
   }
 
   // ─── Request / Response ───────────────────────────────────────────────
 
   async sendRequest(
-    controllerId: string,
+    runnerId: string,
     method: string,
     payload: any,
     timeoutMs = 30_000
   ): Promise<any> {
-    const ctrl = this.controllers.get(controllerId);
+    const ctrl = this.runners.get(runnerId);
     if (!ctrl) {
-      throw new Error(`Controller ${controllerId} not found or disconnected`);
+      throw new Error(`Runner ${runnerId} not found or disconnected`);
     }
 
     const id = this.nextId();
@@ -252,10 +252,10 @@ class ControllerManager {
     });
   }
 
-  sendFire(controllerId: string, method: string, payload: any): void {
-    const ctrl = this.controllers.get(controllerId);
+  sendFire(runnerId: string, method: string, payload: any): void {
+    const ctrl = this.runners.get(runnerId);
     if (!ctrl) {
-      console.warn(`[controller-manager] sendFire ${method}: controller ${controllerId} not found`);
+      console.warn(`[runner-manager] sendFire ${method}: runner ${runnerId} not found`);
       return;
     }
 
@@ -270,7 +270,7 @@ class ControllerManager {
     this.tasks.set(ctx.taskId, ctx);
     const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
     this.ptyKeyToTaskId.set(ptyKey, ctx.taskId);
-    console.log(`[controller-manager] task registered: ${ctx.taskId} (type=${ctx.type}, total=${this.tasks.size})`);
+    console.log(`[runner-manager] task registered: ${ctx.taskId} (type=${ctx.type}, total=${this.tasks.size})`);
     this.persistTasks().catch(() => {});
   }
 
@@ -282,15 +282,15 @@ class ControllerManager {
     return this.ptyKeyToTaskId.get(`${sessionId}:${messageId}`);
   }
 
-  getControllerForTask(taskId: string): string | undefined {
-    return this.tasks.get(taskId)?.controllerId;
+  getRunnerForTask(taskId: string): string | undefined {
+    return this.tasks.get(taskId)?.runnerId;
   }
 
   updateTaskPid(taskId: string, pid: number): void {
     const ctx = this.tasks.get(taskId);
     if (ctx) {
       ctx.pid = pid;
-      console.log(`[controller-manager] task ${taskId} pid=${pid}`);
+      console.log(`[runner-manager] task ${taskId} pid=${pid}`);
       this.persistTasks().catch(() => {});
     }
   }
@@ -302,29 +302,29 @@ class ControllerManager {
     const ctx = this.tasks.get(taskId);
     if (!ctx) return false;
 
-    const controllerId = this.resolveControllerId(ctx.controllerId);
-    if (!controllerId) return false;
+    const runnerId = this.resolveRunnerId(ctx.runnerId);
+    if (!runnerId) return false;
 
     try {
-      await this.sendRequest(controllerId, "exec.cancel", {
+      await this.sendRequest(runnerId, "exec.cancel", {
         taskId,
         signal: "SIGTERM",
       });
       return true;
     } catch (err) {
-      console.error(`[controller-manager] failed to kill task ${taskId}:`, err);
+      console.error(`[runner-manager] failed to kill task ${taskId}:`, err);
       return false;
     }
   }
 
   // ─── Incoming message handler ─────────────────────────────────────────
 
-  handleMessage(controllerId: string, raw: string): void {
+  handleMessage(runnerId: string, raw: string): void {
     let msg: MessageEnvelope;
     try {
       msg = JSON.parse(raw);
     } catch {
-      console.error("[controller-manager] failed to parse message:", raw.slice(0, 200));
+      console.error("[runner-manager] failed to parse message:", raw.slice(0, 200));
       return;
     }
 
@@ -336,10 +336,10 @@ class ControllerManager {
         this.handleStream(msg);
         break;
       case "event":
-        this.handleEvent(controllerId, msg);
+        this.handleEvent(runnerId, msg);
         break;
       default:
-        console.warn(`[controller-manager] unknown message type: ${msg.type}`);
+        console.warn(`[runner-manager] unknown message type: ${msg.type}`);
     }
   }
 
@@ -347,7 +347,7 @@ class ControllerManager {
     const pending = this.pending.get(msg.id);
     if (!pending) {
       if (msg.payload?.ok === false) {
-        console.warn(`[controller-manager] unmatched error response (fire-and-forget): ${msg.payload.error?.message || "unknown"}`);
+        console.warn(`[runner-manager] unmatched error response (fire-and-forget): ${msg.payload.error?.message || "unknown"}`);
       }
       return;
     }
@@ -356,7 +356,7 @@ class ControllerManager {
 
     if (msg.payload?.ok === false) {
       pending.reject(
-        new Error(msg.payload.error?.message || "Controller returned error")
+        new Error(msg.payload.error?.message || "Runner returned error")
       );
     } else {
       pending.resolve(msg.payload);
@@ -366,24 +366,24 @@ class ControllerManager {
   private handleStream(msg: MessageEnvelope): void {
     if (msg.method === "exec.output") {
       this.onExecOutput(msg.payload).catch((err) => {
-        console.error("[controller-manager] onExecOutput error:", err);
+        console.error("[runner-manager] onExecOutput error:", err);
       });
     } else {
-      console.warn(`[controller-manager] unknown stream method: ${msg.method}`);
+      console.warn(`[runner-manager] unknown stream method: ${msg.method}`);
     }
   }
 
-  private handleEvent(controllerId: string, msg: MessageEnvelope): void {
+  private handleEvent(runnerId: string, msg: MessageEnvelope): void {
     switch (msg.method) {
       case "exec.exit":
         this.onExecExit(msg.payload).catch((err) => {
-          console.error("[controller-manager] onExecExit error:", err);
+          console.error("[runner-manager] onExecExit error:", err);
         });
         break;
       case "pong":
         break;
       case "task.status":
-        this.onTaskStatus(controllerId, msg.payload);
+        this.onTaskStatus(runnerId, msg.payload);
         break;
       default:
         break;
@@ -399,7 +399,7 @@ class ControllerManager {
   }): Promise<void> {
     const ctx = this.tasks.get(payload.taskId);
     if (!ctx) {
-      console.warn(`[controller-manager] exec.output for unknown task: ${payload.taskId}`);
+      console.warn(`[runner-manager] exec.output for unknown task: ${payload.taskId}`);
       return;
     }
 
@@ -513,7 +513,7 @@ class ControllerManager {
   }
 
   private onTaskStatus(
-    controllerId: string,
+    runnerId: string,
     payload: {
       tasks: Array<{
         taskId: string;
@@ -526,14 +526,14 @@ class ControllerManager {
     for (const t of payload.tasks) {
       if (t.state === "exited" && t.exitCode !== undefined) {
         this.onExecExit({ taskId: t.taskId, exitCode: t.exitCode }).catch((err) => {
-          console.error("[controller-manager] onExecExit error:", err);
+          console.error("[runner-manager] onExecExit error:", err);
         });
       } else if (t.state === "running") {
-        // Re-associate running tasks with the reporting controller
+        // Re-associate running tasks with the reporting runner
         const ctx = this.tasks.get(t.taskId);
-        if (ctx && ctx.controllerId !== controllerId) {
-          console.log(`[controller-manager] task.status: re-associating ${t.taskId} → ${controllerId}`);
-          ctx.controllerId = controllerId;
+        if (ctx && ctx.runnerId !== runnerId) {
+          console.log(`[runner-manager] task.status: re-associating ${t.taskId} → ${runnerId}`);
+          ctx.runnerId = runnerId;
           this.persistTasks().catch(() => {});
         }
       }
@@ -543,15 +543,15 @@ class ControllerManager {
 
 // ─── Singleton ────────────────────────────────────────────────────────────────
 
-const p = process as typeof process & { __iteroCtrlMgr?: ControllerManager };
-if (!p.__iteroCtrlMgr) {
-  p.__iteroCtrlMgr = new ControllerManager();
-  p.__iteroCtrlMgr.restoreControllers().catch((err) => {
-    console.error("[controller-manager] failed to restore controllers:", err);
+const p = process as typeof process & { __iteroRunnerMgr?: RunnerManager };
+if (!p.__iteroRunnerMgr) {
+  p.__iteroRunnerMgr = new RunnerManager();
+  p.__iteroRunnerMgr.restoreRunners().catch((err) => {
+    console.error("[runner-manager] failed to restore runners:", err);
   });
-  p.__iteroCtrlMgr.restoreTasks().catch((err) => {
-    console.error("[controller-manager] failed to restore tasks:", err);
+  p.__iteroRunnerMgr.restoreTasks().catch((err) => {
+    console.error("[runner-manager] failed to restore tasks:", err);
   });
 }
 
-export const controllerManager = p.__iteroCtrlMgr;
+export const runnerManager = p.__iteroRunnerMgr;

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, updateSession, addMessage, clearSessionLog } from "@/lib/store";
 import { getAgent, AgentType } from "@/lib/agents";
 import { eventBus } from "@/lib/event-bus";
-import { controllerManager } from "@/lib/controller-manager";
+import { runnerManager } from "@/lib/runner-manager";
 
 export async function POST(
   req: NextRequest,
@@ -49,16 +49,16 @@ export async function POST(
     });
     eventBus.publish({ type: "message_added", payload: systemMsg });
 
-    // Run agent via controller
-    const controllerId = controllerManager.resolveControllerId(session.controllerId);
-    if (!controllerId) {
-      return NextResponse.json({ error: "No connected controller available" }, { status: 503 });
+    // Run agent via runner
+    const runnerId = runnerManager.resolveRunnerId(session.runnerId);
+    if (!runnerId) {
+      return NextResponse.json({ error: "No connected runner available" }, { status: 503 });
     }
 
     const taskId = `task_${crypto.randomUUID().slice(0, 8)}`;
-    controllerManager.registerTask({
+    runnerManager.registerTask({
       taskId,
-      controllerId,
+      runnerId,
       sessionId: id,
       messageId: systemMsg.id,
       type: "agent",
@@ -66,14 +66,14 @@ export async function POST(
 
     await clearSessionLog(id, systemMsg.id);
 
-    controllerManager
-      .sendRequest(controllerId, "exec.agent", {
+    runnerManager
+      .sendRequest(runnerId, "exec.agent", {
         taskId,
         command,
         workDir: session.repoPath,
       }, 10_000)
       .then((res: any) => {
-        if (res?.pid) controllerManager.updateTaskPid(taskId, res.pid);
+        if (res?.pid) runnerManager.updateTaskPid(taskId, res.pid);
       })
       .catch(async (err) => {
         const errorMessage = err instanceof Error ? err.message : String(err);

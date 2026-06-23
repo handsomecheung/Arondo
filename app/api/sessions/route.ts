@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessions, createSession, updateSession, addMessage, clearSessionLog } from "@/lib/store";
 import { getAgent, AgentType } from "@/lib/agents";
 import { eventBus } from "@/lib/event-bus";
-import { controllerManager } from "@/lib/controller-manager";
+import { runnerManager } from "@/lib/runner-manager";
 
 export async function GET() {
   const sessions = await getSessions();
@@ -11,23 +11,23 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { prompt, repoPath, agentType = "antigravity", controllerId } = body as {
+  const { prompt, repoPath, agentType = "antigravity", runnerId } = body as {
     prompt: string;
     repoPath: string;
     agentType?: string;
-    controllerId: string;
+    runnerId: string;
   };
 
   if (!prompt || !repoPath) {
     return NextResponse.json({ error: "prompt and repoPath are required" }, { status: 400 });
   }
-  if (!controllerId) {
-    return NextResponse.json({ error: "controllerId is required" }, { status: 400 });
+  if (!runnerId) {
+    return NextResponse.json({ error: "runnerId is required" }, { status: 400 });
   }
 
-  const ctrl = controllerManager.getController(controllerId);
-  if (!ctrl) {
-    return NextResponse.json({ error: "Controller not found or disconnected" }, { status: 400 });
+  const run = runnerManager.getRunner(runnerId);
+  if (!run) {
+    return NextResponse.json({ error: "Runner not found or disconnected" }, { status: 400 });
   }
 
   const session = await createSession({
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     prompt,
     agentType,
     repoPath,
-    controllerId,
+    runnerId,
   });
 
   const agent = getAgent(agentType as AgentType);
@@ -56,11 +56,11 @@ export async function POST(req: NextRequest) {
   eventBus.publish({ type: "message_added", payload: systemMsg });
   eventBus.publish({ type: "session_updated", payload: session });
 
-  // Run agent via controller
+  // Run agent via runner
   const taskId = `task_${crypto.randomUUID().slice(0, 8)}`;
-  controllerManager.registerTask({
+  runnerManager.registerTask({
     taskId,
-    controllerId,
+    runnerId,
     sessionId: session.id,
     messageId: systemMsg.id,
     type: "agent",
@@ -68,14 +68,14 @@ export async function POST(req: NextRequest) {
 
   await clearSessionLog(session.id, systemMsg.id);
 
-  controllerManager
-    .sendRequest(controllerId, "exec.agent", {
+  runnerManager
+    .sendRequest(runnerId, "exec.agent", {
       taskId,
       command,
       workDir: repoPath,
     }, 10_000)
     .then((res: any) => {
-      if (res?.pid) controllerManager.updateTaskPid(taskId, res.pid);
+      if (res?.pid) runnerManager.updateTaskPid(taskId, res.pid);
     })
     .catch(async (err) => {
       const errorMessage = err instanceof Error ? err.message : String(err);

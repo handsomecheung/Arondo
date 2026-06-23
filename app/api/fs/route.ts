@@ -1,21 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { controllerManager } from "@/lib/controller-manager";
+import { runnerManager } from "@/lib/runner-manager";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const requestedPath = searchParams.get("path") || "/";
-  const controllerId = searchParams.get("controller");
+  const runnerId = searchParams.get("runner");
 
-  if (!controllerId) {
+  if (!runnerId) {
     return NextResponse.json(
-      { error: "controller query parameter is required" },
+      { error: "runner query parameter is required" },
       { status: 400 }
     );
   }
 
   try {
-    const result = await controllerManager.sendRequest(
-      controllerId,
+    const result = await runnerManager.sendRequest(
+      runnerId,
       "fs.list",
       { path: requestedPath }
     );

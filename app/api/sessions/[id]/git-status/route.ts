@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/store";
-import { controllerManager } from "@/lib/controller-manager";
+import { runnerManager } from "@/lib/runner-manager";
 
 export async function GET(
   req: NextRequest,
@@ -14,13 +14,13 @@ export async function GET(
   }
 
   try {
-    const controllerId = controllerManager.resolveControllerId(session.controllerId);
-    if (!controllerId) {
-      return NextResponse.json({ hasChanges: false, isGitRepo: false, error: "No controller" }, { status: 200 });
+    const runnerId = runnerManager.resolveRunnerId(session.runnerId);
+    if (!runnerId) {
+      return NextResponse.json({ hasChanges: false, isGitRepo: false, error: "No runner" }, { status: 200 });
     }
 
-    const result = await controllerManager.sendRequest(
-      controllerId,
+    const result = await runnerManager.sendRequest(
+      runnerId,
       "git.status",
       { workDir: session.repoPath }
     );

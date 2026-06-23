@@ -9,8 +9,8 @@ import (
 )
 
 func main() {
-	serverURL := flag.String("server", "ws://localhost:3251/controller", "Server WebSocket URL")
-	name := flag.String("name", "", "Controller name (defaults to hostname)")
+	serverURL := flag.String("server", "ws://localhost:3251/runner", "Server WebSocket URL")
+	name := flag.String("name", "", "Runner name (defaults to hostname)")
 	flag.Parse()
 
 	if *name == "" {
@@ -22,9 +22,9 @@ func main() {
 	}
 
 	log.SetFlags(log.Ltime | log.Lmsgprefix)
-	log.SetPrefix("[controller] ")
+	log.SetPrefix("[runner] ")
 
-	log.Printf("starting controller %q, connecting to %s", *name, *serverURL)
+	log.Printf("starting runner %q, connecting to %s", *name, *serverURL)
 
 	client := NewClient(*serverURL, *name)
 

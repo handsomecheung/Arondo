@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { controllerManager } from "@/lib/controller-manager";
+import { runnerManager } from "@/lib/runner-manager";
 
 export async function POST(req: NextRequest) {
   const { sessionId, messageId } = await req.json();
@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const ok = await controllerManager.killTask(sessionId, messageId);
+  const ok = await runnerManager.killTask(sessionId, messageId);
   if (!ok) {
     return NextResponse.json(
       { error: "Task not found or already finished" },

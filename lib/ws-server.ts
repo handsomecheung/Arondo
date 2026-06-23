@@ -1,6 +1,6 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { eventBus, SseEvent } from "./event-bus";
-import { controllerManager } from "./controller-manager";
+import { runnerManager } from "./runner-manager";
 
 const EVENT_TYPE_MAP: Record<string, string> = {
   session_updated: "session:updated",
@@ -61,28 +61,28 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
 
       switch (type) {
         case "terminal:input": {
-          const taskId = controllerManager.getTaskIdByPtyKey(sessionId, messageId);
+          const taskId = runnerManager.getTaskIdByPtyKey(sessionId, messageId);
           if (!taskId) {
             console.warn(`[ws-server] terminal:input: no task for ptyKey ${sessionId}:${messageId}`);
             break;
           }
-          const controllerId = controllerManager.getControllerForTask(taskId);
-          if (!controllerId) {
-            console.warn(`[ws-server] terminal:input: no controller for task ${taskId}`);
+          const runnerId = runnerManager.getRunnerForTask(taskId);
+          if (!runnerId) {
+            console.warn(`[ws-server] terminal:input: no runner for task ${taskId}`);
             break;
           }
-          controllerManager.sendFire(controllerId, "pty.input", {
+          runnerManager.sendFire(runnerId, "pty.input", {
             taskId,
             data: msg.data,
           });
           break;
         }
         case "terminal:resize": {
-          const taskId = controllerManager.getTaskIdByPtyKey(sessionId, messageId);
+          const taskId = runnerManager.getTaskIdByPtyKey(sessionId, messageId);
           if (taskId) {
-            const controllerId = controllerManager.getControllerForTask(taskId);
-            if (controllerId) {
-              controllerManager.sendFire(controllerId, "pty.resize", {
+            const runnerId = runnerManager.getRunnerForTask(taskId);
+            if (runnerId) {
+              runnerManager.sendFire(runnerId, "pty.resize", {
                 taskId,
                 cols: msg.cols,
                 rows: msg.rows,
@@ -92,7 +92,7 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
           break;
         }
         case "terminal:attach": {
-          // Buffer replay is not available via controller in this version.
+          // Buffer replay is not available via runner in this version.
           // The terminal will receive live output from the stream.
           break;
         }

@@ -2,7 +2,7 @@ import { createServer } from "http";
 import next from "next";
 import { WebSocketServer } from "ws";
 import { setupWebSocketServer } from "./lib/ws-server";
-import { setupControllerServer } from "./lib/controller-server";
+import { setupRunnerServer } from "./lib/runner-server";
 
 const port = parseInt(process.env.PORT || (process.env.NODE_ENV === "production" ? "3250" : "3251"), 10);
 const dev = process.env.NODE_ENV !== "production";
@@ -17,13 +17,13 @@ app.prepare().then(() => {
   const wss = new WebSocketServer({ noServer: true });
   setupWebSocketServer(wss);
 
-  const controllerWss = new WebSocketServer({ noServer: true });
-  setupControllerServer(controllerWss);
+  const runnerWss = new WebSocketServer({ noServer: true });
+  setupRunnerServer(runnerWss);
 
   server.on("upgrade", (req, socket, head) => {
-    if (req.url?.startsWith("/controller")) {
-      controllerWss.handleUpgrade(req, socket, head, (ws) => {
-        controllerWss.emit("connection", ws, req);
+    if (req.url?.startsWith("/runner")) {
+      runnerWss.handleUpgrade(req, socket, head, (ws) => {
+        runnerWss.emit("connection", ws, req);
       });
     } else if (req.url?.startsWith("/ws")) {
       wss.handleUpgrade(req, socket, head, (ws) => {

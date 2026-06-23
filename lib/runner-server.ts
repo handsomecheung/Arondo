@@ -1,12 +1,12 @@
 import { WebSocketServer, WebSocket } from "ws";
-import { controllerManager } from "./controller-manager";
+import { runnerManager } from "./runner-manager";
 
 const HEARTBEAT_INTERVAL = 30_000;
 
-export function setupControllerServer(wss: WebSocketServer): void {
+export function setupRunnerServer(wss: WebSocketServer): void {
   const heartbeat = setInterval(() => {
-    for (const ctrl of controllerManager.getControllers()) {
-      const conn = controllerManager.getController(ctrl.id);
+    for (const run of runnerManager.getRunners()) {
+      const conn = runnerManager.getRunner(run.id);
       if (conn?.ws && conn.ws.readyState === WebSocket.OPEN) {
         conn.ws.ping();
       }
@@ -16,7 +16,7 @@ export function setupControllerServer(wss: WebSocketServer): void {
   wss.on("close", () => clearInterval(heartbeat));
 
   wss.on("connection", (ws: WebSocket) => {
-    let controllerId: string | null = null;
+    let runnerId: string | null = null;
 
     ws.on("message", (raw) => {
       let msg: any;
@@ -26,16 +26,16 @@ export function setupControllerServer(wss: WebSocketServer): void {
         return;
       }
 
-      if (!controllerId) {
+      if (!runnerId) {
         if (msg.type === "event" && msg.method === "register") {
-          controllerId = controllerManager.addController(ws, msg.payload);
+          runnerId = runnerManager.addRunner(ws, msg.payload);
 
           const ack = JSON.stringify({
             id: msg.id || "ack",
             type: "event",
             method: "connected",
             payload: {
-              controllerId,
+              runnerId,
               serverVersion: "0.2.0",
             },
           });
@@ -47,20 +47,20 @@ export function setupControllerServer(wss: WebSocketServer): void {
       }
 
       try {
-        controllerManager.handleMessage(controllerId, raw.toString());
+        runnerManager.handleMessage(runnerId, raw.toString());
       } catch (err) {
-        console.error("[controller-server] handleMessage error:", err);
+        console.error("[runner-server] handleMessage error:", err);
       }
     });
 
     ws.on("close", () => {
-      if (controllerId) {
-        controllerManager.removeController(controllerId);
+      if (runnerId) {
+        runnerManager.removeRunner(runnerId);
       }
     });
 
     ws.on("error", (err) => {
-      console.error(`[controller-server] ws error:`, err.message);
+      console.error(`[runner-server] ws error:`, err.message);
     });
   });
 }
