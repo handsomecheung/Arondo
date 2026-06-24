@@ -1,12 +1,14 @@
 import { BaseAgent } from "./base";
 import { GeminiAgent } from "./gemini";
 import { AntigravityAgent } from "./antigravity";
+import { ClaudeCodeAgent } from "./claude";
 
-export type AgentType = "gemini" | "antigravity";
+export type AgentType = "gemini" | "antigravity" | "claude";
 
 const AGENTS: Record<AgentType, () => BaseAgent> = {
   gemini: () => new GeminiAgent(),
   antigravity: () => new AntigravityAgent(),
+  claude: () => new ClaudeCodeAgent(),
 };
 
 /**

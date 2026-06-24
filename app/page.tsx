@@ -3091,7 +3091,7 @@ export default function HomePage() {
                     }}
                   >
                     Project: {selectedSession.repoPath.split("/").pop() || selectedSession.repoPath} (
-                    {selectedSession.agentType})
+                    {selectedSession.agentType === "antigravity" ? "Antigravity CLI" : selectedSession.agentType === "claude" ? "Claude Code" : "Gemini CLI"})
                   </span>
                 </div>
 
@@ -3513,7 +3513,7 @@ export default function HomePage() {
                       id="agent-select-trigger"
                     >
                       <span>
-                        {agentType === "antigravity" ? "Antigravity" : "Gemini"}
+                        {agentType === "antigravity" ? "Antigravity CLI" : agentType === "claude" ? "Claude Code" : "Gemini CLI"}
                       </span>
                       <IconChevronDown className={`arrow-icon ${agentDropdownOpen ? "open" : ""}`} />
                     </button>
@@ -3527,7 +3527,7 @@ export default function HomePage() {
                             setAgentDropdownOpen(false);
                           }}
                         >
-                          Antigravity
+                          Antigravity CLI
                         </button>
                         <button
                           type="button"
@@ -3537,7 +3537,17 @@ export default function HomePage() {
                             setAgentDropdownOpen(false);
                           }}
                         >
-                          Gemini
+                          Gemini CLI
+                        </button>
+                        <button
+                          type="button"
+                          className={`custom-dropdown-item ${agentType === "claude" ? "active" : ""}`}
+                          onClick={() => {
+                            setAgentType("claude");
+                            setAgentDropdownOpen(false);
+                          }}
+                        >
+                          Claude Code
                         </button>
                       </div>
                     )}
