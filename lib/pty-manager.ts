@@ -86,9 +86,9 @@ class PtyManager {
   }
 }
 
-const p = process as typeof process & { __iteroPtyMgr?: PtyManager };
-if (!p.__iteroPtyMgr) {
-  p.__iteroPtyMgr = new PtyManager();
+const p = process as typeof process & { __arondoPtyMgr?: PtyManager };
+if (!p.__arondoPtyMgr) {
+  p.__arondoPtyMgr = new PtyManager();
 }
 
-export const ptyManager = p.__iteroPtyMgr;
+export const ptyManager = p.__arondoPtyMgr;

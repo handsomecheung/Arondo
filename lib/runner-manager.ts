@@ -543,15 +543,15 @@ class RunnerManager {
 
 // ─── Singleton ────────────────────────────────────────────────────────────────
 
-const p = process as typeof process & { __iteroRunnerMgr?: RunnerManager };
-if (!p.__iteroRunnerMgr) {
-  p.__iteroRunnerMgr = new RunnerManager();
-  p.__iteroRunnerMgr.restoreRunners().catch((err) => {
+const p = process as typeof process & { __arondoRunnerMgr?: RunnerManager };
+if (!p.__arondoRunnerMgr) {
+  p.__arondoRunnerMgr = new RunnerManager();
+  p.__arondoRunnerMgr.restoreRunners().catch((err) => {
     console.error("[runner-manager] failed to restore runners:", err);
   });
-  p.__iteroRunnerMgr.restoreTasks().catch((err) => {
+  p.__arondoRunnerMgr.restoreTasks().catch((err) => {
     console.error("[runner-manager] failed to restore tasks:", err);
   });
 }
 
-export const runnerManager = p.__iteroRunnerMgr;
+export const runnerManager = p.__arondoRunnerMgr;

@@ -2,10 +2,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: devbox-nur-itero-dev
+  name: devbox-nur-arondo-dev
   namespace: default
   labels:
-    app: devbox-nur-itero-dev
+    app: devbox-nur-arondo-dev
 spec:
   type: ClusterIP
   selector:
@@ -20,30 +20,30 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: itero-dev
+  name: arondo-dev
   namespace: default
   annotations:
     cert-manager.io/cluster-issuer: cluster-letsencrypt-dns-cloudflare
     traefik.ingress.kubernetes.io/router.middlewares: middleware-playonjan@kubernetescrd,middleware-antimitm@kubernetescrd,sso-domainx@kubernetescrd
     gethomepage.dev/enabled: "true"
     gethomepage.dev/group: AI
-    gethomepage.dev/name: Itero Dev
-    gethomepage.dev/href: https://itero-dev.__{{infra.domains:f:x}}__/
+    gethomepage.dev/name: Arondo Dev
+    gethomepage.dev/href: https://arondo-dev.__{{infra.domains:f:x}}__/
     gethomepage.dev/weight: "80"
 spec:
   ingressClassName: traefik
   rules:
-    - host: itero-dev.__{{infra.domains:f:x}}__
+    - host: arondo-dev.__{{infra.domains:f:x}}__
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: devbox-nur-itero-dev
+                name: devbox-nur-arondo-dev
                 port:
                   name: default
   tls:
     - hosts:
-        - itero-dev.__{{infra.domains:f:x}}__
-      secretName: itero-dev-domainx
+        - arondo-dev.__{{infra.domains:f:x}}__
+      secretName: arondo-dev-domainx

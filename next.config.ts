@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 // Read allowed dev origins from env var (comma-separated).
-// Example: ALLOWED_DEV_ORIGINS=itero.example.com,localhost:3250
+// Example: ALLOWED_DEV_ORIGINS=arondo.example.com,localhost:3250
 const allowedDevOrigins = process.env.ALLOWED_DEV_ORIGINS
   ? process.env.ALLOWED_DEV_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean)
   : [];

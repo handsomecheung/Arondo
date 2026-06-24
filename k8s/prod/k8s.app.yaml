@@ -2,26 +2,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: itero-prod
+  name: arondo-prod
   namespace: default
   labels:
-    app: itero-prod
+    app: arondo-prod
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: itero-prod
+      app: arondo-prod
   template:
     metadata:
       labels:
-        app: itero-prod
+        app: arondo-prod
     spec:
       nodeSelector:
         kubernetes.io/hostname: nur
       volumes:
         - name: data
           hostPath:
-            path: /mnt/coder-sharepoint/itero/data
+            path: /mnt/coder-sharepoint/arondo/data
             type: DirectoryOrCreate
         - name: coder-workspaces
           hostPath:
@@ -29,14 +29,14 @@ spec:
             type: Directory
       containers:
         - name: app
-          image: cloudpublic/default/itero:latest
+          image: cloudpublic/default/arondo:latest
           imagePullPolicy: Always
           volumeMounts:
             - name: data
               mountPath: /data
           env:
             - name: ALLOWED_DEV_ORIGINS
-              value: itero.__{{infra.domains:f:x}}__
+              value: arondo.__{{infra.domains:f:x}}__
             - name: DATA_DIR
               value: /data
           ports:
@@ -70,14 +70,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: itero-prod
+  name: arondo-prod
   namespace: default
   labels:
-    app: itero-prod
+    app: arondo-prod
 spec:
   type: ClusterIP
   selector:
-    app: itero-prod
+    app: arondo-prod
   ports:
     - name: default
       port: 80
@@ -92,63 +92,63 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: itero-prod
+  name: arondo-prod
   namespace: default
   annotations:
     cert-manager.io/cluster-issuer: cluster-letsencrypt-dns-cloudflare
     traefik.ingress.kubernetes.io/router.middlewares: middleware-playonjan@kubernetescrd,middleware-antimitm@kubernetescrd,sso-domainx@kubernetescrd
     gethomepage.dev/enabled: "true"
     gethomepage.dev/group: AI
-    gethomepage.dev/name: Itero
-    gethomepage.dev/href: https://itero.__{{infra.domains:f:x}}__/
+    gethomepage.dev/name: Arondo
+    gethomepage.dev/href: https://arondo.__{{infra.domains:f:x}}__/
     gethomepage.dev/weight: "5"
 spec:
   ingressClassName: traefik
   rules:
-    - host: itero.__{{infra.domains:f:x}}__
+    - host: arondo.__{{infra.domains:f:x}}__
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: itero-prod
+                name: arondo-prod
                 port:
                   name: default
           - path: /runner
             pathType: Prefix
             backend:
               service:
-                name: itero-prod
+                name: arondo-prod
                 port:
                   name: notfound
   tls:
     - hosts:
-        - itero.__{{infra.domains:f:x}}__
-      secretName: itero-domainx
+        - arondo.__{{infra.domains:f:x}}__
+      secretName: arondo-domainx
 
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: itero-prod-runner
+  name: arondo-prod-runner
   namespace: default
   annotations:
     cert-manager.io/cluster-issuer: cluster-letsencrypt-dns-cloudflare
 spec:
   ingressClassName: traefik
   rules:
-    - host: itero-runner.home4p.__{{infra.domains:f:x}}__
+    - host: arondo-runner.home4p.__{{infra.domains:f:x}}__
       http:
         paths:
           - path: /runner
             pathType: Prefix
             backend:
               service:
-                name: itero-prod
+                name: arondo-prod
                 port:
                   name: default
   tls:
     - hosts:
-        - itero-runner.home4p.__{{infra.domains:f:x}}__
-      secretName: itero-runner-home4p-domainx
+        - arondo-runner.home4p.__{{infra.domains:f:x}}__
+      secretName: arondo-runner-home4p-domainx

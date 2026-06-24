@@ -1,6 +1,6 @@
-# Itero
+# Arondo
 
-Itero is a mobile-first developer workspace that delegates coding tasks to AI agents and monitors executions across multiple machines. It follows a **Frontend + Server + Controller** architecture where lightweight Go-based Controllers are installed on development machines and the central Server coordinates all operations.
+Arondo is a mobile-first developer workspace that delegates coding tasks to AI agents and monitors executions across multiple machines. It follows a **Frontend + Server + Controller** architecture where lightweight Go-based Controllers are installed on development machines and the central Server coordinates all operations.
 
 ## Architecture
 
@@ -43,8 +43,8 @@ npm run dev
 
 ```bash
 cd controller
-go build -o itero-controller .
-./itero-controller --server ws://localhost:3251/controller --name my-dev-machine
+go build -o arondo-controller .
+./arondo-controller --server ws://localhost:3251/controller --name my-dev-machine
 ```
 
 Or use the convenience script:
@@ -65,7 +65,7 @@ Open [http://localhost:3251](http://localhost:3251) in your browser. Select the 
 ## Controller CLI
 
 ```
-itero-controller [flags]
+arondo-controller [flags]
 
 Flags:
   --server string   Server WebSocket URL (default "ws://localhost:3251/controller")

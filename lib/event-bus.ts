@@ -28,9 +28,9 @@ class SseEventBus {
 // Use `process` instead of `global` for the singleton — tsx (server.ts) and
 // Turbopack (API routes) run in different module contexts with separate `global`
 // objects, but share the same `process` object within one Node.js process.
-const p = process as typeof process & { __iteroBus?: SseEventBus };
-if (!p.__iteroBus) {
-  p.__iteroBus = new SseEventBus();
+const p = process as typeof process & { __arondoBus?: SseEventBus };
+if (!p.__arondoBus) {
+  p.__arondoBus = new SseEventBus();
 }
 
-export const eventBus = p.__iteroBus;
+export const eventBus = p.__arondoBus;

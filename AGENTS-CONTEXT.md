@@ -1,9 +1,9 @@
-# Itero – Project Context
+# Arondo – Project Context
 
 Before starting work, ensure you have read the `README.md` in current directory to understand the project's background, objectives, and overall architecture. If a `README.md` exists in your current working directory (the project subdirectory you are modifying), refer to it for specific instructions and project details.
 
 ## Overview
-Itero is a Next.js full-stack application that enables mobile-first software development
+Arondo is a Next.js full-stack application that enables mobile-first software development
 by delegating coding tasks to AI agents across multiple machines via Go-based Controllers.
 
 ## Architecture
@@ -85,7 +85,7 @@ scripts/
   run.dev.controller.sh # Start the Go controller in dev mode (connects to localhost:3251)
 data/                   # Runtime data (gitignored)
   active-tasks.json     # Persisted active task contexts (survives server restart)
-  agy-sessions.json     # Map file matching Itero sessionIds with agy conversation UUIDs
+  agy-sessions.json     # Map file matching Arondo sessionIds with agy conversation UUIDs
   sessions/
     [sessionId]/
       session.json      # Session metadata (status, prompt, agent, repoPath, controllerId)

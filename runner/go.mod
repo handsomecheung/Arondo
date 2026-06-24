@@ -1,4 +1,4 @@
-module github.com/nicholasgasior/itero/runner
+module github.com/nicholasgasior/arondo/runner
 
 go 1.25.4
 

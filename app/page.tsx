@@ -1498,7 +1498,7 @@ export default function HomePage() {
               marginBottom: 14,
             }}
           >
-            Itero will automatically analyze your project and generate a set
+            Arondo will automatically analyze your project and generate a set
             of common scripts (e.g. build, test, lint).
           </p>
           <ul
@@ -1841,7 +1841,7 @@ export default function HomePage() {
 
         <div className="header-logo">
           <IconBolt />
-          <span className="header-title">Itero</span>
+          <span className="header-title">Arondo</span>
         </div>
         <span className="header-subtitle">AI-powered dev · anywhere</span>
         <div
@@ -3297,7 +3297,7 @@ export default function HomePage() {
                   <div className="welcome-icon">
                     <IconBolt />
                   </div>
-                  <h1 className="welcome-title">Welcome to Itero</h1>
+                  <h1 className="welcome-title">Welcome to Arondo</h1>
                   <p className="welcome-desc">
                     Delegate coding tasks to AI agents, review GitHub PRs on
                     your phone, and ship software from anywhere — no laptop
