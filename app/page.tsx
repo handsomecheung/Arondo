@@ -58,6 +58,7 @@ interface Message {
   role: "user" | "agent" | "system";
   content: string;
   type?: string;
+  parentId?: string;
   createdAt: string;
 }
 
@@ -459,6 +460,93 @@ function renderMessageContent(content: string) {
   return content;
 }
 
+interface ExecCardInfo {
+  runMsg: Message;
+  returnMsg: Message | null;
+  isScript: boolean;
+  commandLabel: string;
+  command: string;
+}
+
+function parseExecCommand(content: string): { label: string; command: string } {
+  const scriptMatch = content.match(/Running script:\s*\*\*([^*]+)\*\*/);
+  if (scriptMatch) {
+    const cmdMatch = content.match(/```bash\n([\s\S]*?)```/);
+    return { label: scriptMatch[1].trim(), command: cmdMatch ? cmdMatch[1].trim() : "" };
+  }
+  const cmdMatch = content.match(/```bash\n([\s\S]*?)```/);
+  const cmd = cmdMatch ? cmdMatch[1].trim() : "";
+  const shortCmd = cmd.length > 60 ? cmd.slice(0, 57) + "..." : cmd;
+  return { label: shortCmd || "Executing command", command: cmd };
+}
+
+function ExecCard({
+  info,
+  onViewLog,
+}: {
+  info: ExecCardInfo;
+  onViewLog: () => void;
+}) {
+  const [commandOpen, setCommandOpen] = useState(false);
+
+  const isDone = info.returnMsg !== null;
+  const isSuccess = isDone && info.returnMsg!.content.startsWith("✅");
+
+  let statusClass = "exec-card-running";
+  if (isDone) statusClass = isSuccess ? "exec-card-success" : "exec-card-error";
+
+  return (
+    <div className={`exec-card ${statusClass}`}>
+      <div className="exec-card-header">
+        <div className="exec-card-icon">
+          {!isDone ? (
+            <span className="exec-card-spinner" />
+          ) : isSuccess ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          )}
+        </div>
+        <div className="exec-card-info">
+          <div className="exec-card-title">
+            {info.isScript ? "Script" : "Agent"}: {info.commandLabel}
+          </div>
+          <div className="exec-card-status">
+            {!isDone
+              ? "Running..."
+              : isSuccess
+                ? "Completed"
+                : info.returnMsg!.content.replace(/^❌\s*/, "").replace(/^Error:\s*/, "")}
+          </div>
+        </div>
+        <div className="exec-card-actions">
+          <button
+            className="exec-card-log-btn"
+            onClick={onViewLog}
+            title="Open terminal"
+          >
+            {info.isScript ? <IconPlay /> : <IconBolt />}
+            <span>Terminal</span>
+          </button>
+          <button
+            className="exec-card-toggle-btn"
+            onClick={() => setCommandOpen(!commandOpen)}
+            title={commandOpen ? "Hide command" : "Show command"}
+          >
+            <IconChevronDown className={commandOpen ? "rotated" : ""} />
+          </button>
+        </div>
+      </div>
+      {commandOpen && info.command && (
+        <div className="exec-card-command">
+          <code>{info.command}</code>
+        </div>
+      )}
+      <div className="exec-card-time">{formatTime(info.runMsg.createdAt)}</div>
+    </div>
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 function readUrlState(): { session: string | null; project: string | null } {
@@ -752,10 +840,57 @@ export default function HomePage() {
   }, [taskQueueOpen, taskQueue.length]);
 
 
-  // Find the ID of the last command execution system message in the list
-  const lastExecMsgId = [...messages]
-    .reverse()
-    .find((m) => m.role === "system" && m.content.includes("⚙️"))?.id;
+  // Build execution card info: pair run messages with their return messages.
+  // Return messages carry a parentId pointing to their run message. For legacy
+  // messages without parentId we fall back to FIFO matching by type.
+  const { execCards, returnMsgIds } = useMemo(() => {
+    const cards = new Map<string, ExecCardInfo>();
+    const retIds = new Set<string>();
+    const unmatchedAgent: string[] = [];
+    const unmatchedScript: string[] = [];
+
+    for (const msg of messages) {
+      if (msg.role === "system" && (msg.type === "agent-run" || msg.type === "script-run")) {
+        const parsed = parseExecCommand(msg.content);
+        cards.set(msg.id, {
+          runMsg: msg,
+          returnMsg: null,
+          isScript: msg.type === "script-run",
+          commandLabel: parsed.label,
+          command: parsed.command,
+        });
+        if (msg.type === "script-run") {
+          unmatchedScript.push(msg.id);
+        } else {
+          unmatchedAgent.push(msg.id);
+        }
+        continue;
+      }
+
+      if (msg.type === "agent-return" || msg.type === "script-return") {
+        let card: ExecCardInfo | undefined;
+
+        if (msg.parentId && cards.has(msg.parentId)) {
+          card = cards.get(msg.parentId)!;
+          const queue = card.isScript ? unmatchedScript : unmatchedAgent;
+          const idx = queue.indexOf(msg.parentId);
+          if (idx !== -1) queue.splice(idx, 1);
+        } else {
+          const queue = msg.type === "agent-return" ? unmatchedAgent : unmatchedScript;
+          if (queue.length > 0) {
+            card = cards.get(queue.shift()!)!;
+          }
+        }
+
+        if (card && !card.returnMsg) {
+          card.returnMsg = msg;
+          retIds.add(msg.id);
+        }
+      }
+    }
+
+    return { execCards: cards, returnMsgIds: retIds };
+  }, [messages]);
 
   const loadRunners = useCallback(() => {
     fetch("/api/runners")
@@ -3226,52 +3361,42 @@ export default function HomePage() {
                   </div>
                 )}
 
-              {messages.map((msg, idx) => {
-                const isCommandExec =
-                  msg.role === "system" && msg.content.includes("⚙️");
-                const isThisMsgRunning =
-                  isRunning && isCommandExec && msg.id === lastExecMsgId;
+              {messages.map((msg) => {
+                // Skip return messages — they're absorbed into the exec card
+                if (returnMsgIds.has(msg.id)) return null;
+
+                // Render execution cards for run messages
+                const cardInfo = execCards.get(msg.id);
+                if (cardInfo) {
+                  return (
+                    <ExecCard
+                      key={msg.id}
+                      info={cardInfo}
+                      onViewLog={() => {
+                        setActiveLogMsgId(msg.id);
+                        setLogModalOpen(true);
+                      }}
+                    />
+                  );
+                }
 
                 return (
-                  <div key={msg.id} style={{ display: "contents" }}>
-                    <div className={`message ${msg.role}`}>
-                      <div className="message-avatar">
-                        {msg.role === "user"
-                          ? "U"
-                          : msg.role === "agent"
-                            ? "AI"
-                            : "⚙"}
+                  <div key={msg.id} className={`message ${msg.role}`}>
+                    <div className="message-avatar">
+                      {msg.role === "user"
+                        ? "U"
+                        : msg.role === "agent"
+                          ? "AI"
+                          : "⚙"}
+                    </div>
+                    <div>
+                      <div className="message-bubble">
+                        {renderMessageContent(msg.content)}
                       </div>
-                      <div>
-                        <div className="message-bubble">
-                          {renderMessageContent(msg.content)}
-                        </div>
-                        <div className="message-time">
-                          {formatTime(msg.createdAt)}
-                        </div>
+                      <div className="message-time">
+                        {formatTime(msg.createdAt)}
                       </div>
                     </div>
-                    {isCommandExec && (
-                      <button
-                        className="console-trigger-btn"
-                        onClick={() => {
-                          setActiveLogMsgId(msg.id);
-                          setLogModalOpen(true);
-                        }}
-                      >
-                        {msg.type === "script-run" ? <IconPlay /> : <IconBolt />}
-                        <span>
-                          {msg.type === "script-run"
-                            ? "Script Execution Log"
-                            : "Agent Execution Log"}
-                        </span>
-                        {isThisMsgRunning && (
-                          <span className="console-badge-running">
-                            ⟳ Streaming...
-                          </span>
-                        )}
-                      </button>
-                    )}
                   </div>
                 );
               })}
@@ -3448,6 +3573,7 @@ export default function HomePage() {
                   disabled={!canSubmit}
                   title={getSendTooltip()}
                   id="send-btn"
+                  suppressHydrationWarning
                 >
                   {isNewSession && !prompt.trim() ? <IconCheck /> : <IconSend />}
                 </button>
@@ -3563,7 +3689,7 @@ export default function HomePage() {
               >
                 {isScriptLog ? <IconPlay /> : <IconBolt />}
                 {isScriptLog ? "Script Execution Log" : "Agent Execution Log"}
-                {isRunning && activeLogMsgId === lastExecMsgId && (
+                {activeLogMsgId && execCards.get(activeLogMsgId)?.returnMsg === null && (
                   <span className="console-badge-running" style={{ marginLeft: 8 }}>
                     ⟳ Streaming...
                   </span>
@@ -3586,8 +3712,8 @@ export default function HomePage() {
                   sessionId={selectedSessionId!}
                   messageId={activeLogMsgId}
                   ws={wsInstance}
-                  mode={isRunning && activeLogMsgId === lastExecMsgId ? "live" : "history"}
-                  historyLog={isRunning && activeLogMsgId === lastExecMsgId ? undefined : sessionLog}
+                  mode={execCards.get(activeLogMsgId)?.returnMsg === null ? "live" : "history"}
+                  historyLog={execCards.get(activeLogMsgId)?.returnMsg === null ? undefined : sessionLog}
                 />
               ) : null}
             </div>

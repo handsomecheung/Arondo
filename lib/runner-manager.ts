@@ -476,6 +476,7 @@ class RunnerManager {
       role: success ? "agent" : "system",
       content,
       type: "agent-return",
+      parentId: ctx.messageId,
     });
 
     eventBus.publish({ type: "message_added", payload: agentMsg });
@@ -510,6 +511,7 @@ class RunnerManager {
         role: "system",
         content: "✅ Script completed successfully.",
         type: "script-return",
+        parentId: ctx.messageId,
       });
       eventBus.publish({ type: "message_added", payload: doneMsg });
       eventBus.publish({ type: "session_updated", payload: updated });
@@ -526,6 +528,7 @@ class RunnerManager {
         role: "system",
         content: `❌ Error: ${errorMessage}`,
         type: "script-return",
+        parentId: ctx.messageId,
       });
       eventBus.publish({ type: "message_added", payload: errMsg });
       eventBus.publish({ type: "session_updated", payload: updated });

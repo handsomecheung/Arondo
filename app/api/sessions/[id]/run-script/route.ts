@@ -97,6 +97,7 @@ export async function POST(
         role: "system",
         content: `❌ Error: ${errorMessage}`,
         type: "script-return",
+        parentId: systemMsg.id,
       });
       eventBus.publish({ type: "message_added", payload: errMsg });
       eventBus.publish({ type: "session_updated", payload: updated });

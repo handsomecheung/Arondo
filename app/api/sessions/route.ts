@@ -99,6 +99,7 @@ export async function POST(req: NextRequest) {
         role: "system",
         content: `❌ Failed to start agent: ${errorMessage}`,
         type: "agent-return",
+        parentId: systemMsg.id,
       });
       eventBus.publish({ type: "message_added", payload: errMsg });
       eventBus.publish({ type: "session_updated", payload: updated });

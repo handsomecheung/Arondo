@@ -49,6 +49,7 @@ export interface Message {
   role: "user" | "agent" | "system";
   content: string;
   type?: MessageType;
+  parentId?: string;
   createdAt: string;
 }
 
