@@ -13,6 +13,13 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  if (!runnerManager.getRunner(runnerId)) {
+    return NextResponse.json(
+      { error: "Runner not found or disconnected" },
+      { status: 503 }
+    );
+  }
+
   try {
     const result = await runnerManager.sendRequest(
       runnerId,

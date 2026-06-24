@@ -44,6 +44,7 @@ export interface TaskContext {
 }
 
 interface PendingRequest {
+  runnerId: string;
   resolve: (value: any) => void;
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;
@@ -172,14 +173,12 @@ class RunnerManager {
     this.persistRunner(info).catch(() => {});
     console.log(`[runner-manager] runner registered: ${info.name} (${id})`);
 
-    // Re-associate persisted tasks whose runnerId matches no connected runner
+    // Re-associate persisted tasks that originally belonged to this runner
     for (const [taskId, ctx] of this.tasks) {
-      if (!this.runners.has(ctx.runnerId)) {
-        console.log(`[runner-manager] re-associating task ${taskId} from ${ctx.runnerId} → ${id}`);
-        ctx.runnerId = id;
+      if (ctx.runnerId === id) {
+        console.log(`[runner-manager] runner ${id} reconnected, task ${taskId} retained`);
       }
     }
-    this.persistTasks().catch(() => {});
 
     return id;
   }
@@ -193,19 +192,24 @@ class RunnerManager {
       console.log(`[runner-manager] runner disconnected: ${ctrl.info.name} (${runnerId})`);
 
       for (const [reqId, pending] of this.pending) {
+        if (pending.runnerId !== runnerId) continue;
         pending.reject(new Error("Runner disconnected"));
         clearTimeout(pending.timer);
         this.pending.delete(reqId);
       }
 
-      // Fail all active tasks on this runner
+      // Collect tasks to fail before iterating (async cleanup modifies the map)
+      const orphanedTaskIds: string[] = [];
       for (const [taskId, ctx] of this.tasks) {
         if (ctx.runnerId === runnerId) {
-          console.log(`[runner-manager] failing orphaned task: ${taskId}`);
-          this.onExecExit({ taskId, exitCode: -1 }).catch((err) => {
-            console.error("[runner-manager] failed to clean up task:", err);
-          });
+          orphanedTaskIds.push(taskId);
         }
+      }
+      for (const taskId of orphanedTaskIds) {
+        console.log(`[runner-manager] failing orphaned task: ${taskId}`);
+        this.onExecExit({ taskId, exitCode: -1 }).catch((err) => {
+          console.error("[runner-manager] failed to clean up task:", err);
+        });
       }
     }
   }
@@ -220,8 +224,6 @@ class RunnerManager {
 
   resolveRunnerId(storedId: string): string | undefined {
     if (this.runners.has(storedId)) return storedId;
-    // Stored ID is stale — fall back to any connected runner
-    for (const [id] of this.runners) return id;
     return undefined;
   }
 
@@ -247,7 +249,7 @@ class RunnerManager {
         reject(new Error(`Request ${method} timed out after ${timeoutMs}ms`));
       }, timeoutMs);
 
-      this.pending.set(id, { resolve, reject, timer });
+      this.pending.set(id, { runnerId, resolve, reject, timer });
       ctrl.ws.send(JSON.stringify(msg));
     });
   }
@@ -523,19 +525,32 @@ class RunnerManager {
     }
   ): void {
     if (!payload.tasks) return;
+
+    const reportedTaskIds = new Set(payload.tasks.map((t) => t.taskId));
+
     for (const t of payload.tasks) {
       if (t.state === "exited" && t.exitCode !== undefined) {
         this.onExecExit({ taskId: t.taskId, exitCode: t.exitCode }).catch((err) => {
           console.error("[runner-manager] onExecExit error:", err);
         });
       } else if (t.state === "running") {
-        // Re-associate running tasks with the reporting runner
         const ctx = this.tasks.get(t.taskId);
         if (ctx && ctx.runnerId !== runnerId) {
           console.log(`[runner-manager] task.status: re-associating ${t.taskId} → ${runnerId}`);
           ctx.runnerId = runnerId;
           this.persistTasks().catch(() => {});
         }
+      }
+    }
+
+    // Clean up stale tasks that belong to this runner but weren't reported
+    // (runner restarted and lost track of them)
+    for (const [taskId, ctx] of this.tasks) {
+      if (ctx.runnerId === runnerId && !reportedTaskIds.has(taskId)) {
+        console.log(`[runner-manager] task ${taskId} not reported by runner ${runnerId}, cleaning up`);
+        this.onExecExit({ taskId, exitCode: -1 }).catch((err) => {
+          console.error("[runner-manager] stale task cleanup error:", err);
+        });
       }
     }
   }
