@@ -9,6 +9,12 @@ const allowedDevOrigins = process.env.ALLOWED_DEV_ORIGINS
 const nextConfig: NextConfig = {
   ...(allowedDevOrigins.length > 0 && { allowedDevOrigins }),
   serverExternalPackages: ["node-pty"],
+  async rewrites() {
+    return [
+      { source: "/session/:id", destination: "/" },
+      { source: "/project/:id", destination: "/" },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -551,10 +551,11 @@ function ExecCard({
 
 function readUrlState(): { session: string | null; project: string | null } {
   if (typeof window === "undefined") return { session: null, project: null };
-  const params = new URLSearchParams(window.location.search);
+  const m = window.location.pathname.match(/^\/(session|project)\/(.+)$/);
+  if (!m) return { session: null, project: null };
   return {
-    session: params.get("session"),
-    project: params.get("project"),
+    session: m[1] === "session" ? m[2] : null,
+    project: m[1] === "project" ? m[2] : null,
   };
 }
 
@@ -739,17 +740,37 @@ export default function HomePage() {
     };
   }, []);
 
-  // Sync selected session/project to URL so refresh preserves state
+  // Sync selected session/project to URL with pushState for back/forward
+  const lastPushedUrlRef = useRef(
+    typeof window !== "undefined" ? window.location.pathname : "/",
+  );
   useEffect(() => {
-    const params = new URLSearchParams();
-    if (selectedSessionId) params.set("session", selectedSessionId);
-    if (selectedProjectId) params.set("project", selectedProjectId);
-    const qs = params.toString();
-    const url = qs ? `/?${qs}` : "/";
-    if (window.location.pathname + window.location.search !== url) {
-      window.history.replaceState(null, "", url);
+    let url = "/";
+    if (selectedProjectId) url = `/project/${selectedProjectId}`;
+    else if (selectedSessionId) url = `/session/${selectedSessionId}`;
+    if (url !== lastPushedUrlRef.current) {
+      window.history.pushState(null, "", url);
+      lastPushedUrlRef.current = url;
     }
   }, [selectedSessionId, selectedProjectId]);
+
+  // Handle browser back/forward
+  useEffect(() => {
+    const onPopState = () => {
+      lastPushedUrlRef.current = window.location.pathname;
+      const { session, project } = readUrlState();
+      if (project) {
+        setSidebarMode("projects");
+        setSelectedProjectId(project);
+      } else {
+        setSidebarMode("sessions");
+        setSelectedProjectId(null);
+        setSelectedSessionId(session);
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   const selectedSession =
     sessions.find((s) => s.id === selectedSessionId) ?? null;
