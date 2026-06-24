@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 
 const Terminal = dynamic(() => import("@/components/Terminal"), { ssr: false });
 
@@ -400,6 +401,24 @@ function IconPlay() {
   );
 }
 
+function IconSettings() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+    </svg>
+  );
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatTime(iso: string) {
@@ -477,7 +496,7 @@ export default function HomePage() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Project states
-  const [sidebarMode, setSidebarMode] = useState<"sessions" | "projects" | "runners">(
+  const [sidebarMode, setSidebarMode] = useState<"sessions" | "projects">(
     "sessions",
   );
   const [projects, setProjects] = useState<Project[]>([]);
@@ -577,7 +596,6 @@ export default function HomePage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [viewportStyles, setViewportStyles] = useState<React.CSSProperties>({});
-  const [selectedRunnerId, setSelectedRunnerId] = useState<string | null>(null);
 
   // Handle mobile keyboard overlay by listening to visualViewport changes
   useEffect(() => {
@@ -1280,7 +1298,6 @@ export default function HomePage() {
   const handleNewSession = () => {
     setSelectedSessionId(null);
     setSelectedProjectId(null);
-    setSelectedRunnerId(null);
     setIsNewSession(true);
     setMessages([]);
     setSidebarOpen(false);
@@ -1334,18 +1351,6 @@ export default function HomePage() {
 
   const handleSelectProject = (projectId: string) => {
     setSelectedProjectId(projectId);
-    setSelectedSessionId(null);
-    setSelectedRunnerId(null);
-    setIsNewSession(false);
-    setSidebarOpen(false);
-    setActiveLogMsgId(null);
-    setLogModalOpen(false);
-    setMenuOpen(false);
-  };
-
-  const handleSelectRunner = (runnerId: string) => {
-    setSelectedRunnerId(runnerId);
-    setSelectedProjectId(null);
     setSelectedSessionId(null);
     setIsNewSession(false);
     setSidebarOpen(false);
@@ -1711,7 +1716,6 @@ export default function HomePage() {
   const handleSelectSession = (id: string) => {
     setSelectedSessionId(id);
     setSelectedProjectId(null);
-    setSelectedRunnerId(null);
     setIsNewSession(false);
     setSidebarOpen(false);
     setActiveLogMsgId(null);
@@ -2021,14 +2025,6 @@ export default function HomePage() {
             >
               Projects
             </button>
-            <button
-              role="tab"
-              aria-selected={sidebarMode === "runners"}
-              className={`sidebar-mode-tab${sidebarMode === "runners" ? " active" : ""}`}
-              onClick={() => setSidebarMode("runners")}
-            >
-              Nodes
-            </button>
           </div>
         </div>
         <div className="task-list">
@@ -2115,7 +2111,7 @@ export default function HomePage() {
                 );
               })}
             </>
-          ) : sidebarMode === "projects" ? (
+          ) : (
             <>
               {projects.length === 0 && (
                 <div className="empty-state">
@@ -2207,247 +2203,23 @@ export default function HomePage() {
                 );
               })}
             </>
-          ) : (
-            <>
-              {runners.length === 0 && (
-                <div className="empty-state">
-                  <IconInbox />
-                  <p>
-                    No runners connected.
-                  </p>
-                </div>
-              )}
-              {runners.map((r) => (
-                <div
-                  key={r.id}
-                  className={`task-item ${selectedRunnerId === r.id ? "active" : ""}`}
-                  onClick={() => handleSelectRunner(r.id)}
-                  style={{ cursor: "pointer" }}
-                >
-                  <div className="task-item-header">
-                    <span className={`task-status-badge ${r.connected ? "running" : "idle"}`}>
-                      {r.connected ? "connected" : "disconnected"}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        color: "var(--text-muted)",
-                        marginLeft: "auto",
-                      }}
-                    >
-                      {r.os} ({r.arch})
-                    </span>
-                  </div>
-                  <div
-                    className="task-item-prompt"
-                    style={{ fontWeight: 600 }}
-                  >
-                    {r.name}
-                  </div>
-                  <div
-                    className="task-item-prompt"
-                    style={{
-                      fontSize: 11,
-                      color: "var(--text-secondary)",
-                      marginTop: 2,
-                    }}
-                  >
-                    Host: {r.hostname}
-                  </div>
-                </div>
-              ))}
-            </>
           )}
+        </div>
+        <div className="sidebar-footer">
+          <Link
+            href="/settings"
+            className="sidebar-settings-link"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <IconSettings />
+            <span>Settings</span>
+          </Link>
         </div>
       </aside>
 
       {/* Main */}
       <main className="main">
-        {selectedRunnerId ? (
-          (() => {
-            const runner = runners.find((r) => r.id === selectedRunnerId);
-            if (!runner) return null;
-
-            // Find all projects that use this runner
-            const runnerProjects = projects.filter((p) => p.runnerId === runner.id);
-
-            return (
-              <div className="project-detail-container" style={{ padding: 24, overflowY: "auto", height: "100%" }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    borderBottom: "1px solid var(--border)",
-                    paddingBottom: 16,
-                    marginBottom: 20,
-                  }}
-                >
-                  <div>
-                    <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-primary)" }}>
-                      Node: {runner.name}
-                    </h2>
-                    <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
-                      Runner system details and script configurations
-                    </p>
-                  </div>
-                  <span className={`task-status-badge ${runner.connected ? "running" : "idle"}`} style={{ padding: "4px 10px", fontSize: 12 }}>
-                    {runner.connected ? "Active / Connected" : "Disconnected"}
-                  </span>
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                    gap: 16,
-                    marginBottom: 24,
-                  }}
-                >
-                  {/* Node Info Box */}
-                  <div
-                    style={{
-                      background: "var(--bg-surface)",
-                      border: "1px solid var(--border)",
-                      borderRadius: "var(--radius-md)",
-                      padding: 16,
-                    }}
-                  >
-                    <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary)", marginBottom: 12 }}>
-                      System Information
-                    </h3>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Host Name</span>
-                        <code style={{ fontSize: 12, color: "var(--text-primary)" }}>{runner.hostname || "N/A"}</code>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>OS / Platform</span>
-                        <span style={{ fontSize: 12, color: "var(--text-primary)" }}>{runner.os} ({runner.arch})</span>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Agent Version</span>
-                        <span style={{ fontSize: 12, color: "var(--text-primary)" }}>{runner.version || "0.1.0"}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Capabilities Box */}
-                  <div
-                    style={{
-                      background: "var(--bg-surface)",
-                      border: "1px solid var(--border)",
-                      borderRadius: "var(--radius-md)",
-                      padding: 16,
-                    }}
-                  >
-                    <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary)", marginBottom: 12 }}>
-                      Capabilities
-                    </h3>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {runner.capabilities && runner.capabilities.length > 0 ? (
-                        runner.capabilities.map((cap) => (
-                          <span
-                            key={cap}
-                            style={{
-                              fontSize: 11,
-                              fontWeight: 500,
-                              color: "var(--accent)",
-                              background: "var(--accent-glow)",
-                              border: "1px solid var(--border-accent)",
-                              padding: "2px 8px",
-                              borderRadius: "4px",
-                            }}
-                          >
-                            {cap}
-                          </span>
-                        ))
-                      ) : (
-                        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Standard terminal execution</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Projects & Scripts Section */}
-                <div className="project-section-block">
-                  <div className="project-section-header" style={{ marginBottom: 16 }}>
-                    <h3 className="project-section-title">Associated Projects & Scripts</h3>
-                  </div>
-                  
-                  {runnerProjects.length === 0 ? (
-                    <div
-                      style={{
-                        padding: "40px 16px",
-                        textAlign: "center",
-                        border: "1px dashed var(--border)",
-                        borderRadius: "var(--radius-md)",
-                        color: "var(--text-muted)",
-                        fontSize: 13,
-                      }}
-                    >
-                      No active projects are configured for this node.
-                      <br />
-                      Create a new project session selecting this runner node.
-                    </div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                      {runnerProjects.map((project) => {
-                        const projSessions = sortedSessions.filter((s) => s.projectId === project.id);
-                        const folderName = project.repoPath.split("/").pop() || project.repoPath;
-
-                        return (
-                          <div
-                            key={project.id}
-                            style={{
-                              background: "var(--bg-surface)",
-                              border: "1px solid var(--border)",
-                              borderRadius: "var(--radius-md)",
-                              padding: 16,
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                borderBottom: "1px solid var(--border)",
-                                paddingBottom: 10,
-                                marginBottom: 12,
-                              }}
-                            >
-                              <div>
-                                <h4 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
-                                  {folderName}
-                                </h4>
-                                <code style={{ fontSize: 11, color: "var(--text-muted)" }}>{project.repoPath}</code>
-                              </div>
-                              <button
-                                className="new-task-btn"
-                                onClick={() => handleSelectProject(project.id)}
-                                style={{ padding: "4px 10px", fontSize: 11, background: "transparent", border: "1px solid var(--border)" }}
-                              >
-                                View Project Scripts
-                              </button>
-                            </div>
-                            <div style={{ display: "flex", gap: 16 }}>
-                              <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                                <strong>Sessions:</strong> {projSessions.length} total
-                              </span>
-                              <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                                <strong>Status:</strong> Active
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })()
-        ) : selectedProjectId ? (
+        {selectedProjectId ? (
           (() => {
             const project = projects.find((p) => p.id === selectedProjectId);
             if (!project) return null;
