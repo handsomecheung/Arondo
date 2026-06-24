@@ -2133,6 +2133,9 @@ export default function HomePage() {
                 );
                 const folderName =
                   project.repoPath.split("/").pop() || project.repoPath;
+                const projectRunner = runners.find(
+                  (r) => r.id === project.runnerId,
+                );
 
                 const handleSelectProjectItem = () => {
                   handleSelectProject(project.id);
@@ -2155,6 +2158,28 @@ export default function HomePage() {
                         {projectSessions.length} session
                         {projectSessions.length !== 1 && "s"}
                       </span>
+                      {projectRunner && (
+                        <span
+                          className="task-item-node-badge"
+                          title={`Node: ${projectRunner.name} (${projectRunner.hostname})`}
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 500,
+                            color: "var(--text-secondary)",
+                            backgroundColor: "rgba(255, 255, 255, 0.06)",
+                            border: "1px solid var(--border)",
+                            padding: "1px 6px",
+                            borderRadius: "4px",
+                            maxWidth: "120px",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            marginLeft: "auto",
+                          }}
+                        >
+                          {projectRunner.name}
+                        </span>
+                      )}
                     </div>
                     <div
                       className="task-item-prompt"
