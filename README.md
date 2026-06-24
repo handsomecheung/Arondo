@@ -20,7 +20,7 @@ All execution goes through a Controller — there is no local fallback on the se
 - **Multi-Machine Controllers**: Install Go controllers on any development machine. The UI lets you pick which controller runs each session.
 - **Session-Based Workspaces**: Each task is encapsulated inside a self-contained session under `data/sessions/[sessionId]/`, tracking history, settings, and outputs.
 - **Granular Execution Logging**: Outputs for every CLI command execution are logged separately under `data/sessions/[sessionId]/logs/[messageId].log`.
-- **Multiple AI Agents Support**: Supports **Gemini CLI** and **Antigravity CLI (agy)** for code generation tasks.
+- **Multiple AI Agents Support**: Supports **Antigravity CLI (agy)** and **Claude Code** for code generation tasks.
 - **Interactive Terminal (PTY)**: Both agent and script execution run in a full pseudo-terminal via Go's `creack/pty`, rendered in the browser with `xterm.js`. Supports interactive stdin, ANSI colors, and cursor control. PTY ensures reliable process cleanup on controller exit (SIGHUP).
 - **Concurrent Script Execution**: Allows running multiple scripts simultaneously within a single session. The user can continue chatting while background scripts are running.
 - **Remote File Browsing**: Browse directories on any connected controller directly from the UI when selecting a project path.

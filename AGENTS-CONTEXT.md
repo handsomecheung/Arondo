@@ -77,7 +77,6 @@ lib/
   ws-server.ts          # WebSocket handler for /ws endpoint: event bus broadcast + PTY I/O bridging
   agents/
     base.ts             # Abstract BaseAgent interface
-    gemini.ts           # Gemini CLI adapter
     antigravity.ts      # Antigravity CLI (agy) adapter
     index.ts            # AgentFactory (add new agents here)
 scripts/
