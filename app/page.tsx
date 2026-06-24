@@ -2267,6 +2267,7 @@ export default function HomePage() {
                       className="new-task-btn"
                       onClick={() => {
                         setRepoPath(project.repoPath);
+                        setRunnerId(project.runnerId);
                         handleNewSession();
                         setSidebarMode("sessions");
                       }}
@@ -3240,8 +3241,10 @@ export default function HomePage() {
                               type="button"
                               className={`custom-dropdown-item ${r.id === runnerId ? "active" : ""}`}
                               onClick={() => {
-                                setRunnerId(r.id);
-                                setRepoPath("");
+                                if (r.id !== runnerId) {
+                                  setRunnerId(r.id);
+                                  setRepoPath("");
+                                }
                                 setRunnerDropdownOpen(false);
                               }}
                             >
