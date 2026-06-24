@@ -2228,6 +2228,9 @@ export default function HomePage() {
             );
             const folderName =
               project.repoPath.split("/").pop() || project.repoPath;
+            const projectRunner = runners.find(
+              (r) => r.id === project.runnerId,
+            );
 
             return (
               <div className="project-detail-container">
@@ -2391,6 +2394,68 @@ export default function HomePage() {
                         >
                           {project.id}
                         </code>
+                      </div>
+                      <div>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: "var(--text-muted)",
+                            display: "block",
+                            marginBottom: 4,
+                          }}
+                        >
+                          NODE
+                        </span>
+                        {projectRunner ? (
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                            }}
+                          >
+                            <span
+                              style={{
+                                display: "inline-block",
+                                width: 7,
+                                height: 7,
+                                borderRadius: "50%",
+                                backgroundColor: projectRunner.connected
+                                  ? "var(--success, #4ade80)"
+                                  : "var(--text-muted)",
+                                flexShrink: 0,
+                              }}
+                            />
+                            <code
+                              style={{
+                                fontSize: 12,
+                                color: "var(--accent)",
+                              }}
+                              title={`${projectRunner.name} (${projectRunner.hostname})`}
+                            >
+                              {projectRunner.name}
+                            </code>
+                            <span
+                              style={{
+                                fontSize: 10,
+                                color: projectRunner.connected
+                                  ? "var(--success, #4ade80)"
+                                  : "var(--text-muted)",
+                              }}
+                            >
+                              {projectRunner.connected ? "connected" : "offline"}
+                            </span>
+                          </div>
+                        ) : (
+                          <code
+                            style={{
+                              fontSize: 11,
+                              color: "var(--text-secondary)",
+                            }}
+                          >
+                            {project.runnerId}
+                          </code>
+                        )}
                       </div>
                     </div>
                   </div>
