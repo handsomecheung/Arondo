@@ -24,6 +24,7 @@ export interface RunnerInfo {
   arch: string;
   version: string;
   capabilities: string[];
+  agents: string[];
   connected: boolean;
 }
 
@@ -167,6 +168,7 @@ class RunnerManager {
       arch: registerPayload.arch || "",
       version: registerPayload.version || "",
       capabilities: registerPayload.capabilities || [],
+      agents: registerPayload.agents || [],
       connected: true,
     };
     this.runners.set(id, { id, ws, info });
@@ -387,12 +389,28 @@ class RunnerManager {
       case "task.status":
         this.onTaskStatus(runnerId, msg.payload);
         break;
+      case "agent.status":
+        this.onAgentStatus(runnerId, msg.payload);
+        break;
       default:
         break;
     }
   }
 
   // ─── Stream/Event handlers ────────────────────────────────────────────
+
+  private onAgentStatus(
+    runnerId: string,
+    payload: { agents: string[] }
+  ): void {
+    const conn = this.runners.get(runnerId);
+    if (!conn || !Array.isArray(payload?.agents)) return;
+    conn.info.agents = payload.agents;
+    this.persistRunner(conn.info).catch(() => {});
+    console.log(
+      `[runner-manager] runner ${runnerId} agents updated: [${payload.agents.join(", ")}]`
+    );
+  }
 
   private async onExecOutput(payload: {
     taskId: string;

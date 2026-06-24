@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"runtime"
 	"sync"
 	"time"
@@ -92,6 +93,7 @@ func (c *Client) connect() error {
 
 func (c *Client) sendRegister() error {
 	hostname, _ := os.Hostname()
+
 	payload := map[string]any{
 		"name":     c.name,
 		"version":  "0.1.0",
@@ -104,8 +106,30 @@ func (c *Client) sendRegister() error {
 			"fs.list",
 			"git.status", "git.diff", "git.pr.create",
 		},
+		// agents list is empty on register; the server will send queryAgents
+		// in the connected event, and we respond with agent.status.
+		"agents": []string{},
 	}
 	msg, err := NewEvent("register", payload)
+	if err != nil {
+		return err
+	}
+	return c.Send(msg)
+}
+
+// sendAgentStatus checks which binaries from queryAgents exist on PATH
+// and sends an agent.status event back to the server.
+func (c *Client) sendAgentStatus(queryAgents []string) error {
+	var available []string
+	for _, cmd := range queryAgents {
+		if _, err := exec.LookPath(cmd); err == nil {
+			available = append(available, cmd)
+		}
+	}
+	if available == nil {
+		available = []string{}
+	}
+	msg, err := NewEvent("agent.status", map[string]any{"agents": available})
 	if err != nil {
 		return err
 	}

@@ -60,6 +60,16 @@ func (h *Handler) handleEvent(msg *Message) {
 		h.client.Send(pong)
 	case "connected":
 		log.Println("server acknowledged connection")
+		// Extract queryAgents from the payload and report which ones are
+		// available on this runner's PATH.
+		var connPayload struct {
+			QueryAgents []string `json:"queryAgents"`
+		}
+		if err := parsePayloadInto(msg.Payload, &connPayload); err == nil && len(connPayload.QueryAgents) > 0 {
+			if err := h.client.sendAgentStatus(connPayload.QueryAgents); err != nil {
+				log.Printf("warning: failed to send agent.status: %v", err)
+			}
+		}
 	default:
 		log.Printf("ignoring event: %s", msg.Method)
 	}
@@ -113,4 +123,10 @@ func parsePayload[T any](msg *Message) (T, error) {
 	var v T
 	err := json.Unmarshal(msg.Payload, &v)
 	return v, err
+}
+
+// parsePayloadInto decodes raw JSON bytes into a target value.
+// Use this when you already have a json.RawMessage and no *Message wrapper.
+func parsePayloadInto(raw json.RawMessage, v any) error {
+	return json.Unmarshal(raw, v)
 }

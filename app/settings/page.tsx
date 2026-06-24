@@ -12,6 +12,7 @@ interface Runner {
   connected: boolean;
   version?: string;
   capabilities?: string[];
+  agents?: string[];
 }
 
 interface Project {
@@ -305,6 +306,137 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+
+          {/* AI Agents Section */}
+          <div>
+            <h2
+              style={{
+                fontSize: 16,
+                fontWeight: 600,
+                color: "var(--text-primary)",
+                marginBottom: 4,
+              }}
+            >
+              AI Agents
+            </h2>
+            <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>
+              Agent CLI availability detected on each connected node at registration time.
+            </p>
+
+            {runners.length === 0 ? (
+              <div
+                style={{
+                  padding: "24px 16px",
+                  textAlign: "center",
+                  border: "1px dashed var(--border)",
+                  borderRadius: "var(--radius-md)",
+                  color: "var(--text-muted)",
+                  fontSize: 13,
+                }}
+              >
+                No nodes connected. Connect a node to see agent availability.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {runners.map((r) => {
+                  const agentDefs = [
+                    { label: "Antigravity CLI", cmd: "agy", comingSoon: false },
+                    { label: "Claude Code", cmd: "claude", comingSoon: false },
+                    { label: "Codex", cmd: "codex", comingSoon: true },
+                    { label: "OpenCode", cmd: "opencode", comingSoon: true },
+                  ];
+                  // agents === undefined means legacy runner (no detection support)
+                  const hasAgentInfo = Array.isArray(r.agents);
+                  return (
+                    <div
+                      key={r.id}
+                      style={{
+                        background: "var(--bg-elevated)",
+                        border: "1px solid var(--border)",
+                        borderRadius: "var(--radius-md)",
+                        padding: 14,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          marginBottom: 10,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: "var(--text-primary)",
+                          }}
+                        >
+                          {r.name}
+                        </span>
+                        <span
+                          className={`task-status-badge ${r.connected ? "running" : "idle"}`}
+                        >
+                          {r.connected ? "connected" : "disconnected"}
+                        </span>
+                      </div>
+                      {!hasAgentInfo ? (
+                        <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}>
+                          Agent detection not supported by this node version.
+                        </p>
+                      ) : (
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          {agentDefs.map(({ label, cmd, comingSoon }) => {
+                            const installed = !comingSoon && r.agents!.includes(cmd);
+                            const tooltipText = comingSoon
+                              ? `${label}: Under Development`
+                              : installed
+                              ? `${label} is installed`
+                              : `${label} is not installed`;
+                            return (
+                              <div
+                                key={cmd}
+                                title={tooltipText}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                  padding: "5px 10px",
+                                  borderRadius: 6,
+                                  border: `1px solid ${installed ? "var(--border-accent)" : "var(--border)"}`,
+                                  background: installed ? "var(--accent-glow)" : "var(--bg-surface)",
+                                  opacity: installed ? 1 : 0.5,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    width: 7,
+                                    height: 7,
+                                    borderRadius: "50%",
+                                    background: installed ? "var(--accent)" : "var(--text-muted)",
+                                    flexShrink: 0,
+                                  }}
+                                />
+                                <span
+                                  style={{
+                                    fontSize: 12,
+                                    fontWeight: 500,
+                                    color: installed ? "var(--accent)" : "var(--text-muted)",
+                                  }}
+                                >
+                                  {label}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

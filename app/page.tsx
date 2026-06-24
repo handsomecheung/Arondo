@@ -44,6 +44,7 @@ interface Runner {
   connected: boolean;
   version?: string;
   capabilities?: string[];
+  agents?: string[];
 }
 
 interface ProjectScript {
@@ -648,6 +649,15 @@ export default function HomePage() {
   const isAgentRunning = taskQueue.some(
     (t) => t.sessionId === selectedSessionId && t.type === "agent",
   );
+
+  // Derive the runner for the current new-session form (or selected session)
+  const selectedRunner = runners.find((r) => r.id === runnerId) ?? null;
+  // agents[] sent by the runner on registration; undefined means runner not yet reporting (legacy)
+  const runnerAgents = selectedRunner?.agents;
+  const isAgentAvailable = (agentCmd: string): boolean => {
+    if (!runnerAgents) return true; // legacy runner — allow all
+    return runnerAgents.includes(agentCmd);
+  };
 
   // Close task queue dropdown on click outside
   useEffect(() => {
@@ -3353,33 +3363,33 @@ export default function HomePage() {
                       id="agent-select-trigger"
                     >
                       <span>
-                        {agentType === "antigravity" ? "Antigravity CLI" : agentType === "claude" ? "Claude Code" : agentType}
+                        {agentType === "antigravity" ? "Antigravity CLI" : agentType === "claude" ? "Claude Code" : agentType === "codex" ? "Codex" : agentType}
                       </span>
                       <IconChevronDown className={`arrow-icon ${agentDropdownOpen ? "open" : ""}`} />
                     </button>
                     {agentDropdownOpen && (
                       <div className="custom-dropdown-menu">
-                        <button
-                          type="button"
-                          className={`custom-dropdown-item ${agentType === "antigravity" ? "active" : ""}`}
-                          onClick={() => {
-                            setAgentType("antigravity");
-                            setAgentDropdownOpen(false);
-                          }}
-                        >
-                          Antigravity CLI
-                        </button>
-
-                        <button
-                          type="button"
-                          className={`custom-dropdown-item ${agentType === "claude" ? "active" : ""}`}
-                          onClick={() => {
-                            setAgentType("claude");
-                            setAgentDropdownOpen(false);
-                          }}
-                        >
-                          Claude Code
-                        </button>
+                        {(
+                          [
+                            { value: "antigravity", label: "Antigravity CLI", cmd: "agy", comingSoon: false },
+                            { value: "claude", label: "Claude Code", cmd: "claude", comingSoon: false },
+                            { value: "codex", label: "Codex", cmd: "codex", comingSoon: true },
+                          ] as const
+                        )
+                          .filter(({ cmd, comingSoon }) => !comingSoon && isAgentAvailable(cmd))
+                          .map(({ value, label }) => (
+                            <button
+                              key={value}
+                              type="button"
+                              className={`custom-dropdown-item ${agentType === value ? "active" : ""}`}
+                              onClick={() => {
+                                setAgentType(value);
+                                setAgentDropdownOpen(false);
+                              }}
+                            >
+                              <span style={{ flex: 1, textAlign: "left" }}>{label}</span>
+                            </button>
+                          ))}
                       </div>
                     )}
                   </div>
