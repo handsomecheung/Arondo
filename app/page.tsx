@@ -461,6 +461,15 @@ function renderMessageContent(content: string) {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+function readUrlState(): { session: string | null; project: string | null } {
+  if (typeof window === "undefined") return { session: null, project: null };
+  const params = new URLSearchParams(window.location.search);
+  return {
+    session: params.get("session"),
+    project: params.get("project"),
+  };
+}
+
 export default function HomePage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const sortedSessions = useMemo(() => {
@@ -470,8 +479,9 @@ export default function HomePage() {
       return bTime - aTime;
     });
   }, [sessions]);
+  const initUrl = useMemo(readUrlState, []);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
-    null,
+    initUrl.session,
   );
   const [messages, setMessages] = useState<Message[]>([]);
   const [prompt, setPrompt] = useState("");
@@ -498,11 +508,11 @@ export default function HomePage() {
 
   // Project states
   const [sidebarMode, setSidebarMode] = useState<"sessions" | "projects">(
-    "sessions",
+    initUrl.project ? "projects" : "sessions",
   );
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
-    null,
+    initUrl.project,
   );
   const [projectScripts, setProjectScripts] = useState<ProjectScript[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -640,6 +650,18 @@ export default function HomePage() {
       window.removeEventListener("resize", handleResize);
     };
   }, []);
+
+  // Sync selected session/project to URL so refresh preserves state
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (selectedSessionId) params.set("session", selectedSessionId);
+    if (selectedProjectId) params.set("project", selectedProjectId);
+    const qs = params.toString();
+    const url = qs ? `/?${qs}` : "/";
+    if (window.location.pathname + window.location.search !== url) {
+      window.history.replaceState(null, "", url);
+    }
+  }, [selectedSessionId, selectedProjectId]);
 
   const selectedSession =
     sessions.find((s) => s.id === selectedSessionId) ?? null;
@@ -877,7 +899,13 @@ export default function HomePage() {
       .then((r) => r.json())
       .then((data: Session[]) => {
         setSessions(data);
-        if (data.length > 0) setSelectedSessionId(data[0].id);
+        const urlSession = initUrl.session;
+        const urlProject = initUrl.project;
+        if (urlSession && data.some((s) => s.id === urlSession)) {
+          // URL already set the correct session
+        } else if (!urlProject && data.length > 0) {
+          setSelectedSessionId(data[0].id);
+        }
 
         // Add running sessions to task queue
         const running = data.filter((s) => s.status === "running" || s.status === "script-running");
