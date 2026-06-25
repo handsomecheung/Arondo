@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession, updateSession, addMessage, clearSessionLog } from "@/lib/store";
+import { getSession, updateSession, addMessage, clearSessionLog, getMessages } from "@/lib/store";
 import { getAgent, AgentType } from "@/lib/agents";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
@@ -36,7 +36,8 @@ export async function POST(
     eventBus.publish({ type: "message_added", payload: userMsg });
 
     const agent = getAgent(session.agentType as AgentType);
-    const isResume = session.status !== "idle";
+    const messages = await getMessages(id);
+    const isResume = messages.some((m) => m.type === "agent-run");
     const command = agent.getCommand({ prompt: trimmedMessage, repoPath: session.repoPath, sessionId: id, isResume });
 
     const updatedSession = await updateSession(id, { status: "running", command });
