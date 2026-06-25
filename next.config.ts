@@ -10,10 +10,14 @@ const nextConfig: NextConfig = {
   ...(allowedDevOrigins.length > 0 && { allowedDevOrigins }),
   serverExternalPackages: ["node-pty"],
   async rewrites() {
-    return [
-      { source: "/session/:id", destination: "/" },
-      { source: "/project/:id", destination: "/" },
-    ];
+    return {
+      beforeFiles: [
+        { source: "/session/:id", destination: "/" },
+        { source: "/project/:id", destination: "/" },
+      ],
+      afterFiles: [],
+      fallback: [],
+    };
   },
 };
 
