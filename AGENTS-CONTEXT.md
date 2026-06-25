@@ -34,6 +34,8 @@ runner/                  # Go runner binary
   pty.go                # TaskManager: spawn processes with PTY, scrollback buffer, auto-cleanup on exit
 app/
   page.tsx              # Main UI (runner selector, chat, status tracking, terminal modals, 3-dot dropdown)
+  tasks/
+    page.tsx            # Tasks management page (session list, shell terminal, status monitoring)
   layout.tsx            # Root layout
   globals.css           # Design system
   api/
@@ -69,15 +71,18 @@ app/
     fs/route.ts         # GET: browse directories on a runner
 components/
   Terminal.tsx          # xterm.js terminal component (live WS mode + history replay mode)
+  ShellTerminal.tsx     # Interactive shell terminal component (spawns server-side PTY via WebSocket)
 lib/
   store.ts              # File-based JSON storage (sessions, messages, logs, projects, scripts)
   event-bus.ts          # In-memory pub/sub (singleton on `process` for cross-context sharing)
+  pty-manager.ts        # Server-side PTY manager for local shell sessions (node-pty, scrollback buffer)
   runner-manager.ts     # Manages runner connections, task routing, and task persistence
   runner-server.ts      # WebSocket handler for /runner endpoint (registration, heartbeat)
-  ws-server.ts          # WebSocket handler for /ws endpoint: event bus broadcast + PTY I/O bridging
+  ws-server.ts          # WebSocket handler for /ws endpoint: event bus broadcast + PTY I/O + shell PTY bridging
   agents/
     base.ts             # Abstract BaseAgent interface
     antigravity.ts      # Antigravity CLI (agy) adapter
+    claude.ts           # Claude Code CLI adapter (supports --session-id and --resume for session continuity)
     index.ts            # AgentFactory (add new agents here)
 scripts/
   run.server.sh         # Start the Next.js dev server
@@ -158,6 +163,9 @@ Two WebSocket endpoints:
 **Browser WebSocket protocol (`/ws`):**
 - Server → Client: `session:updated`, `message:added`, `session:deleted`, `terminal:output`, `terminal:exit`
 - Client → Server: `terminal:input`, `terminal:resize`, `terminal:attach`
+- Shell PTY (local server-side terminals via `lib/pty-manager.ts`):
+  - Client → Server: `shell:spawn`, `shell:input`, `shell:resize`, `shell:kill`
+  - Server → Client: `shell:spawned`, `shell:output`, `shell:exit`
 
 **Cross-context singleton pattern:** The event bus and runner manager use `process` (not `global`) as the singleton carrier. This is required because `server.ts` runs via `tsx` while API routes run via Next.js Turbopack — they share the same `process` object but have separate `global` scopes.
 
@@ -169,6 +177,7 @@ Two WebSocket endpoints:
 - **Concurrency**: Multiple background scripts can run concurrently in a single session. The chat prompt stays active during execution.
 - **Task Persistence**: Active task contexts survive server restarts via `data/active-tasks.json`. On runner reconnect, the `task.status` event reconciles running vs exited tasks.
 - **Runner Disconnect Handling**: When a runner disconnects, orphaned tasks are automatically failed with exit code -1, updating session status and notifying the UI.
+- **Agent Session Continuity**: ClaudeCodeAgent supports `--session-id` (bind to a session) and `--resume` (resume an existing session) flags, enabling multi-turn conversations within the same agent session.
 
 ## Project & Custom Scripts Management
 - **Project Scoping**: Sessions are mapped to projects by repository path + runnerId. Projects store metadata at `data/projects/[projectId]/project.json`.
