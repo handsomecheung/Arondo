@@ -2090,18 +2090,11 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <div
-              className={`status-dot ${connected ? "connected" : ""}`}
-              suppressHydrationWarning
-            />
-            <span
-              style={{ fontSize: 11, color: "var(--text-muted)" }}
-              suppressHydrationWarning
-            >
-              {connected ? "Live" : "Connecting…"}
-            </span>
-          </div>
+          <div
+            className={`status-dot ${connected ? "connected" : ""}`}
+            suppressHydrationWarning
+            title={connected ? "Live" : "Connecting…"}
+          />
         </div>
       </header>
 

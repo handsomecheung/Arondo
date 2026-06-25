@@ -521,24 +521,11 @@ export default function TasksPage() {
         </span>
 
         <div
-          style={{
-            marginLeft: "auto",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          <div
-            className={`status-dot ${connected ? "connected" : ""}`}
-            suppressHydrationWarning
-          />
-          <span
-            style={{ fontSize: 11, color: "var(--text-muted)" }}
-            suppressHydrationWarning
-          >
-            {connected ? "Connected" : "Disconnected"}
-          </span>
-        </div>
+          className={`status-dot ${connected ? "connected" : ""}`}
+          style={{ marginLeft: "auto" }}
+          suppressHydrationWarning
+          title={connected ? "Connected" : "Disconnected"}
+        />
       </header>
 
       <main
