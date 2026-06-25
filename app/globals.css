@@ -2099,6 +2099,23 @@ body {
   background: rgba(34, 211, 165, 0.03);
 }
 
+.tasks-list-item.completed .task-queue-item-icon,
+.tasks-list-item.completed .task-queue-item-info {
+  opacity: 0.7;
+}
+
+.task-type-tag.done {
+  background: rgba(34, 211, 165, 0.1);
+  color: var(--success);
+  border: 1px solid rgba(34, 211, 165, 0.2);
+}
+
+.task-type-tag.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
 .tasks-list-item .task-kill-btn {
   opacity: 0;
 }
@@ -2112,6 +2129,12 @@ body {
 .task-item-wrapper {
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 1;
+}
+
+.task-item-wrapper:has(.task-menu-dropdown) {
+  z-index: 10;
 }
 
 .task-menu-container {

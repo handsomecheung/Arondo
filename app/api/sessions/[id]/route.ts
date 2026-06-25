@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deleteSession, getSession, updateSession } from "@/lib/store";
 import { eventBus } from "@/lib/event-bus";
+import { runnerManager } from "@/lib/runner-manager";
 
 export async function DELETE(
   req: NextRequest,
@@ -14,6 +15,7 @@ export async function DELETE(
   }
 
   try {
+    runnerManager.removeTasksForSession(id);
     await deleteSession(id);
     eventBus.publish({ type: "session_deleted", payload: { id } });
     return NextResponse.json({ success: true });

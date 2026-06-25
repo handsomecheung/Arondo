@@ -14,6 +14,7 @@ import path from "path";
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
 const TASKS_FILE = path.join(DATA_DIR, "active-tasks.json");
 const RUNNERS_DIR = path.join(DATA_DIR, "runners");
+const TASK_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,6 +44,8 @@ export interface TaskContext {
   type: "agent" | "script";
   scriptName?: string;
   pid?: number;
+  completedAt?: number;
+  exitCode?: number;
 }
 
 interface PendingRequest {
@@ -131,12 +134,15 @@ class RunnerManager {
       const data: TaskContext[] = JSON.parse(raw);
       for (const ctx of data) {
         this.tasks.set(ctx.taskId, ctx);
-        const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
-        this.ptyKeyToTaskId.set(ptyKey, ctx.taskId);
+        if (!ctx.completedAt) {
+          const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
+          this.ptyKeyToTaskId.set(ptyKey, ctx.taskId);
+        }
       }
       if (data.length > 0) {
         console.log(`[runner-manager] restored ${data.length} task(s) from disk`);
       }
+      this.purgeExpiredTasks();
     } catch {
       // File doesn't exist or is invalid — that's fine on first run
     }
@@ -201,10 +207,10 @@ class RunnerManager {
         this.pending.delete(reqId);
       }
 
-      // Collect tasks to fail before iterating (async cleanup modifies the map)
+      // Collect active tasks to fail before iterating (async cleanup modifies the map)
       const orphanedTaskIds: string[] = [];
       for (const [taskId, ctx] of this.tasks) {
-        if (ctx.runnerId === runnerId) {
+        if (ctx.runnerId === runnerId && !ctx.completedAt) {
           orphanedTaskIds.push(taskId);
         }
       }
@@ -283,6 +289,10 @@ class RunnerManager {
     return this.tasks.get(taskId);
   }
 
+  getAllTasks(): TaskContext[] {
+    return Array.from(this.tasks.values());
+  }
+
   getTaskIdByPtyKey(sessionId: string, messageId: string): string | undefined {
     return this.ptyKeyToTaskId.get(`${sessionId}:${messageId}`);
   }
@@ -319,6 +329,43 @@ class RunnerManager {
     } catch (err) {
       console.error(`[runner-manager] failed to kill task ${taskId}:`, err);
       return false;
+    }
+  }
+
+  removeTasksForSession(sessionId: string): void {
+    const toDelete: string[] = [];
+    for (const [taskId, ctx] of this.tasks) {
+      if (ctx.sessionId === sessionId) {
+        const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
+        this.ptyKeyToTaskId.delete(ptyKey);
+        toDelete.push(taskId);
+      }
+    }
+    for (const taskId of toDelete) {
+      this.tasks.delete(taskId);
+    }
+    if (toDelete.length > 0) {
+      console.log(`[runner-manager] removed ${toDelete.length} task(s) for deleted session ${sessionId}`);
+      this.persistTasks().catch(() => {});
+    }
+  }
+
+  purgeExpiredTasks(): void {
+    const now = Date.now();
+    const toDelete: string[] = [];
+    for (const [taskId, ctx] of this.tasks) {
+      if (ctx.completedAt && now - ctx.completedAt > TASK_RETENTION_MS) {
+        const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
+        this.ptyKeyToTaskId.delete(ptyKey);
+        toDelete.push(taskId);
+      }
+    }
+    for (const taskId of toDelete) {
+      this.tasks.delete(taskId);
+    }
+    if (toDelete.length > 0) {
+      console.log(`[runner-manager] purged ${toDelete.length} expired task(s)`);
+      this.persistTasks().catch(() => {});
     }
   }
 
@@ -446,10 +493,12 @@ class RunnerManager {
   }): Promise<void> {
     const ctx = this.tasks.get(payload.taskId);
     if (!ctx) return;
+    if (ctx.completedAt) return;
 
     const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
     this.ptyKeyToTaskId.delete(ptyKey);
-    this.tasks.delete(payload.taskId);
+    ctx.completedAt = Date.now();
+    ctx.exitCode = payload.exitCode;
     this.persistTasks().catch(() => {});
 
     if (ctx.type === "agent") {
@@ -526,7 +575,7 @@ class RunnerManager {
     const nextRunning = currentRunning.filter((name) => name !== ctx.scriptName);
 
     const hasAgentTask = Array.from(this.tasks.values()).some(
-      (t) => t.sessionId === ctx.sessionId && t.type === "agent",
+      (t) => t.sessionId === ctx.sessionId && t.type === "agent" && !t.completedAt,
     );
 
     if (exitCode === 0) {
@@ -601,8 +650,9 @@ class RunnerManager {
 
     // Clean up stale tasks that belong to this runner but weren't reported
     // (runner restarted and lost track of them)
+    // Skip already-completed tasks — they are retained for history
     for (const [taskId, ctx] of this.tasks) {
-      if (ctx.runnerId === runnerId && !reportedTaskIds.has(taskId)) {
+      if (ctx.runnerId === runnerId && !ctx.completedAt && !reportedTaskIds.has(taskId)) {
         console.log(`[runner-manager] task ${taskId} not reported by runner ${runnerId}, cleaning up`);
         this.onExecExit({ taskId, exitCode: -1 }).catch((err) => {
           console.error("[runner-manager] stale task cleanup error:", err);
@@ -623,6 +673,9 @@ if (!p.__arondoRunnerMgr) {
   p.__arondoRunnerMgr.restoreTasks().catch((err) => {
     console.error("[runner-manager] failed to restore tasks:", err);
   });
+  setInterval(() => {
+    p.__arondoRunnerMgr!.purgeExpiredTasks();
+  }, 60 * 60 * 1000);
 }
 
 export const runnerManager = p.__arondoRunnerMgr;

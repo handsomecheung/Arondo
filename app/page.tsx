@@ -549,10 +549,10 @@ function ExecCard({
           <button
             className="exec-card-log-btn"
             onClick={onViewLog}
-            title="Open terminal"
+            title="Open log"
           >
             {info.isScript ? <IconPlay /> : <IconBolt />}
-            <span>Terminal</span>
+            <span>Log</span>
           </button>
           <button
             className="exec-card-toggle-btn"
@@ -2079,7 +2079,7 @@ export default function HomePage() {
           <div className="task-queue-wrapper">
             <Link
               href="/tasks"
-              className={`task-queue-btn ${taskQueue.length === 0 ? "disabled" : ""}`}
+              className="task-queue-btn"
               title="Task Queue"
               aria-label="View running tasks"
             >
@@ -3801,6 +3801,7 @@ export default function HomePage() {
                       ? undefined
                       : sessionLog
                   }
+                  taskType={isScriptLog ? "script" : "agent"}
                 />
               ) : null}
             </div>

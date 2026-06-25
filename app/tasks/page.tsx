@@ -32,6 +32,18 @@ interface Message {
   createdAt: string;
 }
 
+interface ServerTask {
+  taskId: string;
+  runnerId: string;
+  sessionId: string;
+  messageId: string;
+  type: "agent" | "script";
+  scriptName?: string;
+  pid?: number;
+  completedAt?: number;
+  exitCode?: number;
+}
+
 interface TaskItem {
   id: string;
   type: "script" | "agent";
@@ -39,6 +51,7 @@ interface TaskItem {
   sessionId: string;
   status: "running" | "done" | "error";
   createdAt: number;
+  completedAt?: number;
   messageId?: string;
 }
 
@@ -202,85 +215,51 @@ export default function TasksPage() {
 
   const loadInitialTasks = useCallback(async () => {
     try {
-      const res = await fetch("/api/sessions");
-      const sessions: Session[] = await res.json();
-      const running = sessions.filter(
-        (s) => s.status === "running" || s.status === "script-running",
-      );
-      if (running.length === 0) {
-        setTaskQueue([]);
-        return;
-      }
+      const [tasksRes, sessionsRes] = await Promise.all([
+        fetch("/api/tasks"),
+        fetch("/api/sessions"),
+      ]);
+      const serverTasks: ServerTask[] = await tasksRes.json();
+      const sessions: Session[] = await sessionsRes.json();
+      const sessionMap = new Map(sessions.map((s) => [s.id, s]));
 
-      const initTasks: TaskItem[] = [];
-      running.forEach((s) => {
-        if (s.status === "running") {
-          initTasks.push({
-            id: `task-${s.id}-init-agent`,
-            type: "agent",
-            name: `Agent: ${s.prompt}`,
-            sessionId: s.id,
-            status: "running",
-            createdAt: new Date(s.updatedAt || s.createdAt).getTime(),
-          });
+      const initTasks: TaskItem[] = serverTasks.map((t) => {
+        const session = sessionMap.get(t.sessionId);
+        let name: string;
+        if (t.type === "agent") {
+          name = `Agent: ${session?.prompt || t.sessionId}`;
+        } else {
+          name = `Script: ${t.scriptName || "unknown"}`;
         }
-        if (s.status === "script-running" && s.runningScripts) {
-          s.runningScripts.forEach((scriptName) => {
-            initTasks.push({
-              id: `task-${s.id}-init-script-${scriptName}`,
-              type: "script",
-              name: `Script: ${scriptName}`,
-              sessionId: s.id,
-              status: "running",
-              createdAt: new Date(s.updatedAt || s.createdAt).getTime(),
-            });
-          });
+        let status: TaskItem["status"];
+        if (t.completedAt) {
+          status = t.exitCode === 0 ? "done" : "error";
+        } else {
+          status = "running";
         }
+        return {
+          id: t.taskId,
+          type: t.type,
+          name,
+          sessionId: t.sessionId,
+          status,
+          createdAt: session
+            ? new Date(session.createdAt).getTime()
+            : Date.now(),
+          completedAt: t.completedAt,
+          messageId: t.messageId,
+        };
       });
+
+      initTasks.sort((a, b) => {
+        if (a.status === "running" && b.status !== "running") return -1;
+        if (a.status !== "running" && b.status === "running") return 1;
+        const aTime = a.completedAt || a.createdAt;
+        const bTime = b.completedAt || b.createdAt;
+        return bTime - aTime;
+      });
+
       setTaskQueue(initTasks);
-
-      running.forEach((s) => {
-        fetch(`/api/messages?sessionId=${s.id}`)
-          .then((r) => r.json())
-          .then((msgs: Message[]) => {
-            if (s.status === "running") {
-              const lastRunMsg = [...msgs]
-                .reverse()
-                .find((m) => m.type === "agent-run");
-              if (lastRunMsg) {
-                setTaskQueue((prev) =>
-                  prev.map((t) =>
-                    t.sessionId === s.id && t.type === "agent" && !t.messageId
-                      ? { ...t, messageId: lastRunMsg.id }
-                      : t,
-                  ),
-                );
-              }
-            }
-            if (s.runningScripts?.length) {
-              const returnIds = new Set(
-                msgs.filter((m) => m.type === "script-return" && m.parentId).map((m) => m.parentId),
-              );
-              const activeScriptMsgs = msgs.filter(
-                (m) => m.type === "script-run" && !returnIds.has(m.id),
-              );
-              setTaskQueue((prev) =>
-                prev.map((t) => {
-                  if (t.sessionId !== s.id || t.type !== "script" || t.messageId) return t;
-                  const scriptName = t.name.startsWith("Script: ")
-                    ? t.name.substring(8)
-                    : t.name;
-                  const match = activeScriptMsgs.find((m) => {
-                    const re = m.content.match(/Running script:\s*\*\*([^*]+)\*\*/i);
-                    return re && re[1].trim() === scriptName;
-                  });
-                  return match ? { ...t, messageId: match.id } : t;
-                }),
-              );
-            }
-          })
-          .catch(() => {});
-      });
     } catch {
       // ignore
     }
@@ -326,42 +305,34 @@ export default function TasksPage() {
             if (updated.status === "running") {
               setTaskQueue((prev) => {
                 const exists = prev.some(
-                  (t) => t.sessionId === updated.id && t.type === "agent",
+                  (t) => t.sessionId === updated.id && t.type === "agent" && t.status === "running",
                 );
                 if (exists) return prev;
                 return [
-                  ...prev,
                   {
                     id: `agent-${updated.id}-${Date.now()}`,
-                    type: "agent",
+                    type: "agent" as const,
                     name: `Agent: ${updated.prompt}`,
                     sessionId: updated.id,
-                    status: "running",
+                    status: "running" as const,
                     createdAt: new Date(
                       updated.updatedAt || updated.createdAt,
                     ).getTime(),
                   },
+                  ...prev,
                 ];
               });
-            } else if (updated.status === "script-running") {
+            } else if (updated.status === "done" || updated.status === "error") {
+              const now = Date.now();
               setTaskQueue((prev) =>
-                prev.filter((t) => {
-                  if (t.sessionId !== updated.id) return true;
-                  if (t.type === "agent") return false;
-                  const running = updated.runningScripts || [];
-                  const scriptName = t.name.startsWith("Script: ")
-                    ? t.name.substring(8)
-                    : t.name;
-                  return running.includes(scriptName);
+                prev.map((t) => {
+                  if (t.sessionId !== updated.id || t.status !== "running") return t;
+                  return {
+                    ...t,
+                    status: updated.status === "done" ? "done" as const : "error" as const,
+                    completedAt: now,
+                  };
                 }),
-              );
-            } else if (
-              updated.status === "done" ||
-              updated.status === "error" ||
-              updated.status === "idle"
-            ) {
-              setTaskQueue((prev) =>
-                prev.filter((t) => t.sessionId !== updated.id),
               );
             }
           }
@@ -437,13 +408,14 @@ export default function TasksPage() {
     };
   }, []);
 
+  const hasRunningTasks = taskQueue.some((t) => t.status === "running");
   useEffect(() => {
     if (taskQueue.length === 0) return;
     const interval = setInterval(() => {
       setTaskTimeTicker(Date.now());
-    }, 1000);
+    }, hasRunningTasks ? 1000 : 60000);
     return () => clearInterval(interval);
-  }, [taskQueue.length]);
+  }, [taskQueue.length, hasRunningTasks]);
 
   const handleKillTask = async (task: TaskItem) => {
     if (!task.messageId) return;
@@ -517,7 +489,7 @@ export default function TasksPage() {
             color: "var(--text-secondary)",
           }}
         >
-          Running Tasks
+          Task Queue
         </span>
 
         <div
@@ -565,11 +537,11 @@ export default function TasksPage() {
               <span
                 style={{
                   fontSize: 12,
-                  color: "var(--accent)",
+                  color: "var(--text-secondary)",
                   fontWeight: 500,
                 }}
               >
-                {taskQueue.length} active
+                {taskQueue.filter((t) => t.status === "running").length} active / {taskQueue.length} total
               </span>
             )}
           </div>
@@ -578,24 +550,34 @@ export default function TasksPage() {
             <div className="tasks-empty">
               <IconInbox />
               <p style={{ color: "var(--text-secondary)", fontSize: 14, margin: "12px 0 0" }}>
-                No running tasks
+                No tasks
               </p>
               <p style={{ color: "var(--text-muted)", fontSize: 12, margin: "4px 0 0" }}>
-                Tasks will appear here when agents or scripts are running.
+                Tasks will appear here when agents or scripts run. Records are kept for 7 days.
               </p>
             </div>
           ) : (
             <div className="tasks-list">
               {taskQueue.map((task) => {
                 const hasLog = !!task.messageId;
-                const elapsedMs = taskTimeTicker - task.createdAt;
-                const durationStr = formatDuration(elapsedMs);
+                const isRunning = task.status === "running";
                 const isMenuOpen = openMenuId === task.id;
+
+                let statusText: string;
+                if (isRunning) {
+                  const elapsedMs = taskTimeTicker - task.createdAt;
+                  statusText = `Running (${formatDuration(elapsedMs)})...`;
+                } else if (task.completedAt) {
+                  const ago = formatDuration(taskTimeTicker - task.completedAt);
+                  statusText = task.status === "done" ? `Completed ${ago} ago` : `Failed ${ago} ago`;
+                } else {
+                  statusText = task.status === "done" ? "Completed" : "Failed";
+                }
 
                 return (
                   <div key={task.id} className="task-item-wrapper">
                     <div
-                      className={`tasks-list-item ${task.type} ${hasLog ? "clickable" : "pending"}`}
+                      className={`tasks-list-item ${task.type} ${hasLog ? "clickable" : "pending"} ${!isRunning ? "completed" : ""}`}
                     >
                       <div className="task-queue-item-icon">
                         {task.type === "script" ? (
@@ -612,10 +594,17 @@ export default function TasksPage() {
                           <span className={`task-type-tag ${task.type}`}>
                             {task.type}
                           </span>
+                          {!isRunning && (
+                            <span
+                              className={`task-type-tag ${task.status === "done" ? "done" : "error"}`}
+                            >
+                              {task.status === "done" ? "done" : "error"}
+                            </span>
+                          )}
                         </div>
                         <div className="task-queue-item-status">
-                          <span className="task-spinner" />
-                          Running ({durationStr})...
+                          {isRunning && <span className="task-spinner" />}
+                          {statusText}
                         </div>
                       </div>
                       <div className="task-menu-container" ref={isMenuOpen ? menuRef : undefined}>
@@ -640,7 +629,7 @@ export default function TasksPage() {
                                 }}
                               >
                                 <IconTerminal />
-                                <span>Open Terminal</span>
+                                <span>View Log</span>
                               </button>
                             )}
                             {hasLog && (
@@ -655,7 +644,7 @@ export default function TasksPage() {
                                 <span>Go to Session</span>
                               </button>
                             )}
-                            {hasLog && (
+                            {isRunning && hasLog && (
                               <button
                                 className="task-menu-item danger"
                                 onClick={() => {
@@ -695,12 +684,14 @@ export default function TasksPage() {
                 {terminalTask.type === "script"
                   ? "Script Execution Log"
                   : "Agent Execution Log"}
-                <span
-                  className="console-badge-running"
-                  style={{ marginLeft: 8 }}
-                >
-                  ⟳ Streaming...
-                </span>
+                {terminalTask.status === "running" && (
+                  <span
+                    className="console-badge-running"
+                    style={{ marginLeft: 8 }}
+                  >
+                    ⟳ Streaming...
+                  </span>
+                )}
               </span>
               <button
                 className="modal-close-btn"
@@ -718,7 +709,8 @@ export default function TasksPage() {
                 sessionId={terminalTask.sessionId}
                 messageId={terminalTask.messageId}
                 ws={wsRef.current}
-                mode="live"
+                mode={terminalTask.status === "running" ? "live" : "history"}
+                taskType={terminalTask.type}
               />
             </div>
           </div>

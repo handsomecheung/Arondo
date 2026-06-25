@@ -11,9 +11,10 @@ interface TerminalProps {
   ws: WebSocket | null;
   mode: "live" | "history";
   historyLog?: string;
+  taskType?: "agent" | "script";
 }
 
-export default function Terminal({ sessionId, messageId, ws, mode, historyLog }: TerminalProps) {
+export default function Terminal({ sessionId, messageId, ws, mode, historyLog, taskType }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -37,9 +38,10 @@ export default function Terminal({ sessionId, messageId, ws, mode, historyLog }:
   useEffect(() => {
     if (!containerRef.current) return;
 
+    const disableInput = mode === "history" || taskType === "agent";
     const term = new XTerm({
-      cursorBlink: mode === "live",
-      disableStdin: mode === "history",
+      cursorBlink: mode === "live" && !disableInput,
+      disableStdin: disableInput,
       fontSize: 13,
       fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, monospace",
       theme: {
@@ -57,7 +59,6 @@ export default function Terminal({ sessionId, messageId, ws, mode, historyLog }:
 
     requestAnimationFrame(() => {
       fit.fit();
-      if (mode === "live") term.focus();
     });
 
     termRef.current = term;
@@ -91,7 +92,7 @@ export default function Terminal({ sessionId, messageId, ws, mode, historyLog }:
       termRef.current = null;
       fitRef.current = null;
     };
-  }, [messageId, mode, historyLog, sessionId]);
+  }, [messageId, mode, historyLog, sessionId, taskType]);
 
   // Live mode: WebSocket listener for real-time output
   useEffect(() => {
