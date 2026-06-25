@@ -10,13 +10,19 @@ import { BaseAgent, AgentRunOptions, AgentResult } from "./base";
 export class ClaudeCodeAgent extends BaseAgent {
   readonly name = "claude";
 
-  getCommand({ prompt }: Omit<AgentRunOptions, "onOutput">): string {
+  getCommand({ prompt, sessionId, isResume }: Omit<AgentRunOptions, "onOutput">): string {
     const fullPrompt = this.getSystemPrompt(prompt);
     const escapedPrompt = fullPrompt.replace(/"/g, '\\"');
-    return `claude --print "${escapedPrompt}" --allowedTools "all" --dangerously-skip-permissions`;
+    let sessionFlag = "";
+    if (sessionId) {
+      sessionFlag = isResume
+        ? ` --resume "${sessionId}"`
+        : ` --session-id "${sessionId}"`;
+    }
+    return `claude --print "${escapedPrompt}" --allowedTools "all" --dangerously-skip-permissions${sessionFlag}`;
   }
 
-  async run({ prompt, repoPath, onOutput }: AgentRunOptions): Promise<AgentResult> {
+  async run({ prompt, repoPath, onOutput, sessionId, isResume }: AgentRunOptions): Promise<AgentResult> {
     return new Promise((resolve) => {
       const fullPrompt = this.getSystemPrompt(prompt);
 
@@ -25,6 +31,14 @@ export class ClaudeCodeAgent extends BaseAgent {
         "--allowedTools", "all",
         "--dangerously-skip-permissions",
       ];
+
+      if (sessionId) {
+        if (isResume) {
+          args.push("--resume", sessionId);
+        } else {
+          args.push("--session-id", sessionId);
+        }
+      }
 
       const proc = spawn("claude", args, {
         cwd: repoPath,
@@ -57,7 +71,7 @@ export class ClaudeCodeAgent extends BaseAgent {
           success,
           output,
           error: success ? undefined : errorOutput || `Process exited with code ${code}`,
-          command: this.getCommand({ prompt, repoPath }),
+          command: this.getCommand({ prompt, repoPath, sessionId, isResume }),
         });
       });
 
@@ -66,7 +80,7 @@ export class ClaudeCodeAgent extends BaseAgent {
           success: false,
           output,
           error: err.message,
-          command: this.getCommand({ prompt, repoPath }),
+          command: this.getCommand({ prompt, repoPath, sessionId, isResume }),
         });
       });
     });

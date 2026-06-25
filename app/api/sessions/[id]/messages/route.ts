@@ -36,7 +36,8 @@ export async function POST(
     eventBus.publish({ type: "message_added", payload: userMsg });
 
     const agent = getAgent(session.agentType as AgentType);
-    const command = agent.getCommand({ prompt: trimmedMessage, repoPath: session.repoPath, sessionId: id, isResume: true });
+    const isResume = session.status !== "idle";
+    const command = agent.getCommand({ prompt: trimmedMessage, repoPath: session.repoPath, sessionId: id, isResume });
 
     const updatedSession = await updateSession(id, { status: "running", command });
     eventBus.publish({ type: "session_updated", payload: updatedSession });
