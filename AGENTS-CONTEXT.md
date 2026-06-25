@@ -65,6 +65,7 @@ app/
         auto-scripts/
           route.ts      # GET/POST: AI auto-script analysis
     tasks/
+      route.ts        # GET: list all tasks (active + retained)
       kill/
         route.ts        # POST: kill a running task by sessionId + messageId
     messages/route.ts   # GET: list messages for a session
@@ -86,7 +87,8 @@ lib/
     index.ts            # AgentFactory (add new agents here)
 scripts/
   run.server.sh         # Start the Next.js dev server
-  run.runner.sh         # Start the Go runner in dev mode (connects to localhost:3251)
+  run.runner1.sh        # Start Go runner 1 in dev mode (connects to localhost:3251)
+  run.runner2.sh        # Start Go runner 2 in dev mode (connects to localhost:3251)
 data/                   # Runtime data (gitignored)
   active-tasks.json     # Persisted active task contexts (survives server restart)
   agy-sessions.json     # Map file matching Arondo sessionIds with agy conversation UUIDs
@@ -135,12 +137,13 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 
 `lib/runner-manager.ts` is the central coordinator. Key responsibilities:
 
-- **Connection management**: Tracks connected runners. Runner IDs are stable across reconnections (derived from `name@hostname`).
-- **Task routing**: Maps `taskId` → `TaskContext` (sessionId, messageId, runnerId, type, pid). Maps `sessionId:messageId` → `taskId` for PTY input routing.
-- **Task persistence**: Active tasks are saved to `data/active-tasks.json` on register/exit. On server restart, tasks are restored and re-associated to the reconnecting runner.
+- **Connection management**: Tracks connected runners (including IP address). Runner IDs are stable across reconnections (derived from `name@hostname`).
+- **Task routing**: Maps `taskId` → `TaskContext` (sessionId, messageId, runnerId, type, pid, completedAt, exitCode). Maps `sessionId:messageId` → `taskId` for PTY input routing.
+- **Task persistence & retention**: All tasks (active + completed) are saved to `data/active-tasks.json`. Completed tasks are retained for 7 days (`TASK_RETENTION_MS`), then purged on startup. On server restart, tasks are restored and active ones re-associated to the reconnecting runner.
+- **Task cleanup**: `removeTasksForSession()` cleans up tasks when a session is deleted. `getAllTasks()` returns all tasks (active + retained). `purgeExpiredTasks()` removes completed tasks older than 7 days.
 - **Runner resolution**: `resolveRunnerId()` falls back to any connected runner when a session's stored runnerId is stale.
 - **Stream/event handling**: Routes `exec.output` streams to the correct session's log file and event bus. Handles `exec.exit` to update session status and add completion messages.
-- **Disconnect cleanup**: Fails orphaned tasks when a runner disconnects.
+- **Disconnect cleanup**: Fails orphaned active tasks when a runner disconnects (skips already-completed tasks).
 
 Uses the `process` singleton pattern (shared across tsx and Turbopack contexts).
 
@@ -151,7 +154,8 @@ Uses the `process` singleton pattern (shared across tsx and Turbopack contexts).
 ## Development
 ```bash
 ./scripts/run.server.sh      # Start server via tsx watch (dev: port 3251, prod: port 3250)
-./scripts/run.runner.sh      # Start runner connecting to localhost:3251
+./scripts/run.runner1.sh     # Start runner 1 connecting to localhost:3251
+./scripts/run.runner2.sh     # Start runner 2 connecting to localhost:3251
 ```
 
 ## Real-time Communication
@@ -172,7 +176,7 @@ Two WebSocket endpoints:
 ## Core Logging & Session Lifecycle Features
 - **Message-specific execution logs**: Every agent or script execution creates a specific system message (e.g. `⚙️ Executing command...`). The resulting terminal outputs are streamed via the runner and stored in `data/sessions/[sessionId]/logs/[systemMsgId].log`.
 - **Interactive Terminal (PTY)**: Script execution uses Go's `creack/pty` on the runner for full pseudo-terminal support (stdin, ANSI colors, cursor control). The frontend renders output via `xterm.js` (`components/Terminal.tsx`) in two modes: live (WebSocket-connected for running scripts, with historical log pre-loaded) and history (loads saved log data for completed scripts).
-- **Task Queue & Log Popup**: Active tasks are tracked in a global header queue with PID tracking. Clicking any running task switches to its session and opens the log modal. Each task has a kill button that sends SIGTERM via the runner.
+- **Task Queue & Log Popup**: Tasks are tracked in a global header queue grouped by session, with session names always visible. Completed tasks are retained for 7 days. Clicking any task switches to its session and opens the log modal. Each running task has a kill button that sends SIGTERM via the runner.
 - **Real-time Streaming**: Both agent and script output stream via WebSocket `terminal:output` (base64-encoded PTY data), forwarded through the event bus. The frontend renders all logs via the xterm.js Terminal component.
 - **Concurrency**: Multiple background scripts can run concurrently in a single session. The chat prompt stays active during execution.
 - **Task Persistence**: Active task contexts survive server restarts via `data/active-tasks.json`. On runner reconnect, the `task.status` event reconciles running vs exited tasks.
