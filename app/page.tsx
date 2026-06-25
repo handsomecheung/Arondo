@@ -3796,11 +3796,6 @@ export default function HomePage() {
                       ? "live"
                       : "history"
                   }
-                  historyLog={
-                    execCards.get(activeLogMsgId)?.returnMsg === null
-                      ? undefined
-                      : sessionLog
-                  }
                   taskType={isScriptLog ? "script" : "agent"}
                 />
               ) : null}

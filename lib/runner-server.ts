@@ -1,3 +1,4 @@
+import { IncomingMessage } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { runnerManager } from "./runner-manager";
 import { getAgentBinaryNames } from "./agents";
@@ -16,8 +17,11 @@ export function setupRunnerServer(wss: WebSocketServer): void {
 
   wss.on("close", () => clearInterval(heartbeat));
 
-  wss.on("connection", (ws: WebSocket) => {
+  wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
     let runnerId: string | null = null;
+    const remoteIp = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim()
+      || req.socket.remoteAddress
+      || "";
 
     ws.on("message", (raw) => {
       let msg: any;
@@ -29,7 +33,7 @@ export function setupRunnerServer(wss: WebSocketServer): void {
 
       if (!runnerId) {
         if (msg.type === "event" && msg.method === "register") {
-          runnerId = runnerManager.addRunner(ws, msg.payload);
+          runnerId = runnerManager.addRunner(ws, msg.payload, remoteIp);
 
           const ack = JSON.stringify({
             id: msg.id || "ack",

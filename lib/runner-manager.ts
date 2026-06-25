@@ -22,6 +22,7 @@ export interface RunnerInfo {
   id: string;
   name: string;
   hostname: string;
+  ip: string;
   os: string;
   arch: string;
   version: string;
@@ -150,7 +151,7 @@ class RunnerManager {
 
   // ─── Connection lifecycle ─────────────────────────────────────────────
 
-  addRunner(ws: WebSocket, registerPayload: any): string {
+  addRunner(ws: WebSocket, registerPayload: any, ip?: string): string {
     const name: string = registerPayload.name || "unknown";
     const hostname: string = registerPayload.hostname || "";
 
@@ -171,6 +172,7 @@ class RunnerManager {
       id,
       name,
       hostname,
+      ip: ip || "",
       os: registerPayload.os || "",
       arch: registerPayload.arch || "",
       version: registerPayload.version || "",

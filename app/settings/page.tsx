@@ -7,6 +7,7 @@ interface Runner {
   id: string;
   name: string;
   hostname: string;
+  ip?: string;
   os: string;
   arch: string;
   connected: boolean;
@@ -234,113 +235,6 @@ export default function SettingsPage() {
                   gap: 8,
                 }}
               >
-                {runners.map((r) => (
-                  <div
-                    key={r.id}
-                    onClick={() =>
-                      setSelectedRunnerId(
-                        selectedRunnerId === r.id ? null : r.id,
-                      )
-                    }
-                    style={{
-                      padding: 14,
-                      background:
-                        selectedRunnerId === r.id
-                          ? "var(--bg-surface)"
-                          : "var(--bg-elevated)",
-                      border:
-                        selectedRunnerId === r.id
-                          ? "1px solid var(--accent)"
-                          : "1px solid var(--border)",
-                      borderRadius: "var(--radius-md)",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        marginBottom: 4,
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                        }}
-                      >
-                        <span
-                          className={`task-status-badge ${r.connected ? "running" : "idle"}`}
-                        >
-                          {r.connected ? "connected" : "disconnected"}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: 14,
-                            fontWeight: 600,
-                            color: "var(--text-primary)",
-                          }}
-                        >
-                          {r.name}
-                        </span>
-                      </div>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          color: "var(--text-muted)",
-                        }}
-                      >
-                        {r.os} ({r.arch})
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: "var(--text-secondary)",
-                      }}
-                    >
-                      Host: {r.hostname}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* AI Agents Section */}
-          <div>
-            <h2
-              style={{
-                fontSize: 16,
-                fontWeight: 600,
-                color: "var(--text-primary)",
-                marginBottom: 4,
-              }}
-            >
-              AI Agents
-            </h2>
-            <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>
-              Agent CLI availability detected on each connected node at registration time.
-            </p>
-
-            {runners.length === 0 ? (
-              <div
-                style={{
-                  padding: "24px 16px",
-                  textAlign: "center",
-                  border: "1px dashed var(--border)",
-                  borderRadius: "var(--radius-md)",
-                  color: "var(--text-muted)",
-                  fontSize: 13,
-                }}
-              >
-                No nodes connected. Connect a node to see agent availability.
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {runners.map((r) => {
                   const agentDefs = [
                     { label: "Antigravity CLI", cmd: "agy", comingSoon: false },
@@ -348,16 +242,28 @@ export default function SettingsPage() {
                     { label: "Codex", cmd: "codex", comingSoon: true },
                     { label: "OpenCode", cmd: "opencode", comingSoon: true },
                   ];
-                  // agents === undefined means legacy runner (no detection support)
                   const hasAgentInfo = Array.isArray(r.agents);
                   return (
                     <div
                       key={r.id}
+                      onClick={() =>
+                        setSelectedRunnerId(
+                          selectedRunnerId === r.id ? null : r.id,
+                        )
+                      }
                       style={{
-                        background: "var(--bg-elevated)",
-                        border: "1px solid var(--border)",
-                        borderRadius: "var(--radius-md)",
                         padding: 14,
+                        background:
+                          selectedRunnerId === r.id
+                            ? "var(--bg-surface)"
+                            : "var(--bg-elevated)",
+                        border:
+                          selectedRunnerId === r.id
+                            ? "1px solid var(--accent)"
+                            : "1px solid var(--border)",
+                        borderRadius: "var(--radius-md)",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
                       }}
                     >
                       <div
@@ -365,29 +271,53 @@ export default function SettingsPage() {
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "space-between",
-                          marginBottom: 10,
+                          marginBottom: 4,
                         }}
                       >
-                        <span
+                        <div
                           style={{
-                            fontSize: 13,
-                            fontWeight: 600,
-                            color: "var(--text-primary)",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
                           }}
                         >
-                          {r.name}
-                        </span>
+                          <span
+                            className={`task-status-badge ${r.connected ? "running" : "idle"}`}
+                          >
+                            {r.connected ? "connected" : "disconnected"}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 14,
+                              fontWeight: 600,
+                              color: "var(--text-primary)",
+                            }}
+                          >
+                            {r.name}
+                          </span>
+                        </div>
                         <span
-                          className={`task-status-badge ${r.connected ? "running" : "idle"}`}
+                          style={{
+                            fontSize: 11,
+                            color: "var(--text-muted)",
+                          }}
                         >
-                          {r.connected ? "connected" : "disconnected"}
+                          {r.os} ({r.arch})
                         </span>
                       </div>
-                      {!hasAgentInfo ? (
-                        <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}>
-                          Agent detection not supported by this node version.
-                        </p>
-                      ) : (
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 16,
+                          fontSize: 12,
+                          color: "var(--text-secondary)",
+                          marginBottom: hasAgentInfo ? 10 : 0,
+                        }}
+                      >
+                        <span>Host: {r.hostname}</span>
+                        {r.ip && <span>IP: {r.ip}</span>}
+                      </div>
+                      {hasAgentInfo && (
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                           {agentDefs.map(({ label, cmd, comingSoon }) => {
                             const installed = !comingSoon && r.agents!.includes(cmd);
@@ -570,6 +500,29 @@ export default function SettingsPage() {
                       >
                         {selectedRunner.os} ({selectedRunner.arch})
                       </span>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 12,
+                          color: "var(--text-muted)",
+                        }}
+                      >
+                        IP Address
+                      </span>
+                      <code
+                        style={{
+                          fontSize: 12,
+                          color: "var(--text-primary)",
+                        }}
+                      >
+                        {selectedRunner.ip || "N/A"}
+                      </code>
                     </div>
                     <div
                       style={{
