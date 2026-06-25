@@ -544,7 +544,7 @@ export default function SettingsPage() {
                           color: "var(--text-primary)",
                         }}
                       >
-                        {selectedRunner.version || "0.1.0"}
+                        {selectedRunner.version || "unknown"}
                       </span>
                     </div>
                   </div>
