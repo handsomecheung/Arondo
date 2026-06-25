@@ -94,7 +94,6 @@ function IconTaskQueue() {
   );
 }
 
-
 function IconCheck() {
   return (
     <svg
@@ -111,7 +110,6 @@ function IconCheck() {
     </svg>
   );
 }
-
 
 function IconSend() {
   return (
@@ -472,7 +470,10 @@ function parseExecCommand(content: string): { label: string; command: string } {
   const scriptMatch = content.match(/Running script:\s*\*\*([^*]+)\*\*/);
   if (scriptMatch) {
     const cmdMatch = content.match(/```bash\n([\s\S]*?)```/);
-    return { label: scriptMatch[1].trim(), command: cmdMatch ? cmdMatch[1].trim() : "" };
+    return {
+      label: scriptMatch[1].trim(),
+      command: cmdMatch ? cmdMatch[1].trim() : "",
+    };
   }
   const cmdMatch = content.match(/```bash\n([\s\S]*?)```/);
   const cmd = cmdMatch ? cmdMatch[1].trim() : "";
@@ -502,9 +503,32 @@ function ExecCard({
           {!isDone ? (
             <span className="exec-card-spinner" />
           ) : isSuccess ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
           ) : (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
           )}
         </div>
         <div className="exec-card-info">
@@ -516,7 +540,9 @@ function ExecCard({
               ? "Running..."
               : isSuccess
                 ? "Completed"
-                : info.returnMsg!.content.replace(/^❌\s*/, "").replace(/^Error:\s*/, "")}
+                : info
+                    .returnMsg!.content.replace(/^❌\s*/, "")
+                    .replace(/^Error:\s*/, "")}
           </div>
         </div>
         <div className="exec-card-actions">
@@ -730,7 +756,7 @@ export default function HomePage() {
     vv.addEventListener("resize", handleResize);
     vv.addEventListener("scroll", handleResize);
     window.addEventListener("resize", handleResize);
-    
+
     handleResize();
 
     return () => {
@@ -809,10 +835,7 @@ export default function HomePage() {
   // Close session menu on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(event.target as Node)
-      ) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setMenuOpen(false);
       }
     };
@@ -860,7 +883,6 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, [taskQueueOpen, taskQueue.length]);
 
-
   // Build execution card info: pair run messages with their return messages.
   // Return messages carry a parentId pointing to their run message. For legacy
   // messages without parentId we fall back to FIFO matching by type.
@@ -871,7 +893,10 @@ export default function HomePage() {
     const unmatchedScript: string[] = [];
 
     for (const msg of messages) {
-      if (msg.role === "system" && (msg.type === "agent-run" || msg.type === "script-run")) {
+      if (
+        msg.role === "system" &&
+        (msg.type === "agent-run" || msg.type === "script-run")
+      ) {
         const parsed = parseExecCommand(msg.content);
         cards.set(msg.id, {
           runMsg: msg,
@@ -897,7 +922,8 @@ export default function HomePage() {
           const idx = queue.indexOf(msg.parentId);
           if (idx !== -1) queue.splice(idx, 1);
         } else {
-          const queue = msg.type === "agent-return" ? unmatchedAgent : unmatchedScript;
+          const queue =
+            msg.type === "agent-return" ? unmatchedAgent : unmatchedScript;
           if (queue.length > 0) {
             card = cards.get(queue.shift()!)!;
           }
@@ -1003,7 +1029,9 @@ export default function HomePage() {
       attempts++;
       if (attempts > maxAttempts) {
         setIsAutoAnalyzing(false);
-        setTaskQueue((prev) => prev.filter((t) => t.id !== `auto-script-${selectedProjectId}`));
+        setTaskQueue((prev) =>
+          prev.filter((t) => t.id !== `auto-script-${selectedProjectId}`),
+        );
         setToast({
           message: "AI analysis background task timed out.",
           type: "error",
@@ -1021,7 +1049,9 @@ export default function HomePage() {
           if (data.status === "done") {
             setIsAutoAnalyzing(false);
             loadProjectScripts(selectedProjectId);
-            setTaskQueue((prev) => prev.filter((t) => t.id !== `auto-script-${selectedProjectId}`));
+            setTaskQueue((prev) =>
+              prev.filter((t) => t.id !== `auto-script-${selectedProjectId}`),
+            );
             setToast({
               message: "AI analysis completed! New scripts are now available.",
               type: "success",
@@ -1029,7 +1059,9 @@ export default function HomePage() {
             clearInterval(interval);
           } else if (data.status === "error") {
             setIsAutoAnalyzing(false);
-            setTaskQueue((prev) => prev.filter((t) => t.id !== `auto-script-${selectedProjectId}`));
+            setTaskQueue((prev) =>
+              prev.filter((t) => t.id !== `auto-script-${selectedProjectId}`),
+            );
             setToast({
               message: `AI analysis failed. Error log written to data/auto-script-error.log`,
               type: "error",
@@ -1064,7 +1096,9 @@ export default function HomePage() {
         }
 
         // Add running sessions to task queue
-        const running = data.filter((s) => s.status === "running" || s.status === "script-running");
+        const running = data.filter(
+          (s) => s.status === "running" || s.status === "script-running",
+        );
         if (running.length > 0) {
           const initTasks: TaskItem[] = [];
           running.forEach((s) => {
@@ -1106,7 +1140,11 @@ export default function HomePage() {
                     setTaskQueue((prev) =>
                       prev.map((t) =>
                         t.id === `task-${s.id}-init-agent`
-                          ? { ...t, name: `Agent: ${s.prompt}`, messageId: lastRunMsg.id }
+                          ? {
+                              ...t,
+                              name: `Agent: ${s.prompt}`,
+                              messageId: lastRunMsg.id,
+                            }
                           : t,
                       ),
                     );
@@ -1120,7 +1158,13 @@ export default function HomePage() {
                   s.runningScripts?.forEach((scriptName) => {
                     const matchMsg = [...msgs]
                       .reverse()
-                      .find((m) => m.type === "script-run" && m.content.includes(`Running script: **${scriptName}**`));
+                      .find(
+                        (m) =>
+                          m.type === "script-run" &&
+                          m.content.includes(
+                            `Running script: **${scriptName}**`,
+                          ),
+                      );
                     if (matchMsg) {
                       setTaskQueue((prev) =>
                         prev.map((t) =>
@@ -1186,7 +1230,9 @@ export default function HomePage() {
     if (!fsModalOpen || !runnerId) return;
 
     setFsLoading(true);
-    fetch(`/api/fs?runner=${encodeURIComponent(runnerId)}&path=${encodeURIComponent(fsCurrentPath)}`)
+    fetch(
+      `/api/fs?runner=${encodeURIComponent(runnerId)}&path=${encodeURIComponent(fsCurrentPath)}`,
+    )
       .then((r) => {
         if (!r.ok) throw new Error("Failed to load directories");
         return r.json();
@@ -1285,9 +1331,11 @@ export default function HomePage() {
                   if (t.sessionId !== updated.id) return true;
                   if (t.type === "agent") return false;
                   const running = updated.runningScripts || [];
-                  const scriptName = t.name.startsWith("Script: ") ? t.name.substring(8) : t.name;
+                  const scriptName = t.name.startsWith("Script: ")
+                    ? t.name.substring(8)
+                    : t.name;
                   return running.includes(scriptName);
-                })
+                }),
               );
             } else if (
               updated.status === "done" ||
@@ -1325,7 +1373,10 @@ export default function HomePage() {
               if (msg.type === "agent-run") {
                 setTaskQueue((prev) => {
                   const idx = prev.findIndex(
-                    (t) => t.sessionId === msg.sessionId && t.type === "agent" && !t.messageId
+                    (t) =>
+                      t.sessionId === msg.sessionId &&
+                      t.type === "agent" &&
+                      !t.messageId,
                   );
                   if (idx !== -1) {
                     const next = [...prev];
@@ -1337,7 +1388,9 @@ export default function HomePage() {
               } else if (msg.type === "script-run") {
                 setTaskQueue((prev) => {
                   let idx = -1;
-                  const match = msg.content.match(/Running script:\s*\*\*([^*]+)\*\*/i);
+                  const match = msg.content.match(
+                    /Running script:\s*\*\*([^*]+)\*\*/i,
+                  );
                   if (match) {
                     const sName = match[1].trim();
                     idx = prev.findIndex(
@@ -1345,12 +1398,15 @@ export default function HomePage() {
                         t.sessionId === msg.sessionId &&
                         t.type === "script" &&
                         !t.messageId &&
-                        (t.name === `Script: ${sName}` || t.name === sName)
+                        (t.name === `Script: ${sName}` || t.name === sName),
                     );
                   }
                   if (idx === -1) {
                     idx = prev.findIndex(
-                      (t) => t.sessionId === msg.sessionId && t.type === "script" && !t.messageId
+                      (t) =>
+                        t.sessionId === msg.sessionId &&
+                        t.type === "script" &&
+                        !t.messageId,
                     );
                   }
                   if (idx !== -1) {
@@ -1363,7 +1419,6 @@ export default function HomePage() {
               }
             }
           }
-
         } catch {
           /* ignore */
         }
@@ -1447,11 +1502,14 @@ export default function HomePage() {
           },
         ]);
         try {
-          const res = await fetch(`/api/sessions/${selectedSessionId}/messages`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: trimmed, type: "chat-user" }),
-          });
+          const res = await fetch(
+            `/api/sessions/${selectedSessionId}/messages`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ message: trimmed, type: "chat-user" }),
+            },
+          );
           if (!res.ok) {
             const data = await res.json();
             setApiError({
@@ -1681,8 +1739,6 @@ export default function HomePage() {
     setDraggedIndex(null);
   };
 
-
-
   const handleAutoAddScripts = async () => {
     if (!selectedProjectId) return;
     setInfoDialog({
@@ -1697,8 +1753,8 @@ export default function HomePage() {
               marginBottom: 14,
             }}
           >
-            Arondo will automatically analyze your project and generate a set
-            of common scripts (e.g. build, test, lint).
+            Arondo will automatically analyze your project and generate a set of
+            common scripts (e.g. build, test, lint).
           </p>
           <ul
             style={{
@@ -1857,7 +1913,8 @@ export default function HomePage() {
       console.error(err);
       setApiError({
         title: "Create Pull Request Error",
-        message: err.message || "An error occurred while creating pull request.",
+        message:
+          err.message || "An error occurred while creating pull request.",
       });
     } finally {
       setIsCreatingPr(false);
@@ -1881,11 +1938,14 @@ export default function HomePage() {
     ]);
     try {
       const commitPrompt =
-        "Please commit only the changes within the current project directory with an appropriate commit message. Make sure to only stage and commit modifications under this directory, and avoid committing changes outside of it (for example, avoid using `git commit -a` which might include changes from the entire repository).";
+        'Please commit only the changes within the current project directory with an appropriate commit message. Always use `git commit -m "<message>"` to pass the commit message inline — never run `git commit` without `-m`, as there is no interactive terminal available. Make sure to only stage and commit modifications under this directory, and avoid committing changes outside of it (for example, avoid using `git commit -a` which might include changes from the entire repository).';
       const res = await fetch(`/api/sessions/${selectedSessionId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: commitPrompt, type: "chat-system-defined" }),
+        body: JSON.stringify({
+          message: commitPrompt,
+          type: "chat-system-defined",
+        }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -1899,7 +1959,9 @@ export default function HomePage() {
       console.error(err);
       setApiError({
         title: "Commit Changes Error",
-        message: err.message || "An error occurred while calling the agent to commit changes.",
+        message:
+          err.message ||
+          "An error occurred while calling the agent to commit changes.",
       });
       setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
     } finally {
@@ -1967,9 +2029,7 @@ export default function HomePage() {
       });
       if (res.ok) {
         const updated = await res.json();
-        setSessions((prev) =>
-          prev.map((s) => (s.id === id ? updated : s))
-        );
+        setSessions((prev) => prev.map((s) => (s.id === id ? updated : s)));
         setRenameModal(null);
       } else {
         const data = await res.json();
@@ -2113,7 +2173,11 @@ export default function HomePage() {
                         key={task.id}
                         className={`task-queue-item ${task.type} ${hasLog ? "clickable" : "pending"}`}
                         onClick={handleTaskClick}
-                        title={hasLog ? "Click to view execution log" : "Initializing log..."}
+                        title={
+                          hasLog
+                            ? "Click to view execution log"
+                            : "Initializing log..."
+                        }
                       >
                         <div className="task-queue-item-icon">
                           {task.type === "script" ? (
@@ -2124,7 +2188,10 @@ export default function HomePage() {
                         </div>
                         <div className="task-queue-item-info">
                           <div className="task-queue-item-name-row">
-                            <span className="task-queue-item-name" title={task.name}>
+                            <span
+                              className="task-queue-item-name"
+                              title={task.name}
+                            >
                               {task.name}
                             </span>
                             <span className={`task-type-tag ${task.type}`}>
@@ -2177,8 +2244,17 @@ export default function HomePage() {
 
       {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
-        <div className="sidebar-header" style={{ flexDirection: "column", gap: 12, alignItems: "stretch" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div
+          className="sidebar-header"
+          style={{ flexDirection: "column", gap: 12, alignItems: "stretch" }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
             <span className="sidebar-title">Menu</span>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <button
@@ -2235,12 +2311,14 @@ export default function HomePage() {
                 </div>
               )}
               {sortedSessions.map((session) => {
-                const project = projects.find((p) => p.id === session.projectId);
+                const project = projects.find(
+                  (p) => p.id === session.projectId,
+                );
                 const projectName = project
-                  ? (project.repoPath.split("/").pop() || project.repoPath)
+                  ? project.repoPath.split("/").pop() || project.repoPath
                   : "";
                 const runner = runners.find((r) => r.id === session.runnerId);
-                const nodeName = runner ? runner.name : (session.runnerId || "");
+                const nodeName = runner ? runner.name : session.runnerId || "";
 
                 return (
                   <div
@@ -2278,7 +2356,11 @@ export default function HomePage() {
                       {nodeName && (
                         <span
                           className="task-item-node-badge"
-                          title={runner ? `Node: ${runner.name} (${runner.hostname})` : `Node: ${session.runnerId}`}
+                          title={
+                            runner
+                              ? `Node: ${runner.name} (${runner.hostname})`
+                              : `Node: ${session.runnerId}`
+                          }
                           style={{
                             fontSize: 10,
                             fontWeight: 500,
@@ -2297,7 +2379,9 @@ export default function HomePage() {
                         </span>
                       )}
                     </div>
-                    <div className="task-item-prompt">{session.name || session.prompt}</div>
+                    <div className="task-item-prompt">
+                      {session.name || session.prompt}
+                    </div>
                     <div className="task-item-time">
                       {formatRelative(session.createdAt)}
                     </div>
@@ -2484,7 +2568,7 @@ export default function HomePage() {
                             try {
                               const res = await fetch(
                                 `/api/projects/${project.id}`,
-                                { method: "DELETE" }
+                                { method: "DELETE" },
                               );
                               if (res.ok) {
                                 setSelectedProjectId(null);
@@ -2493,13 +2577,15 @@ export default function HomePage() {
                                 const err = await res.json();
                                 setApiError({
                                   title: "Delete Project Error",
-                                  message: err.error || "Failed to delete project",
+                                  message:
+                                    err.error || "Failed to delete project",
                                 });
                               }
                             } catch (e: any) {
                               setApiError({
                                 title: "Delete Project Error",
-                                message: e.message || "Failed to delete project",
+                                message:
+                                  e.message || "Failed to delete project",
                               });
                             }
                           },
@@ -2637,7 +2723,9 @@ export default function HomePage() {
                                   : "var(--text-muted)",
                               }}
                             >
-                              {projectRunner.connected ? "connected" : "offline"}
+                              {projectRunner.connected
+                                ? "connected"
+                                : "offline"}
                             </span>
                           </div>
                         ) : (
@@ -2807,12 +2895,22 @@ export default function HomePage() {
                             data-index={sidx}
                             style={{
                               padding: 12,
-                              background: draggedIndex === sidx ? "var(--bg-surface)" : "var(--bg-elevated)",
-                              border: draggedIndex === sidx ? "1px dashed var(--accent)" : "1px solid var(--border)",
+                              background:
+                                draggedIndex === sidx
+                                  ? "var(--bg-surface)"
+                                  : "var(--bg-elevated)",
+                              border:
+                                draggedIndex === sidx
+                                  ? "1px dashed var(--accent)"
+                                  : "1px solid var(--border)",
                               borderRadius: "var(--radius-sm)",
                               opacity: draggedIndex === sidx ? 0.6 : 1,
-                              transform: draggedIndex === sidx ? "scale(1.02)" : "scale(1)",
-                              transition: "transform 0.1s, opacity 0.1s, background 0.1s, border 0.1s",
+                              transform:
+                                draggedIndex === sidx
+                                  ? "scale(1.02)"
+                                  : "scale(1)",
+                              transition:
+                                "transform 0.1s, opacity 0.1s, background 0.1s, border 0.1s",
                               position: "relative",
                               zIndex: draggedIndex === sidx ? 10 : 1,
                             }}
@@ -2840,29 +2938,48 @@ export default function HomePage() {
                               >
                                 <div
                                   className="drag-handle"
-                                  onPointerDown={(e) => handlePointerDown(e, sidx)}
+                                  onPointerDown={(e) =>
+                                    handlePointerDown(e, sidx)
+                                  }
                                   style={{
-                                    cursor: draggedIndex === sidx ? "grabbing" : "grab",
+                                    cursor:
+                                      draggedIndex === sidx
+                                        ? "grabbing"
+                                        : "grab",
                                     userSelect: "none",
                                     display: "flex",
                                     alignItems: "center",
                                     paddingRight: 6,
-                                    color: draggedIndex === sidx ? "var(--accent)" : "var(--text-muted)",
+                                    color:
+                                      draggedIndex === sidx
+                                        ? "var(--accent)"
+                                        : "var(--text-muted)",
                                     transition: "color 0.2s",
                                     touchAction: "none",
                                   }}
                                   onMouseEnter={(e) => {
                                     if (draggedIndex !== sidx) {
-                                      e.currentTarget.style.color = "var(--text-secondary)";
+                                      e.currentTarget.style.color =
+                                        "var(--text-secondary)";
                                     }
                                   }}
                                   onMouseLeave={(e) => {
                                     if (draggedIndex !== sidx) {
-                                      e.currentTarget.style.color = "var(--text-muted)";
+                                      e.currentTarget.style.color =
+                                        "var(--text-muted)";
                                     }
                                   }}
                                 >
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <svg
+                                    width="12"
+                                    height="12"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
                                     <circle cx="9" cy="5" r="1.5" />
                                     <circle cx="9" cy="12" r="1.5" />
                                     <circle cx="9" cy="19" r="1.5" />
@@ -3122,8 +3239,16 @@ export default function HomePage() {
                       whiteSpace: "nowrap",
                     }}
                   >
-                    Project: {selectedSession.repoPath.split("/").pop() || selectedSession.repoPath} (
-                    {selectedSession.agentType === "antigravity" ? "Antigravity CLI" : selectedSession.agentType === "claude" ? "Claude Code" : selectedSession.agentType})
+                    Project:{" "}
+                    {selectedSession.repoPath.split("/").pop() ||
+                      selectedSession.repoPath}{" "}
+                    (
+                    {selectedSession.agentType === "antigravity"
+                      ? "Antigravity CLI"
+                      : selectedSession.agentType === "claude"
+                        ? "Claude Code"
+                        : selectedSession.agentType}
+                    )
                   </span>
                 </div>
 
@@ -3200,14 +3325,14 @@ export default function HomePage() {
                           !isGitRepo
                             ? "Not a git repository"
                             : isRunning
-                            ? "Agent is running"
-                            : isCommitting
-                            ? "Committing changes in progress..."
-                            : isCheckingGitChanges
-                            ? "Checking git changes..."
-                            : !hasGitChanges
-                            ? "No changes to commit"
-                            : undefined
+                              ? "Agent is running"
+                              : isCommitting
+                                ? "Committing changes in progress..."
+                                : isCheckingGitChanges
+                                  ? "Checking git changes..."
+                                  : !hasGitChanges
+                                    ? "No changes to commit"
+                                    : undefined
                         }
                         id="menu-commit-changes"
                       >
@@ -3237,15 +3362,17 @@ export default function HomePage() {
                               handleCreatePr();
                               setMenuOpen(false);
                             }}
-                            disabled={!isGitRepo || !githubConfigured || isCreatingPr}
+                            disabled={
+                              !isGitRepo || !githubConfigured || isCreatingPr
+                            }
                             title={
                               !isGitRepo
                                 ? "Not a git repository"
                                 : !githubConfigured
-                                ? "GitHub not configured"
-                                : isCreatingPr
-                                ? "Creating pull request in progress..."
-                                : undefined
+                                  ? "GitHub not configured"
+                                  : isCreatingPr
+                                    ? "Creating pull request in progress..."
+                                    : undefined
                             }
                             id="menu-create-pr"
                           >
@@ -3265,7 +3392,9 @@ export default function HomePage() {
                           <button
                             className="menu-item"
                             disabled={isAgentRunning}
-                            title={isAgentRunning ? "Agent is running" : undefined}
+                            title={
+                              isAgentRunning ? "Agent is running" : undefined
+                            }
                             id="menu-run-script"
                           >
                             <IconPlay /> Run Script
@@ -3278,10 +3407,14 @@ export default function HomePage() {
                                   key={s.name}
                                   className="menu-item"
                                   onClick={() => handleRunScript(s.name)}
-                                  disabled={selectedSession?.runningScripts?.includes(s.name)}
+                                  disabled={selectedSession?.runningScripts?.includes(
+                                    s.name,
+                                  )}
                                   id={`menu-run-script-${s.name.replace(/\s+/g, "-")}`}
                                   title={
-                                    selectedSession?.runningScripts?.includes(s.name)
+                                    selectedSession?.runningScripts?.includes(
+                                      s.name,
+                                    )
                                       ? "Script is already running"
                                       : s.command
                                   }
@@ -3296,7 +3429,9 @@ export default function HomePage() {
                                 onClick={() => {
                                   setMenuOpen(false);
                                   setScriptSubMenuOpen(false);
-                                  setSelectedProjectId(selectedSession.projectId);
+                                  setSelectedProjectId(
+                                    selectedSession.projectId,
+                                  );
                                   setSidebarMode("projects");
                                   setSidebarOpen(true);
                                 }}
@@ -3314,9 +3449,12 @@ export default function HomePage() {
                         onClick={() => {
                           setRenameModal({
                             sessionId: selectedSessionId!,
-                            currentName: selectedSession.name || selectedSession.prompt,
+                            currentName:
+                              selectedSession.name || selectedSession.prompt,
                           });
-                          setRenameInput(selectedSession.name || selectedSession.prompt);
+                          setRenameInput(
+                            selectedSession.name || selectedSession.prompt,
+                          );
                           setMenuOpen(false);
                         }}
                         id="menu-rename-session"
@@ -3465,10 +3603,14 @@ export default function HomePage() {
                     <button
                       type="button"
                       className="custom-dropdown-trigger"
-                      onClick={() => !isRunning && setRunnerDropdownOpen(!runnerDropdownOpen)}
+                      onClick={() =>
+                        !isRunning && setRunnerDropdownOpen(!runnerDropdownOpen)
+                      }
                       disabled={isRunning}
                       style={{
-                        ...(isNewSession && !runnerId ? { borderColor: "var(--error)" } : {}),
+                        ...(isNewSession && !runnerId
+                          ? { borderColor: "var(--error)" }
+                          : {}),
                       }}
                       id="runner-select-trigger"
                     >
@@ -3477,12 +3619,16 @@ export default function HomePage() {
                           ? `${runners.find((r) => r.id === runnerId)?.name} (${runners.find((r) => r.id === runnerId)?.hostname})`
                           : "Select Runner"}
                       </span>
-                      <IconChevronDown className={`arrow-icon ${runnerDropdownOpen ? "open" : ""}`} />
+                      <IconChevronDown
+                        className={`arrow-icon ${runnerDropdownOpen ? "open" : ""}`}
+                      />
                     </button>
                     {runnerDropdownOpen && (
                       <div className="custom-dropdown-menu">
                         {runners.length === 0 ? (
-                          <div className="custom-dropdown-item disabled">No runners connected</div>
+                          <div className="custom-dropdown-item disabled">
+                            No runners connected
+                          </div>
                         ) : (
                           runners.map((r) => (
                             <button
@@ -3515,9 +3661,15 @@ export default function HomePage() {
                       setFsModalOpen(true);
                     }}
                     disabled={isRunning || !runnerId}
-                    title={repoPath ? `Selected: ${repoPath}` : "Browse Directory"}
+                    title={
+                      repoPath ? `Selected: ${repoPath}` : "Browse Directory"
+                    }
                     id="browse-repo-btn"
-                    style={isNewSession && !repoPath.trim() ? { borderColor: "var(--error)" } : {}}
+                    style={
+                      isNewSession && !repoPath.trim()
+                        ? { borderColor: "var(--error)" }
+                        : {}
+                    }
                   >
                     <IconFolder />
                   </button>
@@ -3529,28 +3681,58 @@ export default function HomePage() {
                     <button
                       type="button"
                       className="custom-dropdown-trigger"
-                      onClick={() => !isRunning && setAgentDropdownOpen(!agentDropdownOpen)}
+                      onClick={() =>
+                        !isRunning && setAgentDropdownOpen(!agentDropdownOpen)
+                      }
                       disabled={isRunning}
                       style={{
-                        ...(isNewSession && !agentType ? { borderColor: "var(--error)" } : {}),
+                        ...(isNewSession && !agentType
+                          ? { borderColor: "var(--error)" }
+                          : {}),
                       }}
                       id="agent-select-trigger"
                     >
                       <span>
-                        {agentType === "antigravity" ? "Antigravity CLI" : agentType === "claude" ? "Claude Code" : agentType === "codex" ? "Codex" : agentType}
+                        {agentType === "antigravity"
+                          ? "Antigravity CLI"
+                          : agentType === "claude"
+                            ? "Claude Code"
+                            : agentType === "codex"
+                              ? "Codex"
+                              : agentType}
                       </span>
-                      <IconChevronDown className={`arrow-icon ${agentDropdownOpen ? "open" : ""}`} />
+                      <IconChevronDown
+                        className={`arrow-icon ${agentDropdownOpen ? "open" : ""}`}
+                      />
                     </button>
                     {agentDropdownOpen && (
                       <div className="custom-dropdown-menu">
                         {(
                           [
-                            { value: "antigravity", label: "Antigravity CLI", cmd: "agy", comingSoon: false },
-                            { value: "claude", label: "Claude Code", cmd: "claude", comingSoon: false },
-                            { value: "codex", label: "Codex", cmd: "codex", comingSoon: true },
+                            {
+                              value: "antigravity",
+                              label: "Antigravity CLI",
+                              cmd: "agy",
+                              comingSoon: false,
+                            },
+                            {
+                              value: "claude",
+                              label: "Claude Code",
+                              cmd: "claude",
+                              comingSoon: false,
+                            },
+                            {
+                              value: "codex",
+                              label: "Codex",
+                              cmd: "codex",
+                              comingSoon: true,
+                            },
                           ] as const
                         )
-                          .filter(({ cmd, comingSoon }) => !comingSoon && isAgentAvailable(cmd))
+                          .filter(
+                            ({ cmd, comingSoon }) =>
+                              !comingSoon && isAgentAvailable(cmd),
+                          )
                           .map(({ value, label }) => (
                             <button
                               key={value}
@@ -3561,7 +3743,9 @@ export default function HomePage() {
                                 setAgentDropdownOpen(false);
                               }}
                             >
-                              <span style={{ flex: 1, textAlign: "left" }}>{label}</span>
+                              <span style={{ flex: 1, textAlign: "left" }}>
+                                {label}
+                              </span>
                             </button>
                           ))}
                       </div>
@@ -3596,7 +3780,11 @@ export default function HomePage() {
                   id="send-btn"
                   suppressHydrationWarning
                 >
-                  {isNewSession && !prompt.trim() ? <IconCheck /> : <IconSend />}
+                  {isNewSession && !prompt.trim() ? (
+                    <IconCheck />
+                  ) : (
+                    <IconSend />
+                  )}
                 </button>
               </div>
             </div>
@@ -3710,11 +3898,15 @@ export default function HomePage() {
               >
                 {isScriptLog ? <IconPlay /> : <IconBolt />}
                 {isScriptLog ? "Script Execution Log" : "Agent Execution Log"}
-                {activeLogMsgId && execCards.get(activeLogMsgId)?.returnMsg === null && (
-                  <span className="console-badge-running" style={{ marginLeft: 8 }}>
-                    ⟳ Streaming...
-                  </span>
-                )}
+                {activeLogMsgId &&
+                  execCards.get(activeLogMsgId)?.returnMsg === null && (
+                    <span
+                      className="console-badge-running"
+                      style={{ marginLeft: 8 }}
+                    >
+                      ⟳ Streaming...
+                    </span>
+                  )}
               </span>
               <button
                 className="modal-close-btn"
@@ -3727,14 +3919,25 @@ export default function HomePage() {
                 <IconX />
               </button>
             </div>
-            <div className="modal-body" style={{ padding: 0, overflow: "hidden" }}>
+            <div
+              className="modal-body"
+              style={{ padding: 0, overflow: "hidden" }}
+            >
               {activeLogMsgId ? (
                 <Terminal
                   sessionId={selectedSessionId!}
                   messageId={activeLogMsgId}
                   ws={wsInstance}
-                  mode={execCards.get(activeLogMsgId)?.returnMsg === null ? "live" : "history"}
-                  historyLog={execCards.get(activeLogMsgId)?.returnMsg === null ? undefined : sessionLog}
+                  mode={
+                    execCards.get(activeLogMsgId)?.returnMsg === null
+                      ? "live"
+                      : "history"
+                  }
+                  historyLog={
+                    execCards.get(activeLogMsgId)?.returnMsg === null
+                      ? undefined
+                      : sessionLog
+                  }
                 />
               ) : null}
             </div>
@@ -4120,7 +4323,9 @@ export default function HomePage() {
               </button>
             </div>
             <div className="modal-body" style={{ padding: "20px 16px" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+              >
                 <label
                   htmlFor="rename-session-input"
                   style={{
@@ -4140,7 +4345,10 @@ export default function HomePage() {
                   autoFocus
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && renameInput.trim()) {
-                      handleRenameSession(renameModal.sessionId, renameInput.trim());
+                      handleRenameSession(
+                        renameModal.sessionId,
+                        renameInput.trim(),
+                      );
                     }
                   }}
                   style={{
@@ -4156,7 +4364,10 @@ export default function HomePage() {
                 />
               </div>
             </div>
-            <div className="modal-footer" style={{ justifyContent: "flex-end", gap: "8px" }}>
+            <div
+              className="modal-footer"
+              style={{ justifyContent: "flex-end", gap: "8px" }}
+            >
               <button
                 className="modal-btn-secondary"
                 onClick={() => setRenameModal(null)}
@@ -4165,7 +4376,9 @@ export default function HomePage() {
               </button>
               <button
                 className="modal-btn-primary"
-                onClick={() => handleRenameSession(renameModal.sessionId, renameInput.trim())}
+                onClick={() =>
+                  handleRenameSession(renameModal.sessionId, renameInput.trim())
+                }
                 disabled={!renameInput.trim()}
               >
                 Save
