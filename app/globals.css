@@ -636,6 +636,7 @@ body {
   gap: 8px;
   /* Full width on mobile, max-width on desktop */
   max-width: 100%;
+  flex-shrink: 0;
   animation: fadeInUp 0.25s ease;
 }
 @media (min-width: 768px) {
@@ -755,6 +756,7 @@ body {
   display: flex;
   gap: 8px;
   align-self: flex-start;
+  flex-shrink: 0;
   animation: fadeInUp 0.25s ease;
 }
 @media (min-width: 768px) {
@@ -1287,6 +1289,7 @@ body {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   overflow: hidden;
+  flex-shrink: 0;
   animation: fadeInUp 0.25s ease;
   margin: 2px 0;
 }
