@@ -49,10 +49,19 @@ interface TaskItem {
   type: "script" | "agent";
   name: string;
   sessionId: string;
+  sessionName: string;
   status: "running" | "done" | "error";
   createdAt: number;
   completedAt?: number;
   messageId?: string;
+}
+
+interface SessionGroup {
+  sessionId: string;
+  sessionName: string;
+  hasRunning: boolean;
+  latestTime: number;
+  tasks: TaskItem[];
 }
 
 function IconArrowLeft() {
@@ -242,6 +251,7 @@ export default function TasksPage() {
           type: t.type,
           name,
           sessionId: t.sessionId,
+          sessionName: session?.name || "",
           status,
           createdAt: session
             ? new Date(session.createdAt).getTime()
@@ -314,6 +324,7 @@ export default function TasksPage() {
                     type: "agent" as const,
                     name: `Agent: ${updated.prompt}`,
                     sessionId: updated.id,
+                    sessionName: updated.name || "",
                     status: "running" as const,
                     createdAt: new Date(
                       updated.updatedAt || updated.createdAt,
@@ -557,112 +568,178 @@ export default function TasksPage() {
               </p>
             </div>
           ) : (
-            <div className="tasks-list">
-              {taskQueue.map((task) => {
-                const hasLog = !!task.messageId;
-                const isRunning = task.status === "running";
-                const isMenuOpen = openMenuId === task.id;
-
-                let statusText: string;
-                if (isRunning) {
-                  const elapsedMs = taskTimeTicker - task.createdAt;
-                  statusText = `Running (${formatDuration(elapsedMs)})...`;
-                } else if (task.completedAt) {
-                  const ago = formatDuration(taskTimeTicker - task.completedAt);
-                  statusText = task.status === "done" ? `Completed ${ago} ago` : `Failed ${ago} ago`;
-                } else {
-                  statusText = task.status === "done" ? "Completed" : "Failed";
+            <div className="tasks-list" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              {(() => {
+                const groupMap = new Map<string, SessionGroup>();
+                for (const task of taskQueue) {
+                  let group = groupMap.get(task.sessionId);
+                  if (!group) {
+                    group = {
+                      sessionId: task.sessionId,
+                      sessionName: task.sessionName,
+                      hasRunning: false,
+                      latestTime: 0,
+                      tasks: [],
+                    };
+                    groupMap.set(task.sessionId, group);
+                  }
+                  group.tasks.push(task);
+                  if (task.status === "running") group.hasRunning = true;
+                  const t = task.completedAt || task.createdAt;
+                  if (t > group.latestTime) group.latestTime = t;
                 }
-
-                return (
-                  <div key={task.id} className="task-item-wrapper">
+                const groups = Array.from(groupMap.values());
+                groups.sort((a, b) => {
+                  if (a.hasRunning && !b.hasRunning) return -1;
+                  if (!a.hasRunning && b.hasRunning) return 1;
+                  return b.latestTime - a.latestTime;
+                });
+                return groups.map((group) => (
+                  <div key={group.sessionId}>
                     <div
-                      className={`tasks-list-item ${task.type} ${hasLog ? "clickable" : "pending"} ${!isRunning ? "completed" : ""}`}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        marginBottom: 8,
+                        padding: "0 4px",
+                      }}
                     >
-                      <div className="task-queue-item-icon">
-                        {task.type === "script" ? (
-                          <span className="task-icon-script">&#x2699;&#xFE0F;</span>
-                        ) : (
-                          <span className="task-icon-agent">&#x26A1;</span>
-                        )}
-                      </div>
-                      <div className="task-queue-item-info">
-                        <div className="task-queue-item-name-row">
-                          <span className="task-queue-item-name" title={task.name}>
-                            {task.name}
-                          </span>
-                          <span className={`task-type-tag ${task.type}`}>
-                            {task.type}
-                          </span>
-                          {!isRunning && (
-                            <span
-                              className={`task-type-tag ${task.status === "done" ? "done" : "error"}`}
+                      {group.hasRunning && <span className="task-spinner" />}
+                      <span
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "var(--text-secondary)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          flex: 1,
+                        }}
+                        title={group.sessionName}
+                      >
+                        {group.sessionName}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: "var(--text-muted)",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {group.tasks.length} {group.tasks.length === 1 ? "task" : "tasks"}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                      {group.tasks.map((task) => {
+                        const hasLog = !!task.messageId;
+                        const isRunning = task.status === "running";
+                        const isMenuOpen = openMenuId === task.id;
+
+                        let statusText: string;
+                        if (isRunning) {
+                          const elapsedMs = taskTimeTicker - task.createdAt;
+                          statusText = `Running (${formatDuration(elapsedMs)})...`;
+                        } else if (task.completedAt) {
+                          const ago = formatDuration(taskTimeTicker - task.completedAt);
+                          statusText = task.status === "done" ? `Completed ${ago} ago` : `Failed ${ago} ago`;
+                        } else {
+                          statusText = task.status === "done" ? "Completed" : "Failed";
+                        }
+
+                        return (
+                          <div key={task.id} className="task-item-wrapper">
+                            <div
+                              className={`tasks-list-item ${task.type} ${hasLog ? "clickable" : "pending"} ${!isRunning ? "completed" : ""}`}
                             >
-                              {task.status === "done" ? "done" : "error"}
-                            </span>
-                          )}
-                        </div>
-                        <div className="task-queue-item-status">
-                          {isRunning && <span className="task-spinner" />}
-                          {statusText}
-                        </div>
-                      </div>
-                      <div className="task-menu-container" ref={isMenuOpen ? menuRef : undefined}>
-                        <button
-                          className="task-menu-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenMenuId(isMenuOpen ? null : task.id);
-                          }}
-                          title="More actions"
-                        >
-                          <IconMoreVertical />
-                        </button>
-                        {isMenuOpen && (
-                          <div className="task-menu-dropdown">
-                            {hasLog && (
-                              <button
-                                className="task-menu-item"
-                                onClick={() => {
-                                  setOpenMenuId(null);
-                                  setTerminalTask(task);
-                                }}
-                              >
-                                <IconTerminal />
-                                <span>View Log</span>
-                              </button>
-                            )}
-                            {hasLog && (
-                              <button
-                                className="task-menu-item"
-                                onClick={() => {
-                                  setOpenMenuId(null);
-                                  window.location.href = `/session/${task.sessionId}`;
-                                }}
-                              >
-                                <IconExternalLink />
-                                <span>Go to Session</span>
-                              </button>
-                            )}
-                            {isRunning && hasLog && (
-                              <button
-                                className="task-menu-item danger"
-                                onClick={() => {
-                                  setOpenMenuId(null);
-                                  handleKillTask(task);
-                                }}
-                              >
-                                <IconStop />
-                                <span>Stop Task</span>
-                              </button>
-                            )}
+                              <div className="task-queue-item-icon">
+                                {task.type === "script" ? (
+                                  <span className="task-icon-script">&#x2699;&#xFE0F;</span>
+                                ) : (
+                                  <span className="task-icon-agent">&#x26A1;</span>
+                                )}
+                              </div>
+                              <div className="task-queue-item-info">
+                                <div className="task-queue-item-name-row">
+                                  <span className="task-queue-item-name" title={task.name}>
+                                    {task.name}
+                                  </span>
+                                  <span className={`task-type-tag ${task.type}`}>
+                                    {task.type}
+                                  </span>
+                                  {!isRunning && (
+                                    <span
+                                      className={`task-type-tag ${task.status === "done" ? "done" : "error"}`}
+                                    >
+                                      {task.status === "done" ? "done" : "error"}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="task-queue-item-status">
+                                  {isRunning && <span className="task-spinner" />}
+                                  {statusText}
+                                </div>
+                              </div>
+                              <div className="task-menu-container" ref={isMenuOpen ? menuRef : undefined}>
+                                <button
+                                  className="task-menu-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenMenuId(isMenuOpen ? null : task.id);
+                                  }}
+                                  title="More actions"
+                                >
+                                  <IconMoreVertical />
+                                </button>
+                                {isMenuOpen && (
+                                  <div className="task-menu-dropdown">
+                                    {hasLog && (
+                                      <button
+                                        className="task-menu-item"
+                                        onClick={() => {
+                                          setOpenMenuId(null);
+                                          setTerminalTask(task);
+                                        }}
+                                      >
+                                        <IconTerminal />
+                                        <span>View Log</span>
+                                      </button>
+                                    )}
+                                    {hasLog && (
+                                      <button
+                                        className="task-menu-item"
+                                        onClick={() => {
+                                          setOpenMenuId(null);
+                                          window.location.href = `/session/${task.sessionId}`;
+                                        }}
+                                      >
+                                        <IconExternalLink />
+                                        <span>Go to Session</span>
+                                      </button>
+                                    )}
+                                    {isRunning && hasLog && (
+                                      <button
+                                        className="task-menu-item danger"
+                                        onClick={() => {
+                                          setOpenMenuId(null);
+                                          handleKillTask(task);
+                                        }}
+                                      >
+                                        <IconStop />
+                                        <span>Stop Task</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        )}
-                      </div>
+                        );
+                      })}
                     </div>
                   </div>
-                );
-              })}
+                ));
+              })()}
             </div>
           )}
         </div>
