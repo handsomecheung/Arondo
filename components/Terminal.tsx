@@ -10,11 +10,10 @@ interface TerminalProps {
   messageId: string;
   ws: WebSocket | null;
   mode: "live" | "history";
-  historyLog?: string;
   taskType?: "agent" | "script";
 }
 
-export default function Terminal({ sessionId, messageId, ws, mode, historyLog, taskType }: TerminalProps) {
+export default function Terminal({ sessionId, messageId, ws, mode, taskType }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -65,21 +64,14 @@ export default function Terminal({ sessionId, messageId, ws, mode, historyLog, t
     fitRef.current = fit;
     attachedRef.current = false;
 
-    if (mode === "history" && historyLog) {
-      term.write(historyLog);
-    }
-
-    // In live mode, fetch existing log so output that arrived before modal opened is visible
-    if (mode === "live") {
-      fetch(`/api/sessions/${sessionId}/log?messageId=${messageId}`)
-        .then((r) => r.json())
-        .then((data: { log: string }) => {
-          if (termRef.current === term && data.log) {
-            term.write(data.log);
-          }
-        })
-        .catch(() => {});
-    }
+    fetch(`/api/sessions/${sessionId}/log?messageId=${messageId}`)
+      .then((r) => r.json())
+      .then((data: { log: string }) => {
+        if (termRef.current === term && data.log) {
+          term.write(data.log);
+        }
+      })
+      .catch(() => {});
 
     const resizeObserver = new ResizeObserver(() => {
       requestAnimationFrame(() => fit.fit());
@@ -92,7 +84,7 @@ export default function Terminal({ sessionId, messageId, ws, mode, historyLog, t
       termRef.current = null;
       fitRef.current = null;
     };
-  }, [messageId, mode, historyLog, sessionId, taskType]);
+  }, [messageId, mode, sessionId, taskType]);
 
   // Live mode: WebSocket listener for real-time output
   useEffect(() => {
