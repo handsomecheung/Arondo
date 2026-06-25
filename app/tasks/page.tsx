@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+
 
 const Terminal = dynamic(() => import("@/components/Terminal"), { ssr: false });
 
@@ -192,7 +192,6 @@ function formatDuration(ms: number): string {
 }
 
 export default function TasksPage() {
-  const router = useRouter();
   const [taskQueue, setTaskQueue] = useState<TaskItem[]>([]);
   const [taskTimeTicker, setTaskTimeTicker] = useState(Date.now());
   const [connected, setConnected] = useState(false);
@@ -241,10 +240,10 @@ export default function TasksPage() {
       setTaskQueue(initTasks);
 
       running.forEach((s) => {
-        if (s.status === "running") {
-          fetch(`/api/messages?sessionId=${s.id}`)
-            .then((r) => r.json())
-            .then((msgs: Message[]) => {
+        fetch(`/api/messages?sessionId=${s.id}`)
+          .then((r) => r.json())
+          .then((msgs: Message[]) => {
+            if (s.status === "running") {
               const lastRunMsg = [...msgs]
                 .reverse()
                 .find((m) => m.type === "agent-run");
@@ -257,9 +256,30 @@ export default function TasksPage() {
                   ),
                 );
               }
-            })
-            .catch(() => {});
-        }
+            }
+            if (s.runningScripts?.length) {
+              const returnIds = new Set(
+                msgs.filter((m) => m.type === "script-return" && m.parentId).map((m) => m.parentId),
+              );
+              const activeScriptMsgs = msgs.filter(
+                (m) => m.type === "script-run" && !returnIds.has(m.id),
+              );
+              setTaskQueue((prev) =>
+                prev.map((t) => {
+                  if (t.sessionId !== s.id || t.type !== "script" || t.messageId) return t;
+                  const scriptName = t.name.startsWith("Script: ")
+                    ? t.name.substring(8)
+                    : t.name;
+                  const match = activeScriptMsgs.find((m) => {
+                    const re = m.content.match(/Running script:\s*\*\*([^*]+)\*\*/i);
+                    return re && re[1].trim() === scriptName;
+                  });
+                  return match ? { ...t, messageId: match.id } : t;
+                }),
+              );
+            }
+          })
+          .catch(() => {});
       });
     } catch {
       // ignore
@@ -641,7 +661,7 @@ export default function TasksPage() {
                                 className="task-menu-item"
                                 onClick={() => {
                                   setOpenMenuId(null);
-                                  router.push(`/session/${task.sessionId}`);
+                                  window.location.href = `/session/${task.sessionId}`;
                                 }}
                               >
                                 <IconExternalLink />

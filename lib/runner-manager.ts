@@ -7,6 +7,7 @@ import {
   addMessage,
   getSession,
 } from "./store";
+import { getAgySessionId, detectAgyConvId, saveAgySessionId } from "./agents/antigravity";
 import fs from "fs/promises";
 import path from "path";
 
@@ -463,8 +464,32 @@ class RunnerManager {
     exitCode: number
   ): Promise<void> {
     const success = exitCode === 0;
+
+    const session = await getSession(ctx.sessionId);
+    if (session?.agentType === "antigravity") {
+      try {
+        const existingAgyId = await getAgySessionId(ctx.sessionId);
+        if (!existingAgyId) {
+          const convId = await detectAgyConvId();
+          if (convId) {
+            await saveAgySessionId(ctx.sessionId, convId);
+          }
+        }
+      } catch (err) {
+        console.error("[runner-manager] failed to detect agy conversation:", err);
+      }
+    }
+
+    const hasRunningScripts = (session?.runningScripts?.length ?? 0) > 0;
+    let nextStatus: string;
+    if (hasRunningScripts) {
+      nextStatus = "script-running";
+    } else {
+      nextStatus = success ? "done" : "error";
+    }
+
     const updated = await updateSession(ctx.sessionId, {
-      status: success ? "done" : "error",
+      status: nextStatus as any,
       errorMessage: success
         ? undefined
         : `Agent exited with code ${exitCode}`,
@@ -500,8 +525,15 @@ class RunnerManager {
     const currentRunning = session?.runningScripts || [];
     const nextRunning = currentRunning.filter((name) => name !== ctx.scriptName);
 
+    const hasAgentTask = Array.from(this.tasks.values()).some(
+      (t) => t.sessionId === ctx.sessionId && t.type === "agent",
+    );
+
     if (exitCode === 0) {
-      const nextStatus = nextRunning.length > 0 ? "script-running" : "done";
+      let nextStatus: string;
+      if (hasAgentTask) nextStatus = "running";
+      else if (nextRunning.length > 0) nextStatus = "script-running";
+      else nextStatus = "done";
       const updated = await updateSession(ctx.sessionId, {
         status: nextStatus as any,
         runningScripts: nextRunning,
@@ -517,7 +549,10 @@ class RunnerManager {
       eventBus.publish({ type: "session_updated", payload: updated });
     } else {
       const errorMessage = `Script exited with code ${exitCode}`;
-      const nextStatus = nextRunning.length > 0 ? "script-running" : "error";
+      let nextStatus: string;
+      if (hasAgentTask) nextStatus = "running";
+      else if (nextRunning.length > 0) nextStatus = "script-running";
+      else nextStatus = "error";
       const updated = await updateSession(ctx.sessionId, {
         status: nextStatus as any,
         runningScripts: nextRunning,

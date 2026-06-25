@@ -1,4 +1,3 @@
-import { spawn } from "child_process";
 import fs from "fs/promises";
 import fsSync from "fs";
 import path from "path";
@@ -10,18 +9,9 @@ const DATA_DIR = process.env.DATA_DIR
   : path.join(process.cwd(), "data");
 const AGY_SESSION_MAP_FILE = path.join(DATA_DIR, "agy-sessions.json");
 
-// Helper to load session mapping asynchronously
-async function getAgySessionId(sessionId: string): Promise<string | undefined> {
-  try {
-    const raw = await fs.readFile(AGY_SESSION_MAP_FILE, "utf-8");
-    const map = JSON.parse(raw);
-    return map[sessionId];
-  } catch {
-    return undefined;
-  }
-}
+const AGY_LOG_DIR = path.join(os.homedir(), ".gemini", "antigravity-cli", "log");
+const CONV_ID_RE = /Created conversation ([0-9a-f-]{36})/;
 
-// Helper to load session mapping synchronously
 function getAgySessionIdSync(sessionId: string): string | undefined {
   try {
     const raw = fsSync.readFileSync(AGY_SESSION_MAP_FILE, "utf-8");
@@ -32,8 +22,17 @@ function getAgySessionIdSync(sessionId: string): string | undefined {
   }
 }
 
-// Helper to save session mapping
-async function saveAgySessionId(sessionId: string, agyId: string): Promise<void> {
+export async function getAgySessionId(sessionId: string): Promise<string | undefined> {
+  try {
+    const raw = await fs.readFile(AGY_SESSION_MAP_FILE, "utf-8");
+    const map = JSON.parse(raw);
+    return map[sessionId];
+  } catch {
+    return undefined;
+  }
+}
+
+export async function saveAgySessionId(sessionId: string, agyId: string): Promise<void> {
   try {
     await fs.mkdir(path.dirname(AGY_SESSION_MAP_FILE), { recursive: true });
     let map: Record<string, string> = {};
@@ -45,6 +44,21 @@ async function saveAgySessionId(sessionId: string, agyId: string): Promise<void>
     await fs.writeFile(AGY_SESSION_MAP_FILE, JSON.stringify(map, null, 2), "utf-8");
   } catch (err) {
     console.error("Failed to save agy session mapping:", err);
+  }
+}
+
+export async function detectAgyConvId(): Promise<string | undefined> {
+  try {
+    const files = await fs.readdir(AGY_LOG_DIR);
+    const logFiles = files.filter(f => f.startsWith("cli-") && f.endsWith(".log")).sort();
+    if (logFiles.length === 0) return undefined;
+
+    const latest = path.join(AGY_LOG_DIR, logFiles[logFiles.length - 1]);
+    const content = await fs.readFile(latest, "utf-8");
+    const match = content.match(CONV_ID_RE);
+    return match?.[1];
+  } catch {
+    return undefined;
   }
 }
 
@@ -67,43 +81,12 @@ export class AntigravityAgent extends BaseAgent {
   }
 
   async run({ prompt, repoPath, onOutput, sessionId, isResume }: AgentRunOptions): Promise<AgentResult> {
-    const fullPrompt = this.getSystemPrompt(prompt);
-    
-    // 1. Resolve agy session ID
-    let agyId: string | undefined = undefined;
-    if (sessionId) {
-      agyId = await getAgySessionId(sessionId);
-    }
+    const { spawn } = await import("child_process");
+    const command = this.getCommand({ prompt, repoPath, sessionId, isResume });
+    const hasAgyId = sessionId ? !!getAgySessionIdSync(sessionId) : false;
 
-    // 2. Prepare brain directories baseline if starting a new conversation
-    const brainDir = path.join(os.homedir(), ".gemini", "antigravity-cli", "brain");
-    const existingBrainDirs = new Set<string>();
-    if (!agyId) {
-      try {
-        const entries = await fs.readdir(brainDir, { withFileTypes: true });
-        for (const entry of entries) {
-          if (entry.isDirectory()) {
-            existingBrainDirs.add(entry.name);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to read brain directory baseline:", err);
-      }
-    }
-
-    // 3. Prepare args
-    const args: string[] = [];
-    if (agyId) {
-      args.push("--conversation", agyId);
-    }
-    args.push(
-      "--prompt", fullPrompt,
-      "--dangerously-skip-permissions"
-    );
-
-    // 4. Run process
     return new Promise((resolve) => {
-      const proc = spawn("agy", args, {
+      const proc = spawn("bash", ["-c", command], {
         cwd: repoPath,
         env: { ...process.env },
         stdio: ["ignore", "pipe", "pipe"],
@@ -117,10 +100,7 @@ export class AntigravityAgent extends BaseAgent {
         output += text;
         for (const line of text.split("\n")) {
           const trimmed = line.trim();
-          if (trimmed) {
-            if (trimmed.startsWith("Warning: conversation")) {
-              continue;
-            }
+          if (trimmed && !trimmed.startsWith("Warning: conversation")) {
             onOutput?.(line);
           }
         }
@@ -131,10 +111,7 @@ export class AntigravityAgent extends BaseAgent {
         errorOutput += text;
         for (const line of text.split("\n")) {
           const trimmed = line.trim();
-          if (trimmed) {
-            if (trimmed.startsWith("Warning: conversation")) {
-              continue;
-            }
+          if (trimmed && !trimmed.startsWith("Warning: conversation")) {
             onOutput?.(`[stderr] ${line}`);
           }
         }
@@ -143,19 +120,10 @@ export class AntigravityAgent extends BaseAgent {
       proc.on("close", async (code) => {
         const success = code === 0;
 
-        // 5. If we started a new conversation, detect the newly created brain directory
-        if (!agyId && sessionId) {
-          try {
-            const currentEntries = await fs.readdir(brainDir, { withFileTypes: true });
-            for (const entry of currentEntries) {
-              if (entry.isDirectory() && !existingBrainDirs.has(entry.name)) {
-                agyId = entry.name;
-                await saveAgySessionId(sessionId, agyId);
-                break;
-              }
-            }
-          } catch (err) {
-            console.error("Failed to detect new brain directory:", err);
+        if (!hasAgyId && sessionId) {
+          const convId = await detectAgyConvId();
+          if (convId) {
+            await saveAgySessionId(sessionId, convId);
           }
         }
 
@@ -163,7 +131,7 @@ export class AntigravityAgent extends BaseAgent {
           success,
           output,
           error: success ? undefined : errorOutput || `Process exited with code ${code}`,
-          command: this.getCommand({ prompt, repoPath, sessionId, isResume }),
+          command,
         });
       });
 
@@ -172,7 +140,7 @@ export class AntigravityAgent extends BaseAgent {
           success: false,
           output,
           error: err.message,
-          command: this.getCommand({ prompt, repoPath, sessionId, isResume }),
+          command,
         });
       });
     });

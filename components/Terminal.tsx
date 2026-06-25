@@ -55,7 +55,10 @@ export default function Terminal({ sessionId, messageId, ws, mode, historyLog }:
     term.loadAddon(fit);
     term.open(containerRef.current);
 
-    requestAnimationFrame(() => fit.fit());
+    requestAnimationFrame(() => {
+      fit.fit();
+      if (mode === "live") term.focus();
+    });
 
     termRef.current = term;
     fitRef.current = fit;
