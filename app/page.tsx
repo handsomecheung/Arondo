@@ -616,9 +616,6 @@ export default function HomePage() {
 
   // Task Queue states
   const [taskQueue, setTaskQueue] = useState<TaskItem[]>([]);
-  const [taskQueueOpen, setTaskQueueOpen] = useState(false);
-  const [taskTimeTicker, setTaskTimeTicker] = useState(Date.now());
-  const taskQueueRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Project states
@@ -816,22 +813,6 @@ export default function HomePage() {
     return runnerAgents.includes(agentCmd);
   };
 
-  // Close task queue dropdown on click outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        taskQueueRef.current &&
-        !taskQueueRef.current.contains(event.target as Node)
-      ) {
-        setTaskQueueOpen(false);
-      }
-    };
-    document.addEventListener("click", handleClickOutside);
-    return () => {
-      document.removeEventListener("click", handleClickOutside);
-    };
-  }, []);
-
   // Close session menu on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -866,22 +847,6 @@ export default function HomePage() {
       document.removeEventListener("click", handleClickOutside);
     };
   }, []);
-
-  // Auto-close task queue if it becomes empty
-  useEffect(() => {
-    if (taskQueue.length === 0) {
-      setTaskQueueOpen(false);
-    }
-  }, [taskQueue.length]);
-
-  // Update task queue elapsed times dynamically
-  useEffect(() => {
-    if (!taskQueueOpen || taskQueue.length === 0) return;
-    const interval = setInterval(() => {
-      setTaskTimeTicker(Date.now());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [taskQueueOpen, taskQueue.length]);
 
   // Build execution card info: pair run messages with their return messages.
   // Return messages carry a parentId pointing to their run message. For legacy
@@ -2111,15 +2076,10 @@ export default function HomePage() {
             position: "relative",
           }}
         >
-          <div className="task-queue-wrapper" ref={taskQueueRef}>
-            <button
-              className={`task-queue-btn ${taskQueue.length === 0 ? "disabled" : ""} ${taskQueueOpen ? "active" : ""}`}
-              onClick={() => {
-                if (taskQueue.length > 0) {
-                  setTaskQueueOpen(!taskQueueOpen);
-                }
-              }}
-              disabled={taskQueue.length === 0}
+          <div className="task-queue-wrapper">
+            <Link
+              href="/tasks"
+              className={`task-queue-btn ${taskQueue.length === 0 ? "disabled" : ""}`}
               title="Task Queue"
               aria-label="View running tasks"
             >
@@ -2127,97 +2087,7 @@ export default function HomePage() {
               {taskQueue.length > 0 && (
                 <span className="task-queue-badge">{taskQueue.length}</span>
               )}
-            </button>
-
-            {taskQueueOpen && taskQueue.length > 0 && (
-              <div className="task-queue-dropdown">
-                <div className="task-queue-dropdown-header">
-                  <span>Running Tasks</span>
-                  <span className="task-count">{taskQueue.length} active</span>
-                </div>
-                <div className="task-queue-dropdown-list">
-                  {taskQueue.map((task) => {
-                    const hasLog = !!task.messageId;
-                    const handleTaskClick = () => {
-                      if (hasLog && task.messageId) {
-                        setSelectedSessionId(task.sessionId);
-                        setSelectedProjectId(null);
-                        setActiveLogMsgId(task.messageId);
-                        setLogModalOpen(true);
-                        setTaskQueueOpen(false);
-                      }
-                    };
-
-                    const handleKillTask = async (e: React.MouseEvent) => {
-                      e.stopPropagation();
-                      if (!task.messageId) return;
-                      try {
-                        await fetch("/api/tasks/kill", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            sessionId: task.sessionId,
-                            messageId: task.messageId,
-                          }),
-                        });
-                      } catch (err) {
-                        console.error("Failed to kill task:", err);
-                      }
-                    };
-
-                    const elapsedMs = taskTimeTicker - task.createdAt;
-                    const durationStr = formatDuration(elapsedMs);
-
-                    return (
-                      <div
-                        key={task.id}
-                        className={`task-queue-item ${task.type} ${hasLog ? "clickable" : "pending"}`}
-                        onClick={handleTaskClick}
-                        title={
-                          hasLog
-                            ? "Click to view execution log"
-                            : "Initializing log..."
-                        }
-                      >
-                        <div className="task-queue-item-icon">
-                          {task.type === "script" ? (
-                            <span className="task-icon-script">⚙️</span>
-                          ) : (
-                            <span className="task-icon-agent">⚡</span>
-                          )}
-                        </div>
-                        <div className="task-queue-item-info">
-                          <div className="task-queue-item-name-row">
-                            <span
-                              className="task-queue-item-name"
-                              title={task.name}
-                            >
-                              {task.name}
-                            </span>
-                            <span className={`task-type-tag ${task.type}`}>
-                              {task.type}
-                            </span>
-                          </div>
-                          <div className="task-queue-item-status">
-                            <span className="task-spinner" />
-                            Running ({durationStr})...
-                          </div>
-                        </div>
-                        {hasLog && (
-                          <button
-                            className="task-kill-btn"
-                            onClick={handleKillTask}
-                            title="Kill task"
-                          >
-                            <IconX />
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            </Link>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>

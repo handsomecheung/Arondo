@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { eventBus, SseEvent } from "./event-bus";
 import { runnerManager } from "./runner-manager";
+import { ptyManager } from "./pty-manager";
 
 const EVENT_TYPE_MAP: Record<string, string> = {
   session_updated: "session:updated",
@@ -47,6 +48,7 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
 
   wss.on("connection", (ws) => {
     clients.add(ws);
+    const shellIds = new Set<string>();
     ws.send(JSON.stringify({ type: "connected" }));
 
     ws.on("message", (raw) => {
@@ -92,14 +94,57 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
           break;
         }
         case "terminal:attach": {
-          // Buffer replay is not available via runner in this version.
-          // The terminal will receive live output from the stream.
+          break;
+        }
+
+        case "shell:spawn": {
+          const shellId = `shell-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          const cwd = msg.cwd || process.cwd();
+          const shell = process.env.SHELL || "/bin/bash";
+          ptyManager.create(shellId, {
+            command: shell,
+            cwd,
+            cols: msg.cols || 120,
+            rows: msg.rows || 30,
+            onData: (data) => {
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "shell:output", shellId, data }));
+              }
+            },
+            onExit: (code) => {
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "shell:exit", shellId, code }));
+              }
+              shellIds.delete(shellId);
+            },
+          });
+          shellIds.add(shellId);
+          ws.send(JSON.stringify({ type: "shell:spawned", shellId }));
+          break;
+        }
+        case "shell:input": {
+          if (msg.shellId) ptyManager.write(msg.shellId, msg.data);
+          break;
+        }
+        case "shell:resize": {
+          if (msg.shellId) ptyManager.resize(msg.shellId, msg.cols, msg.rows);
+          break;
+        }
+        case "shell:kill": {
+          if (msg.shellId) {
+            ptyManager.destroy(msg.shellId);
+            shellIds.delete(msg.shellId);
+          }
           break;
         }
       }
     });
 
     ws.on("close", () => {
+      for (const id of shellIds) {
+        ptyManager.destroy(id);
+      }
+      shellIds.clear();
       clients.delete(ws);
     });
   });

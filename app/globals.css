@@ -1844,21 +1844,17 @@ body {
   justify-content: center;
   position: relative;
   transition: all 0.2s ease;
+  text-decoration: none;
 }
 
-.task-queue-btn:hover:not(:disabled) {
+.task-queue-btn:hover {
   background: var(--bg-elevated);
   color: var(--text-primary);
 }
 
-.task-queue-btn.active {
-  background: var(--bg-elevated);
-  color: var(--accent);
-}
-
-.task-queue-btn:disabled {
+.task-queue-btn.disabled {
   color: var(--text-muted);
-  cursor: not-allowed;
+  pointer-events: none;
   opacity: 0.5;
 }
 
@@ -1880,55 +1876,6 @@ body {
   box-shadow: 0 0 6px var(--accent);
 }
 
-.task-queue-dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  width: 260px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-card);
-  z-index: 100;
-  overflow: hidden;
-  animation: taskQueueSlideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  backdrop-filter: blur(8px);
-}
-
-@keyframes taskQueueSlideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.task-queue-dropdown-header {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.task-queue-dropdown-header .task-count {
-  font-size: 11px;
-  color: var(--accent);
-  font-weight: 500;
-}
-
-.task-queue-dropdown-list {
-  max-height: 240px;
-  overflow-y: auto;
-  padding: 6px 0;
-}
 
 .task-queue-item {
   display: flex;
@@ -2096,6 +2043,154 @@ body {
 .task-queue-item.script.clickable:hover {
   background: rgba(34, 211, 165, 0.05);
 }
+
+/* ─── Tasks Page ────────────────────────────────────────────────────────────── */
+
+.tasks-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tasks-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.15s ease;
+}
+
+.tasks-list-item.clickable {
+  cursor: pointer;
+}
+
+.tasks-list-item.pending {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.tasks-list-item.clickable:hover {
+  border-color: var(--border-accent);
+  box-shadow: var(--shadow-card);
+}
+
+.tasks-list-item.agent.clickable:hover {
+  border-color: var(--border-accent);
+  background: rgba(99, 102, 241, 0.03);
+}
+
+.tasks-list-item.script.clickable:hover {
+  border-color: rgba(34, 211, 165, 0.3);
+  background: rgba(34, 211, 165, 0.03);
+}
+
+.tasks-list-item .task-kill-btn {
+  opacity: 0;
+}
+
+.tasks-list-item:hover .task-kill-btn {
+  opacity: 1;
+}
+
+/* ─── Task Three-dot Menu ──────────────────────────────────────────────────── */
+
+.task-item-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.task-menu-container {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.task-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.tasks-list-item:hover .task-menu-btn,
+.task-menu-btn[aria-expanded="true"] {
+  opacity: 1;
+}
+
+.task-menu-container:has(.task-menu-dropdown) .task-menu-btn {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.task-menu-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.task-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 50;
+  min-width: 160px;
+  padding: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.task-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+  text-align: left;
+}
+
+.task-menu-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.task-menu-item.danger:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
+/* ─── Task Log Panel ───────────────────────────────────────────────────────── */
+
 
 .delete-project-btn {
   display: flex;
