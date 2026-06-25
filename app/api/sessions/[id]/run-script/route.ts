@@ -27,12 +27,6 @@ export async function POST(
   }
 
   const runningScripts = session.runningScripts || [];
-  if (runningScripts.includes(scriptName)) {
-    return NextResponse.json(
-      { error: `Script "${scriptName}" is already running` },
-      { status: 400 }
-    );
-  }
 
   const scripts = await getProjectScripts(session.projectId);
   const script = scripts.find((s) => s.name === scriptName);
@@ -85,7 +79,10 @@ export async function POST(
     })
     .catch(async (err) => {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      const nextRunning = runningScripts.filter((n) => n !== scriptName);
+      const removeIdx = runningScripts.indexOf(scriptName);
+      const nextRunning = removeIdx >= 0
+        ? [...runningScripts.slice(0, removeIdx), ...runningScripts.slice(removeIdx + 1)]
+        : [...runningScripts];
       const nextStatus = nextRunning.length > 0 ? "script-running" : "error";
       const updated = await updateSession(id, {
         status: nextStatus as any,

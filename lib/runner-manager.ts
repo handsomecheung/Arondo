@@ -574,7 +574,10 @@ class RunnerManager {
 
     const session = await getSession(ctx.sessionId);
     const currentRunning = session?.runningScripts || [];
-    const nextRunning = currentRunning.filter((name) => name !== ctx.scriptName);
+    const removeIndex = currentRunning.indexOf(ctx.scriptName!);
+    const nextRunning = removeIndex >= 0
+      ? [...currentRunning.slice(0, removeIndex), ...currentRunning.slice(removeIndex + 1)]
+      : [...currentRunning];
 
     const hasAgentTask = Array.from(this.tasks.values()).some(
       (t) => t.sessionId === ctx.sessionId && t.type === "agent" && !t.completedAt,

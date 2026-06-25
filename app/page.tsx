@@ -1078,9 +1078,9 @@ export default function HomePage() {
               });
             }
             if (s.status === "script-running" && s.runningScripts) {
-              s.runningScripts.forEach((scriptName) => {
+              s.runningScripts.forEach((scriptName, idx) => {
                 initTasks.push({
-                  id: `task-${s.id}-init-script-${scriptName}`,
+                  id: `task-${s.id}-init-script-${scriptName}-${idx}`,
                   type: "script",
                   name: `Script: ${scriptName}`,
                   sessionId: s.id,
@@ -3270,17 +3270,9 @@ export default function HomePage() {
                                   key={s.name}
                                   className="menu-item"
                                   onClick={() => handleRunScript(s.name)}
-                                  disabled={selectedSession?.runningScripts?.includes(
-                                    s.name,
-                                  )}
+                                  disabled={false}
                                   id={`menu-run-script-${s.name.replace(/\s+/g, "-")}`}
-                                  title={
-                                    selectedSession?.runningScripts?.includes(
-                                      s.name,
-                                    )
-                                      ? "Script is already running"
-                                      : s.command
-                                  }
+                                  title={s.command}
                                 >
                                   {s.name}
                                 </button>
