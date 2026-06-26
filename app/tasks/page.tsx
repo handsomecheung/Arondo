@@ -44,6 +44,7 @@ interface ServerTask {
   createdAt: number;
   completedAt?: number;
   exitCode?: number;
+  stoppedByUser?: boolean;
 }
 
 interface TaskItem {
@@ -52,7 +53,7 @@ interface TaskItem {
   name: string;
   sessionId: string;
   sessionName: string;
-  status: "running" | "done" | "error";
+  status: "running" | "done" | "error" | "stopped";
   createdAt: number;
   completedAt?: number;
   messageId?: string;
@@ -232,7 +233,7 @@ export default function TasksPage() {
         }
         let status: TaskItem["status"];
         if (t.completedAt) {
-          status = t.exitCode === 0 ? "done" : "error";
+          status = t.stoppedByUser ? "stopped" : t.exitCode === 0 ? "done" : "error";
         } else {
           status = "running";
         }
@@ -366,6 +367,17 @@ export default function TasksPage() {
                   }
                   return prev;
                 });
+              } else if (msg.type === "agent-return" || msg.type === "script-return") {
+                const isStopped = msg.content.startsWith("🛑");
+                if (isStopped && msg.parentId) {
+                  const now = Date.now();
+                  setTaskQueue((prev) =>
+                    prev.map((t) => {
+                      if (t.messageId !== msg.parentId || t.sessionId !== msg.sessionId) return t;
+                      return { ...t, status: "stopped" as const, completedAt: now };
+                    }),
+                  );
+                }
               } else if (msg.type === "script-run") {
                 setTaskQueue((prev) => {
                   let idx = -1;
@@ -675,9 +687,17 @@ export default function TasksPage() {
                           statusText = `Running (${formatDuration(elapsedMs)})...`;
                         } else if (task.completedAt) {
                           const ago = formatDuration(taskTimeTicker - task.completedAt);
-                          statusText = task.status === "done" ? `Completed ${ago} ago` : `Failed ${ago} ago`;
+                          statusText = task.status === "stopped"
+                            ? `Stopped by user ${ago} ago`
+                            : task.status === "done"
+                              ? `Completed ${ago} ago`
+                              : `Failed ${ago} ago`;
                         } else {
-                          statusText = task.status === "done" ? "Completed" : "Failed";
+                          statusText = task.status === "stopped"
+                            ? "Stopped by user"
+                            : task.status === "done"
+                              ? "Completed"
+                              : "Failed";
                         }
 
                         return (

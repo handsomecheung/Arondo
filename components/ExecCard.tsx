@@ -6,7 +6,7 @@ export interface ExecCardItem {
   id: string;
   type: "agent" | "script";
   title: string;
-  status: "running" | "done" | "error";
+  status: "running" | "done" | "error" | "stopped";
   statusText: string;
   command?: string;
   messageId?: string;
@@ -96,7 +96,11 @@ export default function ExecCard({ item, onViewLog, onShowCommand, onStopTask, o
   const hasLog = !!item.messageId;
 
   let statusClass = "exec-card-running";
-  if (!isRunning) statusClass = item.status === "done" ? "exec-card-success" : "exec-card-error";
+  if (!isRunning) {
+    if (item.status === "done") statusClass = "exec-card-success";
+    else if (item.status === "stopped") statusClass = "exec-card-stopped";
+    else statusClass = "exec-card-error";
+  }
 
   const hasMenuItems =
     (!!item.command && onShowCommand) ||
@@ -114,6 +118,10 @@ export default function ExecCard({ item, onViewLog, onShowCommand, onStopTask, o
           ) : item.status === "done" ? (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12" />
+            </svg>
+          ) : item.status === "stopped" ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
             </svg>
           ) : (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

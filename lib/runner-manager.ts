@@ -48,6 +48,7 @@ export interface TaskContext {
   createdAt: number;
   completedAt?: number;
   exitCode?: number;
+  stoppedByUser?: boolean;
 }
 
 interface PendingRequest {
@@ -324,6 +325,19 @@ class RunnerManager {
     if (!runnerId) return false;
 
     try {
+      ctx.stoppedByUser = true;
+
+      const separator = "\r\n\x1b[90m─── stopped by user ───\x1b[0m\r\n";
+      await appendSessionLog(ctx.sessionId, ctx.messageId, separator, true);
+      eventBus.publish({
+        type: "terminal_output",
+        payload: {
+          sessionId: ctx.sessionId,
+          messageId: ctx.messageId,
+          data: separator,
+        },
+      });
+
       await this.sendRequest(runnerId, "exec.cancel", {
         taskId,
         signal: "SIGTERM",
@@ -566,14 +580,22 @@ class RunnerManager {
       nextStatus = success ? "done" : "error";
     }
 
+    const stoppedByUser = !!ctx.stoppedByUser;
+
     const updated = await updateSession(ctx.sessionId, {
       status: nextStatus as any,
       errorMessage: success
         ? undefined
-        : `Agent exited with code ${exitCode}`,
+        : stoppedByUser
+          ? "Stopped by user"
+          : `Agent exited with code ${exitCode}`,
     });
 
-    const content = success ? "✅ Done!" : `❌ Error: Agent exited with code ${exitCode}`;
+    const content = success
+      ? "✅ Done!"
+      : stoppedByUser
+        ? "🛑 Stopped by user"
+        : `❌ Error: Agent exited with code ${exitCode}`;
     const agentMsg = await addMessage({
       sessionId: ctx.sessionId,
       role: success ? "agent" : "system",
@@ -629,20 +651,23 @@ class RunnerManager {
       eventBus.publish({ type: "message_added", payload: doneMsg });
       eventBus.publish({ type: "session_updated", payload: updated });
     } else {
-      const errorMessage = `Script exited with code ${exitCode}`;
+      const stoppedByUser = !!ctx.stoppedByUser;
+      const errorMessage = stoppedByUser
+        ? "Stopped by user"
+        : `Script exited with code ${exitCode}`;
       let nextStatus: string;
       if (hasAgentTask) nextStatus = "running";
       else if (nextRunning.length > 0) nextStatus = "script-running";
-      else nextStatus = "error";
+      else nextStatus = stoppedByUser ? "done" : "error";
       const updated = await updateSession(ctx.sessionId, {
         status: nextStatus as any,
         runningScripts: nextRunning,
-        errorMessage,
+        errorMessage: stoppedByUser ? undefined : errorMessage,
       });
       const errMsg = await addMessage({
         sessionId: ctx.sessionId,
         role: "system",
-        content: `❌ Error: ${errorMessage}`,
+        content: stoppedByUser ? "🛑 Stopped by user" : `❌ Error: ${errorMessage}`,
         type: "script-return",
         parentId: ctx.messageId,
       });

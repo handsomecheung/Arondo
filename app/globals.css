@@ -1255,6 +1255,9 @@ body {
 .exec-card-error {
   border-color: rgba(244, 63, 94, 0.25);
 }
+.exec-card-stopped {
+  border-color: rgba(156, 163, 175, 0.3);
+}
 
 .exec-card-header {
   display: flex;
@@ -1284,6 +1287,10 @@ body {
 .exec-card-error .exec-card-icon {
   background: var(--error-bg);
   color: var(--error);
+}
+.exec-card-stopped .exec-card-icon {
+  background: rgba(156, 163, 175, 0.15);
+  color: var(--text-secondary);
 }
 
 .exec-card-spinner {
@@ -1331,6 +1338,9 @@ body {
 }
 .exec-card-error .exec-card-status {
   color: var(--error);
+}
+.exec-card-stopped .exec-card-status {
+  color: var(--text-secondary);
 }
 
 .exec-card-actions {

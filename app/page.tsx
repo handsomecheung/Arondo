@@ -486,11 +486,14 @@ function parseExecCommand(content: string): { label: string; command: string } {
 function execCardInfoToItem(info: ExecCardInfo): ExecCardItem {
   const isDone = info.returnMsg !== null;
   const isSuccess = isDone && info.returnMsg!.content.startsWith("✅");
+  const isStopped = isDone && info.returnMsg!.content.startsWith("🛑");
   let statusText: string;
   if (!isDone) {
     statusText = "Running...";
   } else if (isSuccess) {
     statusText = "Completed";
+  } else if (isStopped) {
+    statusText = "Stopped by user";
   } else {
     statusText = info.returnMsg!.content.replace(/^❌\s*/, "").replace(/^Error:\s*/, "");
   }
@@ -498,7 +501,7 @@ function execCardInfoToItem(info: ExecCardInfo): ExecCardItem {
     id: info.runMsg.id,
     type: info.isScript ? "script" : "agent",
     title: info.commandLabel,
-    status: !isDone ? "running" : isSuccess ? "done" : "error",
+    status: !isDone ? "running" : isStopped ? "stopped" : isSuccess ? "done" : "error",
     statusText,
     command: info.command || undefined,
     messageId: info.runMsg.id,
