@@ -685,11 +685,6 @@ body {
   }
 }
 
-.message.user .message-avatar {
-  background: var(--accent-glow);
-  border: 1px solid var(--border-accent);
-  color: var(--accent);
-}
 .message.agent .message-avatar {
   background: var(--success-bg);
   border: 1px solid rgba(34, 211, 165, 0.2);

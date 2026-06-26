@@ -3417,13 +3417,11 @@ export default function HomePage() {
 
                 return (
                   <div key={msg.id} className={`message ${msg.role}`}>
-                    <div className="message-avatar">
-                      {msg.role === "user"
-                        ? "U"
-                        : msg.role === "agent"
-                          ? "AI"
-                          : "⚙"}
-                    </div>
+                    {msg.role !== "user" && (
+                      <div className="message-avatar">
+                        {msg.role === "agent" ? "AI" : "⚙"}
+                      </div>
+                    )}
                     <div>
                       <div className="message-bubble">
                         {renderMessageContent(msg.content)}
