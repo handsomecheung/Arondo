@@ -45,6 +45,7 @@ export interface TaskContext {
   type: "agent" | "script";
   scriptName?: string;
   pid?: number;
+  createdAt: number;
   completedAt?: number;
   exitCode?: number;
 }

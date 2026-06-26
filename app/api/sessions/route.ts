@@ -94,6 +94,7 @@ export async function POST(req: NextRequest) {
     sessionId: session.id,
     messageId: systemMsg.id,
     type: "agent",
+    createdAt: Date.now(),
   });
 
   await clearSessionLog(session.id, systemMsg.id);

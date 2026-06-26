@@ -76,6 +76,7 @@ export async function POST(
       sessionId: id,
       messageId: systemMsg.id,
       type: "agent",
+      createdAt: Date.now(),
     });
 
     await clearSessionLog(id, systemMsg.id);

@@ -41,6 +41,7 @@ interface ServerTask {
   type: "agent" | "script";
   scriptName?: string;
   pid?: number;
+  createdAt: number;
   completedAt?: number;
   exitCode?: number;
 }
@@ -245,9 +246,7 @@ export default function TasksPage() {
           sessionId: t.sessionId,
           sessionName: session?.name || "",
           status,
-          createdAt: session
-            ? new Date(session.createdAt).getTime()
-            : Date.now(),
+          createdAt: t.createdAt || (session ? new Date(session.createdAt).getTime() : Date.now()),
           completedAt: t.completedAt,
           messageId: t.messageId,
           command,

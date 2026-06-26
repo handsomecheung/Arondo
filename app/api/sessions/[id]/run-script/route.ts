@@ -62,6 +62,7 @@ export async function POST(
     messageId: systemMsg.id,
     type: "script",
     scriptName,
+    createdAt: Date.now(),
   });
 
   await clearSessionLog(id, systemMsg.id);
