@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { runnerManager } from "@/lib/runner-manager";
 
 export async function GET() {
-  const runners = runnerManager.getRunners();
+  const runners = await runnerManager.getAllKnownRunners();
   return NextResponse.json(runners);
 }
 

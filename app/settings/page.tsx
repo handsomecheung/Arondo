@@ -14,6 +14,7 @@ interface Runner {
   version?: string;
   capabilities?: string[];
   agents?: string[];
+  lastSeenAt?: number;
 }
 
 interface Project {
@@ -87,6 +88,19 @@ function IconInbox() {
   );
 }
 
+function formatLastSeen(ts: number): string {
+  const diff = Date.now() - ts;
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(ts).toLocaleDateString();
+}
+
 export default function SettingsPage() {
   const [runners, setRunners] = useState<Runner[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -114,6 +128,11 @@ export default function SettingsPage() {
     const poll = setInterval(loadRunners, 10_000);
     return () => clearInterval(poll);
   }, [loadRunners]);
+
+  const sortedRunners = [...runners].sort((a, b) => {
+    if (a.connected !== b.connected) return a.connected ? -1 : 1;
+    return (b.lastSeenAt ?? 0) - (a.lastSeenAt ?? 0);
+  });
 
   const selectedRunner = runners.find((r) => r.id === selectedRunnerId) ?? null;
   const runnerProjects = selectedRunner
@@ -208,7 +227,7 @@ export default function SettingsPage() {
               Nodes
             </h2>
 
-            {runners.length === 0 ? (
+            {sortedRunners.length === 0 ? (
               <div
                 style={{
                   display: "flex",
@@ -225,7 +244,7 @@ export default function SettingsPage() {
                 }}
               >
                 <IconInbox />
-                <p>No runners connected.</p>
+                <p>No runners found.</p>
               </div>
             ) : (
               <div
@@ -235,7 +254,7 @@ export default function SettingsPage() {
                   gap: 8,
                 }}
               >
-                {runners.map((r) => {
+                {sortedRunners.map((r) => {
                   const agentDefs = [
                     { label: "Antigravity CLI", cmd: "agy", comingSoon: false },
                     { label: "Claude Code", cmd: "claude", comingSoon: false },
@@ -264,6 +283,7 @@ export default function SettingsPage() {
                         borderRadius: "var(--radius-md)",
                         cursor: "pointer",
                         transition: "all 0.2s ease",
+                        opacity: r.connected ? 1 : 0.6,
                       }}
                     >
                       <div
@@ -316,6 +336,11 @@ export default function SettingsPage() {
                       >
                         <span>Host: {r.hostname}</span>
                         {r.ip && <span>IP: {r.ip}</span>}
+                        {!r.connected && r.lastSeenAt && (
+                          <span style={{ color: "var(--text-muted)" }}>
+                            Last seen: {formatLastSeen(r.lastSeenAt)}
+                          </span>
+                        )}
                       </div>
                       {hasAgentInfo && (
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

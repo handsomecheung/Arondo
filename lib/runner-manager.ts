@@ -29,6 +29,7 @@ export interface RunnerInfo {
   capabilities: string[];
   agents: string[];
   connected: boolean;
+  lastSeenAt?: number;
 }
 
 interface RunnerConnection {
@@ -181,6 +182,7 @@ class RunnerManager {
       capabilities: registerPayload.capabilities || [],
       agents: registerPayload.agents || [],
       connected: true,
+      lastSeenAt: Date.now(),
     };
     this.runners.set(id, { id, ws, info });
     this.persistRunner(info).catch(() => {});
@@ -200,6 +202,7 @@ class RunnerManager {
     const ctrl = this.runners.get(runnerId);
     if (ctrl) {
       ctrl.info.connected = false;
+      ctrl.info.lastSeenAt = Date.now();
       this.persistRunner(ctrl.info).catch(() => {});
       this.runners.delete(runnerId);
       console.log(`[runner-manager] runner disconnected: ${ctrl.info.name} (${runnerId})`);
@@ -229,6 +232,35 @@ class RunnerManager {
 
   getRunners(): RunnerInfo[] {
     return Array.from(this.runners.values()).map((c) => ({ ...c.info }));
+  }
+
+  async getAllKnownRunners(): Promise<RunnerInfo[]> {
+    const allRunners = new Map<string, RunnerInfo>();
+
+    for (const conn of this.runners.values()) {
+      allRunners.set(conn.id, { ...conn.info });
+    }
+
+    try {
+      const entries = await fs.readdir(RUNNERS_DIR, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        if (allRunners.has(entry.name)) continue;
+        const filePath = path.join(RUNNERS_DIR, entry.name, "runner.json");
+        try {
+          const raw = await fs.readFile(filePath, "utf-8");
+          const info: RunnerInfo = JSON.parse(raw);
+          info.connected = false;
+          allRunners.set(info.id, info);
+        } catch {
+          // Ignore corrupt runner files
+        }
+      }
+    } catch {
+      // Directory doesn't exist yet
+    }
+
+    return Array.from(allRunners.values());
   }
 
   getRunner(id: string): RunnerConnection | undefined {
@@ -722,7 +754,10 @@ class RunnerManager {
 // ─── Singleton ────────────────────────────────────────────────────────────────
 
 const p = process as typeof process & { __arondoRunnerMgr?: RunnerManager };
-if (!p.__arondoRunnerMgr) {
+if (p.__arondoRunnerMgr) {
+  // Hot reload: update prototype so existing singleton gets new/changed methods
+  Object.setPrototypeOf(p.__arondoRunnerMgr, RunnerManager.prototype);
+} else {
   p.__arondoRunnerMgr = new RunnerManager();
   p.__arondoRunnerMgr.restoreRunners().catch((err) => {
     console.error("[runner-manager] failed to restore runners:", err);
