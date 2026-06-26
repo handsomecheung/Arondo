@@ -3350,35 +3350,6 @@ export default function HomePage() {
                 );
               })}
 
-              {isAgentRunning && (
-                <div className="typing-indicator">
-                  <div
-                    className="message-avatar"
-                    style={{
-                      background: "var(--success-bg)",
-                      border: "1px solid rgba(34, 211, 165, 0.2)",
-                      color: "var(--success)",
-                      width: 28,
-                      height: 28,
-                      borderRadius: "50%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      flexShrink: 0,
-                    }}
-                  >
-                    AI
-                  </div>
-                  <div className="typing-bubble">
-                    <div className="typing-dot" />
-                    <div className="typing-dot" />
-                    <div className="typing-dot" />
-                  </div>
-                </div>
-              )}
-
               <div ref={chatBottomRef} />
             </div>
 
