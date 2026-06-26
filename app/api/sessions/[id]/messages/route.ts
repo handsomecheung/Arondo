@@ -4,6 +4,8 @@ import { getAgent, AgentType } from "@/lib/agents";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
 
+const MAX_SESSION_NAME_LENGTH = 80;
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -40,7 +42,15 @@ export async function POST(
     const isResume = messages.some((m) => m.type === "agent-run");
     const command = agent.getCommand({ prompt: trimmedMessage, repoPath: session.repoPath, sessionId: id, isResume });
 
-    const updatedSession = await updateSession(id, { status: "running", command });
+    const patch: Record<string, any> = { status: "running", command };
+    if (!session.prompt) {
+      const firstLine = trimmedMessage.split("\n")[0];
+      patch.name = firstLine.length > MAX_SESSION_NAME_LENGTH
+        ? firstLine.slice(0, MAX_SESSION_NAME_LENGTH) + "…"
+        : firstLine;
+      patch.prompt = trimmedMessage;
+    }
+    const updatedSession = await updateSession(id, patch);
     eventBus.publish({ type: "session_updated", payload: updatedSession });
 
     const systemMsg = await addMessage({

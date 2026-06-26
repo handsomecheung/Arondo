@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-
+import ExecCard from "@/components/ExecCard";
 
 const Terminal = dynamic(() => import("@/components/Terminal"), { ssr: false });
 
@@ -17,6 +17,7 @@ interface Session {
   agentType: string;
   repoPath: string;
   projectId: string;
+  command?: string;
   createdAt: string;
   updatedAt: string;
   runningScripts?: string[];
@@ -54,6 +55,7 @@ interface TaskItem {
   createdAt: number;
   completedAt?: number;
   messageId?: string;
+  command?: string;
 }
 
 interface SessionGroup {
@@ -134,21 +136,6 @@ function IconInbox() {
   );
 }
 
-function IconMoreVertical() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="currentColor"
-    >
-      <circle cx="12" cy="5" r="2" />
-      <circle cx="12" cy="12" r="2" />
-      <circle cx="12" cy="19" r="2" />
-    </svg>
-  );
-}
-
 function IconTerminal() {
   return (
     <svg
@@ -167,7 +154,7 @@ function IconTerminal() {
   );
 }
 
-function IconExternalLink() {
+function IconCode() {
   return (
     <svg
       width="14"
@@ -179,26 +166,8 @@ function IconExternalLink() {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-      <polyline points="15 3 21 3 21 9" />
-      <line x1="10" y1="14" x2="21" y2="3" />
-    </svg>
-  );
-}
-
-function IconStop() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+      <polyline points="16 18 22 12 16 6" />
+      <polyline points="8 6 2 12 8 18" />
     </svg>
   );
 }
@@ -218,9 +187,8 @@ export default function TasksPage() {
   const [taskTimeTicker, setTaskTimeTicker] = useState(Date.now());
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
   const [terminalTask, setTerminalTask] = useState<TaskItem | null>(null);
+  const [commandTask, setCommandTask] = useState<TaskItem | null>(null);
 
   const loadInitialTasks = useCallback(async () => {
     try {
@@ -231,6 +199,26 @@ export default function TasksPage() {
       const serverTasks: ServerTask[] = await tasksRes.json();
       const sessions: Session[] = await sessionsRes.json();
       const sessionMap = new Map(sessions.map((s) => [s.id, s]));
+
+      const scriptProjectIds = new Set<string>();
+      for (const t of serverTasks) {
+        if (t.type === "script") {
+          const session = sessionMap.get(t.sessionId);
+          if (session?.projectId) scriptProjectIds.add(session.projectId);
+        }
+      }
+      const scriptMap = new Map<string, Map<string, string>>();
+      await Promise.all(
+        Array.from(scriptProjectIds).map(async (pid) => {
+          try {
+            const res = await fetch(`/api/projects/${pid}/scripts`);
+            const scripts: { name: string; command: string }[] = await res.json();
+            scriptMap.set(pid, new Map(scripts.map((s) => [s.name, s.command])));
+          } catch {
+            // ignore
+          }
+        }),
+      );
 
       const initTasks: TaskItem[] = serverTasks.map((t) => {
         const session = sessionMap.get(t.sessionId);
@@ -246,6 +234,10 @@ export default function TasksPage() {
         } else {
           status = "running";
         }
+        let command = session?.command;
+        if (t.type === "script" && t.scriptName && session?.projectId) {
+          command = scriptMap.get(session.projectId)?.get(t.scriptName);
+        }
         return {
           id: t.taskId,
           type: t.type,
@@ -258,6 +250,7 @@ export default function TasksPage() {
             : Date.now(),
           completedAt: t.completedAt,
           messageId: t.messageId,
+          command,
         };
       });
 
@@ -329,6 +322,7 @@ export default function TasksPage() {
                     createdAt: new Date(
                       updated.updatedAt || updated.createdAt,
                     ).getTime(),
+                    command: updated.command,
                   },
                   ...prev,
                 ];
@@ -397,7 +391,9 @@ export default function TasksPage() {
                   }
                   if (idx !== -1) {
                     const next = [...prev];
-                    next[idx] = { ...next[idx], messageId: msg.id };
+                    const cmdMatch = msg.content.match(/```bash\n([\s\S]*?)```/);
+                    const cmd = cmdMatch ? cmdMatch[1].trim() : undefined;
+                    next[idx] = { ...next[idx], messageId: msg.id, command: cmd };
                     return next;
                   }
                   return prev;
@@ -443,18 +439,6 @@ export default function TasksPage() {
       console.error("Failed to kill task:", err);
     }
   };
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpenMenuId(null);
-      }
-    }
-    if (openMenuId) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [openMenuId]);
 
   return (
     <div
@@ -606,7 +590,8 @@ export default function TasksPage() {
                       }}
                     >
                       {group.hasRunning && <span className="task-spinner" />}
-                      <span
+                      <a
+                        href={`/session/${group.sessionId}`}
                         style={{
                           fontSize: 13,
                           fontWeight: 600,
@@ -615,11 +600,15 @@ export default function TasksPage() {
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
                           flex: 1,
+                          textDecoration: "none",
+                          cursor: "pointer",
                         }}
                         title={group.sessionName}
+                        onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+                        onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
                       >
                         {group.sessionName}
-                      </span>
+                      </a>
                       <span
                         style={{
                           fontSize: 11,
@@ -630,11 +619,9 @@ export default function TasksPage() {
                         {group.tasks.length} {group.tasks.length === 1 ? "task" : "tasks"}
                       </span>
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                       {group.tasks.map((task) => {
-                        const hasLog = !!task.messageId;
                         const isRunning = task.status === "running";
-                        const isMenuOpen = openMenuId === task.id;
 
                         let statusText: string;
                         if (isRunning) {
@@ -648,92 +635,21 @@ export default function TasksPage() {
                         }
 
                         return (
-                          <div key={task.id} className="task-item-wrapper">
-                            <div
-                              className={`tasks-list-item ${task.type} ${hasLog ? "clickable" : "pending"} ${!isRunning ? "completed" : ""}`}
-                            >
-                              <div className="task-queue-item-icon">
-                                {task.type === "script" ? (
-                                  <span className="task-icon-script">&#x2699;&#xFE0F;</span>
-                                ) : (
-                                  <span className="task-icon-agent">&#x26A1;</span>
-                                )}
-                              </div>
-                              <div className="task-queue-item-info">
-                                <div className="task-queue-item-name-row">
-                                  <span className="task-queue-item-name" title={task.name}>
-                                    {task.name}
-                                  </span>
-                                  <span className={`task-type-tag ${task.type}`}>
-                                    {task.type}
-                                  </span>
-                                  {!isRunning && (
-                                    <span
-                                      className={`task-type-tag ${task.status === "done" ? "done" : "error"}`}
-                                    >
-                                      {task.status === "done" ? "done" : "error"}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="task-queue-item-status">
-                                  {isRunning && <span className="task-spinner" />}
-                                  {statusText}
-                                </div>
-                              </div>
-                              <div className="task-menu-container" ref={isMenuOpen ? menuRef : undefined}>
-                                <button
-                                  className="task-menu-btn"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOpenMenuId(isMenuOpen ? null : task.id);
-                                  }}
-                                  title="More actions"
-                                >
-                                  <IconMoreVertical />
-                                </button>
-                                {isMenuOpen && (
-                                  <div className="task-menu-dropdown">
-                                    {hasLog && (
-                                      <button
-                                        className="task-menu-item"
-                                        onClick={() => {
-                                          setOpenMenuId(null);
-                                          setTerminalTask(task);
-                                        }}
-                                      >
-                                        <IconTerminal />
-                                        <span>View Log</span>
-                                      </button>
-                                    )}
-                                    {hasLog && (
-                                      <button
-                                        className="task-menu-item"
-                                        onClick={() => {
-                                          setOpenMenuId(null);
-                                          window.location.href = `/session/${task.sessionId}`;
-                                        }}
-                                      >
-                                        <IconExternalLink />
-                                        <span>Go to Session</span>
-                                      </button>
-                                    )}
-                                    {isRunning && hasLog && (
-                                      <button
-                                        className="task-menu-item danger"
-                                        onClick={() => {
-                                          setOpenMenuId(null);
-                                          handleKillTask(task);
-                                        }}
-                                      >
-                                        <IconStop />
-                                        <span>Stop Task</span>
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
+                          <ExecCard
+                            key={task.id}
+                            item={{
+                              id: task.id,
+                              type: task.type,
+                              title: task.name.replace(/^(Agent|Script):\s*/, ""),
+                              status: task.status,
+                              statusText,
+                              command: task.command,
+                              messageId: task.messageId,
+                            }}
+                            onViewLog={task.messageId ? () => setTerminalTask(task) : undefined}
+                            onShowCommand={task.command ? () => setCommandTask(task) : undefined}
+                            onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
+                          />
                         );
                       })}
                     </div>
@@ -793,6 +709,51 @@ export default function TasksPage() {
           </div>
         </div>
       )}
+      {commandTask && commandTask.command && (
+        <div className="modal-backdrop" onClick={() => setCommandTask(null)}>
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 640 }}
+          >
+            <div className="modal-header">
+              <span
+                className="modal-title"
+                style={{ display: "flex", alignItems: "center", gap: 6 }}
+              >
+                <IconCode />
+                Command
+              </span>
+              <button
+                className="modal-close-btn"
+                onClick={() => setCommandTask(null)}
+                aria-label="Close"
+              >
+                <IconX />
+              </button>
+            </div>
+            <div className="modal-body" style={{ padding: "16px 20px" }}>
+              <pre
+                style={{
+                  margin: 0,
+                  padding: "12px 16px",
+                  background: "var(--bg-tertiary, #1a1a2e)",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  overflowX: "auto",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-all",
+                  color: "var(--text-primary, #e0e0e0)",
+                }}
+              >
+                {commandTask.command}
+              </pre>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

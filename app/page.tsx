@@ -5,6 +5,8 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 
 const Terminal = dynamic(() => import("@/components/Terminal"), { ssr: false });
+import ExecCard from "@/components/ExecCard";
+import type { ExecCardItem } from "@/components/ExecCard";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -481,96 +483,27 @@ function parseExecCommand(content: string): { label: string; command: string } {
   return { label: shortCmd || "Executing command", command: cmd };
 }
 
-function ExecCard({
-  info,
-  onViewLog,
-}: {
-  info: ExecCardInfo;
-  onViewLog: () => void;
-}) {
-  const [commandOpen, setCommandOpen] = useState(false);
-
+function execCardInfoToItem(info: ExecCardInfo): ExecCardItem {
   const isDone = info.returnMsg !== null;
   const isSuccess = isDone && info.returnMsg!.content.startsWith("✅");
-
-  let statusClass = "exec-card-running";
-  if (isDone) statusClass = isSuccess ? "exec-card-success" : "exec-card-error";
-
-  return (
-    <div className={`exec-card ${statusClass}`}>
-      <div className="exec-card-header">
-        <div className="exec-card-icon">
-          {!isDone ? (
-            <span className="exec-card-spinner" />
-          ) : isSuccess ? (
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          ) : (
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          )}
-        </div>
-        <div className="exec-card-info">
-          <div className="exec-card-title">
-            {info.isScript ? "Script" : "Agent"}: {info.commandLabel}
-          </div>
-          <div className="exec-card-status">
-            {!isDone
-              ? "Running..."
-              : isSuccess
-                ? "Completed"
-                : info
-                    .returnMsg!.content.replace(/^❌\s*/, "")
-                    .replace(/^Error:\s*/, "")}
-          </div>
-        </div>
-        <div className="exec-card-actions">
-          <button
-            className="exec-card-log-btn"
-            onClick={onViewLog}
-            title="Open log"
-          >
-            {info.isScript ? <IconPlay /> : <IconBolt />}
-            <span>Log</span>
-          </button>
-          <button
-            className="exec-card-toggle-btn"
-            onClick={() => setCommandOpen(!commandOpen)}
-            title={commandOpen ? "Hide command" : "Show command"}
-          >
-            <IconChevronDown className={commandOpen ? "rotated" : ""} />
-          </button>
-        </div>
-      </div>
-      {commandOpen && info.command && (
-        <div className="exec-card-command">
-          <code>{info.command}</code>
-        </div>
-      )}
-      <div className="exec-card-time">{formatTime(info.runMsg.createdAt)}</div>
-    </div>
-  );
+  let statusText: string;
+  if (!isDone) {
+    statusText = "Running...";
+  } else if (isSuccess) {
+    statusText = "Completed";
+  } else {
+    statusText = info.returnMsg!.content.replace(/^❌\s*/, "").replace(/^Error:\s*/, "");
+  }
+  return {
+    id: info.runMsg.id,
+    type: info.isScript ? "script" : "agent",
+    title: info.commandLabel,
+    status: !isDone ? "running" : isSuccess ? "done" : "error",
+    statusText,
+    command: info.command || undefined,
+    messageId: info.runMsg.id,
+    timestamp: formatTime(info.runMsg.createdAt),
+  };
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -706,6 +639,7 @@ export default function HomePage() {
   const [sessionLog, setSessionLog] = useState("");
   const [activeLogMsgId, setActiveLogMsgId] = useState<string | null>(null);
   const [logModalOpen, setLogModalOpen] = useState(false);
+  const [commandModalText, setCommandModalText] = useState<string | null>(null);
 
   const activeLogMsgIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -3385,11 +3319,12 @@ export default function HomePage() {
                   return (
                     <ExecCard
                       key={msg.id}
-                      info={cardInfo}
+                      item={execCardInfoToItem(cardInfo)}
                       onViewLog={() => {
                         setActiveLogMsgId(msg.id);
                         setLogModalOpen(true);
                       }}
+                      onShowCommand={cardInfo.command ? () => setCommandModalText(cardInfo.command) : undefined}
                     />
                   );
                 }
@@ -3802,6 +3737,43 @@ export default function HomePage() {
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {commandModalText && (
+        <div className="modal-backdrop" onClick={() => setCommandModalText(null)}>
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 640 }}
+          >
+            <div className="modal-header">
+              <span className="modal-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                Command
+              </span>
+              <button className="modal-close-btn" onClick={() => setCommandModalText(null)} aria-label="Close">
+                <IconX />
+              </button>
+            </div>
+            <div className="modal-body" style={{ padding: "16px 20px" }}>
+              <pre
+                style={{
+                  margin: 0,
+                  padding: "12px 16px",
+                  background: "var(--bg-tertiary, #1a1a2e)",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  overflowX: "auto",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-all",
+                  color: "var(--text-primary, #e0e0e0)",
+                }}
+              >
+                {commandModalText}
+              </pre>
             </div>
           </div>
         </div>

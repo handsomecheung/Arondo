@@ -1,8 +1,22 @@
+import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { getSessions, createSession, updateSession, addMessage, clearSessionLog } from "@/lib/store";
 import { getAgent, AgentType } from "@/lib/agents";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
+
+const MAX_SESSION_NAME_LENGTH = 80;
+
+function deriveSessionName(prompt: string, repoPath: string): string {
+  if (prompt && prompt.trim()) {
+    const firstLine = prompt.trim().split("\n")[0];
+    if (firstLine.length > MAX_SESSION_NAME_LENGTH) {
+      return firstLine.slice(0, MAX_SESSION_NAME_LENGTH) + "…";
+    }
+    return firstLine;
+  }
+  return path.basename(repoPath) || "Untitled";
+}
 
 export async function GET() {
   const sessions = await getSessions();
@@ -36,6 +50,7 @@ export async function POST(req: NextRequest) {
     const session = await createSession({
       status: "idle",
       prompt: "",
+      name: deriveSessionName("", repoPath),
       agentType,
       repoPath,
       runnerId,
@@ -47,6 +62,7 @@ export async function POST(req: NextRequest) {
   const session = await createSession({
     status: "running",
     prompt,
+    name: deriveSessionName(prompt, repoPath),
     agentType,
     repoPath,
     runnerId,
