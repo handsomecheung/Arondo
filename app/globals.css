@@ -1374,6 +1374,9 @@ body {
 }
 .exec-card-error .exec-card-status {
   color: var(--error);
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
 }
 .exec-card-stopped .exec-card-status {
   color: var(--text-secondary);

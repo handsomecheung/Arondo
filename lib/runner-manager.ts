@@ -6,8 +6,13 @@ import {
   updateSession,
   addMessage,
   getSession,
+  getSessionLog,
 } from "./store";
-import { getAgySessionId, detectAgyConvId, saveAgySessionId } from "./agents/antigravity";
+import {
+  getAgySessionId,
+  detectAgyConvId,
+  saveAgySessionId,
+} from "./agents/antigravity";
 import fs from "fs/promises";
 import path from "path";
 
@@ -113,7 +118,9 @@ class RunnerManager {
         }
       }
       if (this.knownIds.size > 0) {
-        console.log(`[runner-manager] restored ${this.knownIds.size} known runner(s) from disk`);
+        console.log(
+          `[runner-manager] restored ${this.knownIds.size} known runner(s) from disk`,
+        );
       }
     } catch {
       // Directory doesn't exist yet — fine on first run
@@ -144,7 +151,9 @@ class RunnerManager {
         }
       }
       if (data.length > 0) {
-        console.log(`[runner-manager] restored ${data.length} task(s) from disk`);
+        console.log(
+          `[runner-manager] restored ${data.length} task(s) from disk`,
+        );
       }
       this.purgeExpiredTasks();
     } catch {
@@ -164,7 +173,9 @@ class RunnerManager {
     if (id) {
       const existing = this.runners.get(id);
       if (existing) {
-        try { existing.ws.close(); } catch {}
+        try {
+          existing.ws.close();
+        } catch {}
       }
     } else {
       id = crypto.randomUUID();
@@ -191,7 +202,9 @@ class RunnerManager {
     // Re-associate persisted tasks that originally belonged to this runner
     for (const [taskId, ctx] of this.tasks) {
       if (ctx.runnerId === id) {
-        console.log(`[runner-manager] runner ${id} reconnected, task ${taskId} retained`);
+        console.log(
+          `[runner-manager] runner ${id} reconnected, task ${taskId} retained`,
+        );
       }
     }
 
@@ -205,7 +218,9 @@ class RunnerManager {
       ctrl.info.lastSeenAt = Date.now();
       this.persistRunner(ctrl.info).catch(() => {});
       this.runners.delete(runnerId);
-      console.log(`[runner-manager] runner disconnected: ${ctrl.info.name} (${runnerId})`);
+      console.log(
+        `[runner-manager] runner disconnected: ${ctrl.info.name} (${runnerId})`,
+      );
 
       for (const [reqId, pending] of this.pending) {
         if (pending.runnerId !== runnerId) continue;
@@ -278,7 +293,7 @@ class RunnerManager {
     runnerId: string,
     method: string,
     payload: any,
-    timeoutMs = 30_000
+    timeoutMs = 30_000,
   ): Promise<any> {
     const ctrl = this.runners.get(runnerId);
     if (!ctrl) {
@@ -302,7 +317,9 @@ class RunnerManager {
   sendFire(runnerId: string, method: string, payload: any): void {
     const ctrl = this.runners.get(runnerId);
     if (!ctrl) {
-      console.warn(`[runner-manager] sendFire ${method}: runner ${runnerId} not found`);
+      console.warn(
+        `[runner-manager] sendFire ${method}: runner ${runnerId} not found`,
+      );
       return;
     }
 
@@ -317,7 +334,9 @@ class RunnerManager {
     this.tasks.set(ctx.taskId, ctx);
     const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
     this.ptyKeyToTaskId.set(ptyKey, ctx.taskId);
-    console.log(`[runner-manager] task registered: ${ctx.taskId} (type=${ctx.type}, total=${this.tasks.size})`);
+    console.log(
+      `[runner-manager] task registered: ${ctx.taskId} (type=${ctx.type}, total=${this.tasks.size})`,
+    );
     this.persistTasks().catch(() => {});
   }
 
@@ -381,7 +400,14 @@ class RunnerManager {
     }
   }
 
-  async restartTask(sessionId: string, messageId: string, command: string, workDir: string, cols = 120, rows = 30): Promise<boolean> {
+  async restartTask(
+    sessionId: string,
+    messageId: string,
+    command: string,
+    workDir: string,
+    cols = 120,
+    rows = 30,
+  ): Promise<boolean> {
     const taskId = this.ptyKeyToTaskId.get(`${sessionId}:${messageId}`);
     if (!taskId) return false;
 
@@ -392,13 +418,18 @@ class RunnerManager {
     if (!runnerId) return false;
 
     try {
-      const res: any = await this.sendRequest(runnerId, "exec.restart", {
-        taskId,
-        command,
-        workDir,
-        cols,
-        rows,
-      }, 15_000);
+      const res: any = await this.sendRequest(
+        runnerId,
+        "exec.restart",
+        {
+          taskId,
+          command,
+          workDir,
+          cols,
+          rows,
+        },
+        15_000,
+      );
       if (res?.pid) this.updateTaskPid(taskId, res.pid);
       return true;
     } catch (err) {
@@ -420,7 +451,9 @@ class RunnerManager {
       this.tasks.delete(taskId);
     }
     if (toDelete.length > 0) {
-      console.log(`[runner-manager] removed ${toDelete.length} task(s) for deleted session ${sessionId}`);
+      console.log(
+        `[runner-manager] removed ${toDelete.length} task(s) for deleted session ${sessionId}`,
+      );
       this.persistTasks().catch(() => {});
     }
   }
@@ -451,7 +484,10 @@ class RunnerManager {
     try {
       msg = JSON.parse(raw);
     } catch {
-      console.error("[runner-manager] failed to parse message:", raw.slice(0, 200));
+      console.error(
+        "[runner-manager] failed to parse message:",
+        raw.slice(0, 200),
+      );
       return;
     }
 
@@ -474,7 +510,9 @@ class RunnerManager {
     const pending = this.pending.get(msg.id);
     if (!pending) {
       if (msg.payload?.ok === false) {
-        console.warn(`[runner-manager] unmatched error response (fire-and-forget): ${msg.payload.error?.message || "unknown"}`);
+        console.warn(
+          `[runner-manager] unmatched error response (fire-and-forget): ${msg.payload.error?.message || "unknown"}`,
+        );
       }
       return;
     }
@@ -483,7 +521,7 @@ class RunnerManager {
 
     if (msg.payload?.ok === false) {
       pending.reject(
-        new Error(msg.payload.error?.message || "Runner returned error")
+        new Error(msg.payload.error?.message || "Runner returned error"),
       );
     } else {
       pending.resolve(msg.payload);
@@ -522,16 +560,13 @@ class RunnerManager {
 
   // ─── Stream/Event handlers ────────────────────────────────────────────
 
-  private onAgentStatus(
-    runnerId: string,
-    payload: { agents: string[] }
-  ): void {
+  private onAgentStatus(runnerId: string, payload: { agents: string[] }): void {
     const conn = this.runners.get(runnerId);
     if (!conn || !Array.isArray(payload?.agents)) return;
     conn.info.agents = payload.agents;
     this.persistRunner(conn.info).catch(() => {});
     console.log(
-      `[runner-manager] runner ${runnerId} agents updated: [${payload.agents.join(", ")}]`
+      `[runner-manager] runner ${runnerId} agents updated: [${payload.agents.join(", ")}]`,
     );
   }
 
@@ -542,7 +577,9 @@ class RunnerManager {
   }): Promise<void> {
     const ctx = this.tasks.get(payload.taskId);
     if (!ctx) {
-      console.warn(`[runner-manager] exec.output for unknown task: ${payload.taskId}`);
+      console.warn(
+        `[runner-manager] exec.output for unknown task: ${payload.taskId}`,
+      );
       return;
     }
 
@@ -585,7 +622,7 @@ class RunnerManager {
 
   private async handleAgentExit(
     ctx: TaskContext,
-    exitCode: number
+    exitCode: number,
   ): Promise<void> {
     const success = exitCode === 0;
 
@@ -600,7 +637,19 @@ class RunnerManager {
           }
         }
       } catch (err) {
-        console.error("[runner-manager] failed to detect agy conversation:", err);
+        console.error(
+          "[runner-manager] failed to detect agy conversation:",
+          err,
+        );
+      }
+    }
+
+    // Detect quota exhaustion: agy exits 0 but produces no output
+    let quotaExhausted = false;
+    if (success && session?.agentType === "antigravity") {
+      const log = await getSessionLog(ctx.sessionId, ctx.messageId);
+      if (!log.trim()) {
+        quotaExhausted = true;
       }
     }
 
@@ -609,7 +658,7 @@ class RunnerManager {
     if (hasRunningScripts) {
       nextStatus = "script-running";
     } else {
-      nextStatus = success ? "done" : "error";
+      nextStatus = success && !quotaExhausted ? "done" : "error";
     }
 
     const stoppedByUser = !!ctx.stoppedByUser;
@@ -617,20 +666,24 @@ class RunnerManager {
     const updated = await updateSession(ctx.sessionId, {
       status: nextStatus as any,
       errorMessage: success
-        ? undefined
+        ? quotaExhausted
+          ? "agy quota exhausted — no output was produced"
+          : undefined
         : stoppedByUser
           ? "Stopped by user"
           : `Agent exited with code ${exitCode}`,
     });
 
     const content = success
-      ? "✅ Done!"
+      ? quotaExhausted
+        ? "⚠️ Your quota may be exhausted — please check your usage and try again later."
+        : "✅ Done!"
       : stoppedByUser
         ? "🛑 Stopped by user"
         : `❌ Error: Agent exited with code ${exitCode}`;
     const agentMsg = await addMessage({
       sessionId: ctx.sessionId,
-      role: success ? "agent" : "system",
+      role: success && !quotaExhausted ? "agent" : "system",
       content,
       type: "agent-return",
       parentId: ctx.messageId,
@@ -642,7 +695,7 @@ class RunnerManager {
 
   private async handleScriptExit(
     ctx: TaskContext,
-    exitCode: number
+    exitCode: number,
   ): Promise<void> {
     eventBus.publish({
       type: "terminal_exit",
@@ -656,12 +709,17 @@ class RunnerManager {
     const session = await getSession(ctx.sessionId);
     const currentRunning = session?.runningScripts || [];
     const removeIndex = currentRunning.indexOf(ctx.scriptName!);
-    const nextRunning = removeIndex >= 0
-      ? [...currentRunning.slice(0, removeIndex), ...currentRunning.slice(removeIndex + 1)]
-      : [...currentRunning];
+    const nextRunning =
+      removeIndex >= 0
+        ? [
+            ...currentRunning.slice(0, removeIndex),
+            ...currentRunning.slice(removeIndex + 1),
+          ]
+        : [...currentRunning];
 
     const hasAgentTask = Array.from(this.tasks.values()).some(
-      (t) => t.sessionId === ctx.sessionId && t.type === "agent" && !t.completedAt,
+      (t) =>
+        t.sessionId === ctx.sessionId && t.type === "agent" && !t.completedAt,
     );
 
     if (exitCode === 0) {
@@ -699,7 +757,9 @@ class RunnerManager {
       const errMsg = await addMessage({
         sessionId: ctx.sessionId,
         role: "system",
-        content: stoppedByUser ? "🛑 Stopped by user" : `❌ Error: ${errorMessage}`,
+        content: stoppedByUser
+          ? "🛑 Stopped by user"
+          : `❌ Error: ${errorMessage}`,
         type: "script-return",
         parentId: ctx.messageId,
       });
@@ -716,7 +776,7 @@ class RunnerManager {
         state: string;
         exitCode?: number;
       }>;
-    }
+    },
   ): void {
     if (!payload.tasks) return;
 
@@ -724,13 +784,17 @@ class RunnerManager {
 
     for (const t of payload.tasks) {
       if (t.state === "exited" && t.exitCode !== undefined) {
-        this.onExecExit({ taskId: t.taskId, exitCode: t.exitCode }).catch((err) => {
-          console.error("[runner-manager] onExecExit error:", err);
-        });
+        this.onExecExit({ taskId: t.taskId, exitCode: t.exitCode }).catch(
+          (err) => {
+            console.error("[runner-manager] onExecExit error:", err);
+          },
+        );
       } else if (t.state === "running") {
         const ctx = this.tasks.get(t.taskId);
         if (ctx && ctx.runnerId !== runnerId) {
-          console.log(`[runner-manager] task.status: re-associating ${t.taskId} → ${runnerId}`);
+          console.log(
+            `[runner-manager] task.status: re-associating ${t.taskId} → ${runnerId}`,
+          );
           ctx.runnerId = runnerId;
           this.persistTasks().catch(() => {});
         }
@@ -741,8 +805,14 @@ class RunnerManager {
     // (runner restarted and lost track of them)
     // Skip already-completed tasks — they are retained for history
     for (const [taskId, ctx] of this.tasks) {
-      if (ctx.runnerId === runnerId && !ctx.completedAt && !reportedTaskIds.has(taskId)) {
-        console.log(`[runner-manager] task ${taskId} not reported by runner ${runnerId}, cleaning up`);
+      if (
+        ctx.runnerId === runnerId &&
+        !ctx.completedAt &&
+        !reportedTaskIds.has(taskId)
+      ) {
+        console.log(
+          `[runner-manager] task ${taskId} not reported by runner ${runnerId}, cleaning up`,
+        );
         this.onExecExit({ taskId, exitCode: -1 }).catch((err) => {
           console.error("[runner-manager] stale task cleanup error:", err);
         });
@@ -765,9 +835,12 @@ if (p.__arondoRunnerMgr) {
   p.__arondoRunnerMgr.restoreTasks().catch((err) => {
     console.error("[runner-manager] failed to restore tasks:", err);
   });
-  setInterval(() => {
-    p.__arondoRunnerMgr!.purgeExpiredTasks();
-  }, 60 * 60 * 1000);
+  setInterval(
+    () => {
+      p.__arondoRunnerMgr!.purgeExpiredTasks();
+    },
+    60 * 60 * 1000,
+  );
 }
 
 export const runnerManager = p.__arondoRunnerMgr;
