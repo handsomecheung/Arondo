@@ -57,6 +57,7 @@ interface TaskItem {
   completedAt?: number;
   messageId?: string;
   command?: string;
+  scriptName?: string;
 }
 
 interface SessionGroup {
@@ -250,6 +251,7 @@ export default function TasksPage() {
           completedAt: t.completedAt,
           messageId: t.messageId,
           command,
+          scriptName: t.scriptName,
         };
       });
 
@@ -436,6 +438,51 @@ export default function TasksPage() {
       });
     } catch (err) {
       console.error("Failed to kill task:", err);
+    }
+  };
+
+  const handleRestartScript = async (task: TaskItem) => {
+    if (!task.scriptName || !task.messageId) return;
+    try {
+      await fetch(`/api/sessions/${task.sessionId}/restart-script`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scriptName: task.scriptName, messageId: task.messageId }),
+      });
+      // No state update needed — the runner restarts in-place, same taskId/messageId.
+    } catch (err) {
+      console.error("Failed to restart script:", err);
+    }
+  };
+
+  const handleRetryTask = async (task: TaskItem) => {
+    try {
+      let res: Response;
+      if (task.type === "script" && task.scriptName) {
+        res = await fetch(`/api/sessions/${task.sessionId}/run-script`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scriptName: task.scriptName }),
+        });
+      } else if (task.type === "agent") {
+        res = await fetch(`/api/sessions/${task.sessionId}/rerun-agent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+      } else {
+        return;
+      }
+      if (!res.ok) return;
+      const { messageId: newMessageId } = await res.json();
+      setTaskQueue((prev) =>
+        prev.map((t) =>
+          t.id === task.id
+            ? { ...t, status: "running" as const, messageId: newMessageId, completedAt: undefined, createdAt: Date.now() }
+            : t
+        )
+      );
+    } catch (err) {
+      console.error("Failed to retry task:", err);
     }
   };
 
@@ -648,6 +695,8 @@ export default function TasksPage() {
                             onViewLog={task.messageId ? () => setTerminalTask(task) : undefined}
                             onShowCommand={task.command ? () => setCommandTask(task) : undefined}
                             onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
+                            onRestartScript={isRunning && task.type === "script" && task.scriptName && task.messageId ? () => handleRestartScript(task) : undefined}
+                            onRetryTask={task.status === "error" ? () => handleRetryTask(task) : undefined}
                           />
                         );
                       })}

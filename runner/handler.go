@@ -38,6 +38,8 @@ func (h *Handler) handleRequest(msg *Message) {
 		h.handleExecScript(msg)
 	case "exec.cancel":
 		h.handleExecCancel(msg)
+	case "exec.restart":
+		h.handleExecRestart(msg)
 	case "pty.input":
 		h.handlePtyInput(msg)
 	case "pty.resize":

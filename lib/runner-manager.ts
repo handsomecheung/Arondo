@@ -335,6 +335,32 @@ class RunnerManager {
     }
   }
 
+  async restartTask(sessionId: string, messageId: string, command: string, workDir: string, cols = 120, rows = 30): Promise<boolean> {
+    const taskId = this.ptyKeyToTaskId.get(`${sessionId}:${messageId}`);
+    if (!taskId) return false;
+
+    const ctx = this.tasks.get(taskId);
+    if (!ctx) return false;
+
+    const runnerId = this.resolveRunnerId(ctx.runnerId);
+    if (!runnerId) return false;
+
+    try {
+      const res: any = await this.sendRequest(runnerId, "exec.restart", {
+        taskId,
+        command,
+        workDir,
+        cols,
+        rows,
+      }, 15_000);
+      if (res?.pid) this.updateTaskPid(taskId, res.pid);
+      return true;
+    } catch (err) {
+      console.error(`[runner-manager] failed to restart task ${taskId}:`, err);
+      return false;
+    }
+  }
+
   removeTasksForSession(sessionId: string): void {
     const toDelete: string[] = [];
     for (const [taskId, ctx] of this.tasks) {

@@ -63,7 +63,12 @@ export function setupRunnerServer(wss: WebSocketServer): void {
 
     ws.on("close", () => {
       if (runnerId) {
-        runnerManager.removeRunner(runnerId);
+        // Guard against the race where addRunner already replaced this ws with a
+        // new connection: only remove the runner if this ws is still the current one.
+        const current = runnerManager.getRunner(runnerId);
+        if (!current || current.ws === ws) {
+          runnerManager.removeRunner(runnerId);
+        }
       }
     });
 

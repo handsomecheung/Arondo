@@ -101,7 +101,7 @@ export async function POST(
       eventBus.publish({ type: "session_updated", payload: updated });
     });
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, messageId: systemMsg.id });
 }
 
 export const dynamic = "force-dynamic";

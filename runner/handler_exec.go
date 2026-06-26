@@ -136,3 +136,28 @@ func (h *Handler) handleExecCancel(msg *Message) {
 	log.Printf("cancelled task %s with signal %v", req.TaskID, sig)
 	h.sendResponse(msg.ID, OkResponse{OK: true})
 }
+
+type execRestartRequest struct {
+	TaskID  string `json:"taskId"`
+	Command string `json:"command"`
+	WorkDir string `json:"workDir"`
+	Cols    uint16 `json:"cols,omitempty"`
+	Rows    uint16 `json:"rows,omitempty"`
+}
+
+func (h *Handler) handleExecRestart(msg *Message) {
+	req, err := parsePayload[execRestartRequest](msg)
+	if err != nil {
+		h.sendError(msg.ID, "INTERNAL", "invalid payload: "+err.Error())
+		return
+	}
+
+	pid, err := h.taskManager.Restart(req.TaskID, req.Command, req.WorkDir, req.Cols, req.Rows)
+	if err != nil {
+		h.sendError(msg.ID, "INTERNAL", "failed to restart: "+err.Error())
+		return
+	}
+
+	log.Printf("restarted script task %s (new pid=%d)", req.TaskID, pid)
+	h.sendResponse(msg.ID, execStartResponse{OK: true, TaskID: req.TaskID, PID: pid})
+}

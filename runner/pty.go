@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/creack/pty"
 )
@@ -19,13 +20,17 @@ type TaskInfo struct {
 }
 
 type task struct {
-	id       string
-	cmd      *exec.Cmd
-	ptyFile  *os.File // nil for non-PTY (agent) tasks
-	buffer   []byte
-	done     bool
-	exitCode int
-	mu       sync.Mutex
+	id           string
+	cmd          *exec.Cmd
+	ptyFile      *os.File
+	buffer       []byte
+	done         bool
+	exitCode     int
+	mu           sync.Mutex
+	onData       func([]byte)
+	onExit       func(int)
+	isRestarting bool
+	procDoneC    chan struct{}
 }
 
 type TaskManager struct {
@@ -66,21 +71,29 @@ func (tm *TaskManager) Spawn(opts SpawnOptions) (int, error) {
 		cmd.Env = os.Environ()
 	}
 
-	t := &task{id: opts.TaskID, cmd: cmd}
+	t := &task{
+		id:        opts.TaskID,
+		cmd:       cmd,
+		onData:    opts.OnData,
+		onExit:    opts.OnExit,
+		procDoneC: make(chan struct{}),
+	}
 	tm.tasks[opts.TaskID] = t
 	tm.mu.Unlock()
 
-	if err := tm.startWithPTY(t, opts); err != nil {
+	if err := tm.launchProcess(t, opts.Cols, opts.Rows); err != nil {
+		tm.mu.Lock()
+		delete(tm.tasks, opts.TaskID)
+		tm.mu.Unlock()
 		return 0, err
 	}
 	return t.cmd.Process.Pid, nil
 }
 
-func (tm *TaskManager) startWithPTY(t *task, opts SpawnOptions) error {
-	winSize := &pty.Winsize{
-		Cols: opts.Cols,
-		Rows: opts.Rows,
-	}
+// launchProcess starts a new process with a PTY for the given task.
+// The task must already have cmd, onData, onExit, and procDoneC set.
+func (tm *TaskManager) launchProcess(t *task, cols, rows uint16) error {
+	winSize := &pty.Winsize{Cols: cols, Rows: rows}
 	if winSize.Cols == 0 {
 		winSize.Cols = 120
 	}
@@ -90,12 +103,12 @@ func (tm *TaskManager) startWithPTY(t *task, opts SpawnOptions) error {
 
 	ptmx, err := pty.StartWithSize(t.cmd, winSize)
 	if err != nil {
-		tm.mu.Lock()
-		delete(tm.tasks, t.id)
-		tm.mu.Unlock()
 		return fmt.Errorf("pty start: %w", err)
 	}
 	t.ptyFile = ptmx
+
+	// Capture per-launch values so the goroutine is not affected by future restarts.
+	procDoneC := t.procDoneC
 
 	go func() {
 		buf := make([]byte, 4096)
@@ -110,10 +123,11 @@ func (tm *TaskManager) startWithPTY(t *task, opts SpawnOptions) error {
 				if len(t.buffer) > maxBufferSize {
 					t.buffer = t.buffer[len(t.buffer)-maxBufferSize:]
 				}
+				onData := t.onData
 				t.mu.Unlock()
 
-				if opts.OnData != nil {
-					opts.OnData(data)
+				if onData != nil {
+					onData(data)
 				}
 			}
 			if err != nil {
@@ -133,22 +147,112 @@ func (tm *TaskManager) startWithPTY(t *task, opts SpawnOptions) error {
 		t.mu.Lock()
 		t.done = true
 		t.exitCode = exitCode
+		isRestarting := t.isRestarting
+		onExit := t.onExit
 		t.mu.Unlock()
 
-		if t.ptyFile != nil {
-			t.ptyFile.Close()
-		}
+		ptmx.Close()
 
-		if opts.OnExit != nil {
-			opts.OnExit(exitCode)
-		}
+		// Signal that this process instance is finished.
+		close(procDoneC)
 
-		tm.mu.Lock()
-		delete(tm.tasks, t.id)
-		tm.mu.Unlock()
+		if !isRestarting {
+			if onExit != nil {
+				onExit(exitCode)
+			}
+			tm.mu.Lock()
+			delete(tm.tasks, t.id)
+			tm.mu.Unlock()
+		}
 	}()
 
 	return nil
+}
+
+// Restart kills the running process for taskID and respawns it with the given
+// command, all within the same task slot. The server never sees an exec.exit
+// for the intermediate kill — only for the eventual exit of the new process.
+func (tm *TaskManager) Restart(taskID, command, workDir string, cols, rows uint16) (int, error) {
+	tm.mu.RLock()
+	t, ok := tm.tasks[taskID]
+	tm.mu.RUnlock()
+	if !ok {
+		return 0, fmt.Errorf("task %s not found", taskID)
+	}
+
+	// Mark as restarting and send SIGTERM to the current process.
+	t.mu.Lock()
+	if t.done {
+		t.mu.Unlock()
+		return 0, fmt.Errorf("task %s already exited", taskID)
+	}
+	t.isRestarting = true
+	procDoneC := t.procDoneC
+	if t.cmd.Process != nil {
+		t.cmd.Process.Signal(syscall.SIGTERM)
+	}
+	t.mu.Unlock()
+
+	// Wait for the current process to finish.
+	select {
+	case <-procDoneC:
+		// Exited cleanly after SIGTERM.
+	case <-time.After(5 * time.Second):
+		// Escalate to SIGKILL.
+		t.mu.Lock()
+		if !t.done && t.cmd.Process != nil {
+			t.cmd.Process.Signal(syscall.SIGKILL)
+		}
+		t.mu.Unlock()
+		select {
+		case <-procDoneC:
+		case <-time.After(2 * time.Second):
+			return 0, fmt.Errorf("task %s failed to stop within timeout", taskID)
+		}
+	}
+
+	// Write a visual separator into the stream so the terminal shows a restart boundary.
+	separator := []byte("\r\n\033[90m─── restarting ───\033[0m\r\n\r\n")
+	t.mu.Lock()
+	t.buffer = append(t.buffer, separator...)
+	if len(t.buffer) > maxBufferSize {
+		t.buffer = t.buffer[len(t.buffer)-maxBufferSize:]
+	}
+	onData := t.onData
+	t.mu.Unlock()
+	if onData != nil {
+		onData(separator)
+	}
+
+	// Set up the new command and reset task state.
+	cmd := execCommand("bash", "-c", command)
+	cmd.Dir = workDir
+	cmd.Env = os.Environ()
+
+	t.mu.Lock()
+	t.cmd = cmd
+	t.done = false
+	t.exitCode = 0
+	t.isRestarting = false
+	t.procDoneC = make(chan struct{})
+	t.mu.Unlock()
+
+	if err := tm.launchProcess(t, cols, rows); err != nil {
+		// Launch failed — fire a terminal exit so the server cleans up the task.
+		t.mu.Lock()
+		t.done = true
+		onExit := t.onExit
+		t.mu.Unlock()
+		if onExit != nil {
+			onExit(1)
+		}
+		tm.mu.Lock()
+		delete(tm.tasks, t.id)
+		tm.mu.Unlock()
+		return 0, err
+	}
+
+	return t.cmd.Process.Pid, nil
 }
 
 func (tm *TaskManager) WritePTY(taskID string, data []byte) error {

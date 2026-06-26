@@ -1500,6 +1500,49 @@ export default function HomePage() {
     }
   };
 
+  const handleStopExecCard = async (msgId: string) => {
+    if (!selectedSessionId) return;
+    try {
+      await fetch("/api/tasks/kill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: selectedSessionId, messageId: msgId }),
+      });
+    } catch (err) {
+      console.error("Failed to stop task:", err);
+    }
+  };
+
+  const handleRestartScriptCard = async (msgId: string, scriptName: string) => {
+    if (!selectedSessionId) return;
+    try {
+      await fetch(`/api/sessions/${selectedSessionId}/restart-script`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scriptName, messageId: msgId }),
+      });
+      // Runner restarts in-place — no state update needed.
+    } catch (err) {
+      console.error("Failed to restart script:", err);
+    }
+  };
+
+  const handleRetryCard = async (cardInfo: ExecCardInfo) => {
+    if (!selectedSessionId) return;
+    if (cardInfo.isScript) {
+      handleRunScript(cardInfo.commandLabel);
+    } else {
+      try {
+        await fetch(`/api/sessions/${selectedSessionId}/rerun-agent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+      } catch (err) {
+        console.error("Failed to retry agent:", err);
+      }
+    }
+  };
+
   const handleSelectProject = (projectId: string) => {
     setSelectedProjectId(projectId);
     setSelectedSessionId(null);
@@ -3316,15 +3359,21 @@ export default function HomePage() {
                 // Render execution cards for run messages
                 const cardInfo = execCards.get(msg.id);
                 if (cardInfo) {
+                  const cardItem = execCardInfoToItem(cardInfo);
+                  const isCardRunning = cardItem.status === "running";
+                  const isCardFailed = cardItem.status === "error";
                   return (
                     <ExecCard
                       key={msg.id}
-                      item={execCardInfoToItem(cardInfo)}
+                      item={cardItem}
                       onViewLog={() => {
                         setActiveLogMsgId(msg.id);
                         setLogModalOpen(true);
                       }}
                       onShowCommand={cardInfo.command ? () => setCommandModalText(cardInfo.command) : undefined}
+                      onStopTask={isCardRunning ? () => handleStopExecCard(cardInfo.runMsg.id) : undefined}
+                      onRestartScript={isCardRunning && cardInfo.isScript ? () => handleRestartScriptCard(cardInfo.runMsg.id, cardInfo.commandLabel) : undefined}
+                      onRetryTask={isCardFailed ? () => handleRetryCard(cardInfo) : undefined}
                     />
                   );
                 }
