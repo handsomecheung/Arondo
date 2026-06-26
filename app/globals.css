@@ -2107,3 +2107,17 @@ body {
   cursor: not-allowed;
   text-align: left;
 }
+
+/* ─── Terminal scrollbar: hide scrollbar, keep touch scrolling ────────────── */
+.modal-body .xterm .xterm-viewport {
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  overflow-y: scroll !important;
+}
+.modal-body .xterm .xterm-viewport::-webkit-scrollbar {
+  width: 0;
+  display: none;
+}
+.modal-body .xterm .xterm-scrollable-element > .scrollbar {
+  display: none !important;
+}

@@ -47,6 +47,9 @@ export default function Terminal({ sessionId, messageId, ws, mode, taskType }: T
         background: "#1a1a2e",
         foreground: "#e0e0e0",
         cursor: "#e0e0e0",
+        scrollbarSliderBackground: "transparent",
+        scrollbarSliderHoverBackground: "transparent",
+        scrollbarSliderActiveBackground: "transparent",
       },
       convertEol: true,
       scrollback: 5000,
@@ -78,7 +81,34 @@ export default function Terminal({ sessionId, messageId, ws, mode, taskType }: T
     });
     resizeObserver.observe(containerRef.current);
 
+    let touchStartY = 0;
+    let touchAccum = 0;
+    const lineHeight = Math.ceil(term.options.fontSize! * 1.2);
+    const el = containerRef.current;
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        touchStartY = e.touches[0].clientY;
+        touchAccum = 0;
+      }
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      const dy = touchStartY - e.touches[0].clientY;
+      touchStartY = e.touches[0].clientY;
+      touchAccum += dy;
+      const lines = Math.trunc(touchAccum / lineHeight);
+      if (lines !== 0) {
+        term.scrollLines(lines);
+        touchAccum -= lines * lineHeight;
+      }
+      e.preventDefault();
+    };
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+
     return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
       resizeObserver.disconnect();
       term.dispose();
       termRef.current = null;
