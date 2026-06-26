@@ -207,24 +207,6 @@ function IconGitPullRequest() {
   );
 }
 
-function IconGitCommit() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="4" />
-      <line x1="1.05" y1="12" x2="7" y2="12" />
-      <line x1="17" y1="12" x2="22.95" y2="12" />
-    </svg>
-  );
-}
 
 function IconInbox() {
   return (
@@ -649,7 +631,6 @@ export default function HomePage() {
   // GitHub states
   const [githubConfigured, setGithubConfigured] = useState(false);
   const [isCreatingPr, setIsCreatingPr] = useState(false);
-  const [isCommitting, setIsCommitting] = useState(false);
   const [isCheckingGitChanges, setIsCheckingGitChanges] = useState(false);
   const [hasGitChanges, setHasGitChanges] = useState(true);
   const [isGitRepo, setIsGitRepo] = useState(true);
@@ -1987,53 +1968,6 @@ export default function HomePage() {
     }
   };
 
-  const handleCommitChanges = async () => {
-    if (!selectedSessionId || isRunning || isCommitting) return;
-    setIsCommitting(true);
-    const tempTaskId = `agent-${selectedSessionId}-${Date.now()}`;
-    setTaskQueue((prev) => [
-      ...prev,
-      {
-        id: tempTaskId,
-        type: "agent",
-        name: `Agent: Commit changes`,
-        sessionId: selectedSessionId,
-        status: "running",
-        createdAt: Date.now(),
-      },
-    ]);
-    try {
-      const commitPrompt =
-        'Please commit only the changes within the current project directory with an appropriate commit message. Always use `git commit -m "<message>"` to pass the commit message inline — never run `git commit` without `-m`, as there is no interactive terminal available. Make sure to only stage and commit modifications under this directory, and avoid committing changes outside of it (for example, avoid using `git commit -a` which might include changes from the entire repository).';
-      const res = await fetch(`/api/sessions/${selectedSessionId}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: commitPrompt,
-          type: "chat-system-defined",
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        setApiError({
-          title: "Commit Changes Error",
-          message: data.error || "Failed to commit changes",
-        });
-        setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
-      }
-    } catch (err: any) {
-      console.error(err);
-      setApiError({
-        title: "Commit Changes Error",
-        message:
-          err.message ||
-          "An error occurred while calling the agent to commit changes.",
-      });
-      setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
-    } finally {
-      setIsCommitting(false);
-    }
-  };
 
   const handleSelectSession = (id: string) => {
     setSelectedSessionId(id);
@@ -3270,41 +3204,6 @@ export default function HomePage() {
                           🔍 Show Diff
                         </a>
                       )}
-
-                      {/* Commit Changes — requires git repo */}
-                      <button
-                        className="menu-item"
-                        onClick={() => {
-                          handleCommitChanges();
-                          setMenuOpen(false);
-                        }}
-                        disabled={
-                          !isGitRepo ||
-                          isRunning ||
-                          isCommitting ||
-                          isCheckingGitChanges ||
-                          !hasGitChanges
-                        }
-                        title={
-                          !isGitRepo
-                            ? "Not a git repository"
-                            : isRunning
-                              ? "Agent is running"
-                              : isCommitting
-                                ? "Committing changes in progress..."
-                                : isCheckingGitChanges
-                                  ? "Checking git changes..."
-                                  : !hasGitChanges
-                                    ? "No changes to commit"
-                                    : undefined
-                        }
-                        id="menu-commit-changes"
-                      >
-                        <IconGitCommit />{" "}
-                        {isCommitting
-                          ? "Committing Changes…"
-                          : "Commit Changes"}
-                      </button>
 
                       {/* Create PR / View PR — requires git repo */}
                       {selectedSession.prUrl ? (
