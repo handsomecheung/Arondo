@@ -44,10 +44,12 @@ export async function POST(
 
     const patch: Record<string, any> = { status: "running", command };
     if (!session.prompt) {
-      const firstLine = trimmedMessage.split("\n")[0];
-      patch.name = firstLine.length > MAX_SESSION_NAME_LENGTH
-        ? firstLine.slice(0, MAX_SESSION_NAME_LENGTH) + "…"
-        : firstLine;
+      if (!session.name) {
+        const firstLine = trimmedMessage.split("\n")[0];
+        patch.name = firstLine.length > MAX_SESSION_NAME_LENGTH
+          ? firstLine.slice(0, MAX_SESSION_NAME_LENGTH) + "…"
+          : firstLine;
+      }
       patch.prompt = trimmedMessage;
     }
     const updatedSession = await updateSession(id, patch);
