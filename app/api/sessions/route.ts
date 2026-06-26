@@ -25,11 +25,12 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { prompt, repoPath, agentType = "antigravity", runnerId } = body as {
+  const { prompt, repoPath, agentType = "antigravity", runnerId, name } = body as {
     prompt: string;
     repoPath: string;
     agentType?: string;
     runnerId: string;
+    name?: string;
   };
 
   const isBlank = !prompt || !prompt.trim();
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
     const session = await createSession({
       status: "idle",
       prompt: "",
-      name: deriveSessionName("", repoPath),
+      name: name?.trim() || deriveSessionName("", repoPath),
       agentType,
       repoPath,
       runnerId,
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
   const session = await createSession({
     status: "running",
     prompt,
-    name: deriveSessionName(prompt, repoPath),
+    name: name?.trim() || deriveSessionName(prompt, repoPath),
     agentType,
     repoPath,
     runnerId,

@@ -557,6 +557,7 @@ export default function HomePage() {
   );
   const [messages, setMessages] = useState<Message[]>([]);
   const [prompt, setPrompt] = useState("");
+  const [showCommandMenu, setShowCommandMenu] = useState(false);
   const [repoPath, setRepoPath] = useState("");
   const [agentType, setAgentType] = useState("antigravity");
   const [runnerId, setRunnerId] = useState("");
@@ -1362,20 +1363,61 @@ export default function HomePage() {
 
   // ── Auto-resize textarea ──
   const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setPrompt(e.target.value);
+    const value = e.target.value;
+    setPrompt(value);
+    setShowCommandMenu(value.startsWith("/") && !isNewSession && !!selectedSessionId);
     const el = e.target;
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 260)}px`;
   };
+
+  // ── Handle /new command: open a new blank session with the same project/agent/runner ──
+  const handleNewSessionCommand = useCallback(async (sessionName?: string) => {
+    if (!selectedSession) return;
+    setPrompt("");
+    setShowCommandMenu(false);
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
+    const { repoPath: sessionRepoPath, agentType: sessionAgentType, runnerId: sessionRunnerId } = selectedSession;
+    const res = await fetch("/api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: "",
+        repoPath: sessionRepoPath,
+        agentType: sessionAgentType,
+        runnerId: sessionRunnerId,
+        ...(sessionName ? { name: sessionName } : {}),
+      }),
+    });
+    const newSession: Session = await res.json();
+    setSessions((prev) => [newSession, ...prev]);
+    setSelectedSessionId(newSession.id);
+    setIsNewSession(false);
+    setMessages([]);
+    setSessionLog("");
+    setActiveLogMsgId(null);
+    setLogModalOpen(false);
+    loadProjects();
+  }, [selectedSession, loadProjects]);
 
   // ── Submit session ──
   const handleSubmit = useCallback(async () => {
     const trimmed = prompt.trim();
     const isBlankSession = (isNewSession || !selectedSessionId) && !trimmed;
 
+    // Handle slash commands
+    if (trimmed.startsWith("/new") && !isNewSession && selectedSessionId) {
+      const rest = trimmed.slice(4).trim();
+      if (trimmed === "/new" || rest) {
+        await handleNewSessionCommand(rest || undefined);
+        return;
+      }
+    }
+
     if (!trimmed && !isBlankSession) return;
 
     setPrompt("");
+    setShowCommandMenu(false);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
 
     try {
@@ -1459,11 +1501,18 @@ export default function HomePage() {
     selectedSessionId,
     loadProjects,
     setTaskQueue,
+    handleNewSessionCommand,
   ]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Prevent sending message during IME composition
     if (e.nativeEvent.isComposing) return;
+
+    if (e.key === "Escape" && showCommandMenu) {
+      e.preventDefault();
+      setShowCommandMenu(false);
+      return;
+    }
 
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
@@ -3596,6 +3645,22 @@ export default function HomePage() {
                       </div>
                     )}
                   </div>
+                </div>
+              )}
+
+              {showCommandMenu && (
+                <div className="command-menu">
+                  <button
+                    className={`command-menu-item${prompt.trim().startsWith("/new") ? " active" : ""}`}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      const rest = prompt.trim().slice(4).trim();
+                      handleNewSessionCommand(rest || undefined);
+                    }}
+                  >
+                    <span className="command-menu-name">/new [name]</span>
+                    <span className="command-menu-desc">Open a new session with the same project &amp; agent</span>
+                  </button>
                 </div>
               )}
 
