@@ -1,5 +1,2 @@
-<!-- BEGIN:nextjs-agent-rules -->
-# This is NOT the Next.js you know
-
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
-<!-- END:nextjs-agent-rules -->
+# Codex Rules
+Please refer to [AGENTS-CONTEXT.md](AGENTS-CONTEXT.md) in the root directory for core instructions and project context. If an `AGENTS-CONTEXT.md` file exists in the subdirectory you are working in, please refer to it as well for localized rules.
