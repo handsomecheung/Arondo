@@ -5,6 +5,9 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 
 const Terminal = dynamic(() => import("@/components/Terminal"), { ssr: false });
+const ShellTerminal = dynamic(() => import("@/components/ShellTerminal"), {
+  ssr: false,
+});
 import ExecCard from "@/components/ExecCard";
 import type { ExecCardItem } from "@/components/ExecCard";
 
@@ -421,6 +424,24 @@ function IconSettings() {
   );
 }
 
+function IconTerminal() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="4 17 10 11 4 5" />
+      <line x1="12" y1="19" x2="20" y2="19" />
+    </svg>
+  );
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatTime(iso: string) {
@@ -643,6 +664,7 @@ export default function HomePage() {
   const [activeLogMsgId, setActiveLogMsgId] = useState<string | null>(null);
   const [logModalOpen, setLogModalOpen] = useState(false);
   const [commandModalText, setCommandModalText] = useState<string | null>(null);
+  const [shellModalOpen, setShellModalOpen] = useState(false);
 
   const activeLogMsgIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -3278,6 +3300,18 @@ export default function HomePage() {
                         </div>
                       )}
 
+                      {/* Open Terminal */}
+                      <button
+                        className="menu-item"
+                        onClick={() => {
+                          setShellModalOpen(true);
+                          setMenuOpen(false);
+                        }}
+                        id="menu-open-terminal"
+                      >
+                        <IconTerminal /> Open Terminal
+                      </button>
+
                       {/* Rename Session */}
                       <button
                         className="menu-item"
@@ -3760,6 +3794,47 @@ export default function HomePage() {
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Shell Terminal Modal */}
+      {shellModalOpen && (
+        <div
+          className="modal-backdrop"
+          onClick={() => setShellModalOpen(false)}
+        >
+          <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <span
+                className="modal-title"
+                style={{ display: "flex", alignItems: "center", gap: 6 }}
+              >
+                <IconTerminal />
+                Terminal
+                {selectedSession && (
+                  <span style={{ opacity: 0.5, fontSize: 12, marginLeft: 4 }}>
+                    {selectedSession.repoPath}
+                  </span>
+                )}
+              </span>
+              <button
+                className="modal-close-btn"
+                onClick={() => setShellModalOpen(false)}
+                aria-label="Close terminal"
+              >
+                <IconX />
+              </button>
+            </div>
+            <div
+              className="modal-body"
+              style={{ padding: 0, overflow: "hidden" }}
+            >
+              <ShellTerminal
+                ws={wsInstance}
+                cwd={selectedSession?.repoPath}
+              />
             </div>
           </div>
         </div>
