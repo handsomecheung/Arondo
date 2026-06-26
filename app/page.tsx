@@ -1365,7 +1365,9 @@ export default function HomePage() {
   const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setPrompt(value);
-    setShowCommandMenu(value.startsWith("/") && !isNewSession && !!selectedSessionId);
+    const v = value.trim();
+    const matchesCommand = v.startsWith("/new") || v.startsWith("/commit") || "/new".startsWith(v) || "/commit".startsWith(v);
+    setShowCommandMenu(v.startsWith("/") && matchesCommand && !isNewSession && !!selectedSessionId);
     const el = e.target;
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 260)}px`;
@@ -1400,6 +1402,47 @@ export default function HomePage() {
     loadProjects();
   }, [selectedSession, loadProjects]);
 
+  // ── Handle /commit command: send a commit instruction to the agent ──
+  const handleCommitCommand = useCallback(async (commitMessage?: string) => {
+    if (!selectedSessionId) return;
+    setPrompt("");
+    setShowCommandMenu(false);
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
+    const agentMessage = commitMessage
+      ? `commit the changes with message: "${commitMessage}". Use this exact message — do not add, modify, or append any extra information to it.`
+      : "commit the changes";
+    const tempTaskId = `agent-${selectedSessionId}-${Date.now()}`;
+    setTaskQueue((prev) => [
+      ...prev,
+      {
+        id: tempTaskId,
+        type: "agent",
+        name: `Agent: ${agentMessage}`,
+        sessionId: selectedSessionId,
+        status: "running",
+        createdAt: Date.now(),
+      },
+    ]);
+    try {
+      const res = await fetch(`/api/sessions/${selectedSessionId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: agentMessage, type: "chat-user" }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setApiError({
+          title: "Commit Error",
+          message: data.error || "Failed to send commit command",
+        });
+        setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
+      }
+    } catch (err: any) {
+      console.error(err);
+      setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
+    }
+  }, [selectedSessionId, setTaskQueue]);
+
   // ── Submit session ──
   const handleSubmit = useCallback(async () => {
     const trimmed = prompt.trim();
@@ -1412,6 +1455,12 @@ export default function HomePage() {
         await handleNewSessionCommand(rest || undefined);
         return;
       }
+    }
+
+    if (trimmed.startsWith("/commit") && !isNewSession && selectedSessionId) {
+      const rest = trimmed.slice(7).trim();
+      await handleCommitCommand(rest || undefined);
+      return;
     }
 
     if (!trimmed && !isBlankSession) return;
@@ -1502,6 +1551,7 @@ export default function HomePage() {
     loadProjects,
     setTaskQueue,
     handleNewSessionCommand,
+    handleCommitCommand,
   ]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -3650,17 +3700,32 @@ export default function HomePage() {
 
               {showCommandMenu && (
                 <div className="command-menu">
-                  <button
-                    className={`command-menu-item${prompt.trim().startsWith("/new") ? " active" : ""}`}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      const rest = prompt.trim().slice(4).trim();
-                      handleNewSessionCommand(rest || undefined);
-                    }}
-                  >
-                    <span className="command-menu-name">/new [name]</span>
-                    <span className="command-menu-desc">Open a new session with the same project &amp; agent</span>
-                  </button>
+                  {("/new").startsWith(prompt.trim()) || prompt.trim().startsWith("/new") ? (
+                    <button
+                      className={`command-menu-item${prompt.trim().startsWith("/new") ? " active" : ""}`}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        const rest = prompt.trim().slice(4).trim();
+                        handleNewSessionCommand(rest || undefined);
+                      }}
+                    >
+                      <span className="command-menu-name">/new [name]</span>
+                      <span className="command-menu-desc">Open a new session with the same project &amp; agent</span>
+                    </button>
+                  ) : null}
+                  {("/commit").startsWith(prompt.trim()) || prompt.trim().startsWith("/commit") ? (
+                    <button
+                      className={`command-menu-item${prompt.trim().startsWith("/commit") ? " active" : ""}`}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        const rest = prompt.trim().slice(7).trim();
+                        handleCommitCommand(rest || undefined);
+                      }}
+                    >
+                      <span className="command-menu-name">/commit [message]</span>
+                      <span className="command-menu-desc">Commit the changes, optionally with a specified message</span>
+                    </button>
+                  ) : null}
                 </div>
               )}
 
