@@ -823,14 +823,14 @@ body {
     border-color 0.2s,
     box-shadow 0.2s;
   line-height: 1.6;
-  max-height: 120px;
+  max-height: 200px;
   min-height: 68px; /* Increased min-height to fit 2-line placeholders without text clipping */
 }
 @media (min-width: 768px) {
   .chat-input {
     font-size: 13px;
     min-height: 44px;
-    max-height: 140px;
+    max-height: 260px;
   }
 }
 .chat-input:focus {

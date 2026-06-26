@@ -1365,7 +1365,7 @@ export default function HomePage() {
     setPrompt(e.target.value);
     const el = e.target;
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, 260)}px`;
   };
 
   // ── Submit session ──
