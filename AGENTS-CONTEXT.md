@@ -27,7 +27,7 @@ runner/                  # Go runner binary
   client.go             # WebSocket client: connect, reconnect (exponential backoff), heartbeat
   protocol.go           # Message envelope struct (id, type, method, payload), constructors
   handler.go            # Request dispatcher by method string, response helpers
-  handler_exec.go       # exec.agent, exec.script, exec.cancel (all PTY-based)
+  handler_exec.go       # exec.agent, exec.script, exec.cancel, exec.restart (all PTY-based)
   handler_fs.go         # fs.list: directory listing
   handler_git.go        # git.status, git.diff, git.pr.create
   handler_pty.go        # pty.input (write to PTY), pty.resize
@@ -40,7 +40,7 @@ app/
   globals.css           # Design system
   api/
     runners/
-      route.ts          # GET: list connected runners
+      route.ts          # GET: list all known runners (connected + disconnected, with lastSeenAt)
     sessions/
       route.ts          # POST: create session & run agent via runner; GET: list sessions
       [id]/
@@ -55,6 +55,10 @@ app/
           route.ts      # POST: add user follow-up message & trigger agent via runner
         run-script/
           route.ts      # POST: run a project script via runner PTY
+        restart-script/
+          route.ts      # POST: restart a specific script task in-place via exec.restart
+        rerun-agent/
+          route.ts      # POST: re-run the agent from scratch for a session (isResume: false)
         pr/
           route.ts      # POST: trigger GitHub Pull Request creation via runner
     projects/
@@ -124,6 +128,7 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 | `exec.agent` | S→R request | Start agent command (PTY mode) |
 | `exec.script` | S→R request | Start script (PTY mode) |
 | `exec.cancel` | S→R request | Kill a running task (SIGTERM/SIGKILL) |
+| `exec.restart` | S→R request | Kill current process and re-spawn with new command in the same task slot; shows ─── restarting ─── separator |
 | `exec.output` | R→S stream | Stdout/stderr data (base64-encoded) |
 | `exec.exit` | R→S event | Process exited with exit code |
 | `pty.input` | S→R request | Write stdin data to PTY |
@@ -137,10 +142,12 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 
 `lib/runner-manager.ts` is the central coordinator. Key responsibilities:
 
-- **Connection management**: Tracks connected runners (including IP address). Runner IDs are stable across reconnections (derived from `name@hostname`).
-- **Task routing**: Maps `taskId` → `TaskContext` (sessionId, messageId, runnerId, type, pid, completedAt, exitCode). Maps `sessionId:messageId` → `taskId` for PTY input routing.
+- **Connection management**: Tracks connected runners (including IP address). Runner IDs are stable across reconnections (derived from `name@hostname`). `RunnerInfo.lastSeenAt` is stamped on both connect and disconnect.
+- **Task routing**: Maps `taskId` → `TaskContext` (sessionId, messageId, runnerId, type, pid, completedAt, exitCode, stoppedByUser). Maps `sessionId:messageId` → `taskId` for PTY input routing.
 - **Task persistence & retention**: All tasks (active + completed) are saved to `data/active-tasks.json`. Completed tasks are retained for 7 days (`TASK_RETENTION_MS`), then purged on startup. On server restart, tasks are restored and active ones re-associated to the reconnecting runner.
 - **Task cleanup**: `removeTasksForSession()` cleans up tasks when a session is deleted. `getAllTasks()` returns all tasks (active + retained). `purgeExpiredTasks()` removes completed tasks older than 7 days.
+- **Runner discovery**: `getAllKnownRunners()` returns both connected runners and disconnected runners persisted on disk, used by the `/api/runners` route.
+- **Task restart**: `restartTask()` sends `exec.restart` to the runner, killing the current process and re-spawning it with a new command within the same task slot.
 - **Runner resolution**: `resolveRunnerId()` falls back to any connected runner when a session's stored runnerId is stale.
 - **Stream/event handling**: Routes `exec.output` streams to the correct session's log file and event bus. Handles `exec.exit` to update session status and add completion messages.
 - **Disconnect cleanup**: Fails orphaned active tasks when a runner disconnects (skips already-completed tasks).
@@ -177,6 +184,10 @@ Two WebSocket endpoints:
 - **Message-specific execution logs**: Every agent or script execution creates a specific system message (e.g. `⚙️ Executing command...`). The resulting terminal outputs are streamed via the runner and stored in `data/sessions/[sessionId]/logs/[systemMsgId].log`.
 - **Interactive Terminal (PTY)**: Script execution uses Go's `creack/pty` on the runner for full pseudo-terminal support (stdin, ANSI colors, cursor control). The frontend renders output via `xterm.js` (`components/Terminal.tsx`) in two modes: live (WebSocket-connected for running scripts, with historical log pre-loaded) and history (loads saved log data for completed scripts).
 - **Task Queue & Log Popup**: Tasks are tracked in a global header queue grouped by session, with session names always visible. Completed tasks are retained for 7 days. Clicking any task switches to its session and opens the log modal. Each running task has a kill button that sends SIGTERM via the runner.
+- **User-stopped vs Failed distinction**: When a task is killed via the UI, `TaskContext.stoppedByUser` is set, producing a 🛑 "Stopped by user" completion message and `errorMessage` instead of an ❌ error. The terminal shows a “─── stopped by user ───” separator.
+- **Restart/Retry actions**: ExecCard shows a Restart button for script tasks (calls `restart-script` API → `exec.restart` on the runner) and a Retry button for failed agent tasks (calls `rerun-agent` API). The terminal shows a “─── restarting ───” separator inline in the existing log.
+- **Slash commands in chat**: `/new [name]` opens a new session with the same project/agent/runner. `/commit [message]` sends a commit instruction to the current agent session.
+- **Open Terminal in session menu**: The three-dot dropdown in a session includes an "Open Terminal" option that opens a `ShellTerminal` modal for that session's runner.
 - **Real-time Streaming**: Both agent and script output stream via WebSocket `terminal:output` (base64-encoded PTY data), forwarded through the event bus. The frontend renders all logs via the xterm.js Terminal component.
 - **Concurrency**: Multiple background scripts can run concurrently in a single session. The chat prompt stays active during execution.
 - **Task Persistence**: Active task contexts survive server restarts via `data/active-tasks.json`. On runner reconnect, the `task.status` event reconciles running vs exited tasks.
