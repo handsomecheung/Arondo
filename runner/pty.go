@@ -193,7 +193,6 @@ func (tm *TaskManager) Restart(taskID, command, workDir string, cols, rows uint1
 	}
 	t.mu.Unlock()
 
-	// Wait for the current process to finish.
 	select {
 	case <-procDoneC:
 		// Exited cleanly after SIGTERM.
@@ -211,7 +210,6 @@ func (tm *TaskManager) Restart(taskID, command, workDir string, cols, rows uint1
 		}
 	}
 
-	// Write a visual separator into the stream so the terminal shows a restart boundary.
 	separator := []byte("\r\n\033[90m─── restarting ───\033[0m\r\n\r\n")
 	t.mu.Lock()
 	t.buffer = append(t.buffer, separator...)
@@ -224,7 +222,6 @@ func (tm *TaskManager) Restart(taskID, command, workDir string, cols, rows uint1
 		onData(separator)
 	}
 
-	// Set up the new command and reset task state.
 	cmd := execCommand("bash", "-c", command)
 	cmd.Dir = workDir
 	cmd.Env = os.Environ()

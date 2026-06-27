@@ -4,6 +4,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import ExecCard from "@/components/ExecCard";
+import {
+  IconArrowLeft, IconBolt, IconX, IconInbox, IconTerminal, IconCode,
+} from "@/components/Icons";
 
 const Terminal = dynamic(() => import("@/components/Terminal"), { ssr: false });
 
@@ -69,111 +72,6 @@ interface SessionGroup {
   tasks: TaskItem[];
 }
 
-function IconArrowLeft() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <line x1="19" y1="12" x2="5" y2="12" />
-      <polyline points="12 19 5 12 12 5" />
-    </svg>
-  );
-}
-
-function IconBolt() {
-  return (
-    <svg
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-    </svg>
-  );
-}
-
-function IconX() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-    >
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  );
-}
-
-function IconInbox() {
-  return (
-    <svg
-      width="48"
-      height="48"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
-      <path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z" />
-    </svg>
-  );
-}
-
-function IconTerminal() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <polyline points="4 17 10 11 4 5" />
-      <line x1="12" y1="19" x2="20" y2="19" />
-    </svg>
-  );
-}
-
-function IconCode() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <polyline points="16 18 22 12 16 6" />
-      <polyline points="8 6 2 12 8 18" />
-    </svg>
-  );
-}
 
 function formatDuration(ms: number): string {
   if (ms < 0) return "0s";
@@ -189,6 +87,7 @@ export default function TasksPage() {
   const [taskQueue, setTaskQueue] = useState<TaskItem[]>([]);
   const [taskTimeTicker, setTaskTimeTicker] = useState(Date.now());
   const [connected, setConnected] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const [terminalTask, setTerminalTask] = useState<TaskItem | null>(null);
   const [commandTask, setCommandTask] = useState<TaskItem | null>(null);
@@ -217,8 +116,8 @@ export default function TasksPage() {
             const res = await fetch(`/api/projects/${pid}/scripts`);
             const scripts: { name: string; command: string }[] = await res.json();
             scriptMap.set(pid, new Map(scripts.map((s) => [s.name, s.command])));
-          } catch {
-            // ignore
+          } catch (err) {
+            console.error(`Failed to load scripts for project ${pid}:`, err);
           }
         }),
       );
@@ -449,6 +348,7 @@ export default function TasksPage() {
         }),
       });
     } catch (err) {
+      setActionError("Failed to stop task. Please try again.");
       console.error("Failed to kill task:", err);
     }
   };
@@ -463,6 +363,7 @@ export default function TasksPage() {
       });
       // No state update needed — the runner restarts in-place, same taskId/messageId.
     } catch (err) {
+      setActionError("Failed to restart script. Please try again.");
       console.error("Failed to restart script:", err);
     }
   };
@@ -569,6 +470,29 @@ export default function TasksPage() {
             gap: 16,
           }}
         >
+          {actionError && (
+            <div
+              style={{
+                background: "var(--error-bg, #3a1a1a)",
+                color: "var(--error-text, #ff6b6b)",
+                border: "1px solid var(--error-border, #5a2a2a)",
+                borderRadius: 8,
+                padding: "10px 14px",
+                fontSize: 14,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              {actionError}
+              <button
+                onClick={() => setActionError(null)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontSize: 16, lineHeight: 1 }}
+              >
+                ×
+              </button>
+            </div>
+          )}
           <div
             style={{
               display: "flex",
@@ -601,7 +525,7 @@ export default function TasksPage() {
 
           {taskQueue.length === 0 ? (
             <div className="tasks-empty">
-              <IconInbox />
+              <IconInbox size={48} />
               <p style={{ color: "var(--text-secondary)", fontSize: 14, margin: "12px 0 0" }}>
                 No tasks
               </p>
@@ -741,7 +665,7 @@ export default function TasksPage() {
                 className="modal-title"
                 style={{ display: "flex", alignItems: "center", gap: 6 }}
               >
-                <IconTerminal />
+                <IconTerminal size={14} strokeWidth={2.5} />
                 {terminalTask.type === "script"
                   ? "Script Execution Log"
                   : "Agent Execution Log"}

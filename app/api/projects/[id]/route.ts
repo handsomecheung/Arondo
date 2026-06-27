@@ -13,7 +13,6 @@ export async function DELETE(
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  // Check if there are any associated sessions
   const sessions = await getSessions();
   const associatedSessions = sessions.filter((s) => s.projectId === id);
 

@@ -33,7 +33,6 @@ export default function Terminal({ sessionId, messageId, ws, mode, taskType }: T
     };
   }, [ws]);
 
-  // Create terminal and load initial content
   useEffect(() => {
     if (!containerRef.current) return;
 

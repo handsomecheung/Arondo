@@ -163,7 +163,6 @@ func (h *Handler) handleGitPrCreate(msg *Message) {
 		return
 	}
 
-	// Get current branch
 	branchCmd := execCommand("git", "branch", "--show-current")
 	branchCmd.Dir = req.WorkDir
 	branchOut, err := branchCmd.Output()
@@ -177,7 +176,6 @@ func (h *Handler) handleGitPrCreate(msg *Message) {
 		return
 	}
 
-	// Push branch
 	pushCmd := execCommand("git", "push", "-u", "origin", branchName)
 	pushCmd.Dir = req.WorkDir
 	if out, err := pushCmd.CombinedOutput(); err != nil {
@@ -185,7 +183,6 @@ func (h *Handler) handleGitPrCreate(msg *Message) {
 		return
 	}
 
-	// Create PR
 	prCmd := execCommand("gh", "pr", "create",
 		"--title", req.Title,
 		"--body", req.Body,
@@ -198,7 +195,6 @@ func (h *Handler) handleGitPrCreate(msg *Message) {
 		return
 	}
 
-	// Extract PR URL
 	prURL := ""
 	for _, line := range strings.Split(string(prOut), "\n") {
 		line = strings.TrimSpace(line)

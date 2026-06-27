@@ -36,8 +36,6 @@ export abstract class BaseAgent {
 
   /** Append system constraints to the prompt */
   protected getSystemPrompt(prompt: string): string {
-    // const systemConstraint = "\n\n[IMPORTANT: Do NOT create any pull requests, push to remote repositories, or commit the changes. Only make the required code changes directly on the filesystem.]";
-    const systemConstraint = "";
-    return prompt + systemConstraint;
+    return prompt;
   }
 }

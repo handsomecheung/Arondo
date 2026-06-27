@@ -48,7 +48,6 @@ export async function POST(
   });
   eventBus.publish({ type: "session_updated", payload: updatedSession });
 
-  // Run script via runner
   const runnerId = runnerManager.resolveRunnerId(session.runnerId);
   if (!runnerId) {
     return NextResponse.json({ error: "No connected runner available" }, { status: 503 });

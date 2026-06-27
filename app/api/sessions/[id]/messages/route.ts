@@ -63,7 +63,6 @@ export async function POST(
     });
     eventBus.publish({ type: "message_added", payload: systemMsg });
 
-    // Run agent via runner
     const runnerId = runnerManager.resolveRunnerId(session.runnerId);
     if (!runnerId) {
       return NextResponse.json({ error: "No connected runner available" }, { status: 503 });

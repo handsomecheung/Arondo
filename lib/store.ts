@@ -119,7 +119,6 @@ export async function getSessions(): Promise<Session[]> {
       }
     }
     
-    // Sort by most recent first
     return sessions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   } catch {
     return [];
@@ -276,7 +275,6 @@ export async function createSession(
     updatedAt: new Date().toISOString(),
   };
 
-  // Save session metadata inside its own folder
   await writeJson(getSessionFilePath(id), session);
   return session;
 }

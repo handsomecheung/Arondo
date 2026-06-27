@@ -87,7 +87,6 @@ export async function POST(req: NextRequest) {
   eventBus.publish({ type: "message_added", payload: systemMsg });
   eventBus.publish({ type: "session_updated", payload: session });
 
-  // Run agent via runner
   const taskId = `task_${crypto.randomUUID().slice(0, 8)}`;
   runnerManager.registerTask({
     taskId,

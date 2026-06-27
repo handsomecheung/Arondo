@@ -93,12 +93,8 @@ class RunnerManager {
 
   private async persistRunner(info: RunnerInfo): Promise<void> {
     const filePath = this.runnerFilePath(info.id);
-    try {
-      await fs.mkdir(path.dirname(filePath), { recursive: true });
-      await fs.writeFile(filePath, JSON.stringify(info, null, 2), "utf-8");
-    } catch (err) {
-      console.error("[runner-manager] failed to persist runner:", err);
-    }
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, JSON.stringify(info, null, 2), "utf-8");
   }
 
   async restoreRunners(): Promise<void> {
@@ -131,12 +127,8 @@ class RunnerManager {
 
   private async persistTasks(): Promise<void> {
     const data = Array.from(this.tasks.values());
-    try {
-      await fs.mkdir(path.dirname(TASKS_FILE), { recursive: true });
-      await fs.writeFile(TASKS_FILE, JSON.stringify(data), "utf-8");
-    } catch (err) {
-      console.error("[runner-manager] failed to persist tasks:", err);
-    }
+    await fs.mkdir(path.dirname(TASKS_FILE), { recursive: true });
+    await fs.writeFile(TASKS_FILE, JSON.stringify(data), "utf-8");
   }
 
   async restoreTasks(): Promise<void> {
@@ -173,9 +165,9 @@ class RunnerManager {
     if (id) {
       const existing = this.runners.get(id);
       if (existing) {
-        try {
+        if (existing.ws.readyState === 1 /* OPEN */ || existing.ws.readyState === 0 /* CONNECTING */) {
           existing.ws.close();
-        } catch {}
+        }
       }
     } else {
       id = crypto.randomUUID();

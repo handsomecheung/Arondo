@@ -19,9 +19,10 @@ export function setupRunnerServer(wss: WebSocketServer): void {
 
   wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
     let runnerId: string | null = null;
-    const remoteIp = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim()
-      || req.socket.remoteAddress
-      || "";
+    const remoteIp =
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+      req.socket.remoteAddress ||
+      "";
 
     ws.on("message", (raw) => {
       let msg: any;
@@ -54,11 +55,7 @@ export function setupRunnerServer(wss: WebSocketServer): void {
         return;
       }
 
-      try {
-        runnerManager.handleMessage(runnerId, raw.toString());
-      } catch (err) {
-        console.error("[runner-server] handleMessage error:", err);
-      }
+      runnerManager.handleMessage(runnerId, raw.toString());
     });
 
     ws.on("close", () => {

@@ -1,5 +1,26 @@
 # Arondo – Project Context
 
+## Coding Rules
+
+1. **Mobile-first**: The core purpose of this project is to enable iterating on projects anytime, anywhere, unconstrained by a specific machine. Mobile usability is always the top priority.
+
+2. **Minimal comments**: Only write comments when they carry information that the code itself cannot express. A good comment explains *why* or provides domain knowledge not visible in the code:
+   ```python
+   # Type 1 is A record, Type 28 is AAAA record
+   if answer.get("type") in (1, 28):
+   ```
+   A comment that merely restates what the code does is noise and must be omitted:
+   ```go
+   // run the command with bash   ← redundant, delete it
+   cmd := exec.Command("bash", "-c", command)
+   ```
+
+3. **1000-line file limit**: No file should exceed 1000 lines. If a file grows beyond that, refactor it — extract shared logic into a common library or split by responsibility.
+
+4. **No defensive exception handling**: Do not speculatively catch exceptions just because a function *might* throw. Let errors surface naturally and fix them when they actually occur.
+
+---
+
 Before starting work, ensure you have read the `README.md` in current directory to understand the project's background, objectives, and overall architecture. If a `README.md` exists in your current working directory (the project subdirectory you are modifying), refer to it for specific instructions and project details.
 
 ## Overview

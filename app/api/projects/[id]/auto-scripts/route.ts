@@ -55,7 +55,6 @@ Requirements:
 3. You MUST write your final output to the file "${outputJsonPathFormatted}" as a raw valid JSON array of objects where each object has "name" (string) and "command" (string). Example format: [{"name": "test", "command": "npm run test"}].
 4. Ensure that only the valid JSON array is written to that file, without any markdown formatting wrappers (like \`\`\`json).`;
 
-    // Write prompt instructions to a temporary file
     await fs.writeFile(tempPromptPath, promptInstructions, "utf-8");
 
     const args = [
@@ -136,9 +135,6 @@ Requirements:
     }
   } finally {
     try {
-      // await fs.unlink(tempJsonPath);
-    } catch {}
-    try {
       await fs.unlink(tempPromptPath);
     } catch {}
   }
@@ -163,7 +159,6 @@ export async function POST(
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  // Set status to running before launching background thread
   autoScriptsStatus.set(id, { status: "running" });
 
   // Fire and forget
