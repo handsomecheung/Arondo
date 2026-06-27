@@ -636,11 +636,16 @@ class RunnerManager {
       }
     }
 
-    // Detect quota exhaustion: agy exits 0 but produces no output
+    // Detect quota exhaustion: agy exits 0 but produces no output; claude logs session limit hit
     let quotaExhausted = false;
-    if (success && session?.agentType === "antigravity") {
+    if (session?.agentType === "antigravity" && success) {
       const log = await getSessionLog(ctx.sessionId, ctx.messageId);
       if (!log.trim()) {
+        quotaExhausted = true;
+      }
+    } else if (session?.agentType === "claude") {
+      const log = await getSessionLog(ctx.sessionId, ctx.messageId);
+      if (log.includes("You've hit your session limit")) {
         quotaExhausted = true;
       }
     }
@@ -657,22 +662,24 @@ class RunnerManager {
 
     const updated = await updateSession(ctx.sessionId, {
       status: nextStatus as any,
-      errorMessage: success
-        ? quotaExhausted
-          ? "agy quota exhausted — no output was produced"
-          : undefined
-        : stoppedByUser
-          ? "Stopped by user"
-          : `Agent exited with code ${exitCode}`,
+      errorMessage: quotaExhausted
+        ? session?.agentType === "claude"
+          ? "Claude session limit hit"
+          : "agy quota exhausted — no output was produced"
+        : success
+          ? undefined
+          : stoppedByUser
+            ? "Stopped by user"
+            : `Agent exited with code ${exitCode}`,
     });
 
-    const content = success
-      ? quotaExhausted
-        ? "⚠️ Your quota may be exhausted — please check your usage and try again later."
-        : "✅ Done!"
-      : stoppedByUser
-        ? "🛑 Stopped by user"
-        : `❌ Error: Agent exited with code ${exitCode}`;
+    const content = quotaExhausted
+      ? "⚠️ Your quota may be exhausted — please check your usage and try again later."
+      : success
+        ? "✅ Done!"
+        : stoppedByUser
+          ? "🛑 Stopped by user"
+          : `❌ Error: Agent exited with code ${exitCode}`;
     const agentMsg = await addMessage({
       sessionId: ctx.sessionId,
       role: success && !quotaExhausted ? "agent" : "system",
