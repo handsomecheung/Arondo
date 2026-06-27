@@ -878,10 +878,12 @@ export default function HomePage() {
       />
 
       <ShellTerminalModal
+        key={selectedSessionId ?? ""}
         open={shellModalOpen}
         onClose={() => setShellModalOpen(false)}
         repoPath={selectedSession?.repoPath}
         runnerId={selectedSession?.runnerId}
+        sessionId={selectedSessionId}
         ws={wsInstance}
       />
 

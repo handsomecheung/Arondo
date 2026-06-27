@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { IconX, IconTerminal } from "@/components/Icons";
 
@@ -8,13 +9,27 @@ interface Props {
   onClose: () => void;
   repoPath?: string;
   runnerId?: string;
+  sessionId?: string | null;
   ws: WebSocket | null;
 }
 
-export default function ShellTerminalModal({ open, onClose, repoPath, runnerId, ws }: Props) {
-  if (!open) return null;
+export default function ShellTerminalModal({ open, onClose, repoPath, runnerId, sessionId, ws }: Props) {
+  const [hasOpened, setHasOpened] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setHasOpened(true);
+    }
+  }, [open]);
+
+  if (!hasOpened) return null;
+
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div
+      className="modal-backdrop"
+      onClick={onClose}
+      style={{ display: open ? "flex" : "none" }}
+    >
       <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <span className="modal-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -29,7 +44,7 @@ export default function ShellTerminalModal({ open, onClose, repoPath, runnerId, 
           </button>
         </div>
         <div className="modal-body" style={{ padding: 0, overflow: "hidden" }}>
-          <ShellTerminal ws={ws} cwd={repoPath} runnerId={runnerId} />
+          <ShellTerminal ws={ws} cwd={repoPath} runnerId={runnerId} sessionId={sessionId ?? undefined} />
         </div>
       </div>
     </div>

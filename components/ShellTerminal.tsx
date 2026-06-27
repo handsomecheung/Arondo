@@ -9,9 +9,10 @@ interface ShellTerminalProps {
   ws: WebSocket | null;
   cwd?: string;
   runnerId?: string;
+  sessionId?: string;
 }
 
-export default function ShellTerminal({ ws, cwd, runnerId }: ShellTerminalProps) {
+export default function ShellTerminal({ ws, cwd, runnerId, sessionId }: ShellTerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -104,7 +105,7 @@ export default function ShellTerminal({ ws, cwd, runnerId }: ShellTerminalProps)
     if (!term) return;
 
     const { cols, rows } = term;
-    ws.send(JSON.stringify({ type: "shell:spawn", runnerId, cwd, cols, rows }));
+    ws.send(JSON.stringify({ type: "shell:spawn", runnerId, sessionId, cwd, cols, rows }));
 
     const onData = term.onData((data) => {
       if (ws.readyState === WebSocket.OPEN && shellIdRef.current) {
@@ -137,12 +138,9 @@ export default function ShellTerminal({ ws, cwd, runnerId }: ShellTerminalProps)
       onData.dispose();
       onResize.dispose();
       ws.removeEventListener("message", onMessage);
-      if (shellIdRef.current && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "shell:kill", shellId: shellIdRef.current }));
-        shellIdRef.current = null;
-      }
+      shellIdRef.current = null;
     };
-  }, [ws, wsReady, cwd, runnerId]);
+  }, [ws, wsReady, cwd, runnerId, sessionId]);
 
   return (
     <div

@@ -20,6 +20,21 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
   const clients = new Set<WebSocket>();
 
   eventBus.subscribe((event: SseEvent) => {
+    if (event.type === "session_deleted") {
+      const sessionId = event.payload.id;
+      if (sessionId) {
+        const shellId = `shell-${sessionId}`;
+        const runnerId = shellToRunner.get(shellId);
+        if (runnerId) {
+          runnerManager.sendFire(runnerId, "exec.cancel", {
+            taskId: shellId,
+            signal: "SIGKILL",
+          });
+          shellToRunner.delete(shellId);
+        }
+      }
+    }
+
     const wsType = EVENT_TYPE_MAP[event.type];
     if (!wsType) return;
     const isTerminalEvent = wsType.startsWith("terminal:");
@@ -102,31 +117,55 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
         }
 
         case "shell:spawn": {
-          const shellId = `shell-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          const shellId = msg.sessionId
+            ? `shell-${msg.sessionId}`
+            : `shell-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
           const runnerId = msg.runnerId ? runnerManager.resolveRunnerId(msg.runnerId) : undefined;
 
           if (runnerId) {
-            const cwd = msg.cwd || "";
-            runnerManager
-              .sendRequest(runnerId, "shell.spawn", {
-                taskId: shellId,
-                workDir: cwd,
-                cols: msg.cols || 120,
-                rows: msg.rows || 30,
-              })
-              .then(() => {
-                shellToRunner.set(shellId, runnerId);
-                shellIds.add(shellId);
-                if (ws.readyState === WebSocket.OPEN) {
-                  ws.send(JSON.stringify({ type: "shell:spawned", shellId }));
-                }
-              })
-              .catch((err) => {
-                console.error(`[ws-server] Failed to spawn shell on runner ${runnerId}:`, err);
-                if (ws.readyState === WebSocket.OPEN) {
-                  ws.send(JSON.stringify({ type: "shell:exit", shellId, code: 1 }));
-                }
-              });
+            if (shellToRunner.get(shellId) === runnerId) {
+              // Shell already exists on this runner, reconnect (attach) and replay buffer
+              shellIds.add(shellId);
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "shell:spawned", shellId }));
+              }
+              runnerManager
+                .sendRequest(runnerId, "pty.buffer", { taskId: shellId })
+                .then((res: any) => {
+                  if (res && res.data) {
+                    const data = Buffer.from(res.data, "base64").toString("utf-8");
+                    if (ws.readyState === WebSocket.OPEN) {
+                      ws.send(JSON.stringify({ type: "shell:output", shellId, data }));
+                    }
+                  }
+                })
+                .catch((err) => {
+                  console.error(`[ws-server] Failed to get PTY buffer for ${shellId}:`, err);
+                });
+            } else {
+              // Spawn a new shell
+              const cwd = msg.cwd || "";
+              runnerManager
+                .sendRequest(runnerId, "shell.spawn", {
+                  taskId: shellId,
+                  workDir: cwd,
+                  cols: msg.cols || 120,
+                  rows: msg.rows || 30,
+                })
+                .then(() => {
+                  shellToRunner.set(shellId, runnerId);
+                  shellIds.add(shellId);
+                  if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: "shell:spawned", shellId }));
+                  }
+                })
+                .catch((err) => {
+                  console.error(`[ws-server] Failed to spawn shell on runner ${runnerId}:`, err);
+                  if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: "shell:exit", shellId, code: 1 }));
+                  }
+                });
+            }
           } else {
             console.warn(`[ws-server] Cannot spawn shell: runner ${msg.runnerId || "unknown"} is offline or not specified`);
             if (ws.readyState === WebSocket.OPEN) {
@@ -186,16 +225,6 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
     });
 
     ws.on("close", () => {
-      for (const id of shellIds) {
-        const runnerId = shellToRunner.get(id);
-        if (runnerId) {
-          runnerManager.sendFire(runnerId, "exec.cancel", {
-            taskId: id,
-            signal: "SIGKILL",
-          });
-          shellToRunner.delete(id);
-        }
-      }
       shellIds.clear();
       clients.delete(ws);
     });

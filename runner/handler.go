@@ -46,6 +46,8 @@ func (h *Handler) handleRequest(msg *Message) {
 		h.handlePtyInput(msg)
 	case "pty.resize":
 		h.handlePtyResize(msg)
+	case "pty.buffer":
+		h.handlePtyBuffer(msg)
 	case "git.status":
 		h.handleGitStatus(msg)
 	case "git.diff":

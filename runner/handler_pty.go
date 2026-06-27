@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"log"
 )
 
@@ -47,4 +48,32 @@ func (h *Handler) handlePtyResize(msg *Message) {
 	}
 
 	h.sendResponse(msg.ID, OkResponse{OK: true})
+}
+
+type ptyBufferRequest struct {
+	TaskID string `json:"taskId"`
+}
+
+type ptyBufferResponse struct {
+	OK   bool   `json:"ok"`
+	Data string `json:"data"`
+}
+
+func (h *Handler) handlePtyBuffer(msg *Message) {
+	req, err := parsePayload[ptyBufferRequest](msg)
+	if err != nil {
+		h.sendError(msg.ID, "INTERNAL", "invalid payload: "+err.Error())
+		return
+	}
+
+	buf, err := h.taskManager.GetBuffer(req.TaskID)
+	if err != nil {
+		h.sendError(msg.ID, "NOT_FOUND", err.Error())
+		return
+	}
+
+	h.sendResponse(msg.ID, ptyBufferResponse{
+		OK:   true,
+		Data: base64.StdEncoding.EncodeToString(buf),
+	})
 }
