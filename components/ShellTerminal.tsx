@@ -10,14 +10,23 @@ interface ShellTerminalProps {
   cwd?: string;
   runnerId?: string;
   sessionId?: string;
+  open?: boolean;
 }
 
-export default function ShellTerminal({ ws, cwd, runnerId, sessionId }: ShellTerminalProps) {
+export default function ShellTerminal({ ws, cwd, runnerId, sessionId, open }: ShellTerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const shellIdRef = useRef<string | null>(null);
   const [wsReady, setWsReady] = useState(ws?.readyState === WebSocket.OPEN);
+
+  useEffect(() => {
+    if (open && termRef.current) {
+      requestAnimationFrame(() => {
+        termRef.current?.focus();
+      });
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!ws) { setWsReady(false); return; }
