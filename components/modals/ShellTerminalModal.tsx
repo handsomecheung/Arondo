@@ -44,7 +44,9 @@ export default function ShellTerminalModal({ open, onClose, repoPath, runnerId, 
           </button>
         </div>
         <div className="modal-body" style={{ padding: 0, overflow: "hidden" }}>
-          <ShellTerminal ws={ws} cwd={repoPath} runnerId={runnerId} sessionId={sessionId ?? undefined} open={open} />
+          {open && (
+            <ShellTerminal ws={ws} cwd={repoPath} runnerId={runnerId} sessionId={sessionId ?? undefined} open={open} onClose={onClose} />
+          )}
         </div>
       </div>
     </div>

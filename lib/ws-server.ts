@@ -3,6 +3,7 @@ import { eventBus, SseEvent } from "./event-bus";
 import { runnerManager } from "./runner-manager";
 
 const shellToRunner = new Map<string, string>();
+const pendingSpawns = new Map<string, Promise<any>>();
 
 const EVENT_TYPE_MAP: Record<string, string> = {
   session_updated: "session:updated",
@@ -32,6 +33,11 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
           });
           shellToRunner.delete(shellId);
         }
+      }
+    } else if (event.type === "shell_exit") {
+      const shellId = event.payload.shellId;
+      if (shellId) {
+        shellToRunner.delete(shellId);
       }
     }
 
@@ -123,15 +129,20 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
           const runnerId = msg.runnerId ? runnerManager.resolveRunnerId(msg.runnerId) : undefined;
 
           if (runnerId) {
+            if (pendingSpawns.has(shellId)) {
+              console.warn(`[ws-server] spawn request ignored because spawning is already in progress for shell ${shellId}`);
+              break;
+            }
+
             if (shellToRunner.get(shellId) === runnerId) {
               // Shell already exists on this runner, reconnect (attach) and replay buffer
               shellIds.add(shellId);
-              if (ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: "shell:spawned", shellId }));
-              }
-              runnerManager
+              const promise = runnerManager
                 .sendRequest(runnerId, "pty.buffer", { taskId: shellId })
                 .then((res: any) => {
+                  if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: "shell:spawned", shellId }));
+                  }
                   if (res && res.data) {
                     const data = Buffer.from(res.data, "base64").toString("utf-8");
                     if (ws.readyState === WebSocket.OPEN) {
@@ -140,12 +151,37 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
                   }
                 })
                 .catch((err) => {
-                  console.error(`[ws-server] Failed to get PTY buffer for ${shellId}:`, err);
+                  console.warn(`[ws-server] Failed to get PTY buffer for ${shellId}, spawning a new one:`, err.message);
+                  
+                  // Spawn a new shell since the previous one doesn't exist on the runner anymore
+                  const cwd = msg.cwd || "";
+                  return runnerManager
+                    .sendRequest(runnerId, "shell.spawn", {
+                      taskId: shellId,
+                      workDir: cwd,
+                      cols: msg.cols || 120,
+                      rows: msg.rows || 30,
+                    })
+                    .then(() => {
+                      shellToRunner.set(shellId, runnerId);
+                      if (ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: "shell:spawned", shellId }));
+                      }
+                    })
+                    .catch((spawnErr) => {
+                      console.error(`[ws-server] Failed to spawn shell on runner ${runnerId} after buffer error:`, spawnErr);
+                      if (ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: "shell:exit", shellId, code: 1 }));
+                      }
+                    });
                 });
+
+              pendingSpawns.set(shellId, promise);
+              promise.finally(() => pendingSpawns.delete(shellId));
             } else {
               // Spawn a new shell
               const cwd = msg.cwd || "";
-              runnerManager
+              const promise = runnerManager
                 .sendRequest(runnerId, "shell.spawn", {
                   taskId: shellId,
                   workDir: cwd,
@@ -165,6 +201,9 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
                     ws.send(JSON.stringify({ type: "shell:exit", shellId, code: 1 }));
                   }
                 });
+
+              pendingSpawns.set(shellId, promise);
+              promise.finally(() => pendingSpawns.delete(shellId));
             }
           } else {
             console.warn(`[ws-server] Cannot spawn shell: runner ${msg.runnerId || "unknown"} is offline or not specified`);

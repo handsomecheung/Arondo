@@ -58,9 +58,15 @@ type SpawnOptions struct {
 
 func (tm *TaskManager) Spawn(opts SpawnOptions) (int, error) {
 	tm.mu.Lock()
-	if _, exists := tm.tasks[opts.TaskID]; exists {
-		tm.mu.Unlock()
-		return 0, fmt.Errorf("task %s already exists", opts.TaskID)
+	if t, exists := tm.tasks[opts.TaskID]; exists {
+		fmt.Printf("[task-manager] task %s already exists, cleaning up older task first\n", opts.TaskID)
+		if t.ptyFile != nil {
+			t.ptyFile.Close()
+		}
+		if t.cmd != nil && t.cmd.Process != nil {
+			t.cmd.Process.Signal(syscall.SIGKILL)
+		}
+		delete(tm.tasks, opts.TaskID)
 	}
 
 	cmd := execCommand(opts.Command, opts.Args...)

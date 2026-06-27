@@ -11,9 +11,10 @@ interface ShellTerminalProps {
   runnerId?: string;
   sessionId?: string;
   open?: boolean;
+  onClose?: () => void;
 }
 
-export default function ShellTerminal({ ws, cwd, runnerId, sessionId, open }: ShellTerminalProps) {
+export default function ShellTerminal({ ws, cwd, runnerId, sessionId, open, onClose }: ShellTerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -63,7 +64,10 @@ export default function ShellTerminal({ ws, cwd, runnerId, sessionId, open }: Sh
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(containerRef.current);
-    requestAnimationFrame(() => fit.fit());
+    requestAnimationFrame(() => {
+      fit.fit();
+      term.focus();
+    });
 
     termRef.current = term;
     fitRef.current = fit;
@@ -138,6 +142,9 @@ export default function ShellTerminal({ ws, cwd, runnerId, sessionId, open }: Sh
         } else if (msg.type === "shell:exit" && msg.shellId === shellIdRef.current) {
           term.write(`\r\n\x1b[90m[Shell exited with code ${msg.code}]\x1b[0m\r\n`);
           shellIdRef.current = null;
+          if (onClose) {
+            onClose();
+          }
         }
       } catch { /* ignore */ }
     };
