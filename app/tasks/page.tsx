@@ -89,6 +89,7 @@ export default function TasksPage() {
   const [connected, setConnected] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const [wsInstance, setWsInstance] = useState<WebSocket | null>(null);
   const [terminalTask, setTerminalTask] = useState<TaskItem | null>(null);
   const [commandTask, setCommandTask] = useState<TaskItem | null>(null);
 
@@ -186,12 +187,14 @@ export default function TasksPage() {
 
       ws.onopen = () => {
         setConnected(true);
+        setWsInstance(ws);
         reconnectDelay = 1000;
       };
 
       ws.onclose = () => {
         setConnected(false);
         wsRef.current = null;
+        setWsInstance(null);
         if (!disposed) {
           reconnectTimer = setTimeout(() => {
             reconnectDelay = Math.min(reconnectDelay * 2, 10000);
@@ -693,7 +696,7 @@ export default function TasksPage() {
               <Terminal
                 sessionId={terminalTask.sessionId}
                 messageId={terminalTask.messageId}
-                ws={wsRef.current}
+                ws={wsInstance}
                 mode={terminalTask.status === "running" ? "live" : "history"}
                 taskType={terminalTask.type}
               />
