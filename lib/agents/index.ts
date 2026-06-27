@@ -47,4 +47,4 @@ export function getAgentBinaryNames(): string[] {
 }
 
 export { BaseAgent } from "./base";
-export type { AgentRunOptions, AgentResult } from "./base";
+export type { AgentRunOptions } from "./base";

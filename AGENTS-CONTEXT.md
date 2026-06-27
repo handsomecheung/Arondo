@@ -19,6 +19,8 @@
 
 4. **No defensive exception handling**: Do not speculatively catch exceptions just because a function *might* throw. Let errors surface naturally and fix them when they actually occur.
 
+5. **No dead code**: If you find unused dead code, delete it immediately. Do not keep it.
+
 ---
 
 Before starting work, ensure you have read the `README.md` in current directory to understand the project's background, objectives, and overall architecture. If a `README.md` exists in your current working directory (the project subdirectory you are modifying), refer to it for specific instructions and project details.

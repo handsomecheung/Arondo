@@ -15,21 +15,9 @@ export interface AgentRunOptions {
   isResume?: boolean;
 }
 
-export interface AgentResult {
-  /** Whether the agent completed without error */
-  success: boolean;
-  /** Full combined stdout output */
-  output: string;
-  /** Error message if success is false */
-  error?: string;
-  /** The command that was executed */
-  command?: string;
-}
 
 export abstract class BaseAgent {
   abstract readonly name: string;
-
-  abstract run(options: AgentRunOptions): Promise<AgentResult>;
 
   /** Get the command string that will be executed */
   abstract getCommand(options: Omit<AgentRunOptions, "onOutput">): string;

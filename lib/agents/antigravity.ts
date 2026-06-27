@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import fsSync from "fs";
 import path from "path";
 import os from "os";
-import { BaseAgent, AgentRunOptions, AgentResult } from "./base";
+import { BaseAgent, AgentRunOptions } from "./base";
 
 const DATA_DIR = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
@@ -68,81 +68,16 @@ export async function detectAgyConvId(): Promise<string | undefined> {
 export class AntigravityAgent extends BaseAgent {
   readonly name = "antigravity";
 
-  getCommand({ prompt, sessionId }: Omit<AgentRunOptions, "onOutput">): string {
+  getCommand({ prompt, repoPath, sessionId }: Omit<AgentRunOptions, "onOutput">): string {
     const fullPrompt = this.getSystemPrompt(prompt);
     const escapedPrompt = fullPrompt.replace(/"/g, '\\"');
+    const addDirArg = repoPath ? ` --add-dir "${repoPath}"` : "";
     if (sessionId) {
       const agyId = getAgySessionIdSync(sessionId);
       if (agyId) {
-        return `agy --conversation "${agyId}" --prompt "${escapedPrompt}" --dangerously-skip-permissions`;
+        return `agy --conversation "${agyId}" --prompt "${escapedPrompt}"${addDirArg} --dangerously-skip-permissions`;
       }
     }
-    return `agy --prompt "${escapedPrompt}" --dangerously-skip-permissions`;
-  }
-
-  async run({ prompt, repoPath, onOutput, sessionId, isResume }: AgentRunOptions): Promise<AgentResult> {
-    const { spawn } = await import("child_process");
-    const command = this.getCommand({ prompt, repoPath, sessionId, isResume });
-    const hasAgyId = sessionId ? !!getAgySessionIdSync(sessionId) : false;
-
-    return new Promise((resolve) => {
-      const proc = spawn("bash", ["-c", command], {
-        cwd: repoPath,
-        env: { ...process.env },
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-
-      let output = "";
-      let errorOutput = "";
-
-      proc.stdout.on("data", (chunk: Buffer) => {
-        const text = chunk.toString();
-        output += text;
-        for (const line of text.split("\n")) {
-          const trimmed = line.trim();
-          if (trimmed && !trimmed.startsWith("Warning: conversation")) {
-            onOutput?.(line);
-          }
-        }
-      });
-
-      proc.stderr.on("data", (chunk: Buffer) => {
-        const text = chunk.toString();
-        errorOutput += text;
-        for (const line of text.split("\n")) {
-          const trimmed = line.trim();
-          if (trimmed && !trimmed.startsWith("Warning: conversation")) {
-            onOutput?.(`[stderr] ${line}`);
-          }
-        }
-      });
-
-      proc.on("close", async (code) => {
-        const success = code === 0;
-
-        if (!hasAgyId && sessionId) {
-          const convId = await detectAgyConvId();
-          if (convId) {
-            await saveAgySessionId(sessionId, convId);
-          }
-        }
-
-        resolve({
-          success,
-          output,
-          error: success ? undefined : errorOutput || `Process exited with code ${code}`,
-          command,
-        });
-      });
-
-      proc.on("error", (err) => {
-        resolve({
-          success: false,
-          output,
-          error: err.message,
-          command,
-        });
-      });
-    });
+    return `agy --prompt "${escapedPrompt}"${addDirArg} --dangerously-skip-permissions`;
   }
 }
