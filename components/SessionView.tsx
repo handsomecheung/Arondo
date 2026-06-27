@@ -334,10 +334,16 @@ export default function SessionView({
 
                 <button
                   className="menu-item"
+                  disabled={selectedSession ? !runners.some((r) => r.id === selectedSession.runnerId && r.connected) : true}
                   onClick={() => {
                     onOpenShellModal();
                     onSetMenuOpen(false);
                   }}
+                  title={
+                    selectedSession && !runners.some((r) => r.id === selectedSession.runnerId && r.connected)
+                      ? "Runner is offline"
+                      : undefined
+                  }
                   id="menu-open-terminal"
                 >
                   <IconTerminal /> Open Terminal

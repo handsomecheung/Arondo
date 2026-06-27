@@ -525,6 +525,8 @@ class RunnerManager {
       this.onExecOutput(msg.payload).catch((err) => {
         console.error("[runner-manager] onExecOutput error:", err);
       });
+    } else if (msg.method === "shell.output") {
+      this.onShellOutput(msg.payload);
     } else {
       console.warn(`[runner-manager] unknown stream method: ${msg.method}`);
     }
@@ -536,6 +538,9 @@ class RunnerManager {
         this.onExecExit(msg.payload).catch((err) => {
           console.error("[runner-manager] onExecExit error:", err);
         });
+        break;
+      case "shell.exit":
+        this.onShellExit(msg.payload);
         break;
       case "pong":
         break;
@@ -610,6 +615,37 @@ class RunnerManager {
     } else {
       await this.handleScriptExit(ctx, payload.exitCode);
     }
+  }
+
+  private onShellOutput(payload: {
+    taskId: string;
+    data: string;
+    encoding?: string;
+  }): void {
+    let data = payload.data;
+    if (payload.encoding === "base64") {
+      data = Buffer.from(payload.data, "base64").toString("utf-8");
+    }
+    eventBus.publish({
+      type: "shell_output",
+      payload: {
+        shellId: payload.taskId,
+        data,
+      },
+    });
+  }
+
+  private onShellExit(payload: {
+    taskId: string;
+    exitCode: number;
+  }): void {
+    eventBus.publish({
+      type: "shell_exit",
+      payload: {
+        shellId: payload.taskId,
+        code: payload.exitCode,
+      },
+    });
   }
 
   private async handleAgentExit(

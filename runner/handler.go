@@ -36,6 +36,8 @@ func (h *Handler) handleRequest(msg *Message) {
 		h.handleExecAgent(msg)
 	case "exec.script":
 		h.handleExecScript(msg)
+	case "shell.spawn":
+		h.handleShellSpawn(msg)
 	case "exec.cancel":
 		h.handleExecCancel(msg)
 	case "exec.restart":

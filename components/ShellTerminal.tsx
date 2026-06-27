@@ -8,9 +8,10 @@ import "@xterm/xterm/css/xterm.css";
 interface ShellTerminalProps {
   ws: WebSocket | null;
   cwd?: string;
+  runnerId?: string;
 }
 
-export default function ShellTerminal({ ws, cwd }: ShellTerminalProps) {
+export default function ShellTerminal({ ws, cwd, runnerId }: ShellTerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -103,7 +104,7 @@ export default function ShellTerminal({ ws, cwd }: ShellTerminalProps) {
     if (!term) return;
 
     const { cols, rows } = term;
-    ws.send(JSON.stringify({ type: "shell:spawn", cwd, cols, rows }));
+    ws.send(JSON.stringify({ type: "shell:spawn", runnerId, cwd, cols, rows }));
 
     const onData = term.onData((data) => {
       if (ws.readyState === WebSocket.OPEN && shellIdRef.current) {
@@ -141,7 +142,7 @@ export default function ShellTerminal({ ws, cwd }: ShellTerminalProps) {
         shellIdRef.current = null;
       }
     };
-  }, [ws, wsReady, cwd]);
+  }, [ws, wsReady, cwd, runnerId]);
 
   return (
     <div

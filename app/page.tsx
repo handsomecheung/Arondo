@@ -881,6 +881,7 @@ export default function HomePage() {
         open={shellModalOpen}
         onClose={() => setShellModalOpen(false)}
         repoPath={selectedSession?.repoPath}
+        runnerId={selectedSession?.runnerId}
         ws={wsInstance}
       />
 

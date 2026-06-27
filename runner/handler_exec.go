@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/base64"
 	"log"
+	"os"
 	"strings"
 	"syscall"
 )
@@ -159,5 +160,55 @@ func (h *Handler) handleExecRestart(msg *Message) {
 	}
 
 	log.Printf("restarted script task %s (new pid=%d)", req.TaskID, pid)
+	h.sendResponse(msg.ID, execStartResponse{OK: true, TaskID: req.TaskID, PID: pid})
+}
+
+type shellSpawnRequest struct {
+	TaskID  string `json:"taskId"`
+	WorkDir string `json:"workDir"`
+	Cols    uint16 `json:"cols,omitempty"`
+	Rows    uint16 `json:"rows,omitempty"`
+}
+
+func (h *Handler) handleShellSpawn(msg *Message) {
+	req, err := parsePayload[shellSpawnRequest](msg)
+	if err != nil {
+		h.sendError(msg.ID, "INTERNAL", "invalid payload: "+err.Error())
+		return
+	}
+
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "bash"
+	}
+
+	pid, err := h.taskManager.Spawn(SpawnOptions{
+		TaskID:  req.TaskID,
+		Command: shell,
+		Args:    []string{},
+		WorkDir: req.WorkDir,
+		Cols:    req.Cols,
+		Rows:    req.Rows,
+		OnData: func(data []byte) {
+			h.sendStream("shell.output", map[string]string{
+				"taskId":   req.TaskID,
+				"data":     base64.StdEncoding.EncodeToString(data),
+				"encoding": "base64",
+			})
+		},
+		OnExit: func(exitCode int) {
+			h.sendEvent("shell.exit", map[string]any{
+				"taskId":   req.TaskID,
+				"exitCode": exitCode,
+			})
+		},
+	})
+
+	if err != nil {
+		h.sendError(msg.ID, "INTERNAL", "failed to start shell: "+err.Error())
+		return
+	}
+
+	log.Printf("started shell task %s (pid=%d)", req.TaskID, pid)
 	h.sendResponse(msg.ID, execStartResponse{OK: true, TaskID: req.TaskID, PID: pid})
 }

@@ -1,7 +1,8 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { eventBus, SseEvent } from "./event-bus";
 import { runnerManager } from "./runner-manager";
-import { ptyManager } from "./pty-manager";
+
+const shellToRunner = new Map<string, string>();
 
 const EVENT_TYPE_MAP: Record<string, string> = {
   session_updated: "session:updated",
@@ -9,6 +10,8 @@ const EVENT_TYPE_MAP: Record<string, string> = {
   session_deleted: "session:deleted",
   terminal_output: "terminal:output",
   terminal_exit: "terminal:exit",
+  shell_output: "shell:output",
+  shell_exit: "shell:exit",
 };
 
 const HEARTBEAT_INTERVAL = 30_000;
@@ -20,8 +23,9 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
     const wsType = EVENT_TYPE_MAP[event.type];
     if (!wsType) return;
     const isTerminalEvent = wsType.startsWith("terminal:");
+    const isShellEvent = wsType.startsWith("shell:");
     const msg = JSON.stringify(
-      isTerminalEvent
+      isTerminalEvent || isShellEvent
         ? { type: wsType, ...event.payload }
         : { type: wsType, payload: event.payload }
     );
@@ -99,40 +103,81 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
 
         case "shell:spawn": {
           const shellId = `shell-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-          const cwd = msg.cwd || process.cwd();
-          const shell = process.env.SHELL || "/bin/bash";
-          ptyManager.create(shellId, {
-            command: shell,
-            cwd,
-            cols: msg.cols || 120,
-            rows: msg.rows || 30,
-            onData: (data) => {
-              if (ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: "shell:output", shellId, data }));
-              }
-            },
-            onExit: (code) => {
-              if (ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: "shell:exit", shellId, code }));
-              }
-              shellIds.delete(shellId);
-            },
-          });
-          shellIds.add(shellId);
-          ws.send(JSON.stringify({ type: "shell:spawned", shellId }));
+          const runnerId = msg.runnerId ? runnerManager.resolveRunnerId(msg.runnerId) : undefined;
+
+          if (runnerId) {
+            const cwd = msg.cwd || "";
+            runnerManager
+              .sendRequest(runnerId, "shell.spawn", {
+                taskId: shellId,
+                workDir: cwd,
+                cols: msg.cols || 120,
+                rows: msg.rows || 30,
+              })
+              .then(() => {
+                shellToRunner.set(shellId, runnerId);
+                shellIds.add(shellId);
+                if (ws.readyState === WebSocket.OPEN) {
+                  ws.send(JSON.stringify({ type: "shell:spawned", shellId }));
+                }
+              })
+              .catch((err) => {
+                console.error(`[ws-server] Failed to spawn shell on runner ${runnerId}:`, err);
+                if (ws.readyState === WebSocket.OPEN) {
+                  ws.send(JSON.stringify({ type: "shell:exit", shellId, code: 1 }));
+                }
+              });
+          } else {
+            console.warn(`[ws-server] Cannot spawn shell: runner ${msg.runnerId || "unknown"} is offline or not specified`);
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: "shell:spawned", shellId }));
+              ws.send(
+                JSON.stringify({
+                  type: "shell:output",
+                  shellId,
+                  data: "\r\n\x1b[31mError: Runner is offline. Cannot open terminal.\x1b[0m\r\n",
+                })
+              );
+              ws.send(JSON.stringify({ type: "shell:exit", shellId, code: 1 }));
+            }
+          }
           break;
         }
         case "shell:input": {
-          if (msg.shellId) ptyManager.write(msg.shellId, msg.data);
+          if (msg.shellId) {
+            const runnerId = shellToRunner.get(msg.shellId);
+            if (runnerId) {
+              runnerManager.sendFire(runnerId, "pty.input", {
+                taskId: msg.shellId,
+                data: msg.data,
+              });
+            }
+          }
           break;
         }
         case "shell:resize": {
-          if (msg.shellId) ptyManager.resize(msg.shellId, msg.cols, msg.rows);
+          if (msg.shellId) {
+            const runnerId = shellToRunner.get(msg.shellId);
+            if (runnerId) {
+              runnerManager.sendFire(runnerId, "pty.resize", {
+                taskId: msg.shellId,
+                cols: msg.cols,
+                rows: msg.rows,
+              });
+            }
+          }
           break;
         }
         case "shell:kill": {
           if (msg.shellId) {
-            ptyManager.destroy(msg.shellId);
+            const runnerId = shellToRunner.get(msg.shellId);
+            if (runnerId) {
+              runnerManager.sendFire(runnerId, "exec.cancel", {
+                taskId: msg.shellId,
+                signal: "SIGKILL",
+              });
+              shellToRunner.delete(msg.shellId);
+            }
             shellIds.delete(msg.shellId);
           }
           break;
@@ -142,7 +187,14 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
 
     ws.on("close", () => {
       for (const id of shellIds) {
-        ptyManager.destroy(id);
+        const runnerId = shellToRunner.get(id);
+        if (runnerId) {
+          runnerManager.sendFire(runnerId, "exec.cancel", {
+            taskId: id,
+            signal: "SIGKILL",
+          });
+          shellToRunner.delete(id);
+        }
       }
       shellIds.clear();
       clients.delete(ws);

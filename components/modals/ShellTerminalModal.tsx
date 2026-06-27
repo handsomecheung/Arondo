@@ -7,10 +7,11 @@ interface Props {
   open: boolean;
   onClose: () => void;
   repoPath?: string;
+  runnerId?: string;
   ws: WebSocket | null;
 }
 
-export default function ShellTerminalModal({ open, onClose, repoPath, ws }: Props) {
+export default function ShellTerminalModal({ open, onClose, repoPath, runnerId, ws }: Props) {
   if (!open) return null;
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -28,7 +29,7 @@ export default function ShellTerminalModal({ open, onClose, repoPath, ws }: Prop
           </button>
         </div>
         <div className="modal-body" style={{ padding: 0, overflow: "hidden" }}>
-          <ShellTerminal ws={ws} cwd={repoPath} />
+          <ShellTerminal ws={ws} cwd={repoPath} runnerId={runnerId} />
         </div>
       </div>
     </div>
