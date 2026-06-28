@@ -58,6 +58,11 @@ function renderMessageContent(content: string) {
 }
 
 export default function HomePage() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [sessions, setSessions] = useState<Session[]>([]);
   const sortedSessions = useMemo(() => {
     return [...sessions].sort((a, b) => {
@@ -204,6 +209,7 @@ export default function HomePage() {
     handlePointerUp,
     handleAutoAddScripts,
     handleRunScript,
+    handleRunGlobalScript,
   } = useScripts({
     selectedProjectId,
     selectedSessionId,
@@ -651,6 +657,10 @@ export default function HomePage() {
   const activeLogMsg = messages.find((m) => m.id === activeLogMsgId);
   const isScriptLog = activeLogMsg?.type === "script-run";
 
+  if (!mounted) {
+    return null;
+  }
+
   // ── Render ──
   return (
     <div className="app" style={viewportStyles}>
@@ -734,6 +744,7 @@ export default function HomePage() {
                 draggedIndex={draggedIndex}
                 runners={runners}
                 isAutoAnalyzing={isAutoAnalyzing}
+                onRunScript={handleRunGlobalScript}
                 onNewSession={() => {
                   setRepoPath(project.repoPath);
                   setRunnerId(project.runnerId);

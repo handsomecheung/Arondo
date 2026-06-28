@@ -20,6 +20,7 @@ interface ProjectPanelProps {
   onPointerUp: (e: React.PointerEvent) => void;
   onAutoAddScripts: () => void;
   onSelectSession: (id: string) => void;
+  onRunScript: (name: string) => void;
 }
 
 export default function ProjectPanel({
@@ -39,6 +40,7 @@ export default function ProjectPanel({
   onPointerUp,
   onAutoAddScripts,
   onSelectSession,
+  onRunScript,
 }: ProjectPanelProps) {
   const folderName = project.repoPath.split("/").pop() || project.repoPath;
   const projectRunner = runners.find((r) => r.id === project.runnerId);
@@ -494,6 +496,29 @@ export default function ProjectPanel({
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 4 }}>
+                      <button
+                        onClick={() => onRunScript(script.name)}
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          color: "var(--success, #4ade80)",
+                          cursor: "pointer",
+                          fontSize: 11,
+                          padding: "2px 6px",
+                          borderRadius: "var(--radius-sm)",
+                          transition: "background 0.2s, color 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = "var(--text-primary)";
+                          e.currentTarget.style.background = "var(--success-bg, rgba(74, 222, 128, 0.15))";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = "var(--success, #4ade80)";
+                          e.currentTarget.style.background = "transparent";
+                        }}
+                      >
+                        Run
+                      </button>
                       <button
                         onClick={() =>
                           onOpenScriptModal(script.name, script.command)

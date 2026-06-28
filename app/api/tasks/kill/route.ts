@@ -4,7 +4,7 @@ import { runnerManager } from "@/lib/runner-manager";
 export async function POST(req: NextRequest) {
   const { sessionId, messageId } = await req.json();
 
-  if (!sessionId || !messageId) {
+  if (sessionId === undefined || sessionId === null || !messageId) {
     return NextResponse.json(
       { error: "sessionId and messageId are required" },
       { status: 400 },

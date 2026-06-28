@@ -408,6 +408,50 @@ export function useScripts({
     }
   };
 
+  const handleRunGlobalScript = async (scriptName: string) => {
+    if (!selectedProjectId) return;
+    setMenuOpen(false);
+    setScriptSubMenuOpen(false);
+    const tempTaskId = `global-script-${selectedProjectId}-${Date.now()}`;
+    setTaskQueue((prev) => [
+      ...prev,
+      {
+        id: tempTaskId,
+        type: "script",
+        name: `Script: ${scriptName}`,
+        sessionId: "",
+        sessionName: "",
+        status: "running",
+        createdAt: Date.now(),
+      },
+    ]);
+    try {
+      const res = await fetch(`/api/projects/${selectedProjectId}/run-script`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scriptName }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTaskQueue((prev) =>
+          prev.map((t) =>
+            t.id === tempTaskId
+              ? { ...t, id: data.taskId, messageId: data.taskId }
+              : t
+          )
+        );
+        setToast({ message: `Global script "${scriptName}" started.`, type: "success" });
+      } else {
+        const data = await res.json();
+        setApiError({ title: "Run Global Script Error", message: data.error || "Failed to run global script" });
+        setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
+      }
+    } catch (err: any) {
+      setApiError({ title: "Run Global Script Error", message: err.message || "An error occurred while running the global script." });
+      setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
+    }
+  };
+
   return {
     projectScripts, setProjectScripts,
     draggedIndex,
@@ -428,5 +472,6 @@ export function useScripts({
     handlePointerUp,
     handleAutoAddScripts,
     handleRunScript,
+    handleRunGlobalScript,
   };
 }

@@ -26,6 +26,14 @@ interface Session {
   runningScripts?: string[];
 }
 
+interface Project {
+  id: string;
+  repoPath: string;
+  runnerId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface Message {
   id: string;
   sessionId: string;
@@ -48,6 +56,8 @@ interface ServerTask {
   completedAt?: number;
   exitCode?: number;
   stoppedByUser?: boolean;
+  command?: string;
+  projectId?: string;
 }
 
 interface TaskItem {
@@ -62,9 +72,11 @@ interface TaskItem {
   messageId?: string;
   command?: string;
   scriptName?: string;
+  projectId?: string;
 }
 
 interface SessionGroup {
+  groupId: string;
   sessionId: string;
   sessionName: string;
   hasRunning: boolean;
@@ -93,14 +105,19 @@ export default function TasksPage() {
   const [terminalTask, setTerminalTask] = useState<TaskItem | null>(null);
   const [commandTask, setCommandTask] = useState<TaskItem | null>(null);
 
+  const [projects, setProjects] = useState<Project[]>([]);
+
   const loadInitialTasks = useCallback(async () => {
     try {
-      const [tasksRes, sessionsRes] = await Promise.all([
+      const [tasksRes, sessionsRes, projectsRes] = await Promise.all([
         fetch("/api/tasks"),
         fetch("/api/sessions"),
+        fetch("/api/projects"),
       ]);
       const serverTasks: ServerTask[] = await tasksRes.json();
       const sessions: Session[] = await sessionsRes.json();
+      const projectsList: Project[] = await projectsRes.json();
+      setProjects(projectsList);
       const sessionMap = new Map(sessions.map((s) => [s.id, s]));
 
       const scriptProjectIds = new Set<string>();
@@ -137,8 +154,8 @@ export default function TasksPage() {
         } else {
           status = "running";
         }
-        let command = session?.command;
-        if (t.type === "script" && t.scriptName && session?.projectId) {
+        let command = t.command || session?.command;
+        if (!command && t.type === "script" && t.scriptName && session?.projectId) {
           command = scriptMap.get(session.projectId)?.get(t.scriptName);
         }
         return {
@@ -153,6 +170,7 @@ export default function TasksPage() {
           messageId: t.messageId,
           command,
           scriptName: t.scriptName,
+          projectId: t.projectId || session?.projectId,
         };
       });
 
@@ -359,7 +377,10 @@ export default function TasksPage() {
   const handleRestartScript = async (task: TaskItem) => {
     if (!task.scriptName || !task.messageId) return;
     try {
-      await fetch(`/api/sessions/${task.sessionId}/restart-script`, {
+      const url = task.sessionId
+        ? `/api/sessions/${task.sessionId}/restart-script`
+        : `/api/projects/${task.projectId}/restart-script`;
+      await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scriptName: task.scriptName, messageId: task.messageId }),
@@ -375,12 +396,20 @@ export default function TasksPage() {
     try {
       let res: Response;
       if (task.type === "script" && task.scriptName) {
-        res = await fetch(`/api/sessions/${task.sessionId}/run-script`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ scriptName: task.scriptName }),
-        });
-      } else if (task.type === "agent") {
+        if (!task.sessionId) {
+          res = await fetch(`/api/projects/${task.projectId}/run-script`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ scriptName: task.scriptName }),
+          });
+        } else {
+          res = await fetch(`/api/sessions/${task.sessionId}/run-script`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ scriptName: task.scriptName }),
+          });
+        }
+      } else if (task.type === "agent" && task.sessionId) {
         res = await fetch(`/api/sessions/${task.sessionId}/rerun-agent`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -389,7 +418,8 @@ export default function TasksPage() {
         return;
       }
       if (!res.ok) return;
-      const { messageId: newMessageId } = await res.json();
+      const data = await res.json();
+      const newMessageId = data.taskId || data.messageId;
       setTaskQueue((prev) =>
         prev.map((t) =>
           t.id === task.id
@@ -541,16 +571,18 @@ export default function TasksPage() {
               {(() => {
                 const groupMap = new Map<string, SessionGroup>();
                 for (const task of taskQueue) {
-                  let group = groupMap.get(task.sessionId);
+                  const groupKey = task.sessionId || `global-${task.projectId || "unknown"}`;
+                  let group = groupMap.get(groupKey);
                   if (!group) {
                     group = {
+                      groupId: groupKey,
                       sessionId: task.sessionId,
                       sessionName: task.sessionName,
                       hasRunning: false,
                       latestTime: 0,
                       tasks: [],
                     };
-                    groupMap.set(task.sessionId, group);
+                    groupMap.set(groupKey, group);
                   }
                   group.tasks.push(task);
                   if (task.status === "running") group.hasRunning = true;
@@ -563,93 +595,115 @@ export default function TasksPage() {
                   if (!a.hasRunning && b.hasRunning) return 1;
                   return b.latestTime - a.latestTime;
                 });
-                return groups.map((group) => (
-                  <div key={group.sessionId}>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        marginBottom: 8,
-                        padding: "0 4px",
-                      }}
-                    >
-                      {group.hasRunning && <span className="task-spinner" />}
-                      <a
-                        href={`/session/${group.sessionId}`}
+                return groups.map((group) => {
+                  const isGlobal = !group.sessionId;
+                  const projectId = group.tasks[0]?.projectId;
+                  const project = projects.find((p) => p.id === projectId);
+                  const projectName = project ? project.repoPath.split("/").pop() || project.repoPath : "Unknown Project";
+                  return (
+                    <div key={group.groupId}>
+                      <div
                         style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: "var(--text-secondary)",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          flex: 1,
-                          textDecoration: "none",
-                          cursor: "pointer",
-                        }}
-                        title={group.sessionName}
-                        onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
-                        onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
-                      >
-                        {group.sessionName}
-                      </a>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          color: "var(--text-muted)",
-                          flexShrink: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          marginBottom: 8,
+                          padding: "0 4px",
                         }}
                       >
-                        {group.tasks.length} {group.tasks.length === 1 ? "task" : "tasks"}
-                      </span>
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                      {group.tasks.map((task) => {
-                        const isRunning = task.status === "running";
-
-                        let statusText: string;
-                        if (isRunning) {
-                          const elapsedMs = taskTimeTicker - task.createdAt;
-                          statusText = `Running (${formatDuration(elapsedMs)})...`;
-                        } else if (task.completedAt) {
-                          const ago = formatDuration(taskTimeTicker - task.completedAt);
-                          statusText = task.status === "stopped"
-                            ? `Stopped by user ${ago} ago`
-                            : task.status === "done"
-                              ? `Completed ${ago} ago`
-                              : `Failed ${ago} ago`;
-                        } else {
-                          statusText = task.status === "stopped"
-                            ? "Stopped by user"
-                            : task.status === "done"
-                              ? "Completed"
-                              : "Failed";
-                        }
-
-                        return (
-                          <ExecCard
-                            key={task.id}
-                            item={{
-                              id: task.id,
-                              type: task.type,
-                              title: task.name.replace(/^(Agent|Script):\s*/, ""),
-                              status: task.status,
-                              statusText,
-                              command: task.command,
-                              messageId: task.messageId,
+                        {group.hasRunning && <span className="task-spinner" />}
+                        {isGlobal ? (
+                          <span
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 600,
+                              color: "var(--accent)",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              flex: 1,
                             }}
-                            onViewLog={task.messageId ? () => setTerminalTask(task) : undefined}
-                            onShowCommand={task.command ? () => setCommandTask(task) : undefined}
-                            onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
-                            onRestartScript={isRunning && task.type === "script" && task.scriptName && task.messageId ? () => handleRestartScript(task) : undefined}
-                            onRetryTask={task.status === "error" ? () => handleRetryTask(task) : undefined}
-                          />
-                        );
-                      })}
+                          >
+                            🌐 Project: {projectName} (Global)
+                          </span>
+                        ) : (
+                          <a
+                            href={`/session/${group.sessionId}`}
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 600,
+                              color: "var(--text-secondary)",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              flex: 1,
+                              textDecoration: "none",
+                              cursor: "pointer",
+                            }}
+                            title={group.sessionName}
+                            onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+                            onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+                          >
+                            {group.sessionName || "Unnamed Session"}
+                          </a>
+                        )}
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: "var(--text-muted)",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {group.tasks.length} {group.tasks.length === 1 ? "task" : "tasks"}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        {group.tasks.map((task) => {
+                          const isRunning = task.status === "running";
+
+                          let statusText: string;
+                          if (isRunning) {
+                            const elapsedMs = taskTimeTicker - task.createdAt;
+                            statusText = `Running (${formatDuration(elapsedMs)})...`;
+                          } else if (task.completedAt) {
+                            const ago = formatDuration(taskTimeTicker - task.completedAt);
+                            statusText = task.status === "stopped"
+                              ? `Stopped by user ${ago} ago`
+                              : task.status === "done"
+                                ? `Completed ${ago} ago`
+                                : `Failed ${ago} ago`;
+                          } else {
+                            statusText = task.status === "stopped"
+                              ? "Stopped by user"
+                              : task.status === "done"
+                                ? "Completed"
+                                : "Failed";
+                          }
+
+                          return (
+                            <ExecCard
+                              key={task.id}
+                              item={{
+                                id: task.id,
+                                type: task.type,
+                                title: task.name.replace(/^(Agent|Script):\s*/, ""),
+                                status: task.status,
+                                statusText,
+                                command: task.command,
+                                messageId: task.messageId,
+                              }}
+                              onViewLog={task.messageId ? () => setTerminalTask(task) : undefined}
+                              onShowCommand={task.command ? () => setCommandTask(task) : undefined}
+                              onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
+                              onRestartScript={isRunning && task.type === "script" && task.scriptName && task.messageId ? () => handleRestartScript(task) : undefined}
+                              onRetryTask={task.status === "error" ? () => handleRetryTask(task) : undefined}
+                            />
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ));
+                  );
+                });
               })()}
             </div>
           )}

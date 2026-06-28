@@ -66,7 +66,11 @@ export default function Terminal({ sessionId, messageId, ws, mode, taskType }: T
     fitRef.current = fit;
     attachedRef.current = false;
 
-    fetch(`/api/sessions/${sessionId}/log?messageId=${messageId}`)
+    const logUrl = sessionId
+      ? `/api/sessions/${sessionId}/log?messageId=${messageId}`
+      : `/api/sessions/global/log?messageId=${messageId}`;
+
+    fetch(logUrl)
       .then((r) => r.json())
       .then((data: { log: string }) => {
         if (termRef.current === term && data.log) {

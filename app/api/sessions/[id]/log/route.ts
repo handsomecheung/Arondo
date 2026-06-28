@@ -13,7 +13,7 @@ export async function GET(
     return NextResponse.json({ error: "messageId query parameter is required" }, { status: 400 });
   }
 
-  const log = await getSessionLog(id, messageId);
+  const log = await getSessionLog(id === "global" ? "" : id, messageId);
   return NextResponse.json({ log });
 }
 

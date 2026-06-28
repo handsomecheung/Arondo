@@ -55,6 +55,8 @@ export interface TaskContext {
   completedAt?: number;
   exitCode?: number;
   stoppedByUser?: boolean;
+  command?: string;
+  projectId?: string;
 }
 
 interface PendingRequest {
@@ -740,6 +742,10 @@ class RunnerManager {
         code: exitCode,
       },
     });
+
+    if (!ctx.sessionId) {
+      return;
+    }
 
     const session = await getSession(ctx.sessionId);
     const currentRunning = session?.runningScripts || [];

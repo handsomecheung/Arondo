@@ -320,6 +320,9 @@ export async function addMessage(
 // ─── Logs ─────────────────────────────────────────────────────────────────────
 
 function getLogFilePath(sessionId: string, messageId: string): string {
+  if (!sessionId) {
+    return path.join(DATA_DIR, "global-tasks", "logs", `${messageId}.log`);
+  }
   return path.join(getSessionDir(sessionId), "logs", `${messageId}.log`);
 }
 
