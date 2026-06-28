@@ -630,6 +630,8 @@ export default function SessionView({
           let menuItemIndex = 0;
           const newVisible = ("/new").startsWith(prompt.trim()) || prompt.trim().startsWith("/new");
           const newItemIndex = newVisible ? menuItemIndex++ : -1;
+          const deleteVisible = ("/delete").startsWith(prompt.trim()) || prompt.trim().startsWith("/delete");
+          const deleteItemIndex = deleteVisible ? menuItemIndex++ : -1;
           return (
             <div className="command-menu">
               {newVisible ? (
@@ -643,6 +645,18 @@ export default function SessionView({
                 >
                   <span className="command-menu-name">/new [name]</span>
                   <span className="command-menu-desc">Open a new session with the same project &amp; agent</span>
+                </button>
+              ) : null}
+              {deleteVisible ? (
+                <button
+                  className={`command-menu-item${commandMenuIndex === deleteItemIndex ? " highlighted" : ""}${prompt.trim() === "/delete" ? " active" : ""}`}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    if (selectedSessionId) onDeleteSession(selectedSessionId);
+                  }}
+                >
+                  <span className="command-menu-name">/delete</span>
+                  <span className="command-menu-desc">Delete the current session</span>
                 </button>
               ) : null}
               {agentCommands.map((cmd, idx) => {

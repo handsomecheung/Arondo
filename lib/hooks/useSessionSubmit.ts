@@ -28,6 +28,7 @@ interface UseSessionSubmitParams {
   setApiError: (v: { title: string; message: string } | null) => void;
   loadProjects: () => void;
   agentCommands: AgentCommand[];
+  onDeleteSession: (id: string) => void;
 }
 
 export function useSessionSubmit({
@@ -53,6 +54,7 @@ export function useSessionSubmit({
   setApiError,
   loadProjects,
   agentCommands,
+  onDeleteSession,
 }: UseSessionSubmitParams) {
   const [commandMenuIndex, setCommandMenuIndex] = useState(-1);
 
@@ -60,6 +62,7 @@ export function useSessionSubmit({
     const v = prompt.trim();
     const items: string[] = [];
     if (("/new").startsWith(v) || v.startsWith("/new")) items.push("/new");
+    if (("/delete").startsWith(v) || v.startsWith("/delete")) items.push("/delete");
     for (const cmd of agentCommands) {
       const trigger = getTriggerWord(cmd);
       const slashTrigger = "/" + trigger;
@@ -78,7 +81,7 @@ export function useSessionSubmit({
     const v = value.trim();
     const agentTriggers = getUniqueTriggers(agentCommands);
     const matchesAgentCmd = agentTriggers.some((t) => v.startsWith("/" + t) || ("/" + t).startsWith(v));
-    const matchesCommand = v.startsWith("/new") || "/new".startsWith(v) || matchesAgentCmd;
+    const matchesCommand = v.startsWith("/new") || "/new".startsWith(v) || v.startsWith("/delete") || "/delete".startsWith(v) || matchesAgentCmd;
     setShowCommandMenu(v.startsWith("/") && matchesCommand && !isNewSession && !!selectedSessionId);
     const el = e.target;
     el.style.height = "auto";
@@ -157,6 +160,14 @@ export function useSessionSubmit({
         await handleNewSessionCommand(rest || undefined);
         return;
       }
+    }
+
+    if (trimmed === "/delete" && !isNewSession && selectedSessionId) {
+      setPrompt("");
+      setShowCommandMenu(false);
+      if (textareaRef.current) textareaRef.current.style.height = "auto";
+      onDeleteSession(selectedSessionId);
+      return;
     }
 
     const agentMsg = resolveAgentCommand(trimmed, agentCommands);

@@ -447,6 +447,44 @@ export default function HomePage() {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
+  const handleDeleteSession = async (id: string) => {
+    setConfirmDialog({
+      message:
+        "Delete this session? All messages and logs will be permanently removed.",
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        try {
+          const res = await fetch(`/api/sessions/${id}`, {
+            method: "DELETE",
+          });
+          if (res.ok) {
+            setSessions((prev) => prev.filter((s) => s.id !== id));
+            if (selectedSessionId === id) {
+              setSelectedSessionId(null);
+              setMessages([]);
+              setSessionLog("");
+              setActiveLogMsgId(null);
+              setLogModalOpen(false);
+            }
+          } else {
+            const data = await res.json();
+            setApiError({
+              title: "Delete Session Error",
+              message: data.error || "Failed to delete session",
+            });
+          }
+        } catch (err: any) {
+          console.error(err);
+          setApiError({
+            title: "Delete Session Error",
+            message:
+              err.message || "An error occurred while deleting the session.",
+          });
+        }
+      },
+    });
+  };
+
   const { handlePromptChange, handleNewSessionCommand, handleAgentCommand, handleSubmit, handleKeyDown, commandMenuIndex } = useSessionSubmit({
     prompt,
     repoPath,
@@ -470,6 +508,7 @@ export default function HomePage() {
     setApiError,
     loadProjects,
     agentCommands,
+    onDeleteSession: handleDeleteSession,
   });
 
   const handleNewSession = () => {
@@ -545,44 +584,6 @@ export default function HomePage() {
     setActiveLogMsgId(null);
     setLogModalOpen(false);
     setMenuOpen(false);
-  };
-
-  const handleDeleteSession = async (id: string) => {
-    setConfirmDialog({
-      message:
-        "Delete this session? All messages and logs will be permanently removed.",
-      onConfirm: async () => {
-        setConfirmDialog(null);
-        try {
-          const res = await fetch(`/api/sessions/${id}`, {
-            method: "DELETE",
-          });
-          if (res.ok) {
-            setSessions((prev) => prev.filter((s) => s.id !== id));
-            if (selectedSessionId === id) {
-              setSelectedSessionId(null);
-              setMessages([]);
-              setSessionLog("");
-              setActiveLogMsgId(null);
-              setLogModalOpen(false);
-            }
-          } else {
-            const data = await res.json();
-            setApiError({
-              title: "Delete Session Error",
-              message: data.error || "Failed to delete session",
-            });
-          }
-        } catch (err: any) {
-          console.error(err);
-          setApiError({
-            title: "Delete Session Error",
-            message:
-              err.message || "An error occurred while deleting the session.",
-          });
-        }
-      },
-    });
   };
 
   const handleRenameSession = async (id: string, newName: string) => {
