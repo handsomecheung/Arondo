@@ -635,7 +635,7 @@ export default function HomePage() {
       if (!prompt.trim()) {
         return "Create Blank Session";
       }
-      return "Send (Ctrl+Enter / ⌘+Enter)";
+      return "Send (Enter)";
     } else {
       if (!selectedSessionId) {
         return "No active session selected";
@@ -643,7 +643,7 @@ export default function HomePage() {
       if (prompt.trim().length === 0) {
         return "Please enter a message";
       }
-      return "Send (Ctrl+Enter / ⌘+Enter)";
+      return "Send (Enter)";
     }
   };
 
