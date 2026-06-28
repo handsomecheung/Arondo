@@ -25,9 +25,13 @@ All execution goes through a Runner — there is no local fallback on the server
 - **Terminal Session Persistence & Reattaching**: Terminal sessions persist across browser refreshes or close events. Re-opening a terminal automatically reattaches to the active PTY session on the runner and replays the output buffer.
 - **Quota & Session Limit Detection**: Automatically detects AI agent API limits (such as Claude's session limit hit or `agy` quota exhaustion) and displays human-readable error messages.
 - **Concurrent Script Execution**: Allows running multiple scripts simultaneously within a single session. The user can continue chatting while background scripts are running.
+- **Global & Session-scoped Scripts**: Supports running project-scoped custom scripts either globally (independent of a session, directly from the project panel) or within a specific session.
+- **Config-driven & Custom Slash Commands**: Slash commands (like `/new`, `/commit`, `/delete`) are config-driven and customizable. You can configure user-defined agent slash commands via the **Agent Commands** management UI in Settings (saved in `data/agent-commands.json`) with regex matcher and replacement expansion support.
+- **Smart Chat Input**: Supports Tab completion to cycle through slash commands in the command menu. Keyboard behavior is streamlined: send messages on `Enter`, insert a newline on `Ctrl+Enter` / `Meta+Enter`.
 - **Remote File Browsing**: Browse directories on any connected runner directly from the UI when selecting a project path.
 - **Integrated Diff Viewer (diff2html)**: View visual code changes directly from the browser.
 - **Task Queue & Live Tracking**: Active task queue in the header with PID tracking and live log inspection. Clicking a task opens its dedicated console log modal. Each task can be killed from the queue.
+- **Task Grouping & Filtering**: In the Tasks dashboard, tasks can be filtered by type (Agent/Script) and grouped by either Scope (Session or Project for global tasks) or Status (Running, Completed, Stopped, Failed) for easier monitoring.
 - **Task Persistence**: Active task contexts are persisted to disk (`data/active-tasks.json`) and restored on server restart. Runner IDs are stable across reconnections.
 - **Mobile-Friendly UI**: Designed with collapsible panels, modal logs, responsive menus, and touch-friendly actions.
 - **Project Management**: Scopes and tracks sessions within resolved repository paths. Supports custom project scripts and AI auto-script discovery.

@@ -91,6 +91,12 @@ app/
           route.ts      # GET/POST/DELETE: manage project scripts
         auto-scripts/
           route.ts      # GET/POST: AI auto-script analysis
+        run-script/
+          route.ts      # POST: run a global project script via runner PTY
+        restart-script/
+          route.ts      # POST: restart a global project script task via exec.restart
+    agent-commands/
+      route.ts          # GET/POST/DELETE: manage custom agent slash commands
     tasks/
       route.ts        # GET: list all tasks (active + retained)
       kill/
@@ -102,6 +108,7 @@ components/
   ShellTerminal.tsx     # Interactive shell terminal component (spawns server-side PTY via WebSocket)
 lib/
   store.ts              # File-based JSON storage (sessions, messages, logs, projects, scripts)
+  agentCommands.ts      # Merges built-in and user-defined agent slash commands, resolves matches
   event-bus.ts          # In-memory pub/sub (singleton on `process` for cross-context sharing)
   pty-manager.ts        # Server-side PTY manager for local shell sessions (node-pty, scrollback buffer)
   runner-manager.ts     # Manages runner connections, task routing, and task persistence
@@ -118,6 +125,7 @@ scripts/
   run.runner2.sh        # Start Go runner 2 in dev mode (connects to localhost:3251)
 data/                   # Runtime data (gitignored)
   active-tasks.json     # Persisted active task contexts (survives server restart)
+  agent-commands.json   # Persisted custom agent slash commands
   agy-sessions.json     # Map file matching Arondo sessionIds with agy conversation UUIDs
   sessions/
     [sessionId]/
@@ -209,7 +217,8 @@ Two WebSocket endpoints:
 - **Task Queue & Log Popup**: Tasks are tracked in a global header queue grouped by session, with session names always visible. Completed tasks are retained for 7 days. Clicking any task switches to its session and opens the log modal. Each running task has a kill button that sends SIGTERM via the runner.
 - **User-stopped vs Failed distinction**: When a task is killed via the UI, `TaskContext.stoppedByUser` is set, producing a 🛑 "Stopped by user" completion message and `errorMessage` instead of an ❌ error. The terminal shows a “─── stopped by user ───” separator.
 - **Restart/Retry actions**: ExecCard shows a Restart button for script tasks (calls `restart-script` API → `exec.restart` on the runner) and a Retry button for failed agent tasks (calls `rerun-agent` API). The terminal shows a “─── restarting ───” separator inline in the existing log.
-- **Slash commands in chat**: `/new [name]` opens a new session with the same project/agent/runner. `/commit [message]` sends a commit instruction to the current agent session.
+- **Slash commands in chat**: Slash commands are config-driven and customizable (managed via Settings UI and stored in `data/agent-commands.json`). Built-in commands include `/new [name]` (opens a new session) and `/delete` (deletes the current session). Custom agent commands can define regex matchers and message expansion templates (e.g. `/commit <msg>` expanding into a commit prompt).
+- **Tab Completion & Keyboard UX**: Chat input supports Tab completion to cycle through slash commands. Send messages via `Enter`, and insert a newline via `Ctrl+Enter` / `Meta+Enter`.
 - **Open Terminal in session menu**: The three-dot dropdown in a session includes an "Open Terminal" option that opens a `ShellTerminal` modal for that session's runner.
 - **Real-time Streaming**: Both agent and script output stream via WebSocket `terminal:output` (base64-encoded PTY data), forwarded through the event bus. The frontend renders all logs via the xterm.js Terminal component.
 - **Concurrency**: Multiple background scripts can run concurrently in a single session. The chat prompt stays active during execution.
@@ -219,7 +228,7 @@ Two WebSocket endpoints:
 
 ## Project & Custom Scripts Management
 - **Project Scoping**: Sessions are mapped to projects by repository path + runnerId. Projects store metadata at `data/projects/[projectId]/project.json`.
-- **Custom Project Scripts**: Commands (build, test, deploy) scoped to repositories, stored under `data/projects/[projectId]/settings/scripts.json`.
+- **Custom Project Scripts**: Commands (build, test, deploy) scoped to repositories, stored under `data/projects/[projectId]/settings/scripts.json`. Can be executed globally (sessionless, directly from the project panel) or inside a session.
 - **AI Auto-Script Discovery**: Background process using `agy` to auto-detect and register project scripts.
 
 <!-- BEGIN:nextjs-agent-rules -->
