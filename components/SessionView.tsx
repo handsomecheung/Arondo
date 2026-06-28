@@ -9,7 +9,8 @@ import {
   IconGitPullRequest, IconPlay, IconTerminal, IconEdit, IconTrash,
   IconMoreVertical, IconFolder, IconChevronDown,
 } from "@/components/Icons";
-import { AGENT_COMMANDS, getTriggerWord, resolveAgentCommand } from "@/lib/agentCommands";
+import { getTriggerWord, resolveAgentCommand } from "@/lib/agentCommands";
+import type { AgentCommand } from "@/lib/agentCommands";
 
 interface SessionViewProps {
   selectedSession: Session | null;
@@ -70,6 +71,7 @@ interface SessionViewProps {
   onOpenRenameModal: () => void;
   onManageScripts: () => void;
   onNewSession: () => void;
+  agentCommands: AgentCommand[];
   onNewSessionCommand: (name?: string) => void;
   onExecuteAgentCommand: (promptText: string) => void;
 }
@@ -132,6 +134,7 @@ export default function SessionView({
   onOpenShellModal,
   onOpenRenameModal,
   onManageScripts,
+  agentCommands,
   onNewSession,
   onNewSessionCommand,
   onExecuteAgentCommand,
@@ -636,7 +639,7 @@ export default function SessionView({
                 <span className="command-menu-desc">Open a new session with the same project &amp; agent</span>
               </button>
             ) : null}
-            {AGENT_COMMANDS.map((cmd, idx) => {
+            {agentCommands.map((cmd, idx) => {
               const trigger = getTriggerWord(cmd);
               const slashTrigger = "/" + trigger;
               const afterSlash = prompt.trim().slice(1);

@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import type { Session, Project, Runner, ProjectScript, Message, TaskItem } from "@/types/home";
+import { AGENT_COMMANDS, mergeAgentCommands } from "@/lib/agentCommands";
+import type { AgentCommand } from "@/lib/agentCommands";
 import { IconTaskQueue, IconBolt, IconMenu } from "@/components/Icons";
 import AppSidebar from "@/components/AppSidebar";
 import ProjectPanel from "@/components/ProjectPanel";
@@ -121,6 +123,7 @@ export default function HomePage() {
     onConfirm: () => void;
   } | null>(null);
 
+  const [agentCommands, setAgentCommands] = useState<AgentCommand[]>(AGENT_COMMANDS);
   const [githubConfigured, setGithubConfigured] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [scriptSubMenuOpen, setScriptSubMenuOpen] = useState(false);
@@ -404,6 +407,7 @@ export default function HomePage() {
     setSelectedSessionId,
     setTaskQueue,
     setGithubConfigured,
+    setAgentCommands,
     loadProjects,
     loadRunners,
   });
@@ -465,6 +469,7 @@ export default function HomePage() {
     setTaskQueue,
     setApiError,
     loadProjects,
+    agentCommands,
   });
 
   const handleNewSession = () => {
@@ -843,6 +848,7 @@ export default function HomePage() {
               setSidebarMode("projects");
               setSidebarOpen(true);
             }}
+            agentCommands={agentCommands}
             onNewSession={handleNewSession}
             onNewSessionCommand={handleNewSessionCommand}
             onExecuteAgentCommand={handleAgentCommand}

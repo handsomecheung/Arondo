@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import type { Session, TaskItem } from "@/types/home";
+import type { AgentCommand } from "@/lib/agentCommands";
 
 interface UseInitialLoadParams {
   initUrl: { session: string | null; project: string | null };
@@ -9,6 +10,7 @@ interface UseInitialLoadParams {
   setSelectedSessionId: React.Dispatch<React.SetStateAction<string | null>>;
   setTaskQueue: React.Dispatch<React.SetStateAction<TaskItem[]>>;
   setGithubConfigured: (v: boolean) => void;
+  setAgentCommands: (v: AgentCommand[]) => void;
   loadProjects: () => void;
   loadRunners: () => void;
 }
@@ -19,6 +21,7 @@ export function useInitialLoad({
   setSelectedSessionId,
   setTaskQueue,
   setGithubConfigured,
+  setAgentCommands,
   loadProjects,
   loadRunners,
 }: UseInitialLoadParams) {
@@ -123,6 +126,11 @@ export function useInitialLoad({
     fetch("/api/config")
       .then((r) => r.json())
       .then((data) => setGithubConfigured(!!data.githubToken))
+      .catch(console.error);
+
+    fetch("/api/agent-commands")
+      .then((r) => r.json())
+      .then((data: AgentCommand[]) => setAgentCommands(data))
       .catch(console.error);
 
     return () => clearInterval(runnerPoll);

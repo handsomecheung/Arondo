@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import type { Session, TaskItem } from "@/types/home";
 import { resolveAgentCommand, getUniqueTriggers } from "@/lib/agentCommands";
+import type { AgentCommand } from "@/lib/agentCommands";
 
 interface UseSessionSubmitParams {
   prompt: string;
@@ -26,6 +27,7 @@ interface UseSessionSubmitParams {
   setTaskQueue: React.Dispatch<React.SetStateAction<TaskItem[]>>;
   setApiError: (v: { title: string; message: string } | null) => void;
   loadProjects: () => void;
+  agentCommands: AgentCommand[];
 }
 
 export function useSessionSubmit({
@@ -50,12 +52,13 @@ export function useSessionSubmit({
   setTaskQueue,
   setApiError,
   loadProjects,
+  agentCommands,
 }: UseSessionSubmitParams) {
   const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setPrompt(value);
     const v = value.trim();
-    const agentTriggers = getUniqueTriggers();
+    const agentTriggers = getUniqueTriggers(agentCommands);
     const matchesAgentCmd = agentTriggers.some((t) => v.startsWith("/" + t) || ("/" + t).startsWith(v));
     const matchesCommand = v.startsWith("/new") || "/new".startsWith(v) || matchesAgentCmd;
     setShowCommandMenu(v.startsWith("/") && matchesCommand && !isNewSession && !!selectedSessionId);
@@ -121,10 +124,10 @@ export function useSessionSubmit({
 
   // Called from SessionView with the raw prompt text (e.g. "/commit foo")
   const handleAgentCommand = useCallback(async (promptText: string) => {
-    const agentMessage = resolveAgentCommand(promptText);
+    const agentMessage = resolveAgentCommand(promptText, agentCommands);
     if (agentMessage === null) return;
     await sendAgentMessage(agentMessage);
-  }, [sendAgentMessage]);
+  }, [sendAgentMessage, agentCommands]);
 
   const handleSubmit = useCallback(async () => {
     const trimmed = prompt.trim();
@@ -138,7 +141,7 @@ export function useSessionSubmit({
       }
     }
 
-    const agentMsg = resolveAgentCommand(trimmed);
+    const agentMsg = resolveAgentCommand(trimmed, agentCommands);
     if (agentMsg !== null && !isNewSession && selectedSessionId) {
       await sendAgentMessage(agentMsg);
       return;
