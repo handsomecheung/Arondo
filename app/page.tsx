@@ -443,7 +443,7 @@ export default function HomePage() {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
-  const { handlePromptChange, handleNewSessionCommand, handleCommitCommand, handleSubmit, handleKeyDown } = useSessionSubmit({
+  const { handlePromptChange, handleNewSessionCommand, handleAgentCommand, handleSubmit, handleKeyDown } = useSessionSubmit({
     prompt,
     repoPath,
     agentType,
@@ -845,7 +845,7 @@ export default function HomePage() {
             }}
             onNewSession={handleNewSession}
             onNewSessionCommand={handleNewSessionCommand}
-            onCommitCommand={handleCommitCommand}
+            onExecuteAgentCommand={handleAgentCommand}
           />
         )}
       </main>

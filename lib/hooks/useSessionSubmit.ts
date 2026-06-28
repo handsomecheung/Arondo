@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import type { Session, TaskItem } from "@/types/home";
+import { resolveAgentCommand, getUniqueTriggers } from "@/lib/agentCommands";
 
 interface UseSessionSubmitParams {
   prompt: string;
@@ -54,7 +55,9 @@ export function useSessionSubmit({
     const value = e.target.value;
     setPrompt(value);
     const v = value.trim();
-    const matchesCommand = v.startsWith("/new") || v.startsWith("/commit") || "/new".startsWith(v) || "/commit".startsWith(v);
+    const agentTriggers = getUniqueTriggers();
+    const matchesAgentCmd = agentTriggers.some((t) => v.startsWith("/" + t) || ("/" + t).startsWith(v));
+    const matchesCommand = v.startsWith("/new") || "/new".startsWith(v) || matchesAgentCmd;
     setShowCommandMenu(v.startsWith("/") && matchesCommand && !isNewSession && !!selectedSessionId);
     const el = e.target;
     el.style.height = "auto";
@@ -89,14 +92,11 @@ export function useSessionSubmit({
     loadProjects();
   }, [selectedSession, loadProjects]);
 
-  const handleCommitCommand = useCallback(async (commitMessage?: string) => {
+  const sendAgentMessage = useCallback(async (agentMessage: string) => {
     if (!selectedSessionId) return;
     setPrompt("");
     setShowCommandMenu(false);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
-    const agentMessage = commitMessage
-      ? `commit the changes with message: "${commitMessage}". Use this exact message — do not add, modify, or append any extra information to it.`
-      : "commit the changes";
     const tempTaskId = `agent-${selectedSessionId}-${Date.now()}`;
     setTaskQueue((prev) => [
       ...prev,
@@ -110,7 +110,7 @@ export function useSessionSubmit({
       });
       if (!res.ok) {
         const data = await res.json();
-        setApiError({ title: "Commit Error", message: data.error || "Failed to send commit command" });
+        setApiError({ title: "Command Error", message: data.error || "Failed to send command" });
         setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
       }
     } catch (err: any) {
@@ -118,6 +118,13 @@ export function useSessionSubmit({
       setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
     }
   }, [selectedSessionId, setTaskQueue]);
+
+  // Called from SessionView with the raw prompt text (e.g. "/commit foo")
+  const handleAgentCommand = useCallback(async (promptText: string) => {
+    const agentMessage = resolveAgentCommand(promptText);
+    if (agentMessage === null) return;
+    await sendAgentMessage(agentMessage);
+  }, [sendAgentMessage]);
 
   const handleSubmit = useCallback(async () => {
     const trimmed = prompt.trim();
@@ -131,9 +138,9 @@ export function useSessionSubmit({
       }
     }
 
-    if (trimmed.startsWith("/commit") && !isNewSession && selectedSessionId) {
-      const rest = trimmed.slice(7).trim();
-      await handleCommitCommand(rest || undefined);
+    const agentMsg = resolveAgentCommand(trimmed);
+    if (agentMsg !== null && !isNewSession && selectedSessionId) {
+      await sendAgentMessage(agentMsg);
       return;
     }
 
@@ -190,7 +197,7 @@ export function useSessionSubmit({
     } catch (err) {
       console.error(err);
     }
-  }, [prompt, repoPath, agentType, runnerId, isNewSession, selectedSessionId, loadProjects, setTaskQueue, handleNewSessionCommand, handleCommitCommand]);
+  }, [prompt, repoPath, agentType, runnerId, isNewSession, selectedSessionId, loadProjects, setTaskQueue, handleNewSessionCommand, sendAgentMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return;
@@ -205,5 +212,5 @@ export function useSessionSubmit({
     }
   };
 
-  return { handlePromptChange, handleNewSessionCommand, handleCommitCommand, handleSubmit, handleKeyDown };
+  return { handlePromptChange, handleNewSessionCommand, handleAgentCommand, handleSubmit, handleKeyDown };
 }

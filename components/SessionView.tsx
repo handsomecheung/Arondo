@@ -9,6 +9,7 @@ import {
   IconGitPullRequest, IconPlay, IconTerminal, IconEdit, IconTrash,
   IconMoreVertical, IconFolder, IconChevronDown,
 } from "@/components/Icons";
+import { AGENT_COMMANDS, getTriggerWord, resolveAgentCommand } from "@/lib/agentCommands";
 
 interface SessionViewProps {
   selectedSession: Session | null;
@@ -70,7 +71,7 @@ interface SessionViewProps {
   onManageScripts: () => void;
   onNewSession: () => void;
   onNewSessionCommand: (name?: string) => void;
-  onCommitCommand: (msg?: string) => void;
+  onExecuteAgentCommand: (promptText: string) => void;
 }
 
 export default function SessionView({
@@ -133,7 +134,7 @@ export default function SessionView({
   onManageScripts,
   onNewSession,
   onNewSessionCommand,
-  onCommitCommand,
+  onExecuteAgentCommand,
 }: SessionViewProps) {
   return (
     <>
@@ -635,19 +636,32 @@ export default function SessionView({
                 <span className="command-menu-desc">Open a new session with the same project &amp; agent</span>
               </button>
             ) : null}
-            {("/commit").startsWith(prompt.trim()) || prompt.trim().startsWith("/commit") ? (
-              <button
-                className={`command-menu-item${prompt.trim().startsWith("/commit") ? " active" : ""}`}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  const rest = prompt.trim().slice(7).trim();
-                  onCommitCommand(rest || undefined);
-                }}
-              >
-                <span className="command-menu-name">/commit [message]</span>
-                <span className="command-menu-desc">Commit the changes, optionally with a specified message</span>
-              </button>
-            ) : null}
+            {AGENT_COMMANDS.map((cmd, idx) => {
+              const trigger = getTriggerWord(cmd);
+              const slashTrigger = "/" + trigger;
+              const afterSlash = prompt.trim().slice(1);
+              const isBrowsingTrigger = slashTrigger.startsWith(prompt.trim());
+              const matchesEntry = cmd.matcher ? new RegExp(cmd.matcher).test(afterSlash) : afterSlash === trigger;
+              const triggerVisible = isBrowsingTrigger || matchesEntry;
+              if (!triggerVisible) return null;
+              const isActive = cmd.matcher
+                ? new RegExp(cmd.matcher).test(afterSlash)
+                : afterSlash === trigger;
+              return (
+                <button
+                  key={idx}
+                  className={`command-menu-item${isActive ? " active" : ""}`}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    const effectivePrompt = isActive ? prompt.trim() : slashTrigger;
+                    onExecuteAgentCommand(effectivePrompt);
+                  }}
+                >
+                  <span className="command-menu-name">{cmd.menuLabel ?? slashTrigger}</span>
+                  <span className="command-menu-desc">{cmd.menuDescription ?? ""}</span>
+                </button>
+              );
+            })}
           </div>
         )}
 
