@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import ExecCard from "@/components/ExecCard";
 import {
-  IconArrowLeft, IconBolt, IconX, IconInbox, IconTerminal, IconCode,
+  IconArrowLeft, IconBolt, IconX, IconInbox, IconTerminal, IconCode, IconChevronDown,
 } from "@/components/Icons";
 
 const Terminal = dynamic(() => import("@/components/Terminal"), { ssr: false });
@@ -107,6 +107,9 @@ export default function TasksPage() {
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [groupBy, setGroupBy] = useState<"session" | "status">("session");
+  const [filterType, setFilterType] = useState<"both" | "agent" | "script">("both");
+  const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const loadInitialTasks = useCallback(async () => {
     try {
@@ -349,6 +352,23 @@ export default function TasksPage() {
     };
   }, []);
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setFilterDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const filteredTasks = taskQueue.filter((task) => {
+    if (filterType === "both") return true;
+    return task.type === filterType;
+  });
+
   const hasRunningTasks = taskQueue.some((t) => t.status === "running");
   useEffect(() => {
     if (taskQueue.length === 0) return;
@@ -562,46 +582,140 @@ export default function TasksPage() {
               style={{
                 display: "flex",
                 alignItems: "center",
-                background: "var(--bg-surface)",
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius-md)",
-                padding: 3,
-                gap: 2,
-                width: "fit-content",
+                gap: 12,
+                marginBottom: 20,
               }}
             >
-              <button
-                onClick={() => setGroupBy("session")}
+              <div
                 style={{
-                  padding: "6px 12px",
-                  borderRadius: "calc(var(--radius-md) - 2px)",
-                  border: "none",
-                  background: groupBy === "session" ? "var(--bg-elevated)" : "transparent",
-                  color: groupBy === "session" ? "var(--text-primary)" : "var(--text-muted)",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  transition: "all 0.18s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-md)",
+                  padding: 3,
+                  gap: 2,
+                  width: "fit-content",
                 }}
               >
-                Group by Scope
-              </button>
-              <button
-                onClick={() => setGroupBy("status")}
+                <button
+                  onClick={() => setGroupBy("session")}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "calc(var(--radius-md) - 2px)",
+                    border: "none",
+                    background: groupBy === "session" ? "var(--bg-elevated)" : "transparent",
+                    color: groupBy === "session" ? "var(--text-primary)" : "var(--text-muted)",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.18s ease",
+                  }}
+                >
+                  Scope
+                </button>
+                <button
+                  onClick={() => setGroupBy("status")}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "calc(var(--radius-md) - 2px)",
+                    border: "none",
+                    background: groupBy === "status" ? "var(--bg-elevated)" : "transparent",
+                    color: groupBy === "status" ? "var(--text-primary)" : "var(--text-muted)",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.18s ease",
+                  }}
+                >
+                  Status
+                </button>
+              </div>
+
+              <div
+                ref={dropdownRef}
                 style={{
-                  padding: "6px 12px",
-                  borderRadius: "calc(var(--radius-md) - 2px)",
-                  border: "none",
-                  background: groupBy === "status" ? "var(--bg-elevated)" : "transparent",
-                  color: groupBy === "status" ? "var(--text-primary)" : "var(--text-muted)",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  transition: "all 0.18s ease",
+                  position: "relative",
+                  display: "inline-block",
                 }}
               >
-                Group by Status
-              </button>
+                <button
+                  onClick={() => setFilterDropdownOpen(!filterDropdownOpen)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "9px 12px",
+                    borderRadius: "var(--radius-md)",
+                    border: "1px solid var(--border)",
+                    background: "var(--bg-surface)",
+                    color: "var(--text-primary)",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.18s ease",
+                  }}
+                >
+                  <span style={{ fontSize: 12, color: "var(--text-primary)" }}>
+                    {filterType === "both" ? "Both" : filterType === "agent" ? "Agent" : "Script"}
+                  </span>
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      transform: filterDropdownOpen ? "rotate(180deg)" : "none",
+                      transition: "transform 0.2s ease",
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    <IconChevronDown />
+                  </span>
+                </button>
+                {filterDropdownOpen && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 6px)",
+                      right: 0,
+                      zIndex: 50,
+                      background: "var(--bg-surface)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-md)",
+                      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)",
+                      padding: 4,
+                      minWidth: 110,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 2,
+                    }}
+                  >
+                    {(["both", "agent", "script"] as const).map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => {
+                          setFilterType(type);
+                          setFilterDropdownOpen(false);
+                        }}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: "calc(var(--radius-md) - 2px)",
+                          border: "none",
+                          background: filterType === type ? "var(--bg-elevated)" : "transparent",
+                          color: filterType === type ? "var(--text-primary)" : "var(--text-muted)",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          textAlign: "left",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {type === "both" ? "Both" : type === "agent" ? "Agent" : "Script"}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -615,12 +729,22 @@ export default function TasksPage() {
                 Tasks will appear here when agents or scripts run. Records are kept for 7 days.
               </p>
             </div>
+          ) : filteredTasks.length === 0 ? (
+            <div className="tasks-empty">
+              <IconInbox size={48} />
+              <p style={{ color: "var(--text-secondary)", fontSize: 14, margin: "12px 0 0" }}>
+                No tasks matching the filter
+              </p>
+              <p style={{ color: "var(--text-muted)", fontSize: 12, margin: "4px 0 0" }}>
+                Try switching the filter to "Both" to view all tasks.
+              </p>
+            </div>
           ) : (
             <div className="tasks-list" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               {(() => {
                 if (groupBy === "session") {
                   const groupMap = new Map<string, SessionGroup>();
-                  for (const task of taskQueue) {
+                  for (const task of filteredTasks) {
                     const groupKey = task.sessionId || `global-${task.projectId || "unknown"}`;
                     let group = groupMap.get(groupKey);
                     if (!group) {
@@ -770,7 +894,7 @@ export default function TasksPage() {
                   };
 
                   const groupMap = new Map<TaskItem["status"], TaskItem[]>();
-                  for (const task of taskQueue) {
+                  for (const task of filteredTasks) {
                     let tasks = groupMap.get(task.status);
                     if (!tasks) {
                       tasks = [];
