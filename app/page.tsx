@@ -447,7 +447,7 @@ export default function HomePage() {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
-  const { handlePromptChange, handleNewSessionCommand, handleAgentCommand, handleSubmit, handleKeyDown } = useSessionSubmit({
+  const { handlePromptChange, handleNewSessionCommand, handleAgentCommand, handleSubmit, handleKeyDown, commandMenuIndex } = useSessionSubmit({
     prompt,
     repoPath,
     agentType,
@@ -798,6 +798,7 @@ export default function HomePage() {
             menuOpen={menuOpen}
             scriptSubMenuOpen={scriptSubMenuOpen}
             showCommandMenu={showCommandMenu}
+            commandMenuIndex={commandMenuIndex}
             sessionScripts={sessionScripts}
             githubConfigured={githubConfigured}
             isCreatingPr={isCreatingPr}

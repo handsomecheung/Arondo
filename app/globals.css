@@ -822,7 +822,8 @@ body {
 }
 
 .command-menu-item:hover,
-.command-menu-item.active {
+.command-menu-item.active,
+.command-menu-item.highlighted {
   background: var(--bg-input);
 }
 

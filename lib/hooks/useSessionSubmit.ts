@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import type { Session, TaskItem } from "@/types/home";
-import { resolveAgentCommand, getUniqueTriggers } from "@/lib/agentCommands";
+import { resolveAgentCommand, getUniqueTriggers, getTriggerWord } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
 
 interface UseSessionSubmitParams {
@@ -54,9 +54,27 @@ export function useSessionSubmit({
   loadProjects,
   agentCommands,
 }: UseSessionSubmitParams) {
+  const [commandMenuIndex, setCommandMenuIndex] = useState(-1);
+
+  const getVisibleMenuItems = useCallback((): string[] => {
+    const v = prompt.trim();
+    const items: string[] = [];
+    if (("/new").startsWith(v) || v.startsWith("/new")) items.push("/new");
+    for (const cmd of agentCommands) {
+      const trigger = getTriggerWord(cmd);
+      const slashTrigger = "/" + trigger;
+      const afterSlash = v.slice(1);
+      const isBrowsing = slashTrigger.startsWith(v);
+      const matches = cmd.matcher ? new RegExp(cmd.matcher).test(afterSlash) : afterSlash === trigger;
+      if (isBrowsing || matches) items.push(slashTrigger);
+    }
+    return items;
+  }, [prompt, agentCommands]);
+
   const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setPrompt(value);
+    setCommandMenuIndex(-1);
     const v = value.trim();
     const agentTriggers = getUniqueTriggers(agentCommands);
     const matchesAgentCmd = agentTriggers.some((t) => v.startsWith("/" + t) || ("/" + t).startsWith(v));
@@ -207,6 +225,24 @@ export function useSessionSubmit({
     if (e.key === "Escape" && showCommandMenu) {
       e.preventDefault();
       setShowCommandMenu(false);
+      setCommandMenuIndex(-1);
+      return;
+    }
+    if (e.key === "Tab" && showCommandMenu) {
+      e.preventDefault();
+      const items = getVisibleMenuItems();
+      if (items.length === 0) return;
+      const nextIndex = (commandMenuIndex + 1) % items.length;
+      setCommandMenuIndex(nextIndex);
+      const completed = items[nextIndex];
+      setPrompt(completed + " ");
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.style.height = "auto";
+        el.style.height = `${Math.min(el.scrollHeight, 260)}px`;
+        el.selectionStart = el.selectionEnd = el.value.length;
+      });
       return;
     }
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -229,5 +265,5 @@ export function useSessionSubmit({
     }
   };
 
-  return { handlePromptChange, handleNewSessionCommand, handleAgentCommand, handleSubmit, handleKeyDown };
+  return { handlePromptChange, handleNewSessionCommand, handleAgentCommand, handleSubmit, handleKeyDown, commandMenuIndex };
 }
