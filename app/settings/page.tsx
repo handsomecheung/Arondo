@@ -35,6 +35,60 @@ interface Session {
   updatedAt: string;
 }
 
+interface AgentCommand {
+  command: string;
+  menuLabel?: string;
+  menuDescription?: string;
+  matcher?: string;
+  send: string;
+}
+
+const EMPTY_COMMAND: AgentCommand = {
+  command: "",
+  menuLabel: "",
+  menuDescription: "",
+  matcher: "",
+  send: "",
+};
+
+const COMMAND_FIELDS: {
+  key: keyof AgentCommand;
+  label: string;
+  placeholder: string;
+  hint?: string;
+}[] = [
+  {
+    key: "command",
+    label: "Command *",
+    placeholder: "e.g. commit message",
+    hint: 'e.g. "commit message"',
+  },
+  {
+    key: "send",
+    label: "Send *",
+    placeholder: "Message to send to the agent",
+    hint: 'Use $1, $2, … to insert Matcher capture groups. e.g. "commit the changes with message: $1."',
+  },
+  {
+    key: "menuLabel",
+    label: "Menu Label",
+    placeholder: "e.g. /commit <message>",
+    hint: "e.g. /commit <message>",
+  },
+  {
+    key: "menuDescription",
+    label: "Menu Description",
+    placeholder: "Short description shown in the menu",
+    hint: 'e.g. "Commit the changes with a specific message"',
+  },
+  {
+    key: "matcher",
+    label: "Matcher (regex)",
+    placeholder: "e.g. ^commit\\s+(.+)$",
+    hint: 'Wrap capture groups in parentheses ( ) — they become $1, $2, … in Send. e.g. "^commit\\s+(.+)$ captures the message as $1"',
+  },
+];
+
 function IconArrowLeft() {
   return (
     <svg
@@ -106,6 +160,12 @@ export default function SettingsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [selectedRunnerId, setSelectedRunnerId] = useState<string | null>(null);
+  const [customCommands, setCustomCommands] = useState<AgentCommand[]>([]);
+  const [showAddCommand, setShowAddCommand] = useState(false);
+  const [newCommand, setNewCommand] = useState<AgentCommand>(EMPTY_COMMAND);
+  const [savingCommand, setSavingCommand] = useState(false);
+  const [editingCommand, setEditingCommand] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<AgentCommand>(EMPTY_COMMAND);
 
   const loadRunners = useCallback(() => {
     fetch("/api/runners")
@@ -114,8 +174,16 @@ export default function SettingsPage() {
       .catch(console.error);
   }, []);
 
+  const loadCustomCommands = useCallback(() => {
+    fetch("/api/agent-commands?source=custom")
+      .then((r) => r.json())
+      .then((data: AgentCommand[]) => setCustomCommands(data))
+      .catch(console.error);
+  }, []);
+
   useEffect(() => {
     loadRunners();
+    loadCustomCommands();
     fetch("/api/projects")
       .then((r) => r.json())
       .then((data: Project[]) => setProjects(data))
@@ -127,7 +195,63 @@ export default function SettingsPage() {
 
     const poll = setInterval(loadRunners, 10_000);
     return () => clearInterval(poll);
-  }, [loadRunners]);
+  }, [loadRunners, loadCustomCommands]);
+
+  const handleDeleteCommand = useCallback(
+    async (command: string) => {
+      await fetch(
+        `/api/agent-commands?command=${encodeURIComponent(command)}`,
+        { method: "DELETE" },
+      );
+      loadCustomCommands();
+    },
+    [loadCustomCommands],
+  );
+
+  const buildCommandBody = (draft: AgentCommand): AgentCommand => {
+    const body: AgentCommand = {
+      command: draft.command.trim(),
+      send: draft.send.trim(),
+    };
+    if (draft.menuLabel?.trim()) body.menuLabel = draft.menuLabel.trim();
+    if (draft.menuDescription?.trim())
+      body.menuDescription = draft.menuDescription.trim();
+    if (draft.matcher?.trim()) body.matcher = draft.matcher.trim();
+    return body;
+  };
+
+  const handleAddCommand = useCallback(async () => {
+    if (!newCommand.command.trim() || !newCommand.send.trim()) return;
+    setSavingCommand(true);
+    try {
+      await fetch("/api/agent-commands", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildCommandBody(newCommand)),
+      });
+      setNewCommand(EMPTY_COMMAND);
+      setShowAddCommand(false);
+      loadCustomCommands();
+    } finally {
+      setSavingCommand(false);
+    }
+  }, [newCommand, loadCustomCommands]);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!editDraft.command.trim() || !editDraft.send.trim()) return;
+    setSavingCommand(true);
+    try {
+      await fetch("/api/agent-commands", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildCommandBody(editDraft)),
+      });
+      setEditingCommand(null);
+      loadCustomCommands();
+    } finally {
+      setSavingCommand(false);
+    }
+  }, [editDraft, loadCustomCommands]);
 
   const sortedRunners = [...runners].sort((a, b) => {
     if (a.connected !== b.connected) return a.connected ? -1 : 1;
@@ -176,7 +300,13 @@ export default function SettingsPage() {
           <IconBolt />
           <span className="header-title">Arondo</span>
         </div>
-        <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-secondary)" }}>
+        <span
+          style={{
+            fontSize: 14,
+            fontWeight: 600,
+            color: "var(--text-secondary)",
+          }}
+        >
           Settings
         </span>
       </header>
@@ -343,14 +473,17 @@ export default function SettingsPage() {
                         )}
                       </div>
                       {hasAgentInfo && (
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <div
+                          style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
+                        >
                           {agentDefs.map(({ label, cmd, comingSoon }) => {
-                            const installed = !comingSoon && r.agents!.includes(cmd);
+                            const installed =
+                              !comingSoon && r.agents!.includes(cmd);
                             const tooltipText = comingSoon
                               ? `${label}: Under Development`
                               : installed
-                              ? `${label} is installed`
-                              : `${label} is not installed`;
+                                ? `${label} is installed`
+                                : `${label} is not installed`;
                             return (
                               <div
                                 key={cmd}
@@ -362,7 +495,9 @@ export default function SettingsPage() {
                                   padding: "5px 10px",
                                   borderRadius: 6,
                                   border: `1px solid ${installed ? "var(--border-accent)" : "var(--border)"}`,
-                                  background: installed ? "var(--accent-glow)" : "var(--bg-surface)",
+                                  background: installed
+                                    ? "var(--accent-glow)"
+                                    : "var(--bg-surface)",
                                   opacity: installed ? 1 : 0.5,
                                 }}
                               >
@@ -371,7 +506,9 @@ export default function SettingsPage() {
                                     width: 7,
                                     height: 7,
                                     borderRadius: "50%",
-                                    background: installed ? "var(--accent)" : "var(--text-muted)",
+                                    background: installed
+                                      ? "var(--accent)"
+                                      : "var(--text-muted)",
                                     flexShrink: 0,
                                   }}
                                 />
@@ -379,7 +516,9 @@ export default function SettingsPage() {
                                   style={{
                                     fontSize: 12,
                                     fontWeight: 500,
-                                    color: installed ? "var(--accent)" : "var(--text-muted)",
+                                    color: installed
+                                      ? "var(--accent)"
+                                      : "var(--text-muted)",
                                   }}
                                 >
                                   {label}
@@ -394,6 +533,418 @@ export default function SettingsPage() {
                 })}
               </div>
             )}
+          </div>
+
+          {/* Agent Commands Section */}
+          <div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 12,
+              }}
+            >
+              <div>
+                <h2
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 600,
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  Agent Commands
+                </h2>
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: "var(--text-muted)",
+                    marginTop: 2,
+                  }}
+                >
+                  Custom slash commands that expand into agent instructions.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowAddCommand(true);
+                  setNewCommand(EMPTY_COMMAND);
+                }}
+                style={{
+                  padding: "6px 14px",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: "var(--accent)",
+                  background: "var(--accent-glow)",
+                  border: "1px solid var(--border-accent)",
+                  borderRadius: "var(--radius-sm)",
+                  cursor: "pointer",
+                  flexShrink: 0,
+                }}
+              >
+                + Add
+              </button>
+            </div>
+
+            {showAddCommand && (
+              <div
+                style={{
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border-accent)",
+                  borderRadius: "var(--radius-md)",
+                  padding: 16,
+                  marginBottom: 12,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                }}
+              >
+                <h3
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "var(--text-primary)",
+                    marginBottom: 2,
+                  }}
+                >
+                  New Command
+                </h3>
+                {COMMAND_FIELDS.map(({ key, label, placeholder, hint }) => (
+                  <div
+                    key={key}
+                    style={{ display: "flex", flexDirection: "column", gap: 4 }}
+                  >
+                    <label
+                      style={{
+                        fontSize: 11,
+                        color: "var(--text-muted)",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {label}
+                    </label>
+                    <input
+                      value={(newCommand[key] as string) ?? ""}
+                      onChange={(e) =>
+                        setNewCommand((prev) => ({
+                          ...prev,
+                          [key]: e.target.value,
+                        }))
+                      }
+                      placeholder={placeholder}
+                      style={{
+                        background: "var(--bg-elevated)",
+                        border: "1px solid var(--border)",
+                        borderRadius: "var(--radius-sm)",
+                        padding: "7px 10px",
+                        fontSize: 13,
+                        color: "var(--text-primary)",
+                        fontFamily:
+                          key === "matcher" || key === "send"
+                            ? "monospace"
+                            : "inherit",
+                        outline: "none",
+                        width: "100%",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                    {hint && (
+                      <span
+                        style={{ fontSize: 11, color: "var(--text-muted)" }}
+                      >
+                        {hint}
+                      </span>
+                    )}
+                  </div>
+                ))}
+                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                  <button
+                    onClick={handleAddCommand}
+                    disabled={
+                      savingCommand ||
+                      !newCommand.command.trim() ||
+                      !newCommand.send.trim()
+                    }
+                    style={{
+                      padding: "7px 18px",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "#fff",
+                      background: "var(--accent)",
+                      border: "none",
+                      borderRadius: "var(--radius-sm)",
+                      cursor: "pointer",
+                      opacity:
+                        savingCommand ||
+                        !newCommand.command.trim() ||
+                        !newCommand.send.trim()
+                          ? 0.5
+                          : 1,
+                    }}
+                  >
+                    {savingCommand ? "Saving…" : "Save"}
+                  </button>
+                  <button
+                    onClick={() => setShowAddCommand(false)}
+                    style={{
+                      padding: "7px 14px",
+                      fontSize: 13,
+                      color: "var(--text-secondary)",
+                      background: "var(--bg-elevated)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-sm)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {customCommands.length === 0 && !showAddCommand && (
+                <div
+                  style={{
+                    padding: "32px 16px",
+                    textAlign: "center",
+                    border: "1px dashed var(--border)",
+                    borderRadius: "var(--radius-md)",
+                    color: "var(--text-muted)",
+                    fontSize: 13,
+                  }}
+                >
+                  No custom commands. Click "+ Add" to create one.
+                </div>
+              )}
+              {customCommands.map((cmd) =>
+                editingCommand === cmd.command ? (
+                  <div
+                    key={cmd.command}
+                    style={{
+                      background: "var(--bg-surface)",
+                      border: "1px solid var(--border-accent)",
+                      borderRadius: "var(--radius-md)",
+                      padding: 16,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 10,
+                    }}
+                  >
+                    <h3
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "var(--text-primary)",
+                        marginBottom: 2,
+                      }}
+                    >
+                      Edit Command
+                    </h3>
+                    {COMMAND_FIELDS.map(({ key, label, placeholder, hint }) => (
+                      <div
+                        key={key}
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 4,
+                        }}
+                      >
+                        <label
+                          style={{
+                            fontSize: 11,
+                            color: "var(--text-muted)",
+                            fontWeight: 500,
+                          }}
+                        >
+                          {label}
+                        </label>
+                        <input
+                          value={(editDraft[key] as string) ?? ""}
+                          onChange={(e) =>
+                            setEditDraft((prev) => ({
+                              ...prev,
+                              [key]: e.target.value,
+                            }))
+                          }
+                          placeholder={placeholder}
+                          style={{
+                            background: "var(--bg-elevated)",
+                            border: "1px solid var(--border)",
+                            borderRadius: "var(--radius-sm)",
+                            padding: "7px 10px",
+                            fontSize: 13,
+                            color: "var(--text-primary)",
+                            fontFamily:
+                              key === "matcher" || key === "send"
+                                ? "monospace"
+                                : "inherit",
+                            outline: "none",
+                            width: "100%",
+                            boxSizing: "border-box",
+                          }}
+                        />
+                        {hint && (
+                          <span
+                            style={{ fontSize: 11, color: "var(--text-muted)" }}
+                          >
+                            {hint}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                    <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                      <button
+                        onClick={handleSaveEdit}
+                        disabled={
+                          savingCommand ||
+                          !editDraft.command.trim() ||
+                          !editDraft.send.trim()
+                        }
+                        style={{
+                          padding: "7px 18px",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "#fff",
+                          background: "var(--accent)",
+                          border: "none",
+                          borderRadius: "var(--radius-sm)",
+                          cursor: "pointer",
+                          opacity:
+                            savingCommand ||
+                            !editDraft.command.trim() ||
+                            !editDraft.send.trim()
+                              ? 0.5
+                              : 1,
+                        }}
+                      >
+                        {savingCommand ? "Saving…" : "Save"}
+                      </button>
+                      <button
+                        onClick={() => setEditingCommand(null)}
+                        style={{
+                          padding: "7px 14px",
+                          fontSize: 13,
+                          color: "var(--text-secondary)",
+                          background: "var(--bg-elevated)",
+                          border: "1px solid var(--border)",
+                          borderRadius: "var(--radius-sm)",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    key={cmd.command}
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      padding: 14,
+                      background: "var(--bg-elevated)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-md)",
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          marginBottom: 4,
+                        }}
+                      >
+                        <code
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: "var(--accent)",
+                            background: "var(--accent-glow)",
+                            border: "1px solid var(--border-accent)",
+                            padding: "2px 8px",
+                            borderRadius: 4,
+                          }}
+                        >
+                          /{cmd.command}
+                        </code>
+                        {cmd.menuDescription && (
+                          <span
+                            style={{ fontSize: 12, color: "var(--text-muted)" }}
+                          >
+                            {cmd.menuDescription}
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: "var(--text-secondary)",
+                          fontFamily: "monospace",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                        title={cmd.send}
+                      >
+                        {cmd.send}
+                      </div>
+                      {cmd.matcher && (
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: "var(--text-muted)",
+                            fontFamily: "monospace",
+                            marginTop: 2,
+                          }}
+                        >
+                          matcher: {cmd.matcher}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      <button
+                        onClick={() => {
+                          setEditingCommand(cmd.command);
+                          setEditDraft({ ...cmd });
+                        }}
+                        title="Edit command"
+                        style={{
+                          padding: "4px 10px",
+                          fontSize: 12,
+                          color: "var(--text-secondary)",
+                          background: "transparent",
+                          border: "1px solid var(--border)",
+                          borderRadius: "var(--radius-sm)",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCommand(cmd.command)}
+                        title="Delete command"
+                        style={{
+                          padding: "4px 10px",
+                          fontSize: 12,
+                          color: "var(--error, #e74c3c)",
+                          background: "transparent",
+                          border: "1px solid var(--border)",
+                          borderRadius: "var(--radius-sm)",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ),
+              )}
+            </div>
           </div>
 
           {/* Selected Runner Detail */}
@@ -447,8 +998,7 @@ export default function SettingsPage() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns:
-                    "repeat(auto-fit, minmax(280px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
                   gap: 16,
                 }}
               >
@@ -676,8 +1226,7 @@ export default function SettingsPage() {
                         (s) => s.projectId === project.id,
                       );
                       const folderName =
-                        project.repoPath.split("/").pop() ||
-                        project.repoPath;
+                        project.repoPath.split("/").pop() || project.repoPath;
 
                       return (
                         <div
@@ -724,8 +1273,8 @@ export default function SettingsPage() {
                                 color: "var(--text-secondary)",
                               }}
                             >
-                              <strong>Sessions:</strong>{" "}
-                              {projSessions.length} total
+                              <strong>Sessions:</strong> {projSessions.length}{" "}
+                              total
                             </span>
                             <span
                               style={{

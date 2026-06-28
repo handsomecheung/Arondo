@@ -19,7 +19,7 @@ export const AGENT_COMMANDS: AgentCommand[] = [
     menuLabel: "/commit <message>",
     menuDescription: "Commit the changes with a specific message",
     matcher: "^commit\\s+(.+)$",
-    send: "commit the changes with message: $1. Use this exact message — do not add, modify, or append any extra information to it.",
+    send: "commit the changes with message: $1.",
   },
 ];
 
@@ -34,11 +34,16 @@ export function getTriggerWord(cmd: AgentCommand): string {
   return cmd.command.split(/\s+/)[0];
 }
 
-export function getUniqueTriggers(commands: AgentCommand[] = AGENT_COMMANDS): string[] {
+export function getUniqueTriggers(
+  commands: AgentCommand[] = AGENT_COMMANDS,
+): string[] {
   return [...new Set(commands.map(getTriggerWord))];
 }
 
-export function resolveAgentCommand(promptText: string, commands: AgentCommand[] = AGENT_COMMANDS): string | null {
+export function resolveAgentCommand(
+  promptText: string,
+  commands: AgentCommand[] = AGENT_COMMANDS,
+): string | null {
   const text = promptText.trim();
   if (!text.startsWith("/")) return null;
   const afterSlash = text.slice(1);
