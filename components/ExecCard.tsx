@@ -6,6 +6,7 @@ export interface ExecCardItem {
   id: string;
   type: "agent" | "script";
   title: string;
+  subtitle?: string;
   status: "running" | "done" | "error" | "stopped";
   statusText: string;
   command?: string;
@@ -134,6 +135,11 @@ export default function ExecCard({ item, onViewLog, onShowCommand, onStopTask, o
           <div className="exec-card-title">
             {item.type === "script" ? "Script" : "Agent"}: {item.title}
           </div>
+          {item.subtitle && (
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+              {item.subtitle}
+            </div>
+          )}
           <div className="exec-card-status">{item.statusText}</div>
         </div>
         {hasMenuItems && (

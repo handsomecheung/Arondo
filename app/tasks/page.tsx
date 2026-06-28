@@ -106,6 +106,7 @@ export default function TasksPage() {
   const [commandTask, setCommandTask] = useState<TaskItem | null>(null);
 
   const [projects, setProjects] = useState<Project[]>([]);
+  const [groupBy, setGroupBy] = useState<"session" | "status">("session");
 
   const loadInitialTasks = useCallback(async () => {
     try {
@@ -556,6 +557,54 @@ export default function TasksPage() {
             )}
           </div>
 
+          {taskQueue.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                background: "var(--bg-surface)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-md)",
+                padding: 3,
+                gap: 2,
+                width: "fit-content",
+              }}
+            >
+              <button
+                onClick={() => setGroupBy("session")}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: "calc(var(--radius-md) - 2px)",
+                  border: "none",
+                  background: groupBy === "session" ? "var(--bg-elevated)" : "transparent",
+                  color: groupBy === "session" ? "var(--text-primary)" : "var(--text-muted)",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.18s ease",
+                }}
+              >
+                Group by Scope
+              </button>
+              <button
+                onClick={() => setGroupBy("status")}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: "calc(var(--radius-md) - 2px)",
+                  border: "none",
+                  background: groupBy === "status" ? "var(--bg-elevated)" : "transparent",
+                  color: groupBy === "status" ? "var(--text-primary)" : "var(--text-muted)",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.18s ease",
+                }}
+              >
+                Group by Status
+              </button>
+            </div>
+          )}
+
           {taskQueue.length === 0 ? (
             <div className="tasks-empty">
               <IconInbox size={48} />
@@ -569,141 +618,264 @@ export default function TasksPage() {
           ) : (
             <div className="tasks-list" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               {(() => {
-                const groupMap = new Map<string, SessionGroup>();
-                for (const task of taskQueue) {
-                  const groupKey = task.sessionId || `global-${task.projectId || "unknown"}`;
-                  let group = groupMap.get(groupKey);
-                  if (!group) {
-                    group = {
-                      groupId: groupKey,
-                      sessionId: task.sessionId,
-                      sessionName: task.sessionName,
-                      hasRunning: false,
-                      latestTime: 0,
-                      tasks: [],
-                    };
-                    groupMap.set(groupKey, group);
+                if (groupBy === "session") {
+                  const groupMap = new Map<string, SessionGroup>();
+                  for (const task of taskQueue) {
+                    const groupKey = task.sessionId || `global-${task.projectId || "unknown"}`;
+                    let group = groupMap.get(groupKey);
+                    if (!group) {
+                      group = {
+                        groupId: groupKey,
+                        sessionId: task.sessionId,
+                        sessionName: task.sessionName,
+                        hasRunning: false,
+                        latestTime: 0,
+                        tasks: [],
+                      };
+                      groupMap.set(groupKey, group);
+                    }
+                    group.tasks.push(task);
+                    if (task.status === "running") group.hasRunning = true;
+                    const t = task.completedAt || task.createdAt;
+                    if (t > group.latestTime) group.latestTime = t;
                   }
-                  group.tasks.push(task);
-                  if (task.status === "running") group.hasRunning = true;
-                  const t = task.completedAt || task.createdAt;
-                  if (t > group.latestTime) group.latestTime = t;
-                }
-                const groups = Array.from(groupMap.values());
-                groups.sort((a, b) => {
-                  if (a.hasRunning && !b.hasRunning) return -1;
-                  if (!a.hasRunning && b.hasRunning) return 1;
-                  return b.latestTime - a.latestTime;
-                });
-                return groups.map((group) => {
-                  const isGlobal = !group.sessionId;
-                  const projectId = group.tasks[0]?.projectId;
-                  const project = projects.find((p) => p.id === projectId);
-                  const projectName = project ? project.repoPath.split("/").pop() || project.repoPath : "Unknown Project";
-                  return (
-                    <div key={group.groupId}>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                          marginBottom: 8,
-                          padding: "0 4px",
-                        }}
-                      >
-                        {group.hasRunning && <span className="task-spinner" />}
-                        {isGlobal ? (
+                  const groups = Array.from(groupMap.values());
+                  groups.sort((a, b) => {
+                    if (a.hasRunning && !b.hasRunning) return -1;
+                    if (!a.hasRunning && b.hasRunning) return 1;
+                    return b.latestTime - a.latestTime;
+                  });
+                  return groups.map((group) => {
+                    const isGlobal = !group.sessionId;
+                    const projectId = group.tasks[0]?.projectId;
+                    const project = projects.find((p) => p.id === projectId);
+                    const projectName = project ? project.repoPath.split("/").pop() || project.repoPath : "Unknown Project";
+                    return (
+                      <div key={group.groupId}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            marginBottom: 8,
+                            padding: "0 4px",
+                          }}
+                        >
+                          {group.hasRunning && <span className="task-spinner" />}
+                          {isGlobal ? (
+                            <span
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 600,
+                                color: "var(--accent)",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                flex: 1,
+                              }}
+                            >
+                              🌐 Project: {projectName}
+                            </span>
+                          ) : (
+                            <a
+                              href={`/session/${group.sessionId}`}
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 600,
+                                color: "var(--text-secondary)",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                flex: 1,
+                                textDecoration: "none",
+                                cursor: "pointer",
+                              }}
+                              title={group.sessionName}
+                              onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+                              onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+                            >
+                              {group.sessionName || "Unnamed Session"}
+                            </a>
+                          )}
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: "var(--text-muted)",
+                              flexShrink: 0,
+                            }}
+                          >
+                            {group.tasks.length} {group.tasks.length === 1 ? "task" : "tasks"}
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          {group.tasks.map((task) => {
+                            const isRunning = task.status === "running";
+
+                            let statusText: string;
+                            if (isRunning) {
+                              const elapsedMs = taskTimeTicker - task.createdAt;
+                              statusText = `Running (${formatDuration(elapsedMs)})...`;
+                            } else if (task.completedAt) {
+                              const ago = formatDuration(taskTimeTicker - task.completedAt);
+                              statusText = task.status === "stopped"
+                                ? `Stopped by user ${ago} ago`
+                                : task.status === "done"
+                                  ? `Completed ${ago} ago`
+                                  : `Failed ${ago} ago`;
+                            } else {
+                              statusText = task.status === "stopped"
+                                ? "Stopped by user"
+                                : task.status === "done"
+                                  ? "Completed"
+                                  : "Failed";
+                            }
+
+                            return (
+                              <ExecCard
+                                key={task.id}
+                                item={{
+                                  id: task.id,
+                                  type: task.type,
+                                  title: task.name.replace(/^(Agent|Script):\s*/, ""),
+                                  status: task.status,
+                                  statusText,
+                                  command: task.command,
+                                  messageId: task.messageId,
+                                }}
+                                onViewLog={task.messageId ? () => setTerminalTask(task) : undefined}
+                                onShowCommand={task.command ? () => setCommandTask(task) : undefined}
+                                onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
+                                onRestartScript={isRunning && task.type === "script" && task.scriptName && task.messageId ? () => handleRestartScript(task) : undefined}
+                                onRetryTask={task.status === "error" ? () => handleRetryTask(task) : undefined}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  });
+                } else {
+                  const statusOrder: TaskItem["status"][] = ["running", "error", "done", "stopped"];
+                  const statusLabels: Record<TaskItem["status"], string> = {
+                    running: "Running",
+                    error: "Failed",
+                    done: "Completed",
+                    stopped: "Stopped",
+                  };
+                  const statusColors: Record<TaskItem["status"], string> = {
+                    running: "var(--accent)",
+                    error: "var(--error)",
+                    done: "var(--success)",
+                    stopped: "var(--text-muted)",
+                  };
+
+                  const groupMap = new Map<TaskItem["status"], TaskItem[]>();
+                  for (const task of taskQueue) {
+                    let tasks = groupMap.get(task.status);
+                    if (!tasks) {
+                      tasks = [];
+                      groupMap.set(task.status, tasks);
+                    }
+                    tasks.push(task);
+                  }
+
+                  const groups = statusOrder
+                    .map((status) => ({
+                      status,
+                      label: statusLabels[status],
+                      color: statusColors[status],
+                      tasks: groupMap.get(status) || [],
+                    }))
+                    .filter((g) => g.tasks.length > 0);
+
+                  return groups.map((group) => {
+                    return (
+                      <div key={group.status}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            marginBottom: 8,
+                            padding: "0 4px",
+                          }}
+                        >
+                          {group.status === "running" && <span className="task-spinner" />}
                           <span
                             style={{
                               fontSize: 13,
                               fontWeight: 600,
-                              color: "var(--accent)",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
+                              color: group.color,
                               flex: 1,
                             }}
                           >
-                            🌐 Project: {projectName} (Global)
+                            {group.label}
                           </span>
-                        ) : (
-                          <a
-                            href={`/session/${group.sessionId}`}
+                          <span
                             style={{
-                              fontSize: 13,
-                              fontWeight: 600,
-                              color: "var(--text-secondary)",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                              flex: 1,
-                              textDecoration: "none",
-                              cursor: "pointer",
+                              fontSize: 11,
+                              color: "var(--text-muted)",
+                              flexShrink: 0,
                             }}
-                            title={group.sessionName}
-                            onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
-                            onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
                           >
-                            {group.sessionName || "Unnamed Session"}
-                          </a>
-                        )}
-                        <span
-                          style={{
-                            fontSize: 11,
-                            color: "var(--text-muted)",
-                            flexShrink: 0,
-                          }}
-                        >
-                          {group.tasks.length} {group.tasks.length === 1 ? "task" : "tasks"}
-                        </span>
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                        {group.tasks.map((task) => {
-                          const isRunning = task.status === "running";
+                            {group.tasks.length} {group.tasks.length === 1 ? "task" : "tasks"}
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          {group.tasks.map((task) => {
+                            const isRunning = task.status === "running";
 
-                          let statusText: string;
-                          if (isRunning) {
-                            const elapsedMs = taskTimeTicker - task.createdAt;
-                            statusText = `Running (${formatDuration(elapsedMs)})...`;
-                          } else if (task.completedAt) {
-                            const ago = formatDuration(taskTimeTicker - task.completedAt);
-                            statusText = task.status === "stopped"
-                              ? `Stopped by user ${ago} ago`
-                              : task.status === "done"
-                                ? `Completed ${ago} ago`
-                                : `Failed ${ago} ago`;
-                          } else {
-                            statusText = task.status === "stopped"
-                              ? "Stopped by user"
-                              : task.status === "done"
-                                ? "Completed"
-                                : "Failed";
-                          }
+                            let statusText: string;
+                            if (isRunning) {
+                              const elapsedMs = taskTimeTicker - task.createdAt;
+                              statusText = `Running (${formatDuration(elapsedMs)})...`;
+                            } else if (task.completedAt) {
+                              const ago = formatDuration(taskTimeTicker - task.completedAt);
+                              statusText = task.status === "stopped"
+                                ? `Stopped by user ${ago} ago`
+                                : task.status === "done"
+                                  ? `Completed ${ago} ago`
+                                  : `Failed ${ago} ago`;
+                            } else {
+                              statusText = task.status === "stopped"
+                                ? "Stopped by user"
+                                : task.status === "done"
+                                  ? "Completed"
+                                  : "Failed";
+                            }
 
-                          return (
-                            <ExecCard
-                              key={task.id}
-                              item={{
-                                id: task.id,
-                                type: task.type,
-                                title: task.name.replace(/^(Agent|Script):\s*/, ""),
-                                status: task.status,
-                                statusText,
-                                command: task.command,
-                                messageId: task.messageId,
-                              }}
-                              onViewLog={task.messageId ? () => setTerminalTask(task) : undefined}
-                              onShowCommand={task.command ? () => setCommandTask(task) : undefined}
-                              onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
-                              onRestartScript={isRunning && task.type === "script" && task.scriptName && task.messageId ? () => handleRestartScript(task) : undefined}
-                              onRetryTask={task.status === "error" ? () => handleRetryTask(task) : undefined}
-                            />
-                          );
-                        })}
+                            const project = projects.find((p) => p.id === task.projectId);
+                            const projectName = project ? project.repoPath.split("/").pop() || project.repoPath : "Unknown Project";
+                            const subtitle = task.sessionId
+                              ? `Session: ${task.sessionName || "Unnamed Session"}`
+                              : `Project: ${projectName}`;
+
+                            return (
+                              <ExecCard
+                                key={task.id}
+                                item={{
+                                  id: task.id,
+                                  type: task.type,
+                                  title: task.name.replace(/^(Agent|Script):\s*/, ""),
+                                  subtitle,
+                                  status: task.status,
+                                  statusText,
+                                  command: task.command,
+                                  messageId: task.messageId,
+                                }}
+                                onViewLog={task.messageId ? () => setTerminalTask(task) : undefined}
+                                onShowCommand={task.command ? () => setCommandTask(task) : undefined}
+                                onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
+                                onRestartScript={isRunning && task.type === "script" && task.scriptName && task.messageId ? () => handleRestartScript(task) : undefined}
+                                onRetryTask={task.status === "error" ? () => handleRetryTask(task) : undefined}
+                              />
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  );
-                });
+                    );
+                  });
+                }
               })()}
             </div>
           )}
