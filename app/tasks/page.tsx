@@ -787,7 +787,8 @@ export default function TasksPage() {
                         >
                           {group.hasRunning && <span className="task-spinner" />}
                           {isGlobal ? (
-                            <span
+                            <a
+                              href={`/project/${projectId}`}
                               style={{
                                 fontSize: 13,
                                 fontWeight: 600,
@@ -796,10 +797,15 @@ export default function TasksPage() {
                                 textOverflow: "ellipsis",
                                 whiteSpace: "nowrap",
                                 flex: 1,
+                                textDecoration: "none",
+                                cursor: "pointer",
                               }}
+                              title={projectName}
+                              onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+                              onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
                             >
                               🌐 Project: {projectName}
-                            </span>
+                            </a>
                           ) : (
                             <a
                               href={`/session/${group.sessionId}`}
