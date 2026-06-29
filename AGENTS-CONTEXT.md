@@ -97,6 +97,9 @@ app/
           route.ts      # POST: restart a global project script task via exec.restart
     agent-commands/
       route.ts          # GET/POST/DELETE: manage custom agent slash commands
+    agents/
+      info/
+        route.ts        # GET: fetch quota status for agents on all runners
     tasks/
       route.ts        # GET: list all tasks (active + retained)
       kill/
@@ -124,8 +127,8 @@ scripts/
   run.runner1.sh        # Start Go runner 1 in dev mode (connects to localhost:3251)
   run.runner2.sh        # Start Go runner 2 in dev mode (connects to localhost:3251)
 data/                   # Runtime data (gitignored)
-  active-tasks.json     # Persisted active task contexts (survives server restart)
   agent-commands.json   # Persisted custom agent slash commands
+  global-rules.md       # Global agent rules written from Settings
   agy-sessions.json     # Map file matching Arondo sessionIds with agy conversation UUIDs
   sessions/
     [sessionId]/
@@ -175,7 +178,7 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 
 - **Connection management**: Tracks connected runners (including IP address). Runner IDs are stable across reconnections (derived from `name@hostname`). `RunnerInfo.lastSeenAt` is stamped on both connect and disconnect.
 - **Task routing**: Maps `taskId` → `TaskContext` (sessionId, messageId, runnerId, type, pid, completedAt, exitCode, stoppedByUser). Maps `sessionId:messageId` → `taskId` for PTY input routing.
-- **Task persistence & retention**: All tasks (active + completed) are saved to `data/active-tasks.json`. Completed tasks are retained for 7 days (`TASK_RETENTION_MS`), then purged on startup. On server restart, tasks are restored and active ones re-associated to the reconnecting runner.
+- **Task persistence & retention**: Active task contexts are persisted by saving execution metadata directly to `messages.json` (for both sessions and projects). Completed tasks are retained for 7 days (`TASK_RETENTION_MS`), then purged on startup. On server restart, active tasks are restored and re-associated to the reconnecting runner.
 - **Task cleanup**: `removeTasksForSession()` cleans up tasks when a session is deleted. `getAllTasks()` returns all tasks (active + retained). `purgeExpiredTasks()` removes completed tasks older than 7 days.
 - **Runner discovery**: `getAllKnownRunners()` returns both connected runners and disconnected runners persisted on disk, used by the `/api/runners` route.
 - **Task restart**: `restartTask()` sends `exec.restart` to the runner, killing the current process and re-spawning it with a new command within the same task slot.
@@ -222,9 +225,13 @@ Two WebSocket endpoints:
 - **Open Terminal in session menu**: The three-dot dropdown in a session includes an "Open Terminal" option that opens a `ShellTerminal` modal for that session's runner.
 - **Real-time Streaming**: Both agent and script output stream via WebSocket `terminal:output` (base64-encoded PTY data), forwarded through the event bus. The frontend renders all logs via the xterm.js Terminal component.
 - **Concurrency**: Multiple background scripts can run concurrently in a single session. The chat prompt stays active during execution.
-- **Task Persistence**: Active task contexts survive server restarts via `data/active-tasks.json`. On runner reconnect, the `task.status` event reconciles running vs exited tasks.
+- **Task Persistence**: Active task contexts survive server restarts by restoring metadata from session and project `messages.json`. On runner reconnect, the `task.status` event reconciles running vs exited tasks.
 - **Runner Disconnect Handling**: When a runner disconnects, orphaned tasks are automatically failed with exit code -1, updating session status and notifying the UI.
 - **Agent Session Continuity**: ClaudeCodeAgent supports `--session-id` (bind to a session) and `--resume` (resume an existing session) flags, enabling multi-turn conversations within the same agent session.
+- **Global Agent Rules Sync**: Settings screen allows specifying global agent rules. These are stored in `data/global-rules.md` and automatically synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on runner nodes upon connection.
+- **AI Agent Quota Monitoring**: Runner nodes collect agent quota usage from Claude and Antigravity via tmux pane capture, which is saved locally under `data/agents/` on the server and displayed with progress bars in the Settings dashboard.
+- **@ Path Selector Modal**: Typing `@` in the chat textarea opens a file and directory selector modal to easily select a path and insert its relative path into the input field.
+- **File Browser with Syntax Highlighting**: A Remote File Browser can be opened from the session's three-dot menu, featuring file previews (up to 512KB) with code syntax highlighting and a word wrap toggle option.
 
 ## Project & Custom Scripts Management
 - **Project Scoping**: Sessions are mapped to projects by repository path + runnerId. Projects store metadata at `data/projects/[projectId]/project.json`.
