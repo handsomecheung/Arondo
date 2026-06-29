@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { IconX, IconCornerLeftUp, IconFolder, IconFile, IconCode } from "@/components/Icons";
+import { IconX, IconCornerLeftUp, IconFolder, IconFile, IconCode, IconChevronDown } from "@/components/Icons";
 
 interface FsEntry {
   name: string;
@@ -32,6 +32,8 @@ export default function FileBrowserModal({ open, onClose, runnerId, initialPath 
 
   // Mobile: "list" or "file" view
   const [mobileView, setMobileView] = useState<View>("list");
+  const [wordWrap, setWordWrap] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
 
   const loadDir = useCallback((path: string) => {
     if (!runnerId) return;
@@ -129,7 +131,7 @@ export default function FileBrowserModal({ open, onClose, runnerId, initialPath 
       ) : fileError ? (
         <div className="fb-file-error">{fileError}</div>
       ) : (
-        <pre className="fb-code-pre">
+        <pre className={`fb-code-pre${wordWrap ? " fb-wrap" : ""}`}>
           {highlightedHtml != null ? (
             <code dangerouslySetInnerHTML={{ __html: highlightedHtml }} />
           ) : (
@@ -186,10 +188,27 @@ export default function FileBrowserModal({ open, onClose, runnerId, initialPath 
               ? selectedFile.split("/").pop()
               : "File Browser"}
           </span>
+          <button
+            className={`modal-close-btn fb-options-toggle${optionsOpen ? " active" : ""}`}
+            onClick={() => setOptionsOpen((v) => !v)}
+            aria-label="Toggle options"
+          >
+            <IconChevronDown className={optionsOpen ? "fb-chevron-up" : undefined} />
+          </button>
           <button className="modal-close-btn" onClick={handleClose} aria-label="Close">
             <IconX />
           </button>
         </div>
+        {optionsOpen && (
+          <div className="fb-options-bar">
+            <button
+              className={`fb-wrap-btn${wordWrap ? " active" : ""}`}
+              onClick={() => setWordWrap((v) => !v)}
+            >
+              ↵ Wrap
+            </button>
+          </div>
+        )}
 
         {/* Desktop: two-column layout */}
         <div className="fb-desktop-body">
