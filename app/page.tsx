@@ -11,6 +11,7 @@ import AppSidebar from "@/components/AppSidebar";
 import ProjectPanel from "@/components/ProjectPanel";
 import SessionView from "@/components/SessionView";
 import FileExplorerModal from "@/components/modals/FileExplorerModal";
+import ChatFileSelectorModal from "@/components/modals/ChatFileSelectorModal";
 import LogConsoleModal from "@/components/modals/LogConsoleModal";
 import ShellTerminalModal from "@/components/modals/ShellTerminalModal";
 import CommandModal from "@/components/modals/CommandModal";
@@ -153,6 +154,12 @@ export default function HomePage() {
     fsModalOpen, setFsModalOpen,
     fsCurrentPath, setFsCurrentPath,
     fsDirectories, fsParentPath, fsLoading,
+  } = useFileSystem(runnerId);
+
+  const {
+    fsModalOpen: chatFsModalOpen, setFsModalOpen: setChatFsModalOpen,
+    fsCurrentPath: chatFsCurrentPath, setFsCurrentPath: setChatFsCurrentPath,
+    fsEntries: chatFsEntries, fsParentPath: chatFsParentPath, fsLoading: chatFsLoading,
   } = useFileSystem(runnerId);
 
   const { isCreatingPr, isCheckingGitChanges, hasGitChanges, isGitRepo, handleCreatePr } = useGitHub({
@@ -491,6 +498,53 @@ export default function HomePage() {
     });
   };
 
+  const handleSelectChatFsItem = (absolutePath: string) => {
+    const root = selectedSession?.repoPath || "";
+    let relativePath = absolutePath;
+    if (root) {
+      if (absolutePath === root) {
+        relativePath = ".";
+      } else if (absolutePath.startsWith(root)) {
+        relativePath = absolutePath.substring(root.length);
+        if (relativePath.startsWith("/")) {
+          relativePath = relativePath.substring(1);
+        }
+      }
+    }
+
+    const el = textareaRef.current;
+    if (el) {
+      const selectionStart = el.selectionStart;
+      const value = prompt;
+      let newValue = value;
+      let newCursorPos = selectionStart;
+
+      if (selectionStart > 0 && value[selectionStart - 1] === "@") {
+        newValue = value.substring(0, selectionStart) + relativePath + value.substring(selectionStart);
+        newCursorPos = selectionStart + relativePath.length;
+      } else {
+        newValue = value.substring(0, selectionStart) + "@" + relativePath + value.substring(selectionStart);
+        newCursorPos = selectionStart + 1 + relativePath.length;
+      }
+
+      setPrompt(newValue);
+
+      requestAnimationFrame(() => {
+        el.focus();
+        el.selectionStart = el.selectionEnd = newCursorPos;
+        el.style.height = "auto";
+        el.style.height = `${Math.min(el.scrollHeight, 260)}px`;
+      });
+    } else {
+      if (prompt.endsWith("@")) {
+        setPrompt(prompt + relativePath);
+      } else {
+        setPrompt(prompt + "@" + relativePath);
+      }
+    }
+    setChatFsModalOpen(false);
+  };
+
   const { handlePromptChange, handleNewSessionCommand, handleAgentCommand, handleSubmit, handleKeyDown, commandMenuIndex } = useSessionSubmit({
     prompt,
     repoPath,
@@ -515,6 +569,12 @@ export default function HomePage() {
     loadProjects,
     agentCommands,
     onDeleteSession: handleDeleteSession,
+    onTriggerFsModal: () => {
+      if (selectedSession?.repoPath) {
+        setChatFsCurrentPath(selectedSession.repoPath);
+      }
+      setChatFsModalOpen(true);
+    },
   });
 
   const handleNewSession = () => {
@@ -868,6 +928,18 @@ export default function HomePage() {
           />
         )}
       </main>
+
+      <ChatFileSelectorModal
+        open={chatFsModalOpen}
+        onClose={() => setChatFsModalOpen(false)}
+        currentPath={chatFsCurrentPath}
+        onChangePath={setChatFsCurrentPath}
+        parentPath={chatFsParentPath}
+        entries={chatFsEntries}
+        loading={chatFsLoading}
+        projectRoot={selectedSession?.repoPath || "/"}
+        onSelect={handleSelectChatFsItem}
+      />
 
       <FileExplorerModal
         open={fsModalOpen}

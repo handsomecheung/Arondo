@@ -1080,6 +1080,10 @@ body {
 .fs-item:hover {
   background: var(--bg-elevated);
 }
+.fs-item.active {
+  background: var(--accent-glow);
+  border: 1px solid var(--border-accent);
+}
 .fs-item.fs-parent {
   color: var(--accent);
   font-weight: 500;

@@ -29,6 +29,7 @@ interface UseSessionSubmitParams {
   loadProjects: () => void;
   agentCommands: AgentCommand[];
   onDeleteSession: (id: string) => void;
+  onTriggerFsModal?: () => void;
 }
 
 export function useSessionSubmit({
@@ -55,6 +56,7 @@ export function useSessionSubmit({
   loadProjects,
   agentCommands,
   onDeleteSession,
+  onTriggerFsModal,
 }: UseSessionSubmitParams) {
   const [commandMenuIndex, setCommandMenuIndex] = useState(-1);
 
@@ -78,6 +80,21 @@ export function useSessionSubmit({
     const value = e.target.value;
     setPrompt(value);
     setCommandMenuIndex(-1);
+
+    // Check if user typed '@'
+    const selectionStart = e.target.selectionStart;
+    const lastChar = selectionStart > 0 ? value.substring(selectionStart - 1, selectionStart) : "";
+    if (lastChar === "@" && onTriggerFsModal) {
+      const isStart = selectionStart === 1;
+      const isAfterSpace = selectionStart > 1 && value.substring(selectionStart - 2, selectionStart - 1) === " ";
+      if (isStart || isAfterSpace) {
+        if (textareaRef.current) {
+          textareaRef.current.blur();
+        }
+        onTriggerFsModal();
+      }
+    }
+
     const v = value.trim();
     const agentTriggers = getUniqueTriggers(agentCommands);
     const matchesAgentCmd = agentTriggers.some((t) => v.startsWith("/" + t) || ("/" + t).startsWith(v));

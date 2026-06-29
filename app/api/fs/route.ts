@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
       currentPath: result.currentPath,
       parentPath: result.parentPath,
       directories: result.directories,
+      entries: result.entries,
     });
   } catch (error: any) {
     return NextResponse.json(
