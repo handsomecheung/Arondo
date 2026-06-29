@@ -167,6 +167,10 @@ export default function SettingsPage() {
   const [editingCommand, setEditingCommand] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<AgentCommand>(EMPTY_COMMAND);
 
+  const [globalRules, setGlobalRules] = useState("");
+  const [savingRules, setSavingRules] = useState(false);
+  const [saveRulesSuccess, setSaveRulesSuccess] = useState(false);
+
   const loadRunners = useCallback(() => {
     fetch("/api/runners")
       .then((r) => r.json())
@@ -181,9 +185,37 @@ export default function SettingsPage() {
       .catch(console.error);
   }, []);
 
+  const loadGlobalRules = useCallback(() => {
+    fetch("/api/global-rules")
+      .then((r) => r.json())
+      .then((data: { content: string }) => setGlobalRules(data.content || ""))
+      .catch(console.error);
+  }, []);
+
+  const handleSaveGlobalRules = useCallback(async () => {
+    setSavingRules(true);
+    setSaveRulesSuccess(false);
+    try {
+      const res = await fetch("/api/global-rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: globalRules }),
+      });
+      if (res.ok) {
+        setSaveRulesSuccess(true);
+        setTimeout(() => setSaveRulesSuccess(false), 3000);
+      }
+    } catch (err) {
+      console.error("Failed to save global rules:", err);
+    } finally {
+      setSavingRules(false);
+    }
+  }, [globalRules]);
+
   useEffect(() => {
     loadRunners();
     loadCustomCommands();
+    loadGlobalRules();
     fetch("/api/projects")
       .then((r) => r.json())
       .then((data: Project[]) => setProjects(data))
@@ -943,6 +975,81 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 ),
+              )}
+            </div>
+          </div>
+
+          {/* Global Agent Rules Section */}
+          <div
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-md)",
+              padding: 16,
+            }}
+          >
+            <h2
+              style={{
+                fontSize: 16,
+                fontWeight: 600,
+                color: "var(--text-primary)",
+                marginBottom: 4,
+              }}
+            >
+              Global Agent Rules
+            </h2>
+            <p
+              style={{
+                fontSize: 12,
+                color: "var(--text-muted)",
+                marginBottom: 12,
+              }}
+            >
+              Define global rules that automatically apply to all AI Agents.
+              These will be synced to <code>~/.gemini/GEMINI.md</code> (agy) and <code>~/.claude/CLAUDE.md</code> (claude) on the runner nodes.
+            </p>
+            <textarea
+              value={globalRules}
+              onChange={(e) => setGlobalRules(e.target.value)}
+              placeholder="# Global Agent Rules&#10;&#10;- Prefer clean code without comments.&#10;- Use bash scripts for system automation."
+              style={{
+                width: "100%",
+                height: 200,
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                padding: 12,
+                fontSize: 13,
+                color: "var(--text-primary)",
+                fontFamily: "monospace",
+                outline: "none",
+                resize: "vertical",
+                boxSizing: "border-box",
+                marginBottom: 12,
+              }}
+            />
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <button
+                onClick={handleSaveGlobalRules}
+                disabled={savingRules}
+                style={{
+                  padding: "7px 18px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#fff",
+                  background: "var(--accent)",
+                  border: "none",
+                  borderRadius: "var(--radius-sm)",
+                  cursor: "pointer",
+                  opacity: savingRules ? 0.5 : 1,
+                }}
+              >
+                {savingRules ? "Saving…" : "Save Rules"}
+              </button>
+              {saveRulesSuccess && (
+                <span style={{ fontSize: 13, color: "var(--accent)", fontWeight: 500 }}>
+                  ✓ Rules saved and synced successfully!
+                </span>
               )}
             </div>
           </div>

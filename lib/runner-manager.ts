@@ -287,6 +287,11 @@ class RunnerManager {
     this.persistRunner(info).catch(() => {});
     console.log(`[runner-manager] runner registered: ${info.name} (${id})`);
 
+    // Sync global rules to runner upon connection
+    this.syncGlobalRulesToRunner(id).catch((err) => {
+      console.error(`[runner-manager] Failed to sync global rules on register for runner ${id}:`, err);
+    });
+
     // Re-associate persisted tasks that originally belonged to this runner
     for (const [taskId, ctx] of this.tasks) {
       if (ctx.runnerId === id) {
@@ -335,6 +340,21 @@ class RunnerManager {
 
   getRunners(): RunnerInfo[] {
     return Array.from(this.runners.values()).map((c) => ({ ...c.info }));
+  }
+
+  async syncGlobalRulesToRunner(runnerId: string): Promise<void> {
+    const globalRulesPath = path.join(DATA_DIR, "global-rules.md");
+    try {
+      const content = await fs.readFile(globalRulesPath, "utf-8");
+      if (content.trim()) {
+        console.log(`[runner-manager] Syncing global rules to runner ${runnerId}...`);
+        await this.sendRequest(runnerId, "rules.sync", { content });
+      }
+    } catch (err: any) {
+      if (err.code !== "ENOENT") {
+        console.error(`[runner-manager] Failed to sync global rules to runner ${runnerId}:`, err);
+      }
+    }
   }
 
   async getAllKnownRunners(): Promise<RunnerInfo[]> {

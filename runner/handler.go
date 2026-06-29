@@ -54,6 +54,8 @@ func (h *Handler) handleRequest(msg *Message) {
 		h.handleGitDiff(msg)
 	case "git.pr.create":
 		h.handleGitPrCreate(msg)
+	case "rules.sync":
+		h.handleRulesSync(msg)
 	default:
 		h.sendError(msg.ID, "NOT_FOUND", "unknown method: "+msg.Method)
 	}
