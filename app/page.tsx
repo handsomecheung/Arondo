@@ -14,6 +14,7 @@ import FileExplorerModal from "@/components/modals/FileExplorerModal";
 import ChatFileSelectorModal from "@/components/modals/ChatFileSelectorModal";
 import LogConsoleModal from "@/components/modals/LogConsoleModal";
 import ShellTerminalModal from "@/components/modals/ShellTerminalModal";
+import FileBrowserModal from "@/components/modals/FileBrowserModal";
 import CommandModal from "@/components/modals/CommandModal";
 import AddScriptModal from "@/components/modals/AddScriptModal";
 import AutoAnalyzingNotice from "@/components/modals/AutoAnalyzingNotice";
@@ -139,6 +140,7 @@ export default function HomePage() {
   const [logModalOpen, setLogModalOpen] = useState(false);
   const [commandModalText, setCommandModalText] = useState<string | null>(null);
   const [shellModalOpen, setShellModalOpen] = useState(false);
+  const [fileBrowserOpen, setFileBrowserOpen] = useState(false);
 
   const activeLogMsgIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -908,6 +910,7 @@ export default function HomePage() {
             onRunScript={handleRunScript}
             onDeleteSession={handleDeleteSession}
             onOpenShellModal={() => setShellModalOpen(true)}
+            onOpenFileBrowser={() => setFileBrowserOpen(true)}
             onOpenRenameModal={() => {
               if (selectedSession && selectedSessionId) {
                 setRenameModal({ sessionId: selectedSessionId, currentName: selectedSession.name || selectedSession.prompt });
@@ -976,6 +979,13 @@ export default function HomePage() {
         runnerId={selectedSession?.runnerId}
         sessionId={selectedSessionId}
         ws={wsInstance}
+      />
+
+      <FileBrowserModal
+        open={fileBrowserOpen}
+        onClose={() => setFileBrowserOpen(false)}
+        runnerId={selectedSession?.runnerId ?? runnerId}
+        initialPath={selectedSession?.repoPath ?? "/"}
       />
 
       <CommandModal

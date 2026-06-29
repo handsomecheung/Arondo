@@ -7,7 +7,7 @@ import { formatTime, execCardInfoToItem } from "@/lib/homeUtils";
 import {
   IconBolt, IconPlus, IconSend, IconCheck,
   IconGitPullRequest, IconPlay, IconTerminal, IconEdit, IconTrash,
-  IconMoreVertical, IconFolder, IconChevronDown,
+  IconMoreVertical, IconFolder, IconChevronDown, IconFileSearch,
 } from "@/components/Icons";
 import { getTriggerWord, resolveAgentCommand } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
@@ -69,6 +69,7 @@ interface SessionViewProps {
   onRunScript: (name: string) => void;
   onDeleteSession: (id: string) => void;
   onOpenShellModal: () => void;
+  onOpenFileBrowser: () => void;
   onOpenRenameModal: () => void;
   onManageScripts: () => void;
   onNewSession: () => void;
@@ -134,6 +135,7 @@ export default function SessionView({
   onRunScript,
   onDeleteSession,
   onOpenShellModal,
+  onOpenFileBrowser,
   onOpenRenameModal,
   onManageScripts,
   agentCommands,
@@ -337,6 +339,23 @@ export default function SessionView({
                     )}
                   </div>
                 )}
+
+                <button
+                  className="menu-item"
+                  disabled={selectedSession ? !runners.some((r) => r.id === selectedSession.runnerId && r.connected) : true}
+                  onClick={() => {
+                    onOpenFileBrowser();
+                    onSetMenuOpen(false);
+                  }}
+                  title={
+                    selectedSession && !runners.some((r) => r.id === selectedSession.runnerId && r.connected)
+                      ? "Runner is offline"
+                      : undefined
+                  }
+                  id="menu-file-browser"
+                >
+                  <IconFileSearch /> File Browser
+                </button>
 
                 <button
                   className="menu-item"

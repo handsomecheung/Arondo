@@ -32,6 +32,8 @@ func (h *Handler) handleRequest(msg *Message) {
 	switch msg.Method {
 	case "fs.list":
 		h.handleFsList(msg)
+	case "fs.read":
+		h.handleFsRead(msg)
 	case "exec.agent":
 		h.handleExecAgent(msg)
 	case "exec.script":

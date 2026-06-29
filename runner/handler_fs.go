@@ -1,11 +1,66 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 )
+
+const maxFileReadSize = 512 * 1024 // 512KB
+
+type fsReadRequest struct {
+	Path string `json:"path"`
+}
+
+type fsReadResponse struct {
+	OK      bool   `json:"ok"`
+	Path    string `json:"path"`
+	Content string `json:"content"`
+	Size    int64  `json:"size"`
+}
+
+func (h *Handler) handleFsRead(msg *Message) {
+	req, err := parsePayload[fsReadRequest](msg)
+	if err != nil {
+		h.sendError(msg.ID, "INTERNAL", "invalid payload: "+err.Error())
+		return
+	}
+
+	absPath, err := filepath.Abs(req.Path)
+	if err != nil {
+		h.sendError(msg.ID, "INTERNAL", "invalid path: "+err.Error())
+		return
+	}
+
+	info, err := os.Stat(absPath)
+	if err != nil {
+		h.sendError(msg.ID, "NOT_FOUND", "file not found: "+err.Error())
+		return
+	}
+	if info.IsDir() {
+		h.sendError(msg.ID, "BAD_REQUEST", "path is a directory")
+		return
+	}
+	if info.Size() > maxFileReadSize {
+		h.sendError(msg.ID, "TOO_LARGE", fmt.Sprintf("file too large: %d bytes (max %d)", info.Size(), maxFileReadSize))
+		return
+	}
+
+	content, err := os.ReadFile(absPath)
+	if err != nil {
+		h.sendError(msg.ID, "INTERNAL", "failed to read file: "+err.Error())
+		return
+	}
+
+	h.sendResponse(msg.ID, fsReadResponse{
+		OK:      true,
+		Path:    absPath,
+		Content: string(content),
+		Size:    info.Size(),
+	})
+}
 
 type fsListRequest struct {
 	Path string `json:"path"`

@@ -191,6 +191,17 @@ export function IconCode() {
   );
 }
 
+export function IconFileSearch() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <circle cx="11" cy="15" r="2.5" />
+      <line x1="13" y1="17" x2="15.5" y2="19.5" />
+    </svg>
+  );
+}
+
 export function IconFile() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
