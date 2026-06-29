@@ -7,6 +7,8 @@ import {
   addMessage,
   getSession,
   getSessionLog,
+  getSessions,
+  updateMessage,
 } from "./store";
 import {
   getAgySessionId,
@@ -17,7 +19,6 @@ import fs from "fs/promises";
 import path from "path";
 
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
-const TASKS_FILE = path.join(DATA_DIR, "active-tasks.json");
 const RUNNERS_DIR = path.join(DATA_DIR, "runners");
 const TASK_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -127,31 +128,124 @@ class RunnerManager {
 
   // ─── Task persistence ──────────────────────────────────────────────────
 
-  private async persistTasks(): Promise<void> {
-    const data = Array.from(this.tasks.values());
-    await fs.mkdir(path.dirname(TASKS_FILE), { recursive: true });
-    await fs.writeFile(TASKS_FILE, JSON.stringify(data), "utf-8");
-  }
-
   async restoreTasks(): Promise<void> {
     try {
-      const raw = await fs.readFile(TASKS_FILE, "utf-8");
-      const data: TaskContext[] = JSON.parse(raw);
-      for (const ctx of data) {
-        this.tasks.set(ctx.taskId, ctx);
-        if (!ctx.completedAt) {
+      const { getSessions, getProjects, getMessages } = require("./store");
+      const sessions = await getSessions();
+      const projects = await getProjects();
+      
+      let restoredCount = 0;
+
+      // 1. Restore tasks from sessions
+      for (const s of sessions) {
+        const msgs = await getMessages(s.id);
+        const activeRunMsgs = msgs.filter((m: any) => {
+          if (m.type !== "agent-run" && m.type !== "script-run") return false;
+          const hasReturn = msgs.some((ret: any) => ret.parentId === m.id);
+          return !hasReturn;
+        });
+
+        for (const m of activeRunMsgs) {
+          const taskId = m.taskId || m.id;
+          const runnerId = m.runnerId || s.runnerId || "";
+          
+          let scriptName: string | undefined;
+          if (m.type === "script-run") {
+            const match = m.content.match(/Running script:\s*\*\*([^*]+)\*\*/i);
+            scriptName = match ? match[1].trim() : undefined;
+          }
+
+          const ctx: TaskContext = {
+            taskId,
+            runnerId,
+            sessionId: s.id,
+            messageId: m.id,
+            type: m.type === "agent-run" ? "agent" : "script",
+            scriptName,
+            pid: m.pid,
+            createdAt: new Date(m.createdAt).getTime(),
+            command: m.command,
+            projectId: s.projectId,
+          };
+          this.tasks.set(taskId, ctx);
           const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
-          this.ptyKeyToTaskId.set(ptyKey, ctx.taskId);
+          this.ptyKeyToTaskId.set(ptyKey, taskId);
+          restoredCount++;
         }
       }
-      if (data.length > 0) {
+
+      // 2. Restore tasks from projects
+      for (const p of projects) {
+        const msgs = await getMessages("", p.id);
+        const activeRunMsgs = msgs.filter((m: any) => {
+          if (m.type !== "agent-run" && m.type !== "script-run") return false;
+          const hasReturn = msgs.some((ret: any) => ret.parentId === m.id);
+          return !hasReturn;
+        });
+
+        for (const m of activeRunMsgs) {
+          const taskId = m.taskId || m.id;
+          const runnerId = m.runnerId || p.runnerId || "";
+          
+          let scriptName: string | undefined;
+          if (m.type === "script-run") {
+            const match = m.content.match(/Running script:\s*\*\*([^*]+)\*\*/i);
+            scriptName = match ? match[1].trim() : undefined;
+          }
+
+          const ctx: TaskContext = {
+            taskId,
+            runnerId,
+            sessionId: "",
+            messageId: m.id,
+            type: m.type === "agent-run" ? "agent" : "script",
+            scriptName,
+            pid: m.pid,
+            createdAt: new Date(m.createdAt).getTime(),
+            command: m.command,
+            projectId: p.id,
+          };
+          this.tasks.set(taskId, ctx);
+          const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
+          this.ptyKeyToTaskId.set(ptyKey, taskId);
+          restoredCount++;
+        }
+      }
+
+      if (restoredCount > 0) {
         console.log(
-          `[runner-manager] restored ${data.length} task(s) from disk`,
+          `[runner-manager] restored ${restoredCount} active task(s) from session/project messages`,
         );
       }
       this.purgeExpiredTasks();
-    } catch {
-      // File doesn't exist or is invalid — that's fine on first run
+      await this.reconcileSessions();
+    } catch (err) {
+      console.error("[runner-manager] failed to restore tasks from messages:", err);
+      await this.reconcileSessions();
+    }
+  }
+
+  private async reconcileSessions(): Promise<void> {
+    try {
+      const sessions = await getSessions();
+      for (const s of sessions) {
+        if (s.status === "running" || s.status === "script-running") {
+          const hasActiveTask = Array.from(this.tasks.values()).some(
+            (t) => t.sessionId === s.id && !t.completedAt,
+          );
+          if (!hasActiveTask) {
+            console.log(
+              `[runner-manager] session ${s.id} is marked as "${s.status}" but has no active tasks. Reconciling to "error".`,
+            );
+            await updateSession(s.id, {
+              status: "error",
+              errorMessage: "Session execution interrupted (possibly server restarted)",
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[runner-manager] failed to reconcile sessions:", err);
     }
   }
 
@@ -331,7 +425,16 @@ class RunnerManager {
     console.log(
       `[runner-manager] task registered: ${ctx.taskId} (type=${ctx.type}, total=${this.tasks.size})`,
     );
-    this.persistTasks().catch(() => {});
+    if (ctx.messageId) {
+      updateMessage(ctx.sessionId, ctx.messageId, {
+        taskId: ctx.taskId,
+        runnerId: ctx.runnerId,
+        projectId: ctx.projectId,
+        command: ctx.command,
+      }, ctx.projectId).catch((err) => {
+        console.error(`[runner-manager] failed to update message with task metadata:`, err);
+      });
+    }
   }
 
   getTaskContext(taskId: string): TaskContext | undefined {
@@ -355,7 +458,11 @@ class RunnerManager {
     if (ctx) {
       ctx.pid = pid;
       console.log(`[runner-manager] task ${taskId} pid=${pid}`);
-      this.persistTasks().catch(() => {});
+      if (ctx.messageId) {
+        updateMessage(ctx.sessionId, ctx.messageId, { pid }, ctx.projectId).catch((err) => {
+          console.error(`[runner-manager] failed to update message with pid:`, err);
+        });
+      }
     }
   }
 
@@ -448,7 +555,6 @@ class RunnerManager {
       console.log(
         `[runner-manager] removed ${toDelete.length} task(s) for deleted session ${sessionId}`,
       );
-      this.persistTasks().catch(() => {});
     }
   }
 
@@ -467,7 +573,6 @@ class RunnerManager {
     }
     if (toDelete.length > 0) {
       console.log(`[runner-manager] purged ${toDelete.length} expired task(s)`);
-      this.persistTasks().catch(() => {});
     }
   }
 
@@ -610,7 +715,15 @@ class RunnerManager {
     this.ptyKeyToTaskId.delete(ptyKey);
     ctx.completedAt = Date.now();
     ctx.exitCode = payload.exitCode;
-    this.persistTasks().catch(() => {});
+    
+    if (ctx.messageId) {
+      updateMessage(ctx.sessionId, ctx.messageId, {
+        exitCode: ctx.exitCode,
+        stoppedByUser: ctx.stoppedByUser,
+      }, ctx.projectId).catch((err) => {
+        console.error(`[runner-manager] failed to update message with exitCode:`, err);
+      });
+    }
 
     if (ctx.type === "agent") {
       await this.handleAgentExit(ctx, payload.exitCode);
@@ -837,7 +950,11 @@ class RunnerManager {
             `[runner-manager] task.status: re-associating ${t.taskId} → ${runnerId}`,
           );
           ctx.runnerId = runnerId;
-          this.persistTasks().catch(() => {});
+          if (ctx.messageId) {
+            updateMessage(ctx.sessionId, ctx.messageId, { runnerId }, ctx.projectId).catch((err) => {
+              console.error(`[runner-manager] failed to update message with re-associated runnerId:`, err);
+            });
+          }
         }
       }
     }

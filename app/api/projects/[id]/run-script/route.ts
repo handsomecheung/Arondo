@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProject, getProjectScripts } from "@/lib/store";
+import { getProject, getProjectScripts, addMessage, clearSessionLog } from "@/lib/store";
+import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
-import { clearSessionLog } from "@/lib/store";
 import fs from "fs/promises";
 import path from "path";
 
@@ -32,12 +32,21 @@ export async function POST(
     return NextResponse.json({ error: "No connected runner available" }, { status: 503 });
   }
 
+  const systemMsg = await addMessage({
+    sessionId: "",
+    projectId,
+    role: "system",
+    content: `⚙️ Running script: **${scriptName}**\n\`\`\`bash\n${script.command}\n\`\`\``,
+    type: "script-run",
+  });
+  eventBus.publish({ type: "message_added", payload: systemMsg });
+
   const taskId = `task_${crypto.randomUUID().slice(0, 8)}`;
   runnerManager.registerTask({
     taskId,
     runnerId,
     sessionId: "", // global task
-    messageId: taskId, // use taskId as messageId for log path
+    messageId: systemMsg.id,
     type: "script",
     scriptName,
     command: script.command,
@@ -45,7 +54,7 @@ export async function POST(
     createdAt: Date.now(),
   });
 
-  await clearSessionLog("", taskId);
+  await clearSessionLog("", systemMsg.id);
 
   runnerManager
     .sendRequest(runnerId, "exec.script", {
@@ -61,8 +70,19 @@ export async function POST(
     .catch(async (err) => {
       console.error("Failed to execute global script:", err);
       const errorMessage = err instanceof Error ? err.message : String(err);
+      
+      const errMsg = await addMessage({
+        sessionId: "",
+        projectId,
+        role: "system",
+        content: `❌ Error: ${errorMessage}`,
+        type: "script-return",
+        parentId: systemMsg.id,
+      });
+      eventBus.publish({ type: "message_added", payload: errMsg });
+
       const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data");
-      const logPath = path.join(dataDir, "global-tasks", "logs", `${taskId}.log`);
+      const logPath = path.join(dataDir, "global-tasks", "logs", `${systemMsg.id}.log`);
       try {
         await fs.mkdir(path.dirname(logPath), { recursive: true });
         await fs.appendFile(logPath, `\r\n❌ Error: ${errorMessage}\r\n`, "utf-8");

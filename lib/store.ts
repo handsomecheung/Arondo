@@ -51,6 +51,13 @@ export interface Message {
   type?: MessageType;
   parentId?: string;
   createdAt: string;
+  pid?: number;
+  runnerId?: string;
+  exitCode?: number;
+  command?: string;
+  projectId?: string;
+  stoppedByUser?: boolean;
+  taskId?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -63,7 +70,10 @@ function getSessionFilePath(id: string): string {
   return path.join(getSessionDir(id), "session.json");
 }
 
-function getMessagesFilePath(id: string): string {
+function getMessagesFilePath(id: string, projectId?: string): string {
+  if (!id && projectId) {
+    return path.join(getProjectDir(projectId), "messages.json");
+  }
   return path.join(getSessionDir(id), "messages.json");
 }
 
@@ -298,23 +308,42 @@ export async function updateSession(
 
 // ─── Messages ─────────────────────────────────────────────────────────────────
 
-export async function getMessages(sessionId: string): Promise<Message[]> {
-  return readJson<Message[]>(getMessagesFilePath(sessionId), []);
+export async function getMessages(sessionId: string, projectId?: string): Promise<Message[]> {
+  return readJson<Message[]>(getMessagesFilePath(sessionId, projectId), []);
 }
 
 export async function addMessage(
   data: Omit<Message, "id" | "createdAt">
 ): Promise<Message> {
-  const { sessionId } = data;
-  const all = await getMessages(sessionId);
+  const { sessionId, projectId } = data;
+  const all = await getMessages(sessionId, projectId);
   const message: Message = {
     ...data,
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
   };
   all.push(message);
-  await writeJson(getMessagesFilePath(sessionId), all);
+  await writeJson(getMessagesFilePath(sessionId, projectId), all);
   return message;
+}
+
+export async function updateMessage(
+  sessionId: string,
+  messageId: string,
+  patch: Partial<Omit<Message, "id" | "createdAt">>,
+  projectId?: string
+): Promise<Message | undefined> {
+  const all = await getMessages(sessionId, projectId);
+  const index = all.findIndex((m) => m.id === messageId);
+  if (index === -1) return undefined;
+  
+  const updated: Message = {
+    ...all[index],
+    ...patch,
+  };
+  all[index] = updated;
+  await writeJson(getMessagesFilePath(sessionId, projectId), all);
+  return updated;
 }
 
 // ─── Logs ─────────────────────────────────────────────────────────────────────
