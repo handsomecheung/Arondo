@@ -32,6 +32,8 @@ func main() {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
 	go client.Run()
+	go fetchAgyQuota(client)
+	go fetchClaudeQuota(client)
 
 	sig := <-sigCh
 	log.Printf("received signal %v, shutting down", sig)

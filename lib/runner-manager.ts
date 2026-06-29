@@ -677,6 +677,11 @@ class RunnerManager {
       case "agent.status":
         this.onAgentStatus(runnerId, msg.payload);
         break;
+      case "quota.update":
+        this.onQuotaUpdate(runnerId, msg.payload).catch((err) => {
+          console.error("[runner-manager] onQuotaUpdate error:", err);
+        });
+        break;
       default:
         break;
     }
@@ -692,6 +697,29 @@ class RunnerManager {
     console.log(
       `[runner-manager] runner ${runnerId} agents updated: [${payload.agents.join(", ")}]`,
     );
+  }
+
+  private async onQuotaUpdate(
+    runnerId: string,
+    payload: { agent: string; quota: Record<string, unknown> },
+  ): Promise<void> {
+    const { agent, quota } = payload ?? {};
+    if (!agent || !quota) return;
+    const fileNames: Record<string, string> = {
+      claude: "claude.json",
+      agy: "antigravity.json",
+    };
+    const fileName = fileNames[agent];
+    if (!fileName) {
+      console.warn(`[runner-manager] unknown quota agent: ${agent}`);
+      return;
+    }
+    const agentDir = path.join(DATA_DIR, "agents", runnerId);
+    await fs.mkdir(agentDir, { recursive: true });
+    const filePath = path.join(agentDir, fileName);
+    const data = { ...quota, updatedAt: Math.floor(Date.now() / 1000) };
+    await fs.writeFile(filePath, JSON.stringify(data, null, 2), "utf-8");
+    console.log(`[runner-manager] quota saved: ${filePath}`);
   }
 
   private async onExecOutput(payload: {

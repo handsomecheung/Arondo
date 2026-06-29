@@ -1,0 +1,31 @@
+import { NextRequest, NextResponse } from "next/server";
+import fs from "fs/promises";
+import path from "path";
+
+const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
+
+export async function GET(req: NextRequest) {
+  const runnerId = req.nextUrl.searchParams.get("runnerId");
+  if (!runnerId) {
+    return NextResponse.json({ claude: null, antigravity: null });
+  }
+
+  const agentDir = path.join(DATA_DIR, "agents", runnerId);
+  const read = async (filename: string) => {
+    try {
+      const raw = await fs.readFile(path.join(agentDir, filename), "utf-8");
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  };
+
+  const [claude, antigravity] = await Promise.all([
+    read("claude.json"),
+    read("antigravity.json"),
+  ]);
+
+  return NextResponse.json({ claude, antigravity });
+}
+
+export const dynamic = "force-dynamic";
