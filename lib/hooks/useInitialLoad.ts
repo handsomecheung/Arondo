@@ -37,84 +37,25 @@ export function useInitialLoad({
         } else if (!urlProject && data.length > 0) {
           setSelectedSessionId(data[0].id);
         }
+      })
+      .catch(console.error);
 
-        const running = data.filter(
-          (s) => s.status === "running" || s.status === "script-running",
-        );
-        if (running.length > 0) {
-          const initTasks: TaskItem[] = [];
-          running.forEach((s) => {
-            if (s.status === "running") {
-              initTasks.push({
-                id: `task-${s.id}-init-agent`,
-                type: "agent",
-                name: `Agent: ${s.prompt}`,
-                sessionId: s.id,
-                status: "running",
-                createdAt: new Date(s.updatedAt || s.createdAt).getTime(),
-              });
-            }
-            if (s.status === "script-running" && s.runningScripts) {
-              s.runningScripts.forEach((scriptName, idx) => {
-                initTasks.push({
-                  id: `task-${s.id}-init-script-${scriptName}-${idx}`,
-                  type: "script",
-                  name: `Script: ${scriptName}`,
-                  sessionId: s.id,
-                  status: "running",
-                  createdAt: new Date(s.updatedAt || s.createdAt).getTime(),
-                });
-              });
-            }
-          });
-          setTaskQueue(initTasks);
-
-          running.forEach((s) => {
-            if (s.status === "running") {
-              fetch(`/api/messages?sessionId=${s.id}`)
-                .then((r) => r.json())
-                .then((msgs) => {
-                  const lastRunMsg = [...msgs]
-                    .reverse()
-                    .find((m: any) => m.type === "agent-run");
-                  if (lastRunMsg) {
-                    setTaskQueue((prev) =>
-                      prev.map((t) =>
-                        t.id === `task-${s.id}-init-agent`
-                          ? { ...t, name: `Agent: ${s.prompt}`, messageId: lastRunMsg.id }
-                          : t,
-                      ),
-                    );
-                  }
-                })
-                .catch(console.error);
-            } else if (s.status === "script-running" && s.runningScripts) {
-              fetch(`/api/messages?sessionId=${s.id}`)
-                .then((r) => r.json())
-                .then((msgs) => {
-                  s.runningScripts?.forEach((scriptName) => {
-                    const matchMsg = [...msgs]
-                      .reverse()
-                      .find(
-                        (m: any) =>
-                          m.type === "script-run" &&
-                          m.content.includes(`Running script: **${scriptName}**`),
-                      );
-                    if (matchMsg) {
-                      setTaskQueue((prev) =>
-                        prev.map((t) =>
-                          t.id === `task-${s.id}-init-script-${scriptName}`
-                            ? { ...t, messageId: matchMsg.id }
-                            : t,
-                        ),
-                      );
-                    }
-                  });
-                })
-                .catch(console.error);
-            }
-          });
-        }
+    fetch("/api/tasks")
+      .then((r) => r.json())
+      .then((tasks: any[]) => {
+        const runningTasks = tasks.filter((t) => !t.completedAt);
+        const initTasks: TaskItem[] = runningTasks.map((t) => ({
+          id: t.taskId,
+          type: t.type,
+          name: t.type === "agent"
+            ? `Agent: ${t.command || "Agent Task"}`
+            : `Script: ${t.scriptName || t.command || "Script Task"}`,
+          sessionId: t.sessionId || "",
+          messageId: t.messageId || t.taskId,
+          status: "running",
+          createdAt: t.createdAt,
+        }));
+        setTaskQueue(initTasks);
       })
       .catch(console.error);
 

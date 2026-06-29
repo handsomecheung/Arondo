@@ -91,7 +91,7 @@ export async function POST(
       }
     });
 
-  return NextResponse.json({ success: true, taskId });
+  return NextResponse.json({ success: true, taskId, messageId: systemMsg.id });
 }
 
 export const dynamic = "force-dynamic";

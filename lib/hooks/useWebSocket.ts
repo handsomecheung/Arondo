@@ -103,6 +103,13 @@ export function useWebSocket({
 
           if (event.type === "message:added") {
             const msg = event.payload as Message;
+
+            if (msg.type === "script-return" || msg.type === "agent-return") {
+              setTaskQueue((prev) =>
+                prev.filter((t) => t.messageId !== msg.parentId && t.id !== msg.parentId)
+              );
+            }
+
             if (msg.sessionId === selectedSessionId) {
               setMessages((prev) => {
                 if (prev.find((m) => m.id === msg.id)) return prev;

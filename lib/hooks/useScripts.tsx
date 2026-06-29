@@ -436,7 +436,7 @@ export function useScripts({
         setTaskQueue((prev) =>
           prev.map((t) =>
             t.id === tempTaskId
-              ? { ...t, id: data.taskId, messageId: data.taskId }
+              ? { ...t, id: data.taskId, messageId: data.messageId }
               : t
           )
         );
