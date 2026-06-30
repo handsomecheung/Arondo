@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
 import ScriptExecCard from "@/components/ScriptExecCard";
 import AgentExecCard from "@/components/AgentExecCard";
 import type { Session, ProjectScript, Runner, Message } from "@/types/home";
@@ -78,6 +79,7 @@ interface SessionViewProps {
   agentCommands: AgentCommand[];
   onNewSessionCommand: (name?: string) => void;
   onExecuteAgentCommand: (promptText: string) => void;
+  onSwitchAgent: (agentType: string) => void;
 }
 
 export default function SessionView({
@@ -145,7 +147,29 @@ export default function SessionView({
   onNewSession,
   onNewSessionCommand,
   onExecuteAgentCommand,
+  onSwitchAgent,
 }: SessionViewProps) {
+  const [agentSwitchOpen, setAgentSwitchOpen] = useState(false);
+  const agentSwitchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (agentSwitchRef.current && !agentSwitchRef.current.contains(e.target as Node)) {
+        setAgentSwitchOpen(false);
+      }
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, []);
+
+  function agentTypeLabel(type: string): string {
+    if (type === "antigravity") return "Antigravity CLI";
+    if (type === "claude") return "Claude Code";
+    if (type === "codex") return "Codex";
+    if (type === "auto") return "Auto Model";
+    return type;
+  }
+
   return (
     <>
       {selectedSession && (
@@ -185,29 +209,101 @@ export default function SessionView({
             >
               {selectedSession.name || selectedSession.prompt}
             </span>
-            <span
+            <div
               style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
                 fontSize: 11,
                 color: "var(--text-secondary)",
                 fontFamily: "monospace",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
+                minWidth: 0,
               }}
             >
-              Project:{" "}
-              {selectedSession.repoPath.split("/").pop() ||
-                selectedSession.repoPath}{" "}
-              (
-              {selectedSession.agentType === "antigravity"
-                ? "Antigravity CLI"
-                : selectedSession.agentType === "claude"
-                  ? "Claude Code"
-                  : selectedSession.agentType === "auto"
-                    ? "Auto Model"
-                    : selectedSession.agentType}
-              )
-            </span>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 1 }}>
+                Project:{" "}
+                {selectedSession.repoPath.split("/").pop() ||
+                  selectedSession.repoPath}
+              </span>
+              <div ref={agentSwitchRef} style={{ position: "relative", flexShrink: 0 }}>
+                <button
+                  type="button"
+                  onClick={() => !isRunning && setAgentSwitchOpen(!agentSwitchOpen)}
+                  disabled={isRunning}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 2,
+                    background: "none",
+                    border: "none",
+                    padding: "1px 4px",
+                    borderRadius: 4,
+                    fontSize: 11,
+                    fontFamily: "monospace",
+                    color: "var(--text-secondary)",
+                    cursor: isRunning ? "not-allowed" : "pointer",
+                    opacity: isRunning ? 0.5 : 1,
+                    whiteSpace: "nowrap",
+                  }}
+                  title="Switch agent"
+                >
+                  ({agentTypeLabel(selectedSession.agentType)})
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      transition: "transform 0.2s ease",
+                      transform: agentSwitchOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    }}
+                  >
+                    <IconChevronDown className="" />
+                  </span>
+                </button>
+                {agentSwitchOpen && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 4px)",
+                      left: 0,
+                      zIndex: 50,
+                      background: "rgba(26, 29, 37, 0.95)",
+                      backdropFilter: "blur(16px)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      borderRadius: "var(--radius-md)",
+                      boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+                      padding: 6,
+                      minWidth: 140,
+                    }}
+                  >
+                    {(() => {
+                      const concreteAgents = (
+                        [
+                          { value: "antigravity", label: "Antigravity CLI", cmd: "agy" },
+                          { value: "claude",      label: "Claude Code",     cmd: "claude" },
+                        ] as const
+                      ).filter(({ cmd }) => isAgentAvailable(cmd));
+                      const showAuto = concreteAgents.length > 1;
+                      const items: { value: string; label: string }[] = [
+                        ...(showAuto ? [{ value: "auto", label: "Auto Model" }] : []),
+                        ...concreteAgents,
+                      ];
+                      return items.map(({ value, label }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          className={`custom-dropdown-item ${selectedSession.agentType === value ? "active" : ""}`}
+                          onClick={() => {
+                            setAgentSwitchOpen(false);
+                            if (value !== selectedSession.agentType) onSwitchAgent(value);
+                          }}
+                        >
+                          <span style={{ flex: 1, textAlign: "left" }}>{label}</span>
+                        </button>
+                      ));
+                    })()}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           <div
@@ -601,17 +697,7 @@ export default function SessionView({
                 }}
                 id="agent-select-trigger"
               >
-                <span>
-                  {agentType === "antigravity"
-                    ? "Antigravity CLI"
-                    : agentType === "claude"
-                      ? "Claude Code"
-                      : agentType === "codex"
-                        ? "Codex"
-                        : agentType === "auto"
-                          ? "Auto Model"
-                          : agentType}
-                </span>
+                <span>{agentTypeLabel(agentType)}</span>
                 <IconChevronDown
                   className={`arrow-icon ${agentDropdownOpen ? "open" : ""}`}
                 />

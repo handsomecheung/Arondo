@@ -30,6 +30,8 @@ export async function POST(
   const trimmedMessage = message.trim();
 
   try {
+    const messages = await getMessages(id);
+
     const userMsg = await addMessage({
       sessionId: id,
       role: "user",
@@ -37,21 +39,23 @@ export async function POST(
       type: type || "chat-user",
     });
     eventBus.publish({ type: "message_added", payload: userMsg });
-
-    const messages = await getMessages(id);
     const runnerConn = runnerManager.getRunner(session.runnerId);
     const resolvedType = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? []);
 
-    // For auto sessions, only resume if the same agent type ran before; for
-    // fixed sessions keep the original behavior for backward compatibility.
-    const isResume = session.agentType === "auto"
+    // Detect an agent switch by comparing with the last known resolved agent type.
+    const lastAgentRun = [...messages].reverse().find((m) => m.type === "agent-run" && m.resolvedAgentType);
+    const prevResolvedType = lastAgentRun?.resolvedAgentType;
+    const isAgentSwitch = !!prevResolvedType && prevResolvedType !== resolvedType;
+
+    // When switching agents, only resume if this agent type has run before in this session.
+    // Otherwise use the simple "any prior run" check for backward compatibility.
+    const isResume = isAgentSwitch
       ? messages.some((m) => m.type === "agent-run" && m.resolvedAgentType === resolvedType)
       : messages.some((m) => m.type === "agent-run");
 
-    // When the auto session switches agents, prepend the previous agent's
-    // conversation as context so the new agent has full history.
+    // On agent switch, prepend the previous agent's conversation as context.
     let effectivePrompt = trimmedMessage;
-    if (session.agentType === "auto" && !isResume) {
+    if (isAgentSwitch) {
       const ctx = await buildCrossAgentContext(id, resolvedType, messages);
       if (ctx) effectivePrompt = `${ctx}\n\n${trimmedMessage}`;
     }

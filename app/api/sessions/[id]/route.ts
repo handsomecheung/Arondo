@@ -34,7 +34,7 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const body = await req.json();
-  const { name } = body as { name?: string };
+  const { name, agentType } = body as { name?: string; agentType?: string };
 
   const session = await getSession(id);
   if (!session) {
@@ -42,7 +42,10 @@ export async function PATCH(
   }
 
   try {
-    const updated = await updateSession(id, { name });
+    const patch: Record<string, any> = {};
+    if (name !== undefined) patch.name = name;
+    if (agentType !== undefined) patch.agentType = agentType;
+    const updated = await updateSession(id, patch);
     eventBus.publish({ type: "session_updated", payload: updated });
     return NextResponse.json(updated);
   } catch (error: any) {

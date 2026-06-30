@@ -618,6 +618,23 @@ export default function HomePage() {
     }
   };
 
+  const handleSwitchAgent = async (newAgentType: string) => {
+    if (!selectedSessionId) return;
+    try {
+      const res = await fetch(`/api/sessions/${selectedSessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentType: newAgentType }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setSessions((prev) => prev.map((s) => (s.id === selectedSessionId ? updated : s)));
+      }
+    } catch (err) {
+      console.error("Failed to switch agent:", err);
+    }
+  };
+
   const handleRetryCard = async (cardInfo: ExecCardInfo) => {
     if (!selectedSessionId) return;
     if (cardInfo.isScript) {
@@ -929,6 +946,7 @@ export default function HomePage() {
             onNewSession={handleNewSession}
             onNewSessionCommand={handleNewSessionCommand}
             onExecuteAgentCommand={handleAgentCommand}
+            onSwitchAgent={handleSwitchAgent}
           />
         )}
       </main>
