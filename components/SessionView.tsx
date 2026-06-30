@@ -1,6 +1,7 @@
 "use client";
 
-import ExecCard from "@/components/ExecCard";
+import ScriptExecCard from "@/components/ScriptExecCard";
+import AgentExecCard from "@/components/AgentExecCard";
 import type { Session, ProjectScript, Runner, Message } from "@/types/home";
 import type { ExecCardInfo } from "@/lib/homeUtils";
 import { formatTime, execCardInfoToItem } from "@/lib/homeUtils";
@@ -57,6 +58,7 @@ interface SessionViewProps {
   onSetAgentDropdownOpen: (v: boolean) => void;
   onSetFsCurrentPath: (path: string) => void;
   onSetFsModalOpen: (v: boolean) => void;
+  ws: WebSocket | null;
   onViewLog: (msgId: string) => void;
   onShowCommand: (cmd: string) => void;
   onStopExecCard: (msgId: string) => void;
@@ -123,6 +125,7 @@ export default function SessionView({
   onSetAgentDropdownOpen,
   onSetFsCurrentPath,
   onSetFsModalOpen,
+  ws,
   onViewLog,
   onShowCommand,
   onStopExecCard,
@@ -449,15 +452,28 @@ export default function SessionView({
             const cardItem = execCardInfoToItem(cardInfo);
             const isCardRunning = cardItem.status === "running";
             const isCardFailed = cardItem.status === "error";
+            const sharedProps = {
+              item: cardItem,
+              onShowCommand: cardInfo.command ? () => onShowCommand(cardInfo.command) : undefined,
+              onStopTask: isCardRunning ? () => onStopExecCard(cardInfo.runMsg.id) : undefined,
+              onRetryTask: isCardFailed ? () => onRetryCard(cardInfo) : undefined,
+            };
+            if (cardInfo.isScript) {
+              return (
+                <ScriptExecCard
+                  key={msg.id}
+                  {...sharedProps}
+                  onViewLog={() => onViewLog(msg.id)}
+                  onRestartScript={isCardRunning ? () => onRestartScriptCard(cardInfo.runMsg.id, cardInfo.commandLabel) : undefined}
+                />
+              );
+            }
             return (
-              <ExecCard
+              <AgentExecCard
                 key={msg.id}
-                item={cardItem}
-                onViewLog={() => onViewLog(msg.id)}
-                onShowCommand={cardInfo.command ? () => onShowCommand(cardInfo.command) : undefined}
-                onStopTask={isCardRunning ? () => onStopExecCard(cardInfo.runMsg.id) : undefined}
-                onRestartScript={isCardRunning && cardInfo.isScript ? () => onRestartScriptCard(cardInfo.runMsg.id, cardInfo.commandLabel) : undefined}
-                onRetryTask={isCardFailed ? () => onRetryCard(cardInfo) : undefined}
+                {...sharedProps}
+                sessionId={selectedSessionId!}
+                ws={ws}
               />
             );
           }

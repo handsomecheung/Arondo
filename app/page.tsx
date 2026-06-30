@@ -898,6 +898,7 @@ export default function HomePage() {
             onSetAgentDropdownOpen={setAgentDropdownOpen}
             onSetFsCurrentPath={setFsCurrentPath}
             onSetFsModalOpen={setFsModalOpen}
+            ws={wsInstance}
             onViewLog={(msgId) => { setActiveLogMsgId(msgId); setLogModalOpen(true); }}
             onShowCommand={(cmd) => setCommandModalText(cmd)}
             onStopExecCard={handleStopExecCard}

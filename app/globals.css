@@ -1404,6 +1404,13 @@ body {
   color: var(--text-muted);
 }
 
+.agent-exec-output {
+  height: 300px;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  overflow: hidden;
+}
+
 /* Legacy: keep for modal badge */
 .console-badge-running {
   font-size: 10px;

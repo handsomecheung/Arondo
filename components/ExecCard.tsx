@@ -14,13 +14,14 @@ export interface ExecCardItem {
   timestamp?: string;
 }
 
-interface ExecCardProps {
+export interface ExecCardProps {
   item: ExecCardItem;
-  onViewLog?: () => void;
   onShowCommand?: () => void;
   onStopTask?: () => void;
   onRestartScript?: () => void;
   onRetryTask?: () => void;
+  extraMenuItems?: (closeMenu: () => void) => React.ReactNode;
+  children?: React.ReactNode;
 }
 
 function IconMoreVertical() {
@@ -29,15 +30,6 @@ function IconMoreVertical() {
       <circle cx="12" cy="5" r="2" />
       <circle cx="12" cy="12" r="2" />
       <circle cx="12" cy="19" r="2" />
-    </svg>
-  );
-}
-
-function IconTerminal() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="4 17 10 11 4 5" />
-      <line x1="12" y1="19" x2="20" y2="19" />
     </svg>
   );
 }
@@ -77,7 +69,7 @@ function IconRetry() {
   );
 }
 
-export default function ExecCard({ item, onViewLog, onShowCommand, onStopTask, onRestartScript, onRetryTask }: ExecCardProps) {
+export default function ExecCard({ item, onShowCommand, onStopTask, onRestartScript, onRetryTask, extraMenuItems, children }: ExecCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -104,11 +96,11 @@ export default function ExecCard({ item, onViewLog, onShowCommand, onStopTask, o
   }
 
   const hasMenuItems =
-    (!!item.command && onShowCommand) ||
-    (hasLog && onViewLog) ||
-    (isRunning && hasLog && onStopTask) ||
-    (isRunning && item.type === "script" && onRestartScript) ||
-    (isFailed && onRetryTask);
+    !!extraMenuItems ||
+    (!!item.command && !!onShowCommand) ||
+    (isRunning && hasLog && !!onStopTask) ||
+    (isRunning && item.type === "script" && !!onRestartScript) ||
+    (isFailed && !!onRetryTask);
 
   return (
     <div className={`exec-card ${statusClass}`}>
@@ -157,18 +149,7 @@ export default function ExecCard({ item, onViewLog, onShowCommand, onStopTask, o
               </button>
               {menuOpen && (
                 <div className="task-menu-dropdown">
-                  {hasLog && onViewLog && (
-                    <button
-                      className="task-menu-item"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        onViewLog();
-                      }}
-                    >
-                      <IconTerminal />
-                      <span>View Log</span>
-                    </button>
-                  )}
+                  {extraMenuItems && extraMenuItems(() => setMenuOpen(false))}
                   {item.command && onShowCommand && (
                     <button
                       className="task-menu-item"
@@ -226,6 +207,7 @@ export default function ExecCard({ item, onViewLog, onShowCommand, onStopTask, o
       {item.timestamp && (
         <div className="exec-card-time">{item.timestamp}</div>
       )}
+      {children}
     </div>
   );
 }

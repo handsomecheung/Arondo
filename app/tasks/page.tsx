@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import ExecCard from "@/components/ExecCard";
+import ScriptExecCard from "@/components/ScriptExecCard";
 import {
   IconArrowLeft, IconBolt, IconX, IconInbox, IconTerminal, IconCode, IconChevronDown,
 } from "@/components/Icons";
@@ -861,7 +861,7 @@ export default function TasksPage() {
                             }
 
                             return (
-                              <ExecCard
+                              <ScriptExecCard
                                 key={task.id}
                                 item={{
                                   id: task.id,
@@ -981,7 +981,7 @@ export default function TasksPage() {
                               : `Project: ${projectName}`;
 
                             return (
-                              <ExecCard
+                              <ScriptExecCard
                                 key={task.id}
                                 item={{
                                   id: task.id,
