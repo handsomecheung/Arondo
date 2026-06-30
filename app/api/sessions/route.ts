@@ -1,7 +1,7 @@
 import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { getSessions, createSession, updateSession, addMessage, clearSessionLog } from "@/lib/store";
-import { getAgent, AgentType } from "@/lib/agents";
+import { getAgent, AgentType, resolveAgentType } from "@/lib/agents";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
 
@@ -69,7 +69,8 @@ export async function POST(req: NextRequest) {
     runnerId,
   });
 
-  const agent = getAgent(agentType as AgentType);
+  const resolvedType = await resolveAgentType(agentType, run.info.agents);
+  const agent = getAgent(resolvedType);
   const command = agent.getCommand({ prompt, repoPath, sessionId: session.id, isResume: false });
 
   await updateSession(session.id, { command });
@@ -83,6 +84,7 @@ export async function POST(req: NextRequest) {
     role: "system",
     content: `⚙️ Executing command:\n\`\`\`bash\n${command}\n\`\`\``,
     type: "agent-run",
+    resolvedAgentType: resolvedType,
   });
   eventBus.publish({ type: "message_added", payload: systemMsg });
   eventBus.publish({ type: "session_updated", payload: session });

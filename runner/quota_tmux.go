@@ -11,6 +11,25 @@ import (
 	"time"
 )
 
+func (h *Handler) handleInfoFetch(msg *Message) {
+	var payload struct {
+		Agent string `json:"agent"`
+	}
+	if err := parsePayloadInto(msg.Payload, &payload); err != nil || payload.Agent == "" {
+		h.sendError(msg.ID, "BAD_REQUEST", "missing agent field")
+		return
+	}
+	h.sendResponse(msg.ID, map[string]any{"ok": true})
+	switch payload.Agent {
+	case "claude":
+		go fetchClaudeQuota(h.client)
+	case "agy":
+		go fetchAgyQuota(h.client)
+	default:
+		log.Printf("[quota.fetch] unknown agent: %s", payload.Agent)
+	}
+}
+
 // tmuxSessionName builds a unique tmux session name for the given agent and
 // client, safe for multiple runners on the same host. Format:
 // arondo-{agent}-{name}_{hostname} with special characters replaced by "_".

@@ -2,8 +2,10 @@ import { BaseAgent } from "./base";
 import { AntigravityAgent } from "./antigravity";
 import { ClaudeCodeAgent } from "./claude";
 import { CodexAgent } from "./codex";
+import { selectAgent } from "../autoselect";
 
-export type AgentType = "antigravity" | "claude" | "codex";
+export type ConcreteAgentType = "antigravity" | "claude" | "codex";
+export type AgentType = ConcreteAgentType | "auto";
 
 /**
  * Registry entry: maps an agent type to its factory and the binary name
@@ -15,7 +17,7 @@ interface AgentEntry {
   binary: string;
 }
 
-const AGENTS: Record<AgentType, AgentEntry> = {
+const AGENTS: Record<ConcreteAgentType, AgentEntry> = {
   antigravity: { factory: () => new AntigravityAgent(), binary: "agy" },
   claude:      { factory: () => new ClaudeCodeAgent(),  binary: "claude" },
   codex:       { factory: () => new CodexAgent(),       binary: "codex" },
@@ -25,7 +27,7 @@ const AGENTS: Record<AgentType, AgentEntry> = {
  * Factory to get an agent by type name.
  * To add a new agent: implement BaseAgent, add it to the AGENTS map above.
  */
-export function getAgent(type: AgentType): BaseAgent {
+export function getAgent(type: ConcreteAgentType): BaseAgent {
   const entry = AGENTS[type];
   if (!entry) {
     throw new Error(`Unknown agent type: ${type}. Available: ${Object.keys(AGENTS).join(", ")}`);
@@ -33,8 +35,22 @@ export function getAgent(type: AgentType): BaseAgent {
   return entry.factory();
 }
 
-export function getAvailableAgents(): AgentType[] {
-  return Object.keys(AGENTS) as AgentType[];
+export function getAvailableAgents(): ConcreteAgentType[] {
+  return Object.keys(AGENTS) as ConcreteAgentType[];
+}
+
+/**
+ * Resolves "auto" to a concrete AgentType by running the quota-based selection
+ * algorithm against the agents installed on the given runner.
+ * Non-"auto" types are returned unchanged.
+ */
+export async function resolveAgentType(
+  agentType: string,
+  runnerAgentBinaries: string[],
+): Promise<ConcreteAgentType> {
+  if (agentType !== "auto") return agentType as ConcreteAgentType;
+  const resolved = await selectAgent(runnerAgentBinaries);
+  return resolved ?? "antigravity";
 }
 
 /**

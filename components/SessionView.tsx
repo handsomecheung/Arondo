@@ -203,7 +203,9 @@ export default function SessionView({
                 ? "Antigravity CLI"
                 : selectedSession.agentType === "claude"
                   ? "Claude Code"
-                  : selectedSession.agentType}
+                  : selectedSession.agentType === "auto"
+                    ? "Auto Model"
+                    : selectedSession.agentType}
               )
             </span>
           </div>
@@ -606,7 +608,9 @@ export default function SessionView({
                       ? "Claude Code"
                       : agentType === "codex"
                         ? "Codex"
-                        : agentType}
+                        : agentType === "auto"
+                          ? "Auto Model"
+                          : agentType}
                 </span>
                 <IconChevronDown
                   className={`arrow-icon ${agentDropdownOpen ? "open" : ""}`}
@@ -614,33 +618,22 @@ export default function SessionView({
               </button>
               {agentDropdownOpen && (
                 <div className="custom-dropdown-menu">
-                  {(
-                    [
-                      {
-                        value: "antigravity",
-                        label: "Antigravity CLI",
-                        cmd: "agy",
-                        comingSoon: false,
-                      },
-                      {
-                        value: "claude",
-                        label: "Claude Code",
-                        cmd: "claude",
-                        comingSoon: false,
-                      },
-                      {
-                        value: "codex",
-                        label: "Codex",
-                        cmd: "codex",
-                        comingSoon: true,
-                      },
-                    ] as const
-                  )
-                    .filter(
-                      ({ cmd, comingSoon }) =>
-                        !comingSoon && isAgentAvailable(cmd),
-                    )
-                    .map(({ value, label }) => (
+                  {(() => {
+                    const concreteAgents = (
+                      [
+                        { value: "antigravity", label: "Antigravity CLI", cmd: "agy", comingSoon: false },
+                        { value: "claude",       label: "Claude Code",     cmd: "claude", comingSoon: false },
+                        { value: "codex",        label: "Codex",           cmd: "codex",  comingSoon: true },
+                      ] as const
+                    ).filter(({ cmd, comingSoon }) => !comingSoon && isAgentAvailable(cmd));
+
+                    const showAuto = concreteAgents.length > 1;
+                    const items: { value: string; label: string }[] = [
+                      ...(showAuto ? [{ value: "auto", label: "Auto Model" }] : []),
+                      ...concreteAgents,
+                    ];
+
+                    return items.map(({ value, label }) => (
                       <button
                         key={value}
                         type="button"
@@ -650,11 +643,10 @@ export default function SessionView({
                           onSetAgentDropdownOpen(false);
                         }}
                       >
-                        <span style={{ flex: 1, textAlign: "left" }}>
-                          {label}
-                        </span>
+                        <span style={{ flex: 1, textAlign: "left" }}>{label}</span>
                       </button>
-                    ))}
+                    ));
+                  })()}
                 </div>
               )}
             </div>

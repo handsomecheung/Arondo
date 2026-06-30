@@ -58,6 +58,7 @@ export interface Message {
   projectId?: string;
   stoppedByUser?: boolean;
   taskId?: string;
+  resolvedAgentType?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

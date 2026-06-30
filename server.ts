@@ -3,6 +3,7 @@ import next from "next";
 import { WebSocketServer } from "ws";
 import { setupWebSocketServer } from "./lib/ws-server";
 import { setupRunnerServer } from "./lib/runner-server";
+import { startQuotaAggregator } from "./lib/quota-aggregator";
 
 const port = parseInt(process.env.PORT || (process.env.NODE_ENV === "production" ? "3250" : "3251"), 10);
 const dev = process.env.NODE_ENV !== "production";
@@ -31,6 +32,8 @@ app.prepare().then(() => {
       });
     }
   });
+
+  startQuotaAggregator();
 
   server.listen(port, () => {
     console.log(

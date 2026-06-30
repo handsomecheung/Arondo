@@ -58,6 +58,8 @@ func (h *Handler) handleRequest(msg *Message) {
 		h.handleGitPrCreate(msg)
 	case "rules.sync":
 		h.handleRulesSync(msg)
+	case "info.fetch":
+		h.handleInfoFetch(msg)
 	default:
 		h.sendError(msg.ID, "NOT_FOUND", "unknown method: "+msg.Method)
 	}

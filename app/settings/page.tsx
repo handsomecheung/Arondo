@@ -186,13 +186,15 @@ function formatLastSeen(ts: number): string {
   return new Date(ts).toLocaleDateString();
 }
 
-function formatResetsAt(ts: number | null): string {
+function formatTimestamp(ts: number | null): string {
   if (ts == null) return "—";
-  const diff = ts - Math.floor(Date.now() / 1000);
-  if (diff <= 0) return "soon";
-  const h = Math.floor(diff / 3600);
-  const m = Math.floor((diff % 3600) / 60);
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  const d = new Date(ts * 1000);
+  const now = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  const datePart = `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  return d.getFullYear() === now.getFullYear()
+    ? datePart
+    : `${d.getFullYear()}-${datePart}`;
 }
 
 interface QuotaRow {
@@ -259,7 +261,7 @@ function QuotaCard({
                 <span>
                   {isDisabled
                     ? "Disabled"
-                    : `${Math.round(remainRatio * 100)}% left · resets ${formatResetsAt(row.resetsAt)}`}
+                    : `${Math.round(remainRatio * 100)}% left · resets ${formatTimestamp(row.resetsAt)}`}
                 </span>
               </div>
               <div
@@ -288,7 +290,7 @@ function QuotaCard({
       </div>
       {updatedAt != null && (
         <div style={{ fontSize: 10, color: "var(--text-muted)", textAlign: "right" }}>
-          Updated {formatResetsAt(updatedAt)} ago
+          Updated {formatTimestamp(updatedAt)}
         </div>
       )}
     </div>

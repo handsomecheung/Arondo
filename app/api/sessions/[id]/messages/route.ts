@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, updateSession, addMessage, clearSessionLog, getMessages } from "@/lib/store";
-import { getAgent, AgentType } from "@/lib/agents";
+import { getAgent, AgentType, resolveAgentType } from "@/lib/agents";
+import { buildCrossAgentContext } from "@/lib/autoselect";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
 
@@ -37,10 +38,26 @@ export async function POST(
     });
     eventBus.publish({ type: "message_added", payload: userMsg });
 
-    const agent = getAgent(session.agentType as AgentType);
     const messages = await getMessages(id);
-    const isResume = messages.some((m) => m.type === "agent-run");
-    const command = agent.getCommand({ prompt: trimmedMessage, repoPath: session.repoPath, sessionId: id, isResume });
+    const runnerConn = runnerManager.getRunner(session.runnerId);
+    const resolvedType = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? []);
+
+    // For auto sessions, only resume if the same agent type ran before; for
+    // fixed sessions keep the original behavior for backward compatibility.
+    const isResume = session.agentType === "auto"
+      ? messages.some((m) => m.type === "agent-run" && m.resolvedAgentType === resolvedType)
+      : messages.some((m) => m.type === "agent-run");
+
+    // When the auto session switches agents, prepend the previous agent's
+    // conversation as context so the new agent has full history.
+    let effectivePrompt = trimmedMessage;
+    if (session.agentType === "auto" && !isResume) {
+      const ctx = await buildCrossAgentContext(id, resolvedType, messages);
+      if (ctx) effectivePrompt = `${ctx}\n\n${trimmedMessage}`;
+    }
+
+    const agent = getAgent(resolvedType);
+    const command = agent.getCommand({ prompt: effectivePrompt, repoPath: session.repoPath, sessionId: id, isResume });
 
     const patch: Record<string, any> = { status: "running", command };
     if (!session.prompt) {
@@ -60,6 +77,7 @@ export async function POST(
       role: "system",
       content: `⚙️ Executing command:\n\`\`\`bash\n${command}\n\`\`\``,
       type: "agent-run",
+      resolvedAgentType: resolvedType,
     });
     eventBus.publish({ type: "message_added", payload: systemMsg });
 

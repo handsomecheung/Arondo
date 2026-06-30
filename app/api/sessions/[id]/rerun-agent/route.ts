@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, addMessage, updateSession, clearSessionLog } from "@/lib/store";
-import { getAgent, AgentType } from "@/lib/agents";
+import { getAgent, AgentType, resolveAgentType } from "@/lib/agents";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
 
@@ -28,7 +28,9 @@ export async function POST(
     return NextResponse.json({ error: "No connected runner available" }, { status: 503 });
   }
 
-  const agent = getAgent(session.agentType as AgentType);
+  const runnerConn = runnerManager.getRunner(runnerId);
+  const resolvedType = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? []);
+  const agent = getAgent(resolvedType);
   const command = agent.getCommand({
     prompt: session.prompt,
     repoPath: session.repoPath,
@@ -43,6 +45,7 @@ export async function POST(
     role: "system",
     content: `⚙️ Executing command:\n\`\`\`bash\n${command}\n\`\`\``,
     type: "agent-run",
+    resolvedAgentType: resolvedType,
   });
   eventBus.publish({ type: "message_added", payload: systemMsg });
   eventBus.publish({ type: "session_updated", payload: updatedSession });
