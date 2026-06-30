@@ -441,11 +441,6 @@ export default function SettingsPage() {
     return (b.lastSeenAt ?? 0) - (a.lastSeenAt ?? 0);
   });
 
-  const selectedRunner = runners.find((r) => r.id === selectedRunnerId) ?? null;
-  const runnerProjects = selectedRunner
-    ? projects.filter((p) => p.runnerId === selectedRunner.id)
-    : [];
-
   return (
     <div
       style={{
@@ -575,140 +570,357 @@ export default function SettingsPage() {
                     { label: "OpenCode", cmd: "opencode", comingSoon: true },
                   ];
                   const hasAgentInfo = Array.isArray(r.agents);
+                  const isSelected = selectedRunnerId === r.id;
+                  const rProjects = projects.filter((p) => p.runnerId === r.id);
                   return (
-                    <div
-                      key={r.id}
-                      onClick={() =>
-                        setSelectedRunnerId(
-                          selectedRunnerId === r.id ? null : r.id,
-                        )
-                      }
-                      style={{
-                        padding: 14,
-                        background:
-                          selectedRunnerId === r.id
+                    <div key={r.id} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                      <div
+                        onClick={() =>
+                          setSelectedRunnerId(isSelected ? null : r.id)
+                        }
+                        style={{
+                          padding: 14,
+                          background: isSelected
                             ? "var(--bg-surface)"
                             : "var(--bg-elevated)",
-                        border:
-                          selectedRunnerId === r.id
+                          border: isSelected
                             ? "1px solid var(--accent)"
                             : "1px solid var(--border)",
-                        borderRadius: "var(--radius-md)",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                        opacity: r.connected ? 1 : 0.6,
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          marginBottom: 4,
+                          borderRadius: isSelected ? "var(--radius-md) var(--radius-md) 0 0" : "var(--radius-md)",
+                          cursor: "pointer",
+                          transition: "all 0.2s ease",
+                          opacity: r.connected ? 1 : 0.6,
                         }}
                       >
                         <div
                           style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: 8,
+                            justifyContent: "space-between",
+                            marginBottom: 4,
                           }}
                         >
-                          <span
-                            className={`task-status-badge ${r.connected ? "running" : "idle"}`}
-                          >
-                            {r.connected ? "connected" : "disconnected"}
-                          </span>
-                          <span
+                          <div
                             style={{
-                              fontSize: 14,
-                              fontWeight: 600,
-                              color: "var(--text-primary)",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
                             }}
                           >
-                            {r.name}
+                            <span
+                              className={`task-status-badge ${r.connected ? "running" : "idle"}`}
+                            >
+                              {r.connected ? "connected" : "disconnected"}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 14,
+                                fontWeight: 600,
+                                color: "var(--text-primary)",
+                              }}
+                            >
+                              {r.name}
+                            </span>
+                          </div>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: "var(--text-muted)",
+                            }}
+                          >
+                            {r.os} ({r.arch})
                           </span>
                         </div>
-                        <span
+                        <div
                           style={{
-                            fontSize: 11,
-                            color: "var(--text-muted)",
+                            display: "flex",
+                            gap: 16,
+                            fontSize: 12,
+                            color: "var(--text-secondary)",
+                            marginBottom: hasAgentInfo ? 10 : 0,
                           }}
                         >
-                          {r.os} ({r.arch})
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: 16,
-                          fontSize: 12,
-                          color: "var(--text-secondary)",
-                          marginBottom: hasAgentInfo ? 10 : 0,
-                        }}
-                      >
-                        <span>Host: {r.hostname}</span>
-                        {r.ip && <span>IP: {r.ip}</span>}
-                        {!r.connected && r.lastSeenAt && (
-                          <span style={{ color: "var(--text-muted)" }}>
-                            Last seen: {formatLastSeen(r.lastSeenAt)}
-                          </span>
-                        )}
-                      </div>
-                      {hasAgentInfo && (
-                        <div
-                          style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
-                        >
-                          {agentDefs.map(({ label, cmd, comingSoon }) => {
-                            const installed =
-                              !comingSoon && r.agents!.includes(cmd);
-                            const tooltipText = comingSoon
-                              ? `${label}: Under Development`
-                              : installed
-                                ? `${label} is installed`
-                                : `${label} is not installed`;
-                            return (
-                              <div
-                                key={cmd}
-                                title={tooltipText}
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 6,
-                                  padding: "5px 10px",
-                                  borderRadius: 6,
-                                  border: `1px solid ${installed ? "var(--border-accent)" : "var(--border)"}`,
-                                  background: installed
-                                    ? "var(--accent-glow)"
-                                    : "var(--bg-surface)",
-                                  opacity: installed ? 1 : 0.5,
-                                }}
-                              >
-                                <span
+                          <span>Host: {r.hostname}</span>
+                          {r.ip && <span>IP: {r.ip}</span>}
+                          {!r.connected && r.lastSeenAt && (
+                            <span style={{ color: "var(--text-muted)" }}>
+                              Last seen: {formatLastSeen(r.lastSeenAt)}
+                            </span>
+                          )}
+                        </div>
+                        {hasAgentInfo && (
+                          <div
+                            style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
+                          >
+                            {agentDefs.map(({ label, cmd, comingSoon }) => {
+                              const installed =
+                                !comingSoon && r.agents!.includes(cmd);
+                              const tooltipText = comingSoon
+                                ? `${label}: Under Development`
+                                : installed
+                                  ? `${label} is installed`
+                                  : `${label} is not installed`;
+                              return (
+                                <div
+                                  key={cmd}
+                                  title={tooltipText}
                                   style={{
-                                    width: 7,
-                                    height: 7,
-                                    borderRadius: "50%",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 6,
+                                    padding: "5px 10px",
+                                    borderRadius: 6,
+                                    border: `1px solid ${installed ? "var(--border-accent)" : "var(--border)"}`,
                                     background: installed
-                                      ? "var(--accent)"
-                                      : "var(--text-muted)",
-                                    flexShrink: 0,
-                                  }}
-                                />
-                                <span
-                                  style={{
-                                    fontSize: 12,
-                                    fontWeight: 500,
-                                    color: installed
-                                      ? "var(--accent)"
-                                      : "var(--text-muted)",
+                                      ? "var(--accent-glow)"
+                                      : "var(--bg-surface)",
+                                    opacity: installed ? 1 : 0.5,
                                   }}
                                 >
-                                  {label}
-                                </span>
+                                  <span
+                                    style={{
+                                      width: 7,
+                                      height: 7,
+                                      borderRadius: "50%",
+                                      background: installed
+                                        ? "var(--accent)"
+                                        : "var(--text-muted)",
+                                      flexShrink: 0,
+                                    }}
+                                  />
+                                  <span
+                                    style={{
+                                      fontSize: 12,
+                                      fontWeight: 500,
+                                      color: installed
+                                        ? "var(--accent)"
+                                        : "var(--text-muted)",
+                                    }}
+                                  >
+                                    {label}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Inline detail panel for selected runner */}
+                      {isSelected && (
+                        <div
+                          style={{
+                            border: "1px solid var(--accent)",
+                            borderTop: "none",
+                            borderRadius: "0 0 var(--radius-md) var(--radius-md)",
+                            padding: 16,
+                            background: "var(--bg-base)",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 16,
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                              gap: 16,
+                            }}
+                          >
+                            {/* System Information */}
+                            <div
+                              style={{
+                                background: "var(--bg-surface)",
+                                border: "1px solid var(--border)",
+                                borderRadius: "var(--radius-md)",
+                                padding: 16,
+                              }}
+                            >
+                              <h3
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  color: "var(--text-secondary)",
+                                  marginBottom: 12,
+                                }}
+                              >
+                                System Information
+                              </h3>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                                {[
+                                  { label: "Host Name", value: <code style={{ fontSize: 12, color: "var(--text-primary)" }}>{r.hostname || "N/A"}</code> },
+                                  { label: "OS / Platform", value: <span style={{ fontSize: 12, color: "var(--text-primary)" }}>{r.os} ({r.arch})</span> },
+                                  { label: "IP Address", value: <code style={{ fontSize: 12, color: "var(--text-primary)" }}>{r.ip || "N/A"}</code> },
+                                  { label: "Agent Version", value: <span style={{ fontSize: 12, color: "var(--text-primary)" }}>{r.version || "unknown"}</span> },
+                                ].map(({ label, value }) => (
+                                  <div key={label} style={{ display: "flex", justifyContent: "space-between" }}>
+                                    <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{label}</span>
+                                    {value}
+                                  </div>
+                                ))}
                               </div>
-                            );
-                          })}
+                            </div>
+
+                            {/* Capabilities */}
+                            <div
+                              style={{
+                                background: "var(--bg-surface)",
+                                border: "1px solid var(--border)",
+                                borderRadius: "var(--radius-md)",
+                                padding: 16,
+                              }}
+                            >
+                              <h3
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  color: "var(--text-secondary)",
+                                  marginBottom: 12,
+                                }}
+                              >
+                                Capabilities
+                              </h3>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                {r.capabilities && r.capabilities.length > 0 ? (
+                                  r.capabilities.map((cap) => (
+                                    <span
+                                      key={cap}
+                                      style={{
+                                        fontSize: 11,
+                                        fontWeight: 500,
+                                        color: "var(--accent)",
+                                        background: "var(--accent-glow)",
+                                        border: "1px solid var(--border-accent)",
+                                        padding: "2px 8px",
+                                        borderRadius: "4px",
+                                      }}
+                                    >
+                                      {cap}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                                    Standard terminal execution
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Agent Quota */}
+                          {agentsQuota && (agentsQuota.claude || agentsQuota.antigravity) && (
+                            <div>
+                              <h3
+                                style={{
+                                  fontSize: 14,
+                                  fontWeight: 600,
+                                  color: "var(--text-primary)",
+                                  marginBottom: 12,
+                                }}
+                              >
+                                Agent Quota
+                              </h3>
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                                  gap: 12,
+                                }}
+                              >
+                                {agentsQuota.claude && (
+                                  <QuotaCard
+                                    title="Claude"
+                                    account={agentsQuota.claude.Account}
+                                    plan={agentsQuota.claude.Plan}
+                                    model={agentsQuota.claude.DefaultModel}
+                                    updatedAt={agentsQuota.claude.updatedAt}
+                                    rows={[
+                                      { label: "Session", used: agentsQuota.claude.SessionUsed, resetsAt: agentsQuota.claude.SessionResetAt },
+                                      { label: "Week", used: agentsQuota.claude.WeekUsed, resetsAt: agentsQuota.claude.WeekResetsAt },
+                                    ]}
+                                  />
+                                )}
+                                {agentsQuota.antigravity && (
+                                  <QuotaCard
+                                    title="Antigravity"
+                                    account={agentsQuota.antigravity.Account}
+                                    plan={agentsQuota.antigravity.Plan}
+                                    model={agentsQuota.antigravity.DefaultModel}
+                                    updatedAt={agentsQuota.antigravity.updatedAt}
+                                    rows={[
+                                      { label: "Gemini Weekly", used: agentsQuota.antigravity.GeminiWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.GeminiWeeklyRemain, remaining: agentsQuota.antigravity.GeminiWeeklyRemain, resetsAt: agentsQuota.antigravity.GeminiWeeklyResetsAt },
+                                      { label: "Gemini 5h", used: agentsQuota.antigravity.GeminiFiveHourRemain == null ? null : 1 - agentsQuota.antigravity.GeminiFiveHourRemain, remaining: agentsQuota.antigravity.GeminiFiveHourRemain, resetsAt: agentsQuota.antigravity.GeminiFiveHourResetsAt },
+                                      { label: "Other Weekly", used: agentsQuota.antigravity.OtherWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.OtherWeeklyRemain, remaining: agentsQuota.antigravity.OtherWeeklyRemain, resetsAt: agentsQuota.antigravity.OtherWeeklyResetsAt },
+                                      { label: "Other 5h", used: agentsQuota.antigravity.OtherFiveHourRemain == null ? null : 1 - agentsQuota.antigravity.OtherFiveHourRemain, remaining: agentsQuota.antigravity.OtherFiveHourRemain, resetsAt: agentsQuota.antigravity.OtherFiveHourResetsAt },
+                                    ]}
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Associated Projects */}
+                          <div>
+                            <h3
+                              style={{
+                                fontSize: 14,
+                                fontWeight: 600,
+                                color: "var(--text-primary)",
+                                marginBottom: 12,
+                              }}
+                            >
+                              Associated Projects
+                            </h3>
+                            {rProjects.length === 0 ? (
+                              <div
+                                style={{
+                                  padding: "40px 16px",
+                                  textAlign: "center",
+                                  border: "1px dashed var(--border)",
+                                  borderRadius: "var(--radius-md)",
+                                  color: "var(--text-muted)",
+                                  fontSize: 13,
+                                }}
+                              >
+                                No active projects are configured for this node.
+                                <br />
+                                Create a new project session selecting this runner node.
+                              </div>
+                            ) : (
+                              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                                {rProjects.map((project) => {
+                                  const projSessions = sessions.filter((s) => s.projectId === project.id);
+                                  const folderName = project.repoPath.split("/").pop() || project.repoPath;
+                                  return (
+                                    <div
+                                      key={project.id}
+                                      style={{
+                                        background: "var(--bg-surface)",
+                                        border: "1px solid var(--border)",
+                                        borderRadius: "var(--radius-md)",
+                                        padding: 16,
+                                      }}
+                                    >
+                                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                                        <div>
+                                          <h4 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{folderName}</h4>
+                                          <code style={{ fontSize: 11, color: "var(--text-muted)" }}>{project.repoPath}</code>
+                                        </div>
+                                      </div>
+                                      <div style={{ display: "flex", gap: 16 }}>
+                                        <span style={{ fontSize: 12, color: "var(--text-secondary)" }}><strong>Sessions:</strong> {projSessions.length} total</span>
+                                        <span style={{ fontSize: 12, color: "var(--text-secondary)" }}><strong>Status:</strong> Active</span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -717,442 +929,6 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
-
-
-          {/* Selected Runner Detail */}
-          {selectedRunner && (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 16,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  borderBottom: "1px solid var(--border)",
-                  paddingBottom: 12,
-                }}
-              >
-                <div>
-                  <h2
-                    style={{
-                      fontSize: 18,
-                      fontWeight: 600,
-                      color: "var(--text-primary)",
-                    }}
-                  >
-                    Node: {selectedRunner.name}
-                  </h2>
-                  <p
-                    style={{
-                      fontSize: 13,
-                      color: "var(--text-muted)",
-                      marginTop: 4,
-                    }}
-                  >
-                    Runner system details and associated projects
-                  </p>
-                </div>
-                <span
-                  className={`task-status-badge ${selectedRunner.connected ? "running" : "idle"}`}
-                  style={{ padding: "4px 10px", fontSize: 12 }}
-                >
-                  {selectedRunner.connected
-                    ? "Active / Connected"
-                    : "Disconnected"}
-                </span>
-              </div>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                  gap: 16,
-                }}
-              >
-                {/* System Information */}
-                <div
-                  style={{
-                    background: "var(--bg-surface)",
-                    border: "1px solid var(--border)",
-                    borderRadius: "var(--radius-md)",
-                    padding: 16,
-                  }}
-                >
-                  <h3
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      color: "var(--text-secondary)",
-                      marginBottom: 12,
-                    }}
-                  >
-                    System Information
-                  </h3>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 10,
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 12,
-                          color: "var(--text-muted)",
-                        }}
-                      >
-                        Host Name
-                      </span>
-                      <code
-                        style={{
-                          fontSize: 12,
-                          color: "var(--text-primary)",
-                        }}
-                      >
-                        {selectedRunner.hostname || "N/A"}
-                      </code>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 12,
-                          color: "var(--text-muted)",
-                        }}
-                      >
-                        OS / Platform
-                      </span>
-                      <span
-                        style={{
-                          fontSize: 12,
-                          color: "var(--text-primary)",
-                        }}
-                      >
-                        {selectedRunner.os} ({selectedRunner.arch})
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 12,
-                          color: "var(--text-muted)",
-                        }}
-                      >
-                        IP Address
-                      </span>
-                      <code
-                        style={{
-                          fontSize: 12,
-                          color: "var(--text-primary)",
-                        }}
-                      >
-                        {selectedRunner.ip || "N/A"}
-                      </code>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 12,
-                          color: "var(--text-muted)",
-                        }}
-                      >
-                        Agent Version
-                      </span>
-                      <span
-                        style={{
-                          fontSize: 12,
-                          color: "var(--text-primary)",
-                        }}
-                      >
-                        {selectedRunner.version || "unknown"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Capabilities */}
-                <div
-                  style={{
-                    background: "var(--bg-surface)",
-                    border: "1px solid var(--border)",
-                    borderRadius: "var(--radius-md)",
-                    padding: 16,
-                  }}
-                >
-                  <h3
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      color: "var(--text-secondary)",
-                      marginBottom: 12,
-                    }}
-                  >
-                    Capabilities
-                  </h3>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: 6,
-                    }}
-                  >
-                    {selectedRunner.capabilities &&
-                    selectedRunner.capabilities.length > 0 ? (
-                      selectedRunner.capabilities.map((cap) => (
-                        <span
-                          key={cap}
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 500,
-                            color: "var(--accent)",
-                            background: "var(--accent-glow)",
-                            border: "1px solid var(--border-accent)",
-                            padding: "2px 8px",
-                            borderRadius: "4px",
-                          }}
-                        >
-                          {cap}
-                        </span>
-                      ))
-                    ) : (
-                      <span
-                        style={{
-                          fontSize: 12,
-                          color: "var(--text-muted)",
-                        }}
-                      >
-                        Standard terminal execution
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Agent Quota */}
-              {agentsQuota && (agentsQuota.claude || agentsQuota.antigravity) && (
-                <div>
-                  <h3
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: "var(--text-primary)",
-                      marginBottom: 12,
-                    }}
-                  >
-                    Agent Quota
-                  </h3>
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                      gap: 12,
-                    }}
-                  >
-                    {agentsQuota.claude && (
-                      <QuotaCard
-                        title="Claude"
-                        account={agentsQuota.claude.Account}
-                        plan={agentsQuota.claude.Plan}
-                        model={agentsQuota.claude.DefaultModel}
-                        updatedAt={agentsQuota.claude.updatedAt}
-                        rows={[
-                          {
-                            label: "Session",
-                            used: agentsQuota.claude.SessionUsed,
-                            resetsAt: agentsQuota.claude.SessionResetAt,
-                          },
-                          {
-                            label: "Week",
-                            used: agentsQuota.claude.WeekUsed,
-                            resetsAt: agentsQuota.claude.WeekResetsAt,
-                          },
-                        ]}
-                      />
-                    )}
-                    {agentsQuota.antigravity && (
-                      <QuotaCard
-                        title="Antigravity"
-                        account={agentsQuota.antigravity.Account}
-                        plan={agentsQuota.antigravity.Plan}
-                        model={agentsQuota.antigravity.DefaultModel}
-                        updatedAt={agentsQuota.antigravity.updatedAt}
-                        rows={[
-                          {
-                            label: "Gemini Weekly",
-                            used: agentsQuota.antigravity.GeminiWeeklyRemain == null
-                              ? null
-                              : 1 - agentsQuota.antigravity.GeminiWeeklyRemain,
-                            remaining: agentsQuota.antigravity.GeminiWeeklyRemain,
-                            resetsAt: agentsQuota.antigravity.GeminiWeeklyResetsAt,
-                          },
-                          {
-                            label: "Gemini 5h",
-                            used: agentsQuota.antigravity.GeminiFiveHourRemain == null
-                              ? null
-                              : 1 - agentsQuota.antigravity.GeminiFiveHourRemain,
-                            remaining: agentsQuota.antigravity.GeminiFiveHourRemain,
-                            resetsAt: agentsQuota.antigravity.GeminiFiveHourResetsAt,
-                          },
-                          {
-                            label: "Other Weekly",
-                            used: agentsQuota.antigravity.OtherWeeklyRemain == null
-                              ? null
-                              : 1 - agentsQuota.antigravity.OtherWeeklyRemain,
-                            remaining: agentsQuota.antigravity.OtherWeeklyRemain,
-                            resetsAt: agentsQuota.antigravity.OtherWeeklyResetsAt,
-                          },
-                          {
-                            label: "Other 5h",
-                            used: agentsQuota.antigravity.OtherFiveHourRemain == null
-                              ? null
-                              : 1 - agentsQuota.antigravity.OtherFiveHourRemain,
-                            remaining: agentsQuota.antigravity.OtherFiveHourRemain,
-                            resetsAt: agentsQuota.antigravity.OtherFiveHourResetsAt,
-                          },
-                        ]}
-                      />
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Associated Projects */}
-              <div>
-                <h3
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: "var(--text-primary)",
-                    marginBottom: 12,
-                  }}
-                >
-                  Associated Projects
-                </h3>
-
-                {runnerProjects.length === 0 ? (
-                  <div
-                    style={{
-                      padding: "40px 16px",
-                      textAlign: "center",
-                      border: "1px dashed var(--border)",
-                      borderRadius: "var(--radius-md)",
-                      color: "var(--text-muted)",
-                      fontSize: 13,
-                    }}
-                  >
-                    No active projects are configured for this node.
-                    <br />
-                    Create a new project session selecting this runner node.
-                  </div>
-                ) : (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 12,
-                    }}
-                  >
-                    {runnerProjects.map((project) => {
-                      const projSessions = sessions.filter(
-                        (s) => s.projectId === project.id,
-                      );
-                      const folderName =
-                        project.repoPath.split("/").pop() || project.repoPath;
-
-                      return (
-                        <div
-                          key={project.id}
-                          style={{
-                            background: "var(--bg-surface)",
-                            border: "1px solid var(--border)",
-                            borderRadius: "var(--radius-md)",
-                            padding: 16,
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              marginBottom: 8,
-                            }}
-                          >
-                            <div>
-                              <h4
-                                style={{
-                                  fontSize: 14,
-                                  fontWeight: 600,
-                                  color: "var(--text-primary)",
-                                }}
-                              >
-                                {folderName}
-                              </h4>
-                              <code
-                                style={{
-                                  fontSize: 11,
-                                  color: "var(--text-muted)",
-                                }}
-                              >
-                                {project.repoPath}
-                              </code>
-                            </div>
-                          </div>
-                          <div style={{ display: "flex", gap: 16 }}>
-                            <span
-                              style={{
-                                fontSize: 12,
-                                color: "var(--text-secondary)",
-                              }}
-                            >
-                              <strong>Sessions:</strong> {projSessions.length}{" "}
-                              total
-                            </span>
-                            <span
-                              style={{
-                                fontSize: 12,
-                                color: "var(--text-secondary)",
-                              }}
-                            >
-                              <strong>Status:</strong> Active
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* Agent Commands Section */}
           <div>
