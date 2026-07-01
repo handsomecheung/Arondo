@@ -312,12 +312,15 @@ export default function ProjectPanel({
             <button
               className="new-task-btn"
               onClick={onAutoAddScripts}
+              disabled={isAutoAnalyzing}
               style={{
                 padding: "6px 14px",
                 fontSize: 12,
                 background: "transparent",
                 border: "1px solid var(--border)",
-                color: "var(--accent)",
+                color: isAutoAnalyzing ? "var(--text-muted)" : "var(--accent)",
+                opacity: isAutoAnalyzing ? 0.5 : 1,
+                cursor: isAutoAnalyzing ? "not-allowed" : "pointer",
               }}
             >
               🤖 AI Auto Scripts

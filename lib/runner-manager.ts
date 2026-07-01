@@ -58,6 +58,7 @@ export interface TaskContext {
   stoppedByUser?: boolean;
   command?: string;
   projectId?: string;
+  prompt?: string;
 }
 
 interface PendingRequest {
@@ -153,6 +154,8 @@ class RunnerManager {
           if (m.type === "script-run") {
             const match = m.content.match(/Running script:\s*\*\*([^*]+)\*\*/i);
             scriptName = match ? match[1].trim() : undefined;
+          } else if (m.type === "agent-run" && m.command === "Auto Scripts Analysis") {
+            scriptName = "Auto Scripts Analysis";
           }
 
           const ctx: TaskContext = {
@@ -166,6 +169,7 @@ class RunnerManager {
             createdAt: new Date(m.createdAt).getTime(),
             command: m.command,
             projectId: s.projectId,
+            prompt: m.prompt,
           };
           this.tasks.set(taskId, ctx);
           const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
@@ -191,6 +195,8 @@ class RunnerManager {
           if (m.type === "script-run") {
             const match = m.content.match(/Running script:\s*\*\*([^*]+)\*\*/i);
             scriptName = match ? match[1].trim() : undefined;
+          } else if (m.type === "agent-run" && m.command === "Auto Scripts Analysis") {
+            scriptName = "Auto Scripts Analysis";
           }
 
           const ctx: TaskContext = {
@@ -204,6 +210,7 @@ class RunnerManager {
             createdAt: new Date(m.createdAt).getTime(),
             command: m.command,
             projectId: p.id,
+            prompt: m.prompt,
           };
           this.tasks.set(taskId, ctx);
           const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
@@ -815,6 +822,9 @@ class RunnerManager {
     ctx: TaskContext,
     exitCode: number,
   ): Promise<void> {
+    if (!ctx.sessionId) {
+      return;
+    }
     const success = exitCode === 0;
 
     const session = await getSession(ctx.sessionId);

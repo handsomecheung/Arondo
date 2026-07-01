@@ -62,4 +62,6 @@ export interface TaskItem {
   status: "running" | "done" | "error";
   createdAt: number;
   messageId?: string;
+  projectId?: string;
+  scriptName?: string;
 }

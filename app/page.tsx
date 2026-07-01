@@ -17,7 +17,6 @@ import ShellTerminalModal from "@/components/modals/ShellTerminalModal";
 import FileBrowserModal from "@/components/modals/FileBrowserModal";
 import CommandModal from "@/components/modals/CommandModal";
 import AddScriptModal from "@/components/modals/AddScriptModal";
-import AutoAnalyzingNotice from "@/components/modals/AutoAnalyzingNotice";
 import ToastNotification from "@/components/modals/ToastNotification";
 import ApiErrorModal from "@/components/modals/ApiErrorModal";
 import RenameSessionDialog from "@/components/modals/RenameSessionDialog";
@@ -206,8 +205,6 @@ export default function HomePage() {
     scriptName, setScriptName,
     scriptCommand, setScriptCommand,
     editingScriptName, setEditingScriptName,
-    isAutoAnalyzing,
-    showAutoAnalyzeNotice, setShowAutoAnalyzeNotice,
     sessionScripts,
     isRunningScript,
     loadProjectScripts,
@@ -830,7 +827,7 @@ export default function HomePage() {
                 projectScripts={projectScripts}
                 draggedIndex={draggedIndex}
                 runners={runners}
-                isAutoAnalyzing={isAutoAnalyzing}
+                isAutoAnalyzing={taskQueue.some((t) => (t.name === "Agent: Auto Scripts Analysis" || t.scriptName === "Auto Scripts Analysis") && t.status === "running" && t.projectId === project.id)}
                 onRunScript={handleRunGlobalScript}
                 onNewSession={() => {
                   setRepoPath(project.repoPath);
@@ -1036,11 +1033,6 @@ export default function HomePage() {
         scriptCommand={scriptCommand}
         onScriptCommandChange={setScriptCommand}
         onSave={handleSaveScript}
-      />
-
-      <AutoAnalyzingNotice
-        open={showAutoAnalyzeNotice}
-        onClose={() => setShowAutoAnalyzeNotice(false)}
       />
 
       <ToastNotification

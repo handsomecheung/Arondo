@@ -48,12 +48,16 @@ export function useInitialLoad({
           id: t.taskId,
           type: t.type,
           name: t.type === "agent"
-            ? `Agent: ${t.command || "Agent Task"}`
+            ? t.scriptName === "Auto Scripts Analysis"
+              ? "Agent: Auto Scripts Analysis"
+              : `Agent: ${t.command || "Agent Task"}`
             : `Script: ${t.scriptName || t.command || "Script Task"}`,
           sessionId: t.sessionId || "",
           messageId: t.messageId || t.taskId,
           status: "running",
           createdAt: t.createdAt,
+          projectId: t.projectId,
+          scriptName: t.scriptName,
         }));
         setTaskQueue(initTasks);
       })

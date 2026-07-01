@@ -22,8 +22,16 @@ function parseJsonArray<T>(text: string): T[] {
   return JSON.parse(cleaned) as T[];
 }
 
-async function runAutoScriptsInBackground(projectId: string, repoPath: string) {
-  const { addProjectScript } = await import("@/lib/store");
+async function runAutoScriptsInBackground(
+  projectId: string,
+  repoPath: string,
+  taskId: string,
+  messageId: string,
+  timestamp: number,
+) {
+  const { addProjectScript, addMessage, appendSessionLog, updateMessage } = await import("@/lib/store");
+  const { eventBus } = await import("@/lib/event-bus");
+  const { runnerManager } = await import("@/lib/runner-manager");
   const path = await import("path");
   const fs = await import("fs/promises");
   const os = await import("os");
@@ -34,7 +42,6 @@ async function runAutoScriptsInBackground(projectId: string, repoPath: string) {
   const logDir = DATA_DIR;
   const errorLogPath = path.join(logDir, "auto-script-error.log");
 
-  const timestamp = Date.now();
   const tempJsonPath = path.join(
     os.tmpdir(),
     `auto-scripts-${projectId}-${timestamp}.json`,
@@ -43,6 +50,9 @@ async function runAutoScriptsInBackground(projectId: string, repoPath: string) {
     os.tmpdir(),
     `auto-scripts-prompt-${projectId}-${timestamp}.txt`,
   );
+
+  let exitCode = 0;
+  let finalError: Error | null = null;
 
   try {
     const outputJsonPathFormatted = tempJsonPath.replace(/\\/g, "/");
@@ -74,11 +84,31 @@ Requirements:
       let stderr = "";
 
       proc.stdout.on("data", (chunk) => {
-        stdout += chunk.toString();
+        const text = chunk.toString();
+        stdout += text;
+        appendSessionLog("", messageId, text, true);
+        eventBus.publish({
+          type: "terminal_output",
+          payload: {
+            sessionId: "",
+            messageId,
+            data: text,
+          },
+        });
       });
 
       proc.stderr.on("data", (chunk) => {
-        stderr += chunk.toString();
+        const text = chunk.toString();
+        stderr += text;
+        appendSessionLog("", messageId, text, true);
+        eventBus.publish({
+          type: "terminal_output",
+          payload: {
+            sessionId: "",
+            messageId,
+            data: text,
+          },
+        });
       });
 
       proc.on("close", (code) => {
@@ -120,6 +150,8 @@ Requirements:
 
     autoScriptsStatus.set(projectId, { status: "done" });
   } catch (error: any) {
+    exitCode = 1;
+    finalError = error;
     console.error("AI Auto scripts background process failed:", error);
     autoScriptsStatus.set(projectId, {
       status: "error",
@@ -137,6 +169,48 @@ Requirements:
     try {
       await fs.unlink(tempPromptPath);
     } catch {}
+
+    try {
+      if (exitCode === 0) {
+        const agentMsg = await addMessage({
+          sessionId: "",
+          projectId,
+          role: "agent",
+          content: "✅ Done! Auto scripts analysis completed successfully.",
+          type: "agent-return",
+          parentId: messageId,
+        });
+        eventBus.publish({ type: "message_added", payload: agentMsg });
+      } else {
+        const errMsg = await addMessage({
+          sessionId: "",
+          projectId,
+          role: "system",
+          content: `❌ Error: ${finalError?.message || "Auto scripts analysis failed"}`,
+          type: "agent-return",
+          parentId: messageId,
+        });
+        eventBus.publish({ type: "message_added", payload: errMsg });
+      }
+
+      eventBus.publish({
+        type: "terminal_exit",
+        payload: {
+          sessionId: "",
+          messageId,
+          code: exitCode,
+        },
+      });
+
+      const taskCtx = runnerManager.getTaskContext(taskId);
+      if (taskCtx) {
+        taskCtx.completedAt = Date.now();
+        taskCtx.exitCode = exitCode;
+        await updateMessage("", messageId, { exitCode }, projectId);
+      }
+    } catch (cleanErr) {
+      console.error("Error cleaning up task status in finally block:", cleanErr);
+    }
   }
 }
 
@@ -159,14 +233,67 @@ export async function POST(
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
+  const { runnerManager } = await import("@/lib/runner-manager");
+  const { addMessage, clearSessionLog } = await import("@/lib/store");
+  const { eventBus } = await import("@/lib/event-bus");
+  const path = await import("path");
+  const os = await import("os");
+
+  const runnerId = runnerManager.resolveRunnerId(project.runnerId) || "";
+  const timestamp = Date.now();
+  const tempPromptPath = path.join(
+    os.tmpdir(),
+    `auto-scripts-prompt-${id}-${timestamp}.txt`,
+  );
+
+  const actualCommand = `agy --prompt "Read the instruction file at ${tempPromptPath.replace(/\\/g, "/")} and perform the tasks described in it." --dangerously-skip-permissions`;
+
+  const promptText = `Analyze the files in the current repository directory, package configurations, or project documentation (such as README.md) to identify ALREADY EXISTING scripts used for "test", "build", and "deploy". 
+Do NOT generate or create any new scripts. Only search for and extract the existing commands defined in the project (e.g., npm scripts, makefiles, shell files, configurations, etc.) for testing, building, and deploying.
+
+Requirements:
+1. Strictly restrict your search and analysis to the current working directory and its subdirectories. Do NOT search, read, or analyze any parent or upper-level directories outside the current directory.
+2. The script "name" MUST be unique. If there are multiple scripts with the same name (for example, in different subdirectories or contexts), you MUST prefix or suffix the script name with the directory name or context to distinguish them (e.g., "frontend-build" vs "backend-build").
+3. You MUST write your final output to the file "<temp_json_path>" as a raw valid JSON array of objects where each object has "name" (string) and "command" (string). Example format: [{"name": "test", "command": "npm run test"}].
+4. Ensure that only the valid JSON array is written to that file, without any markdown formatting wrappers (like \`\`\`json).`;
+
+  const systemMsg = await addMessage({
+    sessionId: "",
+    projectId: id,
+    role: "system",
+    content: `⚙️ Running Auto Scripts Analysis...\n\`\`\`bash\n${actualCommand}\n\`\`\``,
+    type: "agent-run",
+    command: "Auto Scripts Analysis",
+    prompt: promptText,
+  });
+  eventBus.publish({ type: "message_added", payload: systemMsg });
+
+  const taskId = `task_${crypto.randomUUID().slice(0, 8)}`;
+  runnerManager.registerTask({
+    taskId,
+    runnerId,
+    sessionId: "",
+    messageId: systemMsg.id,
+    type: "agent",
+    command: actualCommand,
+    prompt: promptText,
+    scriptName: "Auto Scripts Analysis",
+    projectId: id,
+    createdAt: Date.now(),
+  });
+
+  await clearSessionLog("", systemMsg.id);
+
   autoScriptsStatus.set(id, { status: "running" });
 
   // Fire and forget
-  runAutoScriptsInBackground(id, project.repoPath);
+  runAutoScriptsInBackground(id, project.repoPath, taskId, systemMsg.id, timestamp);
 
   return NextResponse.json(
     {
       success: true,
+      taskId,
+      messageId: systemMsg.id,
       message:
         "AI analysis started in the background. Results will automatically appear once finished.",
     },

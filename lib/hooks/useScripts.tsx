@@ -85,8 +85,6 @@ export function useScripts({
   const [scriptCommand, setScriptCommand] = useState("");
   const [editingScriptName, setEditingScriptName] = useState<string | null>(null);
 
-  const [isAutoAnalyzing, setIsAutoAnalyzing] = useState(false);
-  const [showAutoAnalyzeNotice, setShowAutoAnalyzeNotice] = useState(false);
   const [sessionScripts, setSessionScripts] = useState<ProjectScript[]>([]);
   const [isRunningScript, setIsRunningScript] = useState(false);
 
@@ -117,33 +115,10 @@ export function useScripts({
   useEffect(() => {
     if (selectedProjectId) {
       loadProjectScripts(selectedProjectId);
-      fetch(`/api/projects/${selectedProjectId}/auto-scripts`)
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.status === "running") {
-            setIsAutoAnalyzing(true);
-            const tempTaskId = `auto-script-${selectedProjectId}`;
-            setTaskQueue((prev) => {
-              if (prev.some((t) => t.id === tempTaskId)) return prev;
-              return [
-                ...prev,
-                {
-                  id: tempTaskId,
-                  type: "agent",
-                  name: "Agent: Auto Scripts Analysis",
-                  sessionId: "",
-                  status: "running",
-                  createdAt: Date.now(),
-                },
-              ];
-            });
-          }
-        })
-        .catch(console.error);
     } else {
       setProjectScripts([]);
     }
-  }, [selectedProjectId, loadProjectScripts, setTaskQueue]);
+  }, [selectedProjectId, loadProjectScripts]);
 
   useEffect(() => {
     if (selectedSessionProjectId) {
@@ -155,59 +130,6 @@ export function useScripts({
       setSessionScripts([]);
     }
   }, [selectedSessionProjectId]);
-
-  useEffect(() => {
-    if (!isAutoAnalyzing || !selectedProjectId) return;
-
-    let attempts = 0;
-    const maxAttempts = 30;
-    const interval = setInterval(async () => {
-      attempts++;
-      if (attempts > maxAttempts) {
-        setIsAutoAnalyzing(false);
-        setTaskQueue((prev) =>
-          prev.filter((t) => t.id !== `auto-script-${selectedProjectId}`),
-        );
-        setToast({ message: "AI analysis background task timed out.", type: "error" });
-        clearInterval(interval);
-        return;
-      }
-
-      try {
-        const res = await fetch(`/api/projects/${selectedProjectId}/auto-scripts`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.status === "done") {
-            setIsAutoAnalyzing(false);
-            loadProjectScripts(selectedProjectId);
-            setTaskQueue((prev) =>
-              prev.filter((t) => t.id !== `auto-script-${selectedProjectId}`),
-            );
-            setToast({ message: "AI analysis completed! New scripts are now available.", type: "success" });
-            clearInterval(interval);
-          } else if (data.status === "error") {
-            setIsAutoAnalyzing(false);
-            setTaskQueue((prev) =>
-              prev.filter((t) => t.id !== `auto-script-${selectedProjectId}`),
-            );
-            setToast({
-              message: "AI analysis failed. Error log written to data/auto-script-error.log",
-              type: "error",
-            });
-            setApiError({
-              title: "AI Analysis Background Error",
-              message: `${data.error || "Unknown background process error"}\n\nThe error details have been logged in "data/auto-script-error.log".`,
-            });
-            clearInterval(interval);
-          }
-        }
-      } catch (err) {
-        console.error("Error polling auto script status:", err);
-      }
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, [isAutoAnalyzing, selectedProjectId, loadProjectScripts, setTaskQueue, setToast, setApiError]);
 
   const handleSaveScript = async () => {
     if (!selectedProjectId || !scriptName.trim() || !scriptCommand.trim()) return;
@@ -321,26 +243,26 @@ export function useScripts({
       confirmLabel: "Start Analysis",
       onConfirm: async () => {
         setInfoDialog(null);
-        setIsAutoAnalyzing(true);
-        setShowAutoAnalyzeNotice(true);
-        const tempTaskId = `auto-script-${selectedProjectId}`;
-        setTaskQueue((prev) => {
-          if (prev.some((t) => t.id === tempTaskId)) return prev;
-          return [
-            ...prev,
-            {
-              id: tempTaskId,
-              type: "agent",
-              name: "Agent: Auto Scripts Analysis",
-              sessionId: "",
-              status: "running",
-              createdAt: Date.now(),
-            },
-          ];
-        });
         try {
           const res = await fetch(`/api/projects/${selectedProjectId}/auto-scripts`, { method: "POST" });
           if (res.status === 202 || res.ok) {
+            const data = await res.json();
+            setTaskQueue((prev) => {
+              if (prev.some((t) => t.id === data.taskId)) return prev;
+              return [
+                ...prev,
+                {
+                  id: data.taskId,
+                  type: "agent",
+                  name: "Agent: Auto Scripts Analysis",
+                  sessionId: "",
+                  status: "running",
+                  createdAt: Date.now(),
+                  messageId: data.messageId,
+                  projectId: selectedProjectId || undefined,
+                },
+              ];
+            });
             setToast({
               message: "AI analysis started in the background. Scripts will appear automatically once finished.",
               type: "info",
@@ -356,16 +278,10 @@ export function useScripts({
                 errorMessage = text || errorMessage;
               } catch {}
             }
-            setIsAutoAnalyzing(false);
-            setShowAutoAnalyzeNotice(false);
-            setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
             setApiError({ title: "AI Analysis Error", message: errorMessage });
           }
         } catch (err: any) {
           console.error(err);
-          setIsAutoAnalyzing(false);
-          setShowAutoAnalyzeNotice(false);
-          setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
           setApiError({ title: "System Error", message: err.message || String(err) });
         }
       },
@@ -459,8 +375,6 @@ export function useScripts({
     scriptName, setScriptName,
     scriptCommand, setScriptCommand,
     editingScriptName, setEditingScriptName,
-    isAutoAnalyzing,
-    showAutoAnalyzeNotice, setShowAutoAnalyzeNotice,
     sessionScripts,
     isRunningScript,
     loadProjectScripts,

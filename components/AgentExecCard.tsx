@@ -35,7 +35,11 @@ export default function AgentExecCard({ sessionId, ws, onShowPrompt, ...props }:
   useEffect(() => {
     if (!props.item.messageId) return;
 
-    fetch(`/api/sessions/${sessionId}/log?messageId=${props.item.messageId}`)
+    const url = sessionId
+      ? `/api/sessions/${sessionId}/log?messageId=${props.item.messageId}`
+      : `/api/sessions/global/log?messageId=${props.item.messageId}`;
+
+    fetch(url)
       .then((r) => r.json())
       .then(({ log }: { log: string }) => {
         if (log) setLog(stripAnsi(log));
@@ -52,7 +56,7 @@ export default function AgentExecCard({ sessionId, ws, onShowPrompt, ...props }:
         const msg = JSON.parse(e.data);
         if (
           msg.type === "terminal:output" &&
-          msg.sessionId === sessionId &&
+          msg.sessionId === (sessionId || "") &&
           msg.messageId === props.item.messageId
         ) {
           setLog((prev) => prev + stripAnsi(msg.data));

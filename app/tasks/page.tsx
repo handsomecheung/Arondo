@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import ScriptExecCard from "@/components/ScriptExecCard";
+import AgentExecCard from "@/components/AgentExecCard";
 import {
   IconArrowLeft, IconBolt, IconX, IconInbox, IconTerminal, IconCode, IconChevronDown,
 } from "@/components/Icons";
@@ -58,6 +59,7 @@ interface ServerTask {
   stoppedByUser?: boolean;
   command?: string;
   projectId?: string;
+  prompt?: string;
 }
 
 interface TaskItem {
@@ -73,6 +75,7 @@ interface TaskItem {
   command?: string;
   scriptName?: string;
   projectId?: string;
+  prompt?: string;
 }
 
 interface SessionGroup {
@@ -148,7 +151,7 @@ export default function TasksPage() {
         const session = sessionMap.get(t.sessionId);
         let name: string;
         if (t.type === "agent") {
-          name = `Agent: ${session?.prompt || t.sessionId}`;
+          name = `Agent: ${t.prompt || session?.prompt || t.sessionId}`;
         } else {
           name = `Script: ${t.scriptName || "unknown"}`;
         }
@@ -175,6 +178,7 @@ export default function TasksPage() {
           command,
           scriptName: t.scriptName,
           projectId: t.projectId || session?.projectId,
+          prompt: t.prompt || session?.prompt,
         };
       });
 
@@ -249,6 +253,7 @@ export default function TasksPage() {
                       updated.updatedAt || updated.createdAt,
                     ).getTime(),
                     command: updated.command,
+                    prompt: updated.prompt,
                   },
                   ...prev,
                 ];
@@ -860,6 +865,29 @@ export default function TasksPage() {
                                   : "Failed";
                             }
 
+                            if (task.type === "agent") {
+                              return (
+                                <AgentExecCard
+                                  key={task.id}
+                                  item={{
+                                    id: task.id,
+                                    type: task.type,
+                                    title: task.name.replace(/^(Agent|Script):\s*/, ""),
+                                    status: task.status,
+                                    statusText,
+                                    command: task.command,
+                                    messageId: task.messageId,
+                                  }}
+                                  sessionId={task.sessionId || ""}
+                                  ws={wsInstance}
+                                  onShowCommand={task.command ? () => setCommandTask(task) : undefined}
+                                  onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
+                                  onRetryTask={task.status === "error" ? () => handleRetryTask(task) : undefined}
+                                  onShowPrompt={task.prompt ? () => setCommandTask({ ...task, name: `Agent Prompt`, command: task.prompt }) : undefined}
+                                />
+                              );
+                            }
+
                             return (
                               <ScriptExecCard
                                 key={task.id}
@@ -979,6 +1007,30 @@ export default function TasksPage() {
                             const subtitle = task.sessionId
                               ? `Session: ${task.sessionName || "Unnamed Session"}`
                               : `Project: ${projectName}`;
+
+                            if (task.type === "agent") {
+                              return (
+                                <AgentExecCard
+                                  key={task.id}
+                                  item={{
+                                    id: task.id,
+                                    type: task.type,
+                                    title: task.name.replace(/^(Agent|Script):\s*/, ""),
+                                    subtitle,
+                                    status: task.status,
+                                    statusText,
+                                    command: task.command,
+                                    messageId: task.messageId,
+                                  }}
+                                  sessionId={task.sessionId || ""}
+                                  ws={wsInstance}
+                                  onShowCommand={task.command ? () => setCommandTask(task) : undefined}
+                                  onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
+                                  onRetryTask={task.status === "error" ? () => handleRetryTask(task) : undefined}
+                                  onShowPrompt={task.prompt ? () => setCommandTask({ ...task, name: `Agent Prompt`, command: task.prompt }) : undefined}
+                                />
+                              );
+                            }
 
                             return (
                               <ScriptExecCard
