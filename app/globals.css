@@ -1406,10 +1406,24 @@ body {
 }
 
 .agent-exec-output {
-  height: 300px;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  max-height: 480px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 12px 14px;
   border-top: 1px solid var(--border);
   border-radius: 0 0 var(--radius-md) var(--radius-md);
-  overflow: hidden;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 /* Legacy: keep for modal badge */
