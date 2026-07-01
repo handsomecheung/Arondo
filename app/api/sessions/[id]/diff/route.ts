@@ -68,7 +68,7 @@ export async function GET(
     // diff2html not available on runner — return raw diff as preformatted HTML
     const rawHtml = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Diff</title>
-<style>body{font-family:monospace;white-space:pre-wrap;padding:1em;background:#1e1e1e;color:#d4d4d4;}</style>
+<style>body{font-family:monospace;white-space:pre-wrap;padding:1em;background:#f8fafc;color:#0f172a;}</style>
 </head><body>${result.diff.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</body></html>`;
     return new NextResponse(rawHtml, {
       headers: { "Content-Type": "text/html; charset=utf-8" },

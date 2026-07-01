@@ -44,9 +44,9 @@ export default function Terminal({ sessionId, projectId, messageId, ws, mode, ta
       fontSize: 13,
       fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, monospace",
       theme: {
-        background: "#1a1a2e",
-        foreground: "#e0e0e0",
-        cursor: "#e0e0e0",
+        background: "#f8fafc",
+        foreground: "#0f172a",
+        cursor: "#4f46e5",
         scrollbarSliderBackground: "transparent",
         scrollbarSliderHoverBackground: "transparent",
         scrollbarSliderActiveBackground: "transparent",
