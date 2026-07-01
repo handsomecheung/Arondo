@@ -93,7 +93,7 @@ export default function AppSidebar({
                   >
                     <div className="task-item-header">
                       <span className={`task-status-badge ${session.status}`}>
-                        {session.status === "running" && "⟳ "}
+                        {(session.status === "running" || session.status === "script-running") && "⟳ "}
                         {session.status}
                       </span>
                       {projectName && (

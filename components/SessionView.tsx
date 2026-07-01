@@ -10,6 +10,7 @@ import {
   IconBolt, IconPlus, IconSend, IconCheck,
   IconGitPullRequest, IconPlay, IconTerminal, IconEdit, IconTrash,
   IconMoreVertical, IconFolder, IconChevronDown, IconFileSearch,
+  IconClaude, IconAntigravity, IconCodex,
 } from "@/components/Icons";
 import { getTriggerWord, resolveAgentCommand } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
@@ -184,11 +185,52 @@ export default function SessionView({
             minHeight: "56px",
           }}
         >
-          <span className={`task-status-badge ${selectedSession.status}`}>
-            {selectedSession.status === "running" && "⟳ "}
-            {selectedSession.status === "running"
-              ? "Agent working…"
-              : selectedSession.status}
+          <span
+            className={`task-status-badge ${selectedSession.status}`}
+            style={
+              selectedSession.status === "running" || selectedSession.status === "script-running"
+                ? {
+                    padding: "4px",
+                    width: "24px",
+                    height: "24px",
+                    borderRadius: "50%",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }
+                : undefined
+            }
+            title={selectedSession.status === "script-running" ? "Script running…" : "Agent working…"}
+          >
+            {selectedSession.status === "running" || selectedSession.status === "script-running" ? (
+              <span className="agent-pulse">
+                {(() => {
+                  if (selectedSession.status === "script-running") {
+                    return <IconTerminal size={16} strokeWidth={2.5} />;
+                  }
+                  const runningAgentMsg = [...messages].reverse().find(
+                    (m) => m.role === "system" && m.type === "agent-run"
+                  );
+                  let activeAgentType =
+                    runningAgentMsg?.resolvedAgentType ||
+                    selectedSession.agentType ||
+                    "antigravity";
+                  if (activeAgentType === "auto") {
+                    activeAgentType = "antigravity";
+                  }
+
+                  if (activeAgentType === "claude") {
+                    return <IconClaude />;
+                  } else if (activeAgentType === "codex") {
+                    return <IconCodex />;
+                  } else {
+                    return <IconAntigravity />;
+                  }
+                })()}
+              </span>
+            ) : (
+              selectedSession.status
+            )}
           </span>
           <div
             style={{
@@ -495,9 +537,9 @@ export default function SessionView({
                     onDeleteSession(selectedSessionId!);
                     onSetMenuOpen(false);
                   }}
-                  disabled={selectedSession.status === "running"}
+                  disabled={isRunning}
                   title={
-                    selectedSession.status === "running"
+                    isRunning
                       ? "Cannot delete a running session"
                       : undefined
                   }

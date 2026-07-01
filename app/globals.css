@@ -430,7 +430,8 @@ body {
   letter-spacing: 0.05em;
   flex-shrink: 0;
 }
-.task-status-badge.running {
+.task-status-badge.running,
+.task-status-badge.script-running {
   background: rgba(99, 102, 241, 0.15);
   color: var(--accent);
   animation: badge-pulse 1.5s infinite;
@@ -2363,4 +2364,27 @@ body {
 }
 .modal-body .xterm .xterm-scrollable-element > .scrollbar {
   display: none !important;
+}
+
+/* Agent icon blink/pulse animation */
+.agent-pulse {
+  animation: agentPulseKeyframe 1.5s ease-in-out infinite;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes agentPulseKeyframe {
+  0% {
+    opacity: 0.35;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 0.35;
+    transform: scale(0.95);
+  }
 }

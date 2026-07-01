@@ -86,6 +86,7 @@ export function execCardInfoToItem(info: ExecCardInfo): ExecCardItem {
   return {
     id: info.runMsg.id,
     type: info.isScript ? "script" : "agent",
+    agentType: info.agentType,
     title: !info.isScript && info.agentType ? agentTypeLabel(info.agentType) : info.commandLabel,
     status: !isDone ? "running" : isStopped ? "stopped" : isSuccess ? "done" : "error",
     statusText,
