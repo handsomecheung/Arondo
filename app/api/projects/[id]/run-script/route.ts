@@ -4,6 +4,7 @@ import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
 import fs from "fs/promises";
 import path from "path";
+import { getConfigDir } from "@/lib/config";
 
 export async function POST(
   req: NextRequest,
@@ -81,7 +82,7 @@ export async function POST(
       });
       eventBus.publish({ type: "message_added", payload: errMsg });
 
-      const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data");
+      const dataDir = getConfigDir();
       const logPath = path.join(dataDir, "projects", projectId, "logs", `${systemMsg.id}.log`);
       try {
         await fs.mkdir(path.dirname(logPath), { recursive: true });

@@ -3,12 +3,11 @@ import path from "path";
 import type { ConcreteAgentType } from "./agents/index";
 import type { Message } from "./store";
 import { getSessionLog } from "./store";
+import { getConfigDir } from "./config";
 
-const DATA_DIR = process.env.DATA_DIR
-  ? path.resolve(process.env.DATA_DIR)
-  : path.join(process.cwd(), "data");
+const CONFIG_DIR = getConfigDir();
 
-const QUOTA_PATH = path.join(DATA_DIR, "autoselect", "agent", "quota.json");
+const QUOTA_PATH = path.join(CONFIG_DIR, "autoselect", "agent", "quota.json");
 
 // Maps ConcreteAgentType → binary name (must stay in sync with agents/index.ts).
 const AGENT_BINARY: Record<string, string> = {

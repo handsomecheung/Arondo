@@ -3,11 +3,10 @@ import fsSync from "fs";
 import path from "path";
 import os from "os";
 import { BaseAgent, AgentRunOptions, PROMPT_ENV_VAR } from "./base";
+import { getConfigDir } from "../config";
 
-const DATA_DIR = process.env.DATA_DIR
-  ? path.resolve(process.env.DATA_DIR)
-  : path.join(process.cwd(), "data");
-const AGY_SESSION_MAP_FILE = path.join(DATA_DIR, "agy-sessions.json");
+const CONFIG_DIR = getConfigDir();
+const AGY_SESSION_MAP_FILE = path.join(CONFIG_DIR, "agy-sessions.json");
 
 const AGY_LOG_DIR = path.join(os.homedir(), ".gemini", "antigravity-cli", "log");
 const CONV_ID_RE = /Created conversation ([0-9a-f-]{36})/;

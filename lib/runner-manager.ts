@@ -17,9 +17,10 @@ import {
 } from "./agents/antigravity";
 import fs from "fs/promises";
 import path from "path";
+import { getConfigDir } from "./config";
 
-const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
-const RUNNERS_DIR = path.join(DATA_DIR, "runners");
+const CONFIG_DIR = getConfigDir();
+const RUNNERS_DIR = path.join(CONFIG_DIR, "runners");
 const TASK_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -350,7 +351,7 @@ class RunnerManager {
   }
 
   async syncGlobalRulesToRunner(runnerId: string): Promise<void> {
-    const globalRulesPath = path.join(DATA_DIR, "global-rules.md");
+    const globalRulesPath = path.join(CONFIG_DIR, "global-rules.md");
     try {
       const content = await fs.readFile(globalRulesPath, "utf-8");
       if (content.trim()) {
@@ -721,7 +722,7 @@ class RunnerManager {
       console.warn(`[runner-manager] unknown quota agent: ${agent}`);
       return;
     }
-    const agentDir = path.join(DATA_DIR, "agents", runnerId);
+    const agentDir = path.join(CONFIG_DIR, "agents", runnerId);
     await fs.mkdir(agentDir, { recursive: true });
     const filePath = path.join(agentDir, fileName);
     const data = { ...quota, updatedAt: Math.floor(Date.now() / 1000) };

@@ -2,11 +2,10 @@ import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import { runnerManager } from "../../../lib/runner-manager";
+import { getConfigDir } from "../../../lib/config";
 
-const DATA_DIR = process.env.DATA_DIR
-  ? path.resolve(process.env.DATA_DIR)
-  : path.join(process.cwd(), "data");
-const GLOBAL_RULES_FILE = path.join(DATA_DIR, "global-rules.md");
+const CONFIG_DIR = getConfigDir();
+const GLOBAL_RULES_FILE = path.join(CONFIG_DIR, "global-rules.md");
 
 export async function GET() {
   try {
@@ -23,7 +22,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const { content } = await request.json();
-    await fs.mkdir(DATA_DIR, { recursive: true });
+    await fs.mkdir(CONFIG_DIR, { recursive: true });
     await fs.writeFile(GLOBAL_RULES_FILE, content, "utf-8");
 
     const runners = runnerManager.getRunners();

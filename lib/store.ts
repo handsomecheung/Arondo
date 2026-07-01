@@ -1,11 +1,10 @@
 import fs from "fs/promises";
 import path from "path";
+import { getConfigDir } from "./config";
 
-const DATA_DIR = process.env.DATA_DIR
-  ? path.resolve(process.env.DATA_DIR)
-  : path.join(process.cwd(), "data");
-const SESSIONS_DIR = path.join(DATA_DIR, "sessions");
-const PROJECTS_DIR = path.join(DATA_DIR, "projects");
+const CONFIG_DIR = getConfigDir();
+const SESSIONS_DIR = path.join(CONFIG_DIR, "sessions");
+const PROJECTS_DIR = path.join(CONFIG_DIR, "projects");
 
 export type SessionStatus = "idle" | "running" | "script-running" | "done" | "error";
 

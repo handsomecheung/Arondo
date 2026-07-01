@@ -1,13 +1,12 @@
 import fs from "fs/promises";
 import path from "path";
 import { runnerManager } from "./runner-manager";
+import { getConfigDir } from "./config";
 
-const DATA_DIR = process.env.DATA_DIR
-  ? path.resolve(process.env.DATA_DIR)
-  : path.join(process.cwd(), "data");
+const CONFIG_DIR = getConfigDir();
 
-const AGENTS_DIR = path.join(DATA_DIR, "agents");
-const OUTPUT_PATH = path.join(DATA_DIR, "autoselect", "agent", "quota.json");
+const AGENTS_DIR = path.join(CONFIG_DIR, "agents");
+const OUTPUT_PATH = path.join(CONFIG_DIR, "autoselect", "agent", "quota.json");
 const STALE_THRESHOLD_S = 60 * 60; // 1 hour
 
 const AGENT_TYPES = ["claude", "antigravity"] as const;

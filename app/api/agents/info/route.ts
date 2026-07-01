@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
+import { getConfigDir } from "@/lib/config";
 
-const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
+const CONFIG_DIR = getConfigDir();
 
 export async function GET(req: NextRequest) {
   const runnerId = req.nextUrl.searchParams.get("runnerId");
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ claude: null, antigravity: null });
   }
 
-  const agentDir = path.join(DATA_DIR, "agents", runnerId);
+  const agentDir = path.join(CONFIG_DIR, "agents", runnerId);
   const read = async (filename: string) => {
     try {
       const raw = await fs.readFile(path.join(agentDir, filename), "utf-8");

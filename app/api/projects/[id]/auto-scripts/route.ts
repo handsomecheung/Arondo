@@ -32,14 +32,13 @@ async function runAutoScriptsInBackground(
   const { addProjectScript, addMessage, appendSessionLog, updateMessage } = await import("@/lib/store");
   const { eventBus } = await import("@/lib/event-bus");
   const { runnerManager } = await import("@/lib/runner-manager");
+  const { getConfigDir } = await import("@/lib/config");
   const path = await import("path");
   const fs = await import("fs/promises");
   const os = await import("os");
 
-  const DATA_DIR = process.env.DATA_DIR
-    ? path.resolve(process.env.DATA_DIR)
-    : path.join(process.cwd(), "data");
-  const logDir = DATA_DIR;
+  const CONFIG_DIR = getConfigDir();
+  const logDir = CONFIG_DIR;
   const errorLogPath = path.join(logDir, "auto-script-error.log");
 
   const tempJsonPath = path.join(

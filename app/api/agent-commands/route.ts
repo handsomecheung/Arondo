@@ -3,14 +3,13 @@ import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { AGENT_COMMANDS, mergeAgentCommands } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
+import { getConfigDir } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
-const DATA_DIR = process.env.DATA_DIR
-  ? path.resolve(process.env.DATA_DIR)
-  : path.join(process.cwd(), "data");
+const CONFIG_DIR = getConfigDir();
 
-const COMMANDS_FILE = path.join(DATA_DIR, "agent-commands.json");
+const COMMANDS_FILE = path.join(CONFIG_DIR, "agent-commands.json");
 
 async function readCustomCommands(): Promise<AgentCommand[]> {
   try {
@@ -23,7 +22,7 @@ async function readCustomCommands(): Promise<AgentCommand[]> {
 }
 
 async function writeCustomCommands(commands: AgentCommand[]): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.mkdir(CONFIG_DIR, { recursive: true });
   await fs.writeFile(COMMANDS_FILE, JSON.stringify(commands, null, 2));
 }
 
