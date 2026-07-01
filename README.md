@@ -22,9 +22,13 @@ All execution goes through a Runner — there is no local fallback on the server
 - **Granular Execution Logging**: Outputs for every CLI command execution are logged separately under `data/sessions/[sessionId]/logs/[messageId].log`.
 - **Multiple AI Agents Support**: Supports **Antigravity CLI (agy)** and **Claude Code** for code generation tasks.
 - **Interactive Terminal (PTY)**: Both agent and script execution run in a full pseudo-terminal via Go's `creack/pty`, rendered in the browser with `xterm.js`. Supports interactive stdin, ANSI colors, and cursor control. PTY ensures reliable process cleanup on runner exit (SIGHUP). Interactive shell terminals are spawned directly on the runner rather than the server.
+- **Dedicated Execution Cards & Plain Text View**: Script execution uses `ScriptExecCard` with `xterm.js` for interactive output, while agent execution uses `AgentExecCard` with a lightweight, plain wrapped text view for better readability of agent outputs. Supports agent-specific icons (Claude, Antigravity, Codex, Shell) and a 'script-running' status.
 - **Terminal Session Persistence & Reattaching**: Terminal sessions persist across browser refreshes or close events. Re-opening a terminal automatically reattaches to the active PTY session on the runner and replays the output buffer.
 - **Quota & Session Limit Detection**: Automatically detects AI agent API limits (such as Claude's session limit hit or `agy` quota exhaustion) and displays human-readable error messages.
 - **AI Agent Quota Monitoring**: Automatically collects quota usage data for Claude and Antigravity via tmux on the runner nodes and displays remaining quota with progress bars in the Settings UI.
+- **AI Agent Auto-Selection (Auto Mode)**: Automatically selects the best agent and model based on hourly and weekly quota availability retrieved from the runner node.
+- **Manual Agent Switching**: Switch the active agent (Antigravity CLI, Claude Code, or Auto Model) on-the-fly within an existing session when the agent is idle.
+- **Secure Prompt Passing**: Prompts are passed to agents using temporary files and environment variables (using the `ARONDO_PROMPT_FILE` environment variable), avoiding shell command-line length limits and exposing sensitive prompts in command arguments. Displays the real resolved prompt instead of original raw inputs in the "Show Prompt" panel.
 - **Concurrent Script Execution**: Allows running multiple scripts simultaneously within a single session. The user can continue chatting while background scripts are running.
 - **Global & Session-scoped Scripts**: Supports running project-scoped custom scripts either globally (independent of a session, directly from the project panel) or within a specific session.
 - **Config-driven & Custom Slash Commands**: Slash commands (like `/new`, `/commit`, `/delete`) are config-driven and customizable. You can configure user-defined agent slash commands via the **Agent Commands** management UI in Settings (saved in `data/agent-commands.json`) with regex matcher and replacement expansion support.
@@ -34,7 +38,7 @@ All execution goes through a Runner — there is no local fallback on the server
 - **Integrated Diff Viewer (diff2html)**: View visual code changes directly from the browser.
 - **Task Queue & Live Tracking**: Active task queue in the header with PID tracking and live log inspection. Clicking a task opens its dedicated console log modal. Each task can be killed from the queue.
 - **Task Grouping & Filtering**: In the Tasks dashboard, tasks can be filtered by type (Agent/Script) and grouped by either Scope (Session or Project for global tasks) or Status (Running, Completed, Stopped, Failed) for easier monitoring.
-- **Task Persistence**: Active task contexts are persisted to disk (`data/active-tasks.json`) and restored on server restart. Runner IDs are stable across reconnections.
+- **Task Persistence**: Active task contexts are persisted by serializing execution metadata directly into the session and project `messages.json` files and dynamically restored on server restart. Runner IDs are stable across reconnections.
 - **Mobile-Friendly UI**: Designed with collapsible panels, modal logs, responsive menus, and touch-friendly actions.
 - **Project Management**: Scopes and tracks sessions within resolved repository paths. Supports custom project scripts and AI auto-script discovery.
 
