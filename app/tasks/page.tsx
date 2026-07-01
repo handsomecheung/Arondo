@@ -879,6 +879,7 @@ export default function TasksPage() {
                                     messageId: task.messageId,
                                   }}
                                   sessionId={task.sessionId || ""}
+                                  projectId={task.projectId}
                                   ws={wsInstance}
                                   onShowCommand={task.command ? () => setCommandTask(task) : undefined}
                                   onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
@@ -1024,6 +1025,7 @@ export default function TasksPage() {
                                     messageId: task.messageId,
                                   }}
                                   sessionId={task.sessionId || ""}
+                                  projectId={task.projectId}
                                   ws={wsInstance}
                                   onShowCommand={task.command ? () => setCommandTask(task) : undefined}
                                   onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
@@ -1105,6 +1107,7 @@ export default function TasksPage() {
             >
               <Terminal
                 sessionId={terminalTask.sessionId}
+                projectId={terminalTask.projectId}
                 messageId={terminalTask.messageId}
                 ws={wsInstance}
                 mode={terminalTask.status === "running" ? "live" : "history"}

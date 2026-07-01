@@ -507,7 +507,7 @@ class RunnerManager {
       ctx.stoppedByUser = true;
 
       const separator = "\r\n\x1b[90m─── stopped by user ───\x1b[0m\r\n";
-      await appendSessionLog(ctx.sessionId, ctx.messageId, separator, true);
+      await appendSessionLog(ctx.sessionId, ctx.messageId, separator, true, ctx.projectId);
       eventBus.publish({
         type: "terminal_output",
         payload: {
@@ -747,7 +747,7 @@ class RunnerManager {
       data = Buffer.from(payload.data, "base64").toString("utf-8");
     }
 
-    await appendSessionLog(ctx.sessionId, ctx.messageId, data, true);
+    await appendSessionLog(ctx.sessionId, ctx.messageId, data, true, ctx.projectId);
     eventBus.publish({
       type: "terminal_output",
       payload: {

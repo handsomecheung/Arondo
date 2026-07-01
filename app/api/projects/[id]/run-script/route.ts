@@ -54,7 +54,7 @@ export async function POST(
     createdAt: Date.now(),
   });
 
-  await clearSessionLog("", systemMsg.id);
+  await clearSessionLog("", systemMsg.id, projectId);
 
   runnerManager
     .sendRequest(runnerId, "exec.script", {
@@ -82,7 +82,7 @@ export async function POST(
       eventBus.publish({ type: "message_added", payload: errMsg });
 
       const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data");
-      const logPath = path.join(dataDir, "global-tasks", "logs", `${systemMsg.id}.log`);
+      const logPath = path.join(dataDir, "projects", projectId, "logs", `${systemMsg.id}.log`);
       try {
         await fs.mkdir(path.dirname(logPath), { recursive: true });
         await fs.appendFile(logPath, `\r\n❌ Error: ${errorMessage}\r\n`, "utf-8");

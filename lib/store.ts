@@ -350,28 +350,31 @@ export async function updateMessage(
 
 // ─── Logs ─────────────────────────────────────────────────────────────────────
 
-function getLogFilePath(sessionId: string, messageId: string): string {
+function getLogFilePath(sessionId: string, messageId: string, projectId?: string): string {
   if (!sessionId) {
-    return path.join(DATA_DIR, "global-tasks", "logs", `${messageId}.log`);
+    if (!projectId) {
+      throw new Error("getLogFilePath: projectId is required for project-scoped (sessionless) logs");
+    }
+    return path.join(getProjectDir(projectId), "logs", `${messageId}.log`);
   }
   return path.join(getSessionDir(sessionId), "logs", `${messageId}.log`);
 }
 
-export async function clearSessionLog(sessionId: string, messageId: string): Promise<void> {
-  const logPath = getLogFilePath(sessionId, messageId);
+export async function clearSessionLog(sessionId: string, messageId: string, projectId?: string): Promise<void> {
+  const logPath = getLogFilePath(sessionId, messageId, projectId);
   await ensureDir(path.dirname(logPath));
   await fs.writeFile(logPath, "", "utf-8");
 }
 
-export async function appendSessionLog(sessionId: string, messageId: string, text: string, raw = false): Promise<void> {
-  const logPath = getLogFilePath(sessionId, messageId);
+export async function appendSessionLog(sessionId: string, messageId: string, text: string, raw = false, projectId?: string): Promise<void> {
+  const logPath = getLogFilePath(sessionId, messageId, projectId);
   await ensureDir(path.dirname(logPath));
   await fs.appendFile(logPath, raw ? text : text + "\n", "utf-8");
 }
 
-export async function getSessionLog(sessionId: string, messageId: string): Promise<string> {
+export async function getSessionLog(sessionId: string, messageId: string, projectId?: string): Promise<string> {
   try {
-    return await fs.readFile(getLogFilePath(sessionId, messageId), "utf-8");
+    return await fs.readFile(getLogFilePath(sessionId, messageId, projectId), "utf-8");
   } catch {
     return "";
   }

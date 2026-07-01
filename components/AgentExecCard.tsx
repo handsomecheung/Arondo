@@ -24,12 +24,13 @@ function IconFileText() {
 
 interface AgentExecCardProps extends ExecCardProps {
   sessionId: string;
+  projectId?: string;
   ws: WebSocket | null;
   onShowPrompt?: () => void;
   onViewLog?: () => void;
 }
 
-export default function AgentExecCard({ sessionId, ws, onShowPrompt, onViewLog, ...props }: AgentExecCardProps) {
+export default function AgentExecCard({ sessionId, projectId, ws, onShowPrompt, onViewLog, ...props }: AgentExecCardProps) {
   const isLive = props.item.status === "running";
   const [log, setLog] = useState("");
   const outputRef = useRef<HTMLPreElement>(null);
@@ -43,7 +44,7 @@ export default function AgentExecCard({ sessionId, ws, onShowPrompt, onViewLog, 
 
     const url = sessionId
       ? `/api/sessions/${sessionId}/log?messageId=${props.item.messageId}`
-      : `/api/sessions/global/log?messageId=${props.item.messageId}`;
+      : `/api/sessions/global/log?messageId=${props.item.messageId}&projectId=${projectId || ""}`;
 
     fetch(url)
       .then((r) => r.json())
@@ -51,7 +52,7 @@ export default function AgentExecCard({ sessionId, ws, onShowPrompt, onViewLog, 
         if (log) setLog(stripAnsi(log));
       })
       .catch(() => {});
-  }, [props.item.messageId, sessionId, onViewLog]);
+  }, [props.item.messageId, sessionId, projectId, onViewLog]);
 
   // Live tasks: append streamed output as it arrives over the WebSocket
   useEffect(() => {

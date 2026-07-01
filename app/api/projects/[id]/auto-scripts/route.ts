@@ -86,7 +86,7 @@ Requirements:
       proc.stdout.on("data", (chunk) => {
         const text = chunk.toString();
         stdout += text;
-        appendSessionLog("", messageId, text, true);
+        appendSessionLog("", messageId, text, true, projectId);
         eventBus.publish({
           type: "terminal_output",
           payload: {
@@ -100,7 +100,7 @@ Requirements:
       proc.stderr.on("data", (chunk) => {
         const text = chunk.toString();
         stderr += text;
-        appendSessionLog("", messageId, text, true);
+        appendSessionLog("", messageId, text, true, projectId);
         eventBus.publish({
           type: "terminal_output",
           payload: {
@@ -282,7 +282,7 @@ Requirements:
     createdAt: Date.now(),
   });
 
-  await clearSessionLog("", systemMsg.id);
+  await clearSessionLog("", systemMsg.id, id);
 
   autoScriptsStatus.set(id, { status: "running" });
 

@@ -7,13 +7,14 @@ import "@xterm/xterm/css/xterm.css";
 
 interface TerminalProps {
   sessionId: string;
+  projectId?: string;
   messageId: string;
   ws: WebSocket | null;
   mode: "live" | "history";
   taskType?: "agent" | "script";
 }
 
-export default function Terminal({ sessionId, messageId, ws, mode, taskType }: TerminalProps) {
+export default function Terminal({ sessionId, projectId, messageId, ws, mode, taskType }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -68,7 +69,7 @@ export default function Terminal({ sessionId, messageId, ws, mode, taskType }: T
 
     const logUrl = sessionId
       ? `/api/sessions/${sessionId}/log?messageId=${messageId}`
-      : `/api/sessions/global/log?messageId=${messageId}`;
+      : `/api/sessions/global/log?messageId=${messageId}&projectId=${projectId || ""}`;
 
     fetch(logUrl)
       .then((r) => r.json())
@@ -117,7 +118,7 @@ export default function Terminal({ sessionId, messageId, ws, mode, taskType }: T
       termRef.current = null;
       fitRef.current = null;
     };
-  }, [messageId, mode, sessionId, taskType]);
+  }, [messageId, mode, sessionId, projectId, taskType]);
 
   // Live mode: WebSocket listener for real-time output
   useEffect(() => {
