@@ -50,6 +50,7 @@ export interface Message {
   type?: string;
   parentId?: string;
   resolvedAgentType?: string;
+  prompt?: string;
   createdAt: string;
 }
 

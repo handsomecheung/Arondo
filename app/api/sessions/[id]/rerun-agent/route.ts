@@ -49,6 +49,7 @@ export async function POST(
     content: `⚙️ Executing command:\n\`\`\`bash\n${command}\n\`\`\``,
     type: "agent-run",
     resolvedAgentType: resolvedType,
+    prompt: fullPrompt,
   });
   eventBus.publish({ type: "message_added", payload: systemMsg });
   eventBus.publish({ type: "session_updated", payload: updatedSession });

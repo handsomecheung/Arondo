@@ -59,6 +59,7 @@ export interface Message {
   stoppedByUser?: boolean;
   taskId?: string;
   resolvedAgentType?: string;
+  prompt?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

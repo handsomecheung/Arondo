@@ -360,7 +360,7 @@ export default function HomePage() {
           commandLabel: parsed.label,
           command: parsed.command,
           agentType: msg.resolvedAgentType,
-          prompt: lastUserPrompt || undefined,
+          prompt: msg.prompt || lastUserPrompt || undefined,
         });
         if (msg.type === "script-run") {
           unmatchedScript.push(msg.id);
