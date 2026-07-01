@@ -8,6 +8,7 @@ import AgentExecCard from "@/components/AgentExecCard";
 import {
   IconArrowLeft, IconBolt, IconX, IconInbox, IconTerminal, IconCode, IconChevronDown,
 } from "@/components/Icons";
+import { agentTypeLabel } from "@/lib/homeUtils";
 
 const Terminal = dynamic(() => import("@/components/Terminal"), { ssr: false });
 
@@ -76,6 +77,7 @@ interface TaskItem {
   scriptName?: string;
   projectId?: string;
   prompt?: string;
+  agentType?: string;
 }
 
 interface SessionGroup {
@@ -179,6 +181,7 @@ export default function TasksPage() {
           scriptName: t.scriptName,
           projectId: t.projectId || session?.projectId,
           prompt: t.prompt || session?.prompt,
+          agentType: session?.agentType,
         };
       });
 
@@ -254,6 +257,7 @@ export default function TasksPage() {
                     ).getTime(),
                     command: updated.command,
                     prompt: updated.prompt,
+                    agentType: updated.agentType,
                   },
                   ...prev,
                 ];
@@ -872,7 +876,8 @@ export default function TasksPage() {
                                   item={{
                                     id: task.id,
                                     type: task.type,
-                                    title: task.name.replace(/^(Agent|Script):\s*/, ""),
+                                    agentType: task.agentType,
+                                    title: task.agentType ? agentTypeLabel(task.agentType) : task.name.replace(/^(Agent|Script):\s*/, ""),
                                     status: task.status,
                                     statusText,
                                     command: task.command,
@@ -1017,7 +1022,8 @@ export default function TasksPage() {
                                   item={{
                                     id: task.id,
                                     type: task.type,
-                                    title: task.name.replace(/^(Agent|Script):\s*/, ""),
+                                    agentType: task.agentType,
+                                    title: task.agentType ? agentTypeLabel(task.agentType) : task.name.replace(/^(Agent|Script):\s*/, ""),
                                     subtitle,
                                     status: task.status,
                                     statusText,
