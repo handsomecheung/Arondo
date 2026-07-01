@@ -8,13 +8,14 @@ import { BaseAgent, AgentRunOptions, PROMPT_ENV_VAR } from "./base";
 export class ClaudeCodeAgent extends BaseAgent {
   readonly name = "claude";
 
-  getCommand({ sessionId, isResume }: Omit<AgentRunOptions, "onOutput">): string {
+  getCommand({ sessionId, isResume, model }: Omit<AgentRunOptions, "onOutput">): string {
     let sessionFlag = "";
     if (sessionId) {
       sessionFlag = isResume
         ? ` --resume "${sessionId}"`
         : ` --session-id "${sessionId}"`;
     }
-    return `claude --print "$(< "$${PROMPT_ENV_VAR}")" --allowedTools "all" --dangerously-skip-permissions${sessionFlag}`;
+    const modelArg = model ? ` --model "${model}"` : "";
+    return `claude --print "$(< "$${PROMPT_ENV_VAR}")" --allowedTools "all" --dangerously-skip-permissions${sessionFlag}${modelArg}`;
   }
 }

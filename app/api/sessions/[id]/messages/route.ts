@@ -40,7 +40,8 @@ export async function POST(
     });
     eventBus.publish({ type: "message_added", payload: userMsg });
     const runnerConn = runnerManager.getRunner(session.runnerId);
-    const resolvedType = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? []);
+    const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? []);
+    const resolvedType = resolved.agentType;
 
     // Detect an agent switch by comparing with the last known resolved agent type.
     const lastAgentRun = [...messages].reverse().find((m) => m.type === "agent-run" && m.resolvedAgentType);
@@ -62,7 +63,13 @@ export async function POST(
 
     const agent = getAgent(resolvedType);
     const fullPrompt = agent.buildPrompt(effectivePrompt);
-    const command = agent.getCommand({ prompt: effectivePrompt, repoPath: session.repoPath, sessionId: id, isResume });
+    const command = agent.getCommand({
+      prompt: effectivePrompt,
+      repoPath: session.repoPath,
+      sessionId: id,
+      isResume,
+      model: resolved.model,
+    });
 
     const patch: Record<string, any> = { status: "running", command };
     if (!session.prompt) {

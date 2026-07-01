@@ -29,7 +29,8 @@ export async function POST(
   }
 
   const runnerConn = runnerManager.getRunner(runnerId);
-  const resolvedType = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? []);
+  const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? []);
+  const resolvedType = resolved.agentType;
   const agent = getAgent(resolvedType);
   const fullPrompt = agent.buildPrompt(session.prompt);
   const command = agent.getCommand({
@@ -37,6 +38,7 @@ export async function POST(
     repoPath: session.repoPath,
     sessionId: session.id,
     isResume: false,
+    model: resolved.model,
   });
 
   const updatedSession = await updateSession(id, { status: "running", command, errorMessage: undefined });

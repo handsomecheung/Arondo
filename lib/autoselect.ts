@@ -16,25 +16,40 @@ const AGENT_BINARY: Record<string, string> = {
   antigravity: "agy",
 };
 
+export interface ResolvedAgent {
+  agentType: ConcreteAgentType;
+  model?: string;
+}
+
 interface ClaudeQuota {
   Type: "claude";
+  Plan: string;
+  Account: string;
+  DefaultModel: string;
   HourRemain: number | null;
+  HourResetAt: number | null;
   WeekRemain: number | null;
+  WeekResetsAt: number | null;
+  updatedAt: number | null;
 }
 
 interface AntigravityQuota {
   Type: "antigravity";
-  GeminiHourRemain: number | null;
+  Plan: string;
+  Account: string;
+  DefaultModel: string;
   GeminiWeeklyRemain: number | null;
-  OtherHourRemain: number | null;
+  GeminiWeeklyResetsAt: number | null;
+  GeminiHourRemain: number | null;
+  GeminiHourResetsAt: number | null;
   OtherWeeklyRemain: number | null;
+  OtherWeeklyResetsAt: number | null;
+  OtherHourRemain: number | null;
+  OtherHourResetsAt: number | null;
+  updatedAt: number | null;
 }
 
-type QuotaEntry = (ClaudeQuota | AntigravityQuota) & {
-  Account: string;
-  Plan: string;
-  updatedAt: number;
-};
+type QuotaEntry = ClaudeQuota | AntigravityQuota;
 
 async function readQuota(): Promise<Record<string, QuotaEntry>> {
   try {
@@ -45,80 +60,148 @@ async function readQuota(): Promise<Record<string, QuotaEntry>> {
   }
 }
 
-// Returns the best-effort remaining quota score (0–1) for an agent type.
-// Higher = more quota available. Returns null if no quota data exists.
-function scoreAgent(type: ConcreteAgentType, quota: Record<string, QuotaEntry>): number | null {
-  const entries = Object.values(quota).filter((e) => e.Type === type);
-  if (entries.length === 0) return null;
-
-  // Multiple accounts/plans for the same type: use the best one.
-  let best = -Infinity;
-  for (const entry of entries) {
-    let score: number;
-    if (entry.Type === "claude") {
-      const q = entry as ClaudeQuota;
-      // HourRemain and WeekRemain are remaining ratios (higher = more remaining).
-      const hourRemain = q.HourRemain ?? 0;
-      const weekRemain = q.WeekRemain ?? 0;
-      // The binding constraint is whichever limit is tightest.
-      score = Math.min(hourRemain, weekRemain);
-    } else {
-      const q = entry as AntigravityQuota;
-      // Remaining ratios (higher = more quota left); null means disabled (0).
-      const geminiScore = Math.min(
-        q.GeminiHourRemain ?? 0,
-        q.GeminiWeeklyRemain ?? 0,
-      );
-      const otherScore = Math.min(
-        q.OtherHourRemain ?? 0,
-        q.OtherWeeklyRemain ?? 0,
-      );
-      // The agent is usable if any model family has quota.
-      score = Math.max(geminiScore, otherScore);
-    }
-    best = Math.max(best, score);
-  }
-  return best;
+interface AgentChoice {
+  id: "A" | "B" | "C";
+  agentType: ConcreteAgentType;
+  model?: string;
 }
 
 /**
- * Selects the best agent from the available binary names on a runner.
- * Falls back to the first available agent if no quota data exists.
+ * Selects the best agent and model from the available binary names on a runner.
  */
-export async function selectAgent(runnerAgentBinaries: string[]): Promise<ConcreteAgentType | null> {
-  // Binary → ConcreteAgentType lookup (reverse of AGENT_BINARY).
-  const binaryToType = Object.fromEntries(
-    Object.entries(AGENT_BINARY).map(([t, b]) => [b, t as ConcreteAgentType])
-  );
+export async function selectAgent(runnerAgentBinaries: string[]): Promise<ResolvedAgent | null> {
+  const hasAgy = runnerAgentBinaries.includes("agy");
+  const hasClaude = runnerAgentBinaries.includes("claude");
 
-  const candidateTypes = runnerAgentBinaries
-    .map((b) => binaryToType[b])
-    .filter((t): t is ConcreteAgentType => !!t);
+  // A: agy + Gemini 3.5 Flash
+  // B: agy + Claude Sonnet 4.6
+  // C: claude + Sonnet
+  const choices: AgentChoice[] = [];
+  if (hasAgy) {
+    choices.push({ id: "A", agentType: "antigravity", model: "Gemini 3.5 Flash (Medium)" });
+    choices.push({ id: "B", agentType: "antigravity", model: "Claude Sonnet 4.6 (Thinking)" });
+  }
+  if (hasClaude) {
+    choices.push({ id: "C", agentType: "claude" });
+  }
 
-  if (candidateTypes.length === 0) return null;
-  if (candidateTypes.length === 1) return candidateTypes[0];
+  console.log(`[autoselect] Available runner binaries: ${runnerAgentBinaries.join(", ")}`);
+  console.log(`[autoselect] Initial choices: ${choices.map((c) => c.id).join(", ")}`);
+
+  if (choices.length === 0) {
+    console.log("[autoselect] No choices available.");
+    return null;
+  }
+  if (choices.length === 1) {
+    console.log(`[autoselect] Only one choice available: ${choices[0].id}. Selecting it directly.`);
+    return { agentType: choices[0].agentType, model: choices[0].model };
+  }
 
   const quota = await readQuota();
 
-  let bestType: ConcreteAgentType = candidateTypes[0];
-  let bestScore = -Infinity;
-  let hasAnyData = false;
+  // Helper to extract relevant quota metrics for a choice
+  const getMetrics = (choice: AgentChoice) => {
+    let hourRemain = 1.0;
+    let weekRemain = 1.0;
+    let resetsAt: number | null = null;
 
-  for (const type of candidateTypes) {
-    const score = scoreAgent(type, quota);
-    if (score !== null) {
-      hasAnyData = true;
-      if (score > bestScore) {
-        bestScore = score;
-        bestType = type;
+    // Find the matching quota entries
+    const entries = Object.values(quota);
+
+    if (choice.id === "A") {
+      const q = entries.find((e) => e.Type === "antigravity") as AntigravityQuota | undefined;
+      if (q) {
+        hourRemain = q.GeminiHourRemain ?? 1.0;
+        weekRemain = q.GeminiWeeklyRemain ?? 1.0;
+        resetsAt = q.GeminiWeeklyResetsAt;
       }
+    } else if (choice.id === "B") {
+      const q = entries.find((e) => e.Type === "antigravity") as AntigravityQuota | undefined;
+      if (q) {
+        hourRemain = q.OtherHourRemain ?? 1.0;
+        weekRemain = q.OtherWeeklyRemain ?? 1.0;
+        resetsAt = q.OtherWeeklyResetsAt;
+      }
+    } else if (choice.id === "C") {
+      const q = entries.find((e) => e.Type === "claude") as ClaudeQuota | undefined;
+      if (q) {
+        hourRemain = q.HourRemain ?? 1.0;
+        weekRemain = q.WeekRemain ?? 1.0;
+        resetsAt = q.WeekResetsAt;
+      }
+    }
+
+    return { hourRemain, weekRemain, resetsAt };
+  };
+
+  for (const choice of choices) {
+    const { hourRemain, weekRemain, resetsAt } = getMetrics(choice);
+    console.log(
+      `[autoselect] Choice ${choice.id} (${choice.agentType} / ${choice.model ?? "default"}): ` +
+      `HourRemain=${hourRemain}, WeekRemain=${weekRemain}, ResetsAt=${resetsAt}`
+    );
+  }
+
+  // Step 1: Filter choices where HourRemain < 0.15
+  const now = Math.floor(Date.now() / 1000);
+  const lowQuotaChoices: AgentChoice[] = [];
+  const normalChoices: AgentChoice[] = [];
+
+  for (const choice of choices) {
+    const { hourRemain } = getMetrics(choice);
+    if (hourRemain < 0.15) {
+      lowQuotaChoices.push(choice);
+    } else {
+      normalChoices.push(choice);
     }
   }
 
-  // No quota data at all → fall back to first candidate.
-  if (!hasAnyData) return candidateTypes[0];
+  console.log(
+    `[autoselect] Step 1 Filter: Normal choices = [${normalChoices.map((c) => c.id).join(", ")}], ` +
+    `Low quota choices (<0.15) = [${lowQuotaChoices.map((c) => c.id).join(", ")}]`
+  );
 
-  return bestType;
+  // Exception: if ALL available choices are low quota, keep them all in comparison
+  let activeChoices = normalChoices;
+  let excludedChoices = lowQuotaChoices;
+  if (normalChoices.length === 0) {
+    console.log("[autoselect] Exception: All choices are low quota. Keeping all choices in active list.");
+    activeChoices = lowQuotaChoices;
+    excludedChoices = [];
+  }
+
+  // Step 2: Score active choices based on WeekRemain and time passed in week
+  const scoredChoices = activeChoices.map((choice) => {
+    const { weekRemain, resetsAt } = getMetrics(choice);
+    let weekTimeRemain = 0.0;
+
+    if (resetsAt !== null) {
+      // 1 week is 604,800 seconds
+      weekTimeRemain = Math.max(0, Math.min(1, (resetsAt - now) / 604800));
+    }
+
+    const score = weekRemain - weekTimeRemain;
+    console.log(
+      `[autoselect] Step 2 Scoring: Choice ${choice.id} -> ` +
+      `WeekRemain=${weekRemain.toFixed(3)}, WeekTimeRemain=${weekTimeRemain.toFixed(3)}, ` +
+      `Score=${score.toFixed(3)} (Reset at ${resetsAt}, Current time ${now})`
+    );
+    return { choice, score };
+  });
+
+  // Sort active choices by score descending
+  scoredChoices.sort((a, b) => b.score - a.score);
+
+  const candidateAgents = [
+    ...scoredChoices.map((sc) => sc.choice),
+    ...excludedChoices,
+  ];
+
+  console.log(`[autoselect] Final Candidate Order: [${candidateAgents.map((c) => c.id).join(", ")}]`);
+
+  const best = candidateAgents[0];
+  console.log(`[autoselect] Selection Result: Choice ${best.id} (Agent: ${best.agentType}, Model: ${best.model ?? "default"})`);
+  return { agentType: best.agentType, model: best.model };
 }
 
 // ─── Cross-agent context injection ────────────────────────────────────────────

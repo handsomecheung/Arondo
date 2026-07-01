@@ -73,21 +73,20 @@ export default function AppSidebar({
         </div>
         <div className="task-list">
           {sidebarMode === "sessions" ? (
-            <>
-              {sortedSessions.length === 0 && (
-                <div className="empty-state">
-                  <IconInbox />
-                  <p>No sessions yet.<br />Start by creating a new session.</p>
-                </div>
-              )}
-              {sortedSessions.map((session) => {
+            sortedSessions.length === 0 ? (
+              <div className="empty-state">
+                <IconInbox />
+                <p>No sessions yet.<br />Start by creating a new session.</p>
+              </div>
+            ) : (
+              sortedSessions.map((session, index) => {
                 const project = projects.find((p) => p.id === session.projectId);
                 const projectName = project ? project.repoPath.split("/").pop() || project.repoPath : "";
                 const runner = runners.find((r) => r.id === session.runnerId);
                 const nodeName = runner ? runner.name : session.runnerId || "";
                 return (
                   <div
-                    key={session.id}
+                    key={session.id ? `session-${session.id}` : `session-idx-${index}`}
                     className={`task-item ${selectedSessionId === session.id ? "active" : ""}`}
                     onClick={() => onSelectSession(session.id)}
                     id={`session-item-${session.id}`}
@@ -130,23 +129,22 @@ export default function AppSidebar({
                     <div className="task-item-time">{formatRelative(session.createdAt)}</div>
                   </div>
                 );
-              })}
-            </>
+              })
+            )
           ) : (
-            <>
-              {projects.length === 0 && (
-                <div className="empty-state">
-                  <IconInbox />
-                  <p>No projects yet.<br />Create a session to initialize a project.</p>
-                </div>
-              )}
-              {projects.map((project) => {
+            projects.length === 0 ? (
+              <div className="empty-state">
+                <IconInbox />
+                <p>No projects yet.<br />Create a session to initialize a project.</p>
+              </div>
+            ) : (
+              projects.map((project, index) => {
                 const projectSessions = sortedSessions.filter((s) => s.projectId === project.id);
                 const folderName = project.repoPath.split("/").pop() || project.repoPath;
                 const projectRunner = runners.find((r) => r.id === project.runnerId);
                 return (
                   <div
-                    key={project.id}
+                    key={project.id ? `project-${project.id}` : `project-idx-${index}`}
                     className={`task-item ${selectedProjectId === project.id ? "active" : ""}`}
                     onClick={() => onSelectProject(project.id)}
                     id={`project-item-${project.id}`}
@@ -178,8 +176,8 @@ export default function AppSidebar({
                     <div className="task-item-time">{formatRelative(project.createdAt)}</div>
                   </div>
                 );
-              })}
-            </>
+              })
+            )
           )}
         </div>
         <div className="sidebar-footer">

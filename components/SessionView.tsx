@@ -224,8 +224,9 @@ export default function SessionView({
             >
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 1 }}>
                 Project:{" "}
-                {selectedSession.repoPath.split("/").pop() ||
-                  selectedSession.repoPath}
+                {selectedSession.repoPath
+                  ? (selectedSession.repoPath.split("/").pop() || selectedSession.repoPath)
+                  : "None"}
               </span>
               <div ref={agentSwitchRef} style={{ position: "relative", flexShrink: 0 }}>
                 <button

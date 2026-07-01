@@ -15,6 +15,8 @@ export interface AgentRunOptions {
   sessionId?: string;
   /** Whether to resume from a previous run in the session */
   isResume?: boolean;
+  /** Model to run the agent with */
+  model?: string;
 }
 
 

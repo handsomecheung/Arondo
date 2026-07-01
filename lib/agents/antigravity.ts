@@ -68,14 +68,15 @@ export async function detectAgyConvId(): Promise<string | undefined> {
 export class AntigravityAgent extends BaseAgent {
   readonly name = "antigravity";
 
-  getCommand({ repoPath, sessionId }: Omit<AgentRunOptions, "onOutput">): string {
+  getCommand({ repoPath, sessionId, model }: Omit<AgentRunOptions, "onOutput">): string {
     const addDirArg = repoPath ? ` --add-dir "${repoPath}"` : "";
+    const modelArg = model ? ` --model "${model}"` : "";
     if (sessionId) {
       const agyId = getAgySessionIdSync(sessionId);
       if (agyId) {
-        return `agy --conversation "${agyId}" --prompt "$(< "$${PROMPT_ENV_VAR}")"${addDirArg} --dangerously-skip-permissions`;
+        return `agy --conversation "${agyId}" --prompt "$(< "$${PROMPT_ENV_VAR}")"${addDirArg}${modelArg} --dangerously-skip-permissions`;
       }
     }
-    return `agy --prompt "$(< "$${PROMPT_ENV_VAR}")"${addDirArg} --dangerously-skip-permissions`;
+    return `agy --prompt "$(< "$${PROMPT_ENV_VAR}")"${addDirArg}${modelArg} --dangerously-skip-permissions`;
   }
 }

@@ -39,6 +39,11 @@ export function getAvailableAgents(): ConcreteAgentType[] {
   return Object.keys(AGENTS) as ConcreteAgentType[];
 }
 
+export interface ResolvedAgent {
+  agentType: ConcreteAgentType;
+  model?: string;
+}
+
 /**
  * Resolves "auto" to a concrete AgentType by running the quota-based selection
  * algorithm against the agents installed on the given runner.
@@ -47,10 +52,10 @@ export function getAvailableAgents(): ConcreteAgentType[] {
 export async function resolveAgentType(
   agentType: string,
   runnerAgentBinaries: string[],
-): Promise<ConcreteAgentType> {
-  if (agentType !== "auto") return agentType as ConcreteAgentType;
+): Promise<ResolvedAgent> {
+  if (agentType !== "auto") return { agentType: agentType as ConcreteAgentType };
   const resolved = await selectAgent(runnerAgentBinaries);
-  return resolved ?? "antigravity";
+  return resolved ?? { agentType: "antigravity" };
 }
 
 /**

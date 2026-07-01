@@ -69,10 +69,11 @@ export async function POST(req: NextRequest) {
     runnerId,
   });
 
-  const resolvedType = await resolveAgentType(agentType, run.info.agents);
+  const resolved = await resolveAgentType(agentType, run.info.agents);
+  const resolvedType = resolved.agentType;
   const agent = getAgent(resolvedType);
   const fullPrompt = agent.buildPrompt(prompt);
-  const command = agent.getCommand({ prompt, repoPath, sessionId: session.id, isResume: false });
+  const command = agent.getCommand({ prompt, repoPath, sessionId: session.id, isResume: false, model: resolved.model });
 
   await updateSession(session.id, { command });
   session.command = command;

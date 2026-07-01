@@ -230,6 +230,15 @@ Two WebSocket endpoints:
 - **Agent Session Continuity**: ClaudeCodeAgent supports `--session-id` (bind to a session) and `--resume` (resume an existing session) flags, enabling multi-turn conversations within the same agent session.
 - **Global Agent Rules Sync**: Settings screen allows specifying global agent rules. These are stored in `data/global-rules.md` and automatically synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on runner nodes upon connection.
 - **AI Agent Quota Monitoring**: Runner nodes collect agent quota usage from Claude and Antigravity via tmux pane capture, which is saved locally under `data/agents/` on the server and displayed with progress bars in the Settings dashboard.
+- **AI Agent Auto-Selection (Auto Mode)**: Automatically selects the best agent and model based on hourly and weekly quota availability retrieved from the runner node.
+  - **Choices**:
+    - **Choice A**: Antigravity (`agy`) + `Gemini 3.5 Flash (Medium)` (Quota: `GeminiHourRemain`, `GeminiWeeklyRemain`)
+    - **Choice B**: Antigravity (`agy`) + `Claude Sonnet 4.6 (Thinking)` (Quota: `OtherHourRemain`, `OtherWeeklyRemain`)
+    - **Choice C**: Claude (`claude`) + default `Sonnet` (Quota: `HourRemain`, `WeekRemain`)
+  - **Selection Algorithm**:
+    1. **Hourly Quota Filtering**: If any choice's remaining hourly ratio (`HourRemain`, `GeminiHourRemain`, `OtherHourRemain`) is below `0.15`, it is appended to the end of the candidate list and excluded from step 2. Exception: If *all* choices are below `0.15`, they are all kept for step 2 comparison.
+    2. **Weekly Time-Remaining Score**: For active choices, calculate `score = WeekRemain - WeekTimeRemain`, where `WeekTimeRemain = max(0, min(1, (ResetsAt - Now) / 604800))`. This compares the remaining quota ratio against the remaining time ratio of the quota week.
+    3. **Final Order**: Sort active choices by score in descending order and prepend them to the low-quota choices. The first candidate is selected and spawned with the mapped `--model` parameter.
 - **@ Path Selector Modal**: Typing `@` in the chat textarea opens a file and directory selector modal to easily select a path and insert its relative path into the input field.
 - **File Browser with Syntax Highlighting**: A Remote File Browser can be opened from the session's three-dot menu, featuring file previews (up to 512KB) with code syntax highlighting and a word wrap toggle option.
 
