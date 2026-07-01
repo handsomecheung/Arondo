@@ -56,12 +56,12 @@ func fetchAgyQuota(client *Client) {
 		log.Printf("[quota/agy] default model : %s", q.DefaultModel)
 		log.Printf("[quota/agy] gemini weekly  remaining : %s", fmtF(q.GeminiWeeklyRemain))
 		log.Printf("[quota/agy] gemini weekly  refreshes : %s", fmtI(q.GeminiWeeklyResetsAt))
-		log.Printf("[quota/agy] gemini 5h      remaining : %s", fmtF(q.GeminiFiveHourRemain))
-		log.Printf("[quota/agy] gemini 5h      refreshes : %s", fmtI(q.GeminiFiveHourResetsAt))
+		log.Printf("[quota/agy] gemini hour    remaining : %s", fmtF(q.GeminiHourRemain))
+		log.Printf("[quota/agy] gemini hour    refreshes : %s", fmtI(q.GeminiHourResetsAt))
 		log.Printf("[quota/agy] other  weekly  remaining : %s", fmtF(q.OtherWeeklyRemain))
 		log.Printf("[quota/agy] other  weekly  refreshes : %s", fmtI(q.OtherWeeklyResetsAt))
-		log.Printf("[quota/agy] other  5h      remaining : %s", fmtF(q.OtherFiveHourRemain))
-		log.Printf("[quota/agy] other  5h      refreshes : %s", fmtI(q.OtherFiveHourResetsAt))
+		log.Printf("[quota/agy] other  hour    remaining : %s", fmtF(q.OtherHourRemain))
+		log.Printf("[quota/agy] other  hour    refreshes : %s", fmtI(q.OtherHourResetsAt))
 	}
 }
 
@@ -71,13 +71,13 @@ type AgyQuota struct {
 	Plan                  string
 	DefaultModel          string
 	GeminiWeeklyRemain    *float64 // 0-1, null if unavailable
-	GeminiWeeklyResetsAt   *int64   // Unix timestamp of next refresh, null if unavailable
-	GeminiFiveHourRemain  *float64
-	GeminiFiveHourResetsAt *int64
+	GeminiWeeklyResetsAt   *int64
+	GeminiHourRemain      *float64
+	GeminiHourResetsAt     *int64
 	OtherWeeklyRemain     *float64
 	OtherWeeklyResetsAt    *int64
-	OtherFiveHourRemain   *float64
-	OtherFiveHourResetsAt  *int64
+	OtherHourRemain       *float64
+	OtherHourResetsAt      *int64
 }
 
 var (
@@ -136,10 +136,10 @@ func applyAgyLimit(q *AgyQuota, section, limitType string, remain *float64, refr
 	case "gemini+weekly":
 		q.GeminiWeeklyRemain, q.GeminiWeeklyResetsAt = remain, refresh
 	case "gemini+fivehour":
-		q.GeminiFiveHourRemain, q.GeminiFiveHourResetsAt = remain, refresh
+		q.GeminiHourRemain, q.GeminiHourResetsAt = remain, refresh
 	case "other+weekly":
 		q.OtherWeeklyRemain, q.OtherWeeklyResetsAt = remain, refresh
 	case "other+fivehour":
-		q.OtherFiveHourRemain, q.OtherFiveHourResetsAt = remain, refresh
+		q.OtherHourRemain, q.OtherHourResetsAt = remain, refresh
 	}
 }

@@ -9,12 +9,12 @@ interface AgyQuota {
   DefaultModel: string;
   GeminiWeeklyRemain: number | null;
   GeminiWeeklyResetsAt: number | null;
-  GeminiFiveHourRemain: number | null;
-  GeminiFiveHourResetsAt: number | null;
+  GeminiHourRemain: number | null;
+  GeminiHourResetsAt: number | null;
   OtherWeeklyRemain: number | null;
   OtherWeeklyResetsAt: number | null;
-  OtherFiveHourRemain: number | null;
-  OtherFiveHourResetsAt: number | null;
+  OtherHourRemain: number | null;
+  OtherHourResetsAt: number | null;
   updatedAt: number | null;
 }
 
@@ -22,9 +22,9 @@ interface ClaudeQuota {
   Plan: string;
   Account: string;
   DefaultModel: string;
-  SessionUsed: number | null;
-  SessionResetAt: number | null;
-  WeekUsed: number | null;
+  HourRemain: number | null;
+  HourResetAt: number | null;
+  WeekRemain: number | null;
   WeekResetsAt: number | null;
   updatedAt: number | null;
 }
@@ -841,8 +841,8 @@ export default function SettingsPage() {
                                     model={agentsQuota.claude.DefaultModel}
                                     updatedAt={agentsQuota.claude.updatedAt}
                                     rows={[
-                                      { label: "Session", used: agentsQuota.claude.SessionUsed, resetsAt: agentsQuota.claude.SessionResetAt },
-                                      { label: "Week", used: agentsQuota.claude.WeekUsed, resetsAt: agentsQuota.claude.WeekResetsAt },
+                                      { label: "Hour", used: agentsQuota.claude.HourRemain == null ? null : 1 - agentsQuota.claude.HourRemain, remaining: agentsQuota.claude.HourRemain, resetsAt: agentsQuota.claude.HourResetAt },
+                                      { label: "Week", used: agentsQuota.claude.WeekRemain == null ? null : 1 - agentsQuota.claude.WeekRemain, remaining: agentsQuota.claude.WeekRemain, resetsAt: agentsQuota.claude.WeekResetsAt },
                                     ]}
                                   />
                                 )}
@@ -855,9 +855,9 @@ export default function SettingsPage() {
                                     updatedAt={agentsQuota.antigravity.updatedAt}
                                     rows={[
                                       { label: "Gemini Weekly", used: agentsQuota.antigravity.GeminiWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.GeminiWeeklyRemain, remaining: agentsQuota.antigravity.GeminiWeeklyRemain, resetsAt: agentsQuota.antigravity.GeminiWeeklyResetsAt },
-                                      { label: "Gemini 5h", used: agentsQuota.antigravity.GeminiFiveHourRemain == null ? null : 1 - agentsQuota.antigravity.GeminiFiveHourRemain, remaining: agentsQuota.antigravity.GeminiFiveHourRemain, resetsAt: agentsQuota.antigravity.GeminiFiveHourResetsAt },
+                                      { label: "Gemini Hour", used: agentsQuota.antigravity.GeminiHourRemain == null ? null : 1 - agentsQuota.antigravity.GeminiHourRemain, remaining: agentsQuota.antigravity.GeminiHourRemain, resetsAt: agentsQuota.antigravity.GeminiHourResetsAt },
                                       { label: "Other Weekly", used: agentsQuota.antigravity.OtherWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.OtherWeeklyRemain, remaining: agentsQuota.antigravity.OtherWeeklyRemain, resetsAt: agentsQuota.antigravity.OtherWeeklyResetsAt },
-                                      { label: "Other 5h", used: agentsQuota.antigravity.OtherFiveHourRemain == null ? null : 1 - agentsQuota.antigravity.OtherFiveHourRemain, remaining: agentsQuota.antigravity.OtherFiveHourRemain, resetsAt: agentsQuota.antigravity.OtherFiveHourResetsAt },
+                                      { label: "Other Hour", used: agentsQuota.antigravity.OtherHourRemain == null ? null : 1 - agentsQuota.antigravity.OtherHourRemain, remaining: agentsQuota.antigravity.OtherHourRemain, resetsAt: agentsQuota.antigravity.OtherHourResetsAt },
                                     ]}
                                   />
                                 )}

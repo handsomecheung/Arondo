@@ -71,17 +71,17 @@ func fetchClaudeQuota(client *Client) {
 	sq := parseClaudeStatus(statusOutput)
 	uq := parseClaudeUsage(usageOutput)
 	merged := *sq
-	merged.SessionUsed = uq.SessionUsed
-	merged.SessionResetAt = uq.SessionResetAt
-	merged.WeekUsed = uq.WeekUsed
+	merged.HourRemain = uq.HourRemain
+	merged.HourResetAt = uq.HourResetAt
+	merged.WeekRemain = uq.WeekRemain
 	merged.WeekResetsAt = uq.WeekResetsAt
 	sendQuotaUpdate(client, "claude", &merged)
 	log.Printf("[quota/claude] plan          : %s", sq.Plan)
 	log.Printf("[quota/claude] account       : %s", sq.Account)
 	log.Printf("[quota/claude] default model : %s", sq.DefaultModel)
-	log.Printf("[quota/claude] session used  : %s", fmtF(uq.SessionUsed))
-	log.Printf("[quota/claude] session resets: %s", fmtI(uq.SessionResetAt))
-	log.Printf("[quota/claude] week used     : %s", fmtF(uq.WeekUsed))
+	log.Printf("[quota/claude] hour remain   : %s", fmtF(uq.HourRemain))
+	log.Printf("[quota/claude] hour resets   : %s", fmtI(uq.HourResetAt))
+	log.Printf("[quota/claude] week remain   : %s", fmtF(uq.WeekRemain))
 	log.Printf("[quota/claude] week resets   : %s", fmtI(uq.WeekResetsAt))
 }
 
@@ -90,9 +90,9 @@ type ClaudeQuota struct {
 	Plan          string
 	Account       string
 	DefaultModel  string
-	SessionUsed   *float64 // 0-1, null if unavailable
-	SessionResetAt *int64   // Unix timestamp, null if unavailable
-	WeekUsed      *float64
+	HourRemain    *float64 // 0-1, null if unavailable
+	HourResetAt   *int64   // Unix timestamp, null if unavailable
+	WeekRemain    *float64
 	WeekResetsAt    *int64
 }
 
@@ -130,18 +130,20 @@ func parseClaudeUsage(text string) *ClaudeQuota {
 			section = "week"
 		default:
 			if m := claudeUsedRe.FindStringSubmatch(line); m != nil {
-				f := pctToFloat(m[1])
-				switch section {
-				case "session":
-					q.SessionUsed = f
-				case "week":
-					q.WeekUsed = f
+				if f := pctToFloat(m[1]); f != nil {
+					remain := floatPtr(1.0 - *f)
+					switch section {
+					case "session":
+						q.HourRemain = remain
+					case "week":
+						q.WeekRemain = remain
+					}
 				}
 			} else if m := claudeResetsRe.FindStringSubmatch(line); m != nil {
 				ts := parseResetsTimestamp(strings.TrimSpace(m[1]))
 				switch section {
 				case "session":
-					q.SessionResetAt = ts
+					q.HourResetAt = ts
 				case "week":
 					q.WeekResetsAt = ts
 				}

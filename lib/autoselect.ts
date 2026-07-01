@@ -18,15 +18,15 @@ const AGENT_BINARY: Record<string, string> = {
 
 interface ClaudeQuota {
   Type: "claude";
-  SessionUsed: number | null;
-  WeekUsed: number | null;
+  HourRemain: number | null;
+  WeekRemain: number | null;
 }
 
 interface AntigravityQuota {
   Type: "antigravity";
-  GeminiFiveHourRemain: number | null;
+  GeminiHourRemain: number | null;
   GeminiWeeklyRemain: number | null;
-  OtherFiveHourRemain: number | null;
+  OtherHourRemain: number | null;
   OtherWeeklyRemain: number | null;
 }
 
@@ -57,20 +57,20 @@ function scoreAgent(type: ConcreteAgentType, quota: Record<string, QuotaEntry>):
     let score: number;
     if (entry.Type === "claude") {
       const q = entry as ClaudeQuota;
-      // SessionUsed and WeekUsed are consumed ratios (higher = less remaining).
-      const sessionRemain = 1 - (q.SessionUsed ?? 0);
-      const weekRemain = 1 - (q.WeekUsed ?? 0);
+      // HourRemain and WeekRemain are remaining ratios (higher = more remaining).
+      const hourRemain = q.HourRemain ?? 0;
+      const weekRemain = q.WeekRemain ?? 0;
       // The binding constraint is whichever limit is tightest.
-      score = Math.min(sessionRemain, weekRemain);
+      score = Math.min(hourRemain, weekRemain);
     } else {
       const q = entry as AntigravityQuota;
       // Remaining ratios (higher = more quota left); null means disabled (0).
       const geminiScore = Math.min(
-        q.GeminiFiveHourRemain ?? 0,
+        q.GeminiHourRemain ?? 0,
         q.GeminiWeeklyRemain ?? 0,
       );
       const otherScore = Math.min(
-        q.OtherFiveHourRemain ?? 0,
+        q.OtherHourRemain ?? 0,
         q.OtherWeeklyRemain ?? 0,
       );
       // The agent is usable if any model family has quota.
