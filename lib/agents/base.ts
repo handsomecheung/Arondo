@@ -1,3 +1,5 @@
+export const PROMPT_ENV_VAR = "ARONDO_PROMPT_FILE";
+
 /**
  * Base interface for all AI agent adapters.
  * To add a new agent, implement this interface and register it in AgentFactory.
@@ -25,5 +27,10 @@ export abstract class BaseAgent {
   /** Append system constraints to the prompt */
   protected getSystemPrompt(prompt: string): string {
     return prompt;
+  }
+
+  /** Build the full prompt (including any system constraints) to send to the runner */
+  public buildPrompt(prompt: string): string {
+    return this.getSystemPrompt(prompt);
   }
 }

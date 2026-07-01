@@ -62,6 +62,7 @@ interface SessionViewProps {
   ws: WebSocket | null;
   onViewLog: (msgId: string) => void;
   onShowCommand: (cmd: string) => void;
+  onShowPrompt: (prompt: string) => void;
   onStopExecCard: (msgId: string) => void;
   onRestartScriptCard: (msgId: string, scriptName: string) => void;
   onRetryCard: (cardInfo: ExecCardInfo) => void;
@@ -130,6 +131,7 @@ export default function SessionView({
   ws,
   onViewLog,
   onShowCommand,
+  onShowPrompt,
   onStopExecCard,
   onRestartScriptCard,
   onRetryCard,
@@ -572,6 +574,7 @@ export default function SessionView({
                 {...sharedProps}
                 sessionId={selectedSessionId!}
                 ws={ws}
+                onShowPrompt={cardInfo.prompt ? () => onShowPrompt(cardInfo.prompt!) : undefined}
               />
             );
           }

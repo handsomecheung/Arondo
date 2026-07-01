@@ -49,6 +49,7 @@ export interface Message {
   content: string;
   type?: string;
   parentId?: string;
+  resolvedAgentType?: string;
   createdAt: string;
 }
 

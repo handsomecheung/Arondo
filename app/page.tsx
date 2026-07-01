@@ -139,6 +139,7 @@ export default function HomePage() {
   const [activeLogMsgId, setActiveLogMsgId] = useState<string | null>(null);
   const [logModalOpen, setLogModalOpen] = useState(false);
   const [commandModalText, setCommandModalText] = useState<string | null>(null);
+  const [promptModalText, setPromptModalText] = useState<string | null>(null);
   const [shellModalOpen, setShellModalOpen] = useState(false);
   const [fileBrowserOpen, setFileBrowserOpen] = useState(false);
 
@@ -340,8 +341,13 @@ export default function HomePage() {
     const retIds = new Set<string>();
     const unmatchedAgent: string[] = [];
     const unmatchedScript: string[] = [];
+    let lastUserPrompt = "";
 
     for (const msg of messages) {
+      if (msg.role === "user" && msg.type === "chat-user") {
+        lastUserPrompt = msg.content;
+      }
+
       if (
         msg.role === "system" &&
         (msg.type === "agent-run" || msg.type === "script-run")
@@ -353,6 +359,8 @@ export default function HomePage() {
           isScript: msg.type === "script-run",
           commandLabel: parsed.label,
           command: parsed.command,
+          agentType: msg.resolvedAgentType,
+          prompt: lastUserPrompt || undefined,
         });
         if (msg.type === "script-run") {
           unmatchedScript.push(msg.id);
@@ -918,6 +926,7 @@ export default function HomePage() {
             ws={wsInstance}
             onViewLog={(msgId) => { setActiveLogMsgId(msgId); setLogModalOpen(true); }}
             onShowCommand={(cmd) => setCommandModalText(cmd)}
+            onShowPrompt={(prompt) => setPromptModalText(prompt)}
             onStopExecCard={handleStopExecCard}
             onRestartScriptCard={handleRestartScriptCard}
             onRetryCard={handleRetryCard}
@@ -1010,6 +1019,12 @@ export default function HomePage() {
       <CommandModal
         text={commandModalText}
         onClose={() => setCommandModalText(null)}
+      />
+
+      <CommandModal
+        text={promptModalText}
+        title="Prompt"
+        onClose={() => setPromptModalText(null)}
       />
 
       <AddScriptModal

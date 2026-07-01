@@ -36,6 +36,14 @@ export function readUrlState(): { session: string | null; project: string | null
   };
 }
 
+export function agentTypeLabel(type: string): string {
+  if (type === "antigravity") return "Antigravity CLI";
+  if (type === "claude") return "Claude Code";
+  if (type === "codex") return "Codex";
+  if (type === "auto") return "Auto";
+  return type;
+}
+
 export function parseExecCommand(content: string): { label: string; command: string } {
   const scriptMatch = content.match(/Running script:\s*\*\*([^*]+)\*\*/);
   if (scriptMatch) {
@@ -57,6 +65,8 @@ export interface ExecCardInfo {
   isScript: boolean;
   commandLabel: string;
   command: string;
+  agentType?: string;
+  prompt?: string;
 }
 
 export function execCardInfoToItem(info: ExecCardInfo): ExecCardItem {
@@ -76,7 +86,7 @@ export function execCardInfoToItem(info: ExecCardInfo): ExecCardItem {
   return {
     id: info.runMsg.id,
     type: info.isScript ? "script" : "agent",
-    title: info.commandLabel,
+    title: !info.isScript && info.agentType ? agentTypeLabel(info.agentType) : info.commandLabel,
     status: !isDone ? "running" : isStopped ? "stopped" : isSuccess ? "done" : "error",
     statusText,
     command: info.command || undefined,

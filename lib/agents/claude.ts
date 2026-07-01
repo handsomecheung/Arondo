@@ -1,23 +1,20 @@
-import { BaseAgent, AgentRunOptions } from "./base";
+import { BaseAgent, AgentRunOptions, PROMPT_ENV_VAR } from "./base";
 
 /**
  * Adapter for Claude Code (https://github.com/anthropics/claude-code).
  *
- * Invokes: claude --print "<prompt>" --allowedTools "all" --dangerously-skip-permissions
- * in the target repository directory.
+ * Prompt is passed via the env var defined by PROMPT_ENV_VAR, set by the runner.
  */
 export class ClaudeCodeAgent extends BaseAgent {
   readonly name = "claude";
 
-  getCommand({ prompt, sessionId, isResume }: Omit<AgentRunOptions, "onOutput">): string {
-    const fullPrompt = this.getSystemPrompt(prompt);
-    const escapedPrompt = fullPrompt.replace(/"/g, '\\"');
+  getCommand({ sessionId, isResume }: Omit<AgentRunOptions, "onOutput">): string {
     let sessionFlag = "";
     if (sessionId) {
       sessionFlag = isResume
         ? ` --resume "${sessionId}"`
         : ` --session-id "${sessionId}"`;
     }
-    return `claude --print "${escapedPrompt}" --allowedTools "all" --dangerously-skip-permissions${sessionFlag}`;
+    return `claude --print "$(< "$${PROMPT_ENV_VAR}")" --allowedTools "all" --dangerously-skip-permissions${sessionFlag}`;
   }
 }

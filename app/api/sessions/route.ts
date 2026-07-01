@@ -1,7 +1,7 @@
 import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { getSessions, createSession, updateSession, addMessage, clearSessionLog } from "@/lib/store";
-import { getAgent, AgentType, resolveAgentType } from "@/lib/agents";
+import { getAgent, AgentType, resolveAgentType, PROMPT_ENV_VAR } from "@/lib/agents";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
 
@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
 
   const resolvedType = await resolveAgentType(agentType, run.info.agents);
   const agent = getAgent(resolvedType);
+  const fullPrompt = agent.buildPrompt(prompt);
   const command = agent.getCommand({ prompt, repoPath, sessionId: session.id, isResume: false });
 
   await updateSession(session.id, { command });
@@ -106,6 +107,8 @@ export async function POST(req: NextRequest) {
       taskId,
       command,
       workDir: repoPath,
+      prompt: fullPrompt,
+      promptEnvVar: PROMPT_ENV_VAR,
     }, 10_000)
     .then((res: any) => {
       if (res?.pid) runnerManager.updateTaskPid(taskId, res.pid);

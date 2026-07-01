@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import fsSync from "fs";
 import path from "path";
 import os from "os";
-import { BaseAgent, AgentRunOptions } from "./base";
+import { BaseAgent, AgentRunOptions, PROMPT_ENV_VAR } from "./base";
 
 const DATA_DIR = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
@@ -68,16 +68,14 @@ export async function detectAgyConvId(): Promise<string | undefined> {
 export class AntigravityAgent extends BaseAgent {
   readonly name = "antigravity";
 
-  getCommand({ prompt, repoPath, sessionId }: Omit<AgentRunOptions, "onOutput">): string {
-    const fullPrompt = this.getSystemPrompt(prompt);
-    const escapedPrompt = fullPrompt.replace(/"/g, '\\"');
+  getCommand({ repoPath, sessionId }: Omit<AgentRunOptions, "onOutput">): string {
     const addDirArg = repoPath ? ` --add-dir "${repoPath}"` : "";
     if (sessionId) {
       const agyId = getAgySessionIdSync(sessionId);
       if (agyId) {
-        return `agy --conversation "${agyId}" --prompt "${escapedPrompt}"${addDirArg} --dangerously-skip-permissions`;
+        return `agy --conversation "${agyId}" --prompt "$(< "$${PROMPT_ENV_VAR}")"${addDirArg} --dangerously-skip-permissions`;
       }
     }
-    return `agy --prompt "${escapedPrompt}"${addDirArg} --dangerously-skip-permissions`;
+    return `agy --prompt "$(< "$${PROMPT_ENV_VAR}")"${addDirArg} --dangerously-skip-permissions`;
   }
 }

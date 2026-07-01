@@ -3,16 +3,17 @@ import { IconX } from "@/components/Icons";
 interface Props {
   text: string | null;
   onClose: () => void;
+  title?: string;
 }
 
-export default function CommandModal({ text, onClose }: Props) {
+export default function CommandModal({ text, onClose, title = "Command" }: Props) {
   if (!text) return null;
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
         <div className="modal-header">
           <span className="modal-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            Command
+            {title}
           </span>
           <button className="modal-close-btn" onClick={onClose} aria-label="Close">
             <IconX />

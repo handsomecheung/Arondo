@@ -9,11 +9,13 @@ import (
 )
 
 type execAgentRequest struct {
-	TaskID  string   `json:"taskId"`
-	Command string   `json:"command"`
-	Args    []string `json:"args,omitempty"`
-	WorkDir string   `json:"workDir"`
-	Env     []string `json:"env,omitempty"`
+	TaskID       string   `json:"taskId"`
+	Command      string   `json:"command"`
+	Args         []string `json:"args,omitempty"`
+	WorkDir      string   `json:"workDir"`
+	Env          []string `json:"env,omitempty"`
+	Prompt       string   `json:"prompt,omitempty"`
+	PromptEnvVar string   `json:"promptEnvVar,omitempty"`
 }
 
 type execScriptRequest struct {
@@ -49,12 +51,31 @@ func (h *Handler) handleExecAgent(msg *Message) {
 		command = "bash"
 	}
 
+	env := req.Env
+	var promptFile string
+	if req.Prompt != "" && req.PromptEnvVar != "" {
+		f, err := os.CreateTemp("", "arondo-prompt-*.txt")
+		if err != nil {
+			h.sendError(msg.ID, "INTERNAL", "failed to create prompt file: "+err.Error())
+			return
+		}
+		if _, err := f.WriteString(req.Prompt); err != nil {
+			f.Close()
+			os.Remove(f.Name())
+			h.sendError(msg.ID, "INTERNAL", "failed to write prompt file: "+err.Error())
+			return
+		}
+		f.Close()
+		promptFile = f.Name()
+		env = append(env, req.PromptEnvVar+"="+promptFile)
+	}
+
 	pid, err := h.taskManager.Spawn(SpawnOptions{
 		TaskID:  req.TaskID,
 		Command: command,
 		Args:    args,
 		WorkDir: req.WorkDir,
-		Env:     req.Env,
+		Env:     env,
 		OnData: func(data []byte) {
 			h.sendStream("exec.output", map[string]string{
 				"taskId":   req.TaskID,
@@ -63,6 +84,9 @@ func (h *Handler) handleExecAgent(msg *Message) {
 			})
 		},
 		OnExit: func(exitCode int) {
+			if promptFile != "" {
+				os.Remove(promptFile)
+			}
 			h.sendEvent("exec.exit", map[string]any{
 				"taskId":   req.TaskID,
 				"exitCode": exitCode,

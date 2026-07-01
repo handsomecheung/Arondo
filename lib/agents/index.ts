@@ -62,5 +62,5 @@ export function getAgentBinaryNames(): string[] {
   return Object.values(AGENTS).map((e) => e.binary);
 }
 
-export { BaseAgent } from "./base";
+export { BaseAgent, PROMPT_ENV_VAR } from "./base";
 export type { AgentRunOptions } from "./base";

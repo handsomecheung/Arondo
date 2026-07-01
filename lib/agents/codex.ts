@@ -1,4 +1,4 @@
-import { BaseAgent, AgentRunOptions } from "./base";
+import { BaseAgent, AgentRunOptions, PROMPT_ENV_VAR } from "./base";
 
 /**
  * Adapter for OpenAI Codex CLI (https://github.com/openai/codex).
@@ -9,9 +9,7 @@ import { BaseAgent, AgentRunOptions } from "./base";
 export class CodexAgent extends BaseAgent {
   readonly name = "codex";
 
-  getCommand({ prompt }: Omit<AgentRunOptions, "onOutput">): string {
-    const fullPrompt = this.getSystemPrompt(prompt);
-    const escapedPrompt = fullPrompt.replace(/"/g, '\\"');
-    return `codex --approval-mode full-auto "${escapedPrompt}"`;
+  getCommand(_options: Omit<AgentRunOptions, "onOutput">): string {
+    return `codex --approval-mode full-auto "$(< "$${PROMPT_ENV_VAR}")"`;
   }
 }

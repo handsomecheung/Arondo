@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, updateSession, addMessage, clearSessionLog, getMessages } from "@/lib/store";
-import { getAgent, AgentType, resolveAgentType } from "@/lib/agents";
+import { getAgent, AgentType, resolveAgentType, PROMPT_ENV_VAR } from "@/lib/agents";
 import { buildCrossAgentContext } from "@/lib/autoselect";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
@@ -61,6 +61,7 @@ export async function POST(
     }
 
     const agent = getAgent(resolvedType);
+    const fullPrompt = agent.buildPrompt(effectivePrompt);
     const command = agent.getCommand({ prompt: effectivePrompt, repoPath: session.repoPath, sessionId: id, isResume });
 
     const patch: Record<string, any> = { status: "running", command };
@@ -107,6 +108,8 @@ export async function POST(
         taskId,
         command,
         workDir: session.repoPath,
+        prompt: fullPrompt,
+        promptEnvVar: PROMPT_ENV_VAR,
       }, 10_000)
       .then((res: any) => {
         if (res?.pid) runnerManager.updateTaskPid(taskId, res.pid);
