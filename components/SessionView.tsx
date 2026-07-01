@@ -152,6 +152,10 @@ export default function SessionView({
   onExecuteAgentCommand,
   onSwitchAgent,
 }: SessionViewProps) {
+  const activeRunnerId = selectedSession ? selectedSession.runnerId : runnerId;
+  const activeRunner = runners.find((r) => r.id === activeRunnerId) ?? null;
+  const isRunnerOffline = !activeRunner || !activeRunner.connected;
+
   const [agentSwitchOpen, setAgentSwitchOpen] = useState(false);
   const agentSwitchRef = useRef<HTMLDivElement>(null);
 
@@ -676,27 +680,29 @@ export default function SessionView({
               </button>
               {runnerDropdownOpen && (
                 <div className="custom-dropdown-menu">
-                  {runners.length === 0 ? (
+                  {runners.filter((r) => r.connected).length === 0 ? (
                     <div className="custom-dropdown-item disabled">
                       No runners connected
                     </div>
                   ) : (
-                    runners.map((r) => (
-                      <button
-                        key={r.id}
-                        type="button"
-                        className={`custom-dropdown-item ${r.id === runnerId ? "active" : ""}`}
-                        onClick={() => {
-                          if (r.id !== runnerId) {
-                            onSetRunnerId(r.id);
-                            onSetRepoPath("");
-                          }
-                          onSetRunnerDropdownOpen(false);
-                        }}
-                      >
-                        {r.name} ({r.hostname})
-                      </button>
-                    ))
+                    runners
+                      .filter((r) => r.connected)
+                      .map((r) => (
+                        <button
+                          key={r.id}
+                          type="button"
+                          className={`custom-dropdown-item ${r.id === runnerId ? "active" : ""}`}
+                          onClick={() => {
+                            if (r.id !== runnerId) {
+                              onSetRunnerId(r.id);
+                              onSetRepoPath("");
+                            }
+                            onSetRunnerDropdownOpen(false);
+                          }}
+                        >
+                          {r.name} ({r.hostname})
+                        </button>
+                      ))
                   )}
                 </div>
               )}
@@ -854,16 +860,18 @@ export default function SessionView({
             ref={textareaRef}
             className="chat-input"
             placeholder={
-              isAgentRunning
-                ? "Agent is working…"
-                : isNewSession
-                  ? "Describe what you want the agent to build or fix in this project…"
-                  : "Send a message or follow-up feedback to the agent…"
+              isRunnerOffline
+                ? "Runner is offline. Chat is disabled."
+                : isAgentRunning
+                  ? "Agent is working…"
+                  : isNewSession
+                    ? "Describe what you want the agent to build or fix in this project…"
+                    : "Send a message or follow-up feedback to the agent…"
             }
             value={prompt}
             onChange={onPromptChange}
             onKeyDown={onKeyDown}
-            disabled={isAgentRunning}
+            disabled={isAgentRunning || isRunnerOffline}
             rows={1}
             id="chat-input"
           />

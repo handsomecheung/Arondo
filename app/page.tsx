@@ -399,7 +399,12 @@ export default function HomePage() {
       .then((data: Runner[]) => {
         setRunners(data);
         if (data.length > 0 && !runnerId) {
-          setRunnerId(data[0].id);
+          const onlineRunner = data.find((r) => r.connected);
+          if (onlineRunner) {
+            setRunnerId(onlineRunner.id);
+          } else {
+            setRunnerId(data[0].id);
+          }
         }
       })
       .catch(console.error);
@@ -706,8 +711,15 @@ export default function HomePage() {
     }
   };
 
+  const selectedRunnerConnected = useMemo(() => {
+    const activeId = selectedSession ? selectedSession.runnerId : runnerId;
+    const r = runners.find((r) => r.id === activeId);
+    return r ? r.connected : false;
+  }, [runners, runnerId, selectedSession]);
+
   const canSubmit =
     !isAgentRunning &&
+    selectedRunnerConnected &&
     (isNewSession
       ? repoPath.trim().length > 0 && !!runnerId
       : prompt.trim().length > 0 && !!selectedSessionId);
@@ -715,6 +727,9 @@ export default function HomePage() {
   const getSendTooltip = () => {
     if (isAgentRunning) {
       return "Agent is working…";
+    }
+    if (!selectedRunnerConnected) {
+      return "Runner is offline";
     }
     if (isNewSession) {
       if (!runnerId) {
