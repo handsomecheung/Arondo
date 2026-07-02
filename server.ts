@@ -1,3 +1,5 @@
+import "./register-env";
+
 import { createServer } from "http";
 import next from "next";
 import { WebSocketServer } from "ws";
