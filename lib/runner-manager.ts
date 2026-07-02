@@ -346,6 +346,33 @@ class RunnerManager {
     }
   }
 
+  async deleteRunner(id: string): Promise<boolean> {
+    if (this.runners.has(id)) {
+      throw new Error("Cannot delete a connected runner");
+    }
+
+    let stableKeyToDelete: string | undefined;
+    for (const [key, val] of this.knownIds.entries()) {
+      if (val === id) {
+        stableKeyToDelete = key;
+        break;
+      }
+    }
+    if (stableKeyToDelete) {
+      this.knownIds.delete(stableKeyToDelete);
+    }
+
+    const runnerDir = path.join(RUNNERS_DIR, id);
+    try {
+      await fs.rm(runnerDir, { recursive: true, force: true });
+      console.log(`[runner-manager] runner deleted: ${id}`);
+      return true;
+    } catch (err) {
+      console.error(`[runner-manager] failed to delete runner directory ${runnerDir}:`, err);
+      return false;
+    }
+  }
+
   getRunners(): RunnerInfo[] {
     return Array.from(this.runners.values()).map((c) => ({ ...c.info }));
   }

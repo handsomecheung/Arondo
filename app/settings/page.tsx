@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import ConfirmDialog from "@/components/modals/ConfirmDialog";
 
 interface AgyQuota {
   Account: string;
@@ -310,6 +311,10 @@ export default function SettingsPage() {
   const [editDraft, setEditDraft] = useState<AgentCommand>(EMPTY_COMMAND);
 
   const [agentsQuota, setAgentsQuota] = useState<AgentsQuota | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   const [globalRules, setGlobalRules] = useState("");
   const [savingRules, setSavingRules] = useState(false);
@@ -391,6 +396,29 @@ export default function SettingsPage() {
       loadCustomCommands();
     },
     [loadCustomCommands],
+  );
+
+  const handleDeleteRunner = useCallback(
+    async (id: string) => {
+      try {
+        const res = await fetch(`/api/runners?id=${encodeURIComponent(id)}`, {
+          method: "DELETE",
+        });
+        if (res.ok) {
+          loadRunners();
+          if (selectedRunnerId === id) {
+            setSelectedRunnerId(null);
+          }
+        } else {
+          const data = await res.json();
+          alert(data.error || "Failed to delete runner");
+        }
+      } catch (err) {
+        console.error("Failed to delete runner:", err);
+        alert("An error occurred while deleting the runner");
+      }
+    },
+    [loadRunners, selectedRunnerId],
   );
 
   const buildCommandBody = (draft: AgentCommand): AgentCommand => {
@@ -624,14 +652,51 @@ export default function SettingsPage() {
                               {r.name}
                             </span>
                           </div>
-                          <span
-                            style={{
-                              fontSize: 11,
-                              color: "var(--text-muted)",
-                            }}
-                          >
-                            {r.os} ({r.arch})
-                          </span>
+                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                color: "var(--text-muted)",
+                              }}
+                            >
+                              {r.os} ({r.arch})
+                            </span>
+                            {!r.connected && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setConfirmDialog({
+                                    message: `Are you sure you want to delete runner "${r.name}"?`,
+                                    onConfirm: async () => {
+                                      setConfirmDialog(null);
+                                      await handleDeleteRunner(r.id);
+                                    },
+                                  });
+                                }}
+                                style={{
+                                  padding: "2px 6px",
+                                  fontSize: 11,
+                                  fontWeight: 500,
+                                  color: "var(--error, #e74c3c)",
+                                  background: "transparent",
+                                  border: "1px solid var(--border)",
+                                  borderRadius: "var(--radius-sm)",
+                                  cursor: "pointer",
+                                  transition: "all 0.2s ease",
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = "rgba(231, 76, 60, 0.1)";
+                                  e.currentTarget.style.borderColor = "var(--error, #e74c3c)";
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = "transparent";
+                                  e.currentTarget.style.borderColor = "var(--border)";
+                                }}
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <div
                           style={{
@@ -1421,6 +1486,10 @@ export default function SettingsPage() {
 
         </div>
       </main>
+      <ConfirmDialog
+        confirmDialog={confirmDialog}
+        onClose={() => setConfirmDialog(null)}
+      />
     </div>
   );
 }
