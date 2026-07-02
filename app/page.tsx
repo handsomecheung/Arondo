@@ -557,7 +557,7 @@ export default function HomePage() {
     setChatFsModalOpen(false);
   };
 
-  const { handlePromptChange, handleNewSessionCommand, handleAgentCommand, handleSubmit, handleKeyDown, commandMenuIndex } = useSessionSubmit({
+  const { handlePromptChange, handleNewSessionCommand, handleAgentCommand, handleScriptCommand, handleSubmit, handleKeyDown, commandMenuIndex } = useSessionSubmit({
     prompt,
     repoPath,
     agentType,
@@ -580,6 +580,8 @@ export default function HomePage() {
     setApiError,
     loadProjects,
     agentCommands,
+    sessionScripts,
+    onRunScript: handleRunScript,
     onDeleteSession: handleDeleteSession,
     onTriggerFsModal: () => {
       if (selectedSession?.repoPath) {
@@ -986,6 +988,7 @@ export default function HomePage() {
             onNewSession={handleNewSession}
             onNewSessionCommand={handleNewSessionCommand}
             onExecuteAgentCommand={handleAgentCommand}
+            onExecuteScriptCommand={handleScriptCommand}
             onSwitchAgent={handleSwitchAgent}
           />
         )}

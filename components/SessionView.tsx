@@ -81,6 +81,7 @@ interface SessionViewProps {
   agentCommands: AgentCommand[];
   onNewSessionCommand: (name?: string) => void;
   onExecuteAgentCommand: (promptText: string) => void;
+  onExecuteScriptCommand: (promptText: string) => void;
   onSwitchAgent: (agentType: string) => void;
 }
 
@@ -150,6 +151,7 @@ export default function SessionView({
   onNewSession,
   onNewSessionCommand,
   onExecuteAgentCommand,
+  onExecuteScriptCommand,
   onSwitchAgent,
 }: SessionViewProps) {
   const activeRunnerId = selectedSession ? selectedSession.runnerId : runnerId;
@@ -791,7 +793,36 @@ export default function SessionView({
           </div>
         )}
 
-        {showCommandMenu && (() => {
+        {showCommandMenu && prompt.startsWith("!") && (() => {
+          const trimmedPrompt = prompt.trim();
+          const visibleScripts = sessionScripts.filter((s) => {
+            const trigger = "!" + s.name;
+            return trigger.startsWith(trimmedPrompt) || trimmedPrompt.startsWith(trigger);
+          });
+          return (
+            <div className="command-menu">
+              {visibleScripts.map((s, idx) => {
+                const trigger = "!" + s.name;
+                const isActive = trimmedPrompt === trigger;
+                return (
+                  <button
+                    key={s.name}
+                    className={`command-menu-item${commandMenuIndex === idx ? " highlighted" : ""}${isActive ? " active" : ""}`}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      onExecuteScriptCommand(trigger);
+                    }}
+                  >
+                    <span className="command-menu-name">{trigger}</span>
+                    <span className="command-menu-desc">{s.command}</span>
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
+
+        {showCommandMenu && !prompt.startsWith("!") && (() => {
           let menuItemIndex = 0;
           const newVisible = ("/new").startsWith(prompt.trim()) || prompt.trim().startsWith("/new");
           const newItemIndex = newVisible ? menuItemIndex++ : -1;

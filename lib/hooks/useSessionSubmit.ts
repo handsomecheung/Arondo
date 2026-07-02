@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import type { Session, TaskItem } from "@/types/home";
+import type { Session, TaskItem, ProjectScript } from "@/types/home";
 import { resolveAgentCommand, getUniqueTriggers, getTriggerWord } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
 
@@ -28,6 +28,8 @@ interface UseSessionSubmitParams {
   setApiError: (v: { title: string; message: string } | null) => void;
   loadProjects: () => void;
   agentCommands: AgentCommand[];
+  sessionScripts: ProjectScript[];
+  onRunScript: (name: string) => void;
   onDeleteSession: (id: string) => void;
   onTriggerFsModal?: () => void;
 }
@@ -55,6 +57,8 @@ export function useSessionSubmit({
   setApiError,
   loadProjects,
   agentCommands,
+  sessionScripts,
+  onRunScript,
   onDeleteSession,
   onTriggerFsModal,
 }: UseSessionSubmitParams) {
@@ -63,6 +67,13 @@ export function useSessionSubmit({
   const getVisibleMenuItems = useCallback((): string[] => {
     const v = prompt.trim();
     const items: string[] = [];
+    if (prompt.startsWith("!")) {
+      for (const s of sessionScripts) {
+        const trigger = "!" + s.name;
+        if (trigger.startsWith(v) || v.startsWith(trigger)) items.push(trigger);
+      }
+      return items;
+    }
     if (("/new").startsWith(v) || v.startsWith("/new")) items.push("/new");
     if (("/delete").startsWith(v) || v.startsWith("/delete")) items.push("/delete");
     for (const cmd of agentCommands) {
@@ -74,7 +85,7 @@ export function useSessionSubmit({
       if (isBrowsing || matches) items.push(slashTrigger);
     }
     return items;
-  }, [prompt, agentCommands]);
+  }, [prompt, agentCommands, sessionScripts]);
 
   const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
@@ -99,7 +110,12 @@ export function useSessionSubmit({
     const agentTriggers = getUniqueTriggers(agentCommands);
     const matchesAgentCmd = agentTriggers.some((t) => v.startsWith("/" + t) || ("/" + t).startsWith(v));
     const matchesCommand = v.startsWith("/new") || "/new".startsWith(v) || v.startsWith("/delete") || "/delete".startsWith(v) || matchesAgentCmd;
-    setShowCommandMenu(v.startsWith("/") && matchesCommand && !isNewSession && !!selectedSessionId);
+    const matchesScript = sessionScripts.some((s) => v.startsWith("!" + s.name) || ("!" + s.name).startsWith(v));
+    setShowCommandMenu(
+      ((v.startsWith("/") && matchesCommand) || (value.startsWith("!") && matchesScript)) &&
+        !isNewSession &&
+        !!selectedSessionId
+    );
     const el = e.target;
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 260)}px`;
@@ -167,6 +183,17 @@ export function useSessionSubmit({
     await sendAgentMessage(agentMessage);
   }, [sendAgentMessage, agentCommands]);
 
+  // Called from SessionView with the raw prompt text (e.g. "!build")
+  const handleScriptCommand = useCallback((promptText: string) => {
+    const scriptName = promptText.trim().replace(/^!/, "");
+    const match = sessionScripts.find((s) => s.name === scriptName);
+    if (!match) return;
+    setPrompt("");
+    setShowCommandMenu(false);
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
+    onRunScript(match.name);
+  }, [sessionScripts, onRunScript]);
+
   const handleSubmit = useCallback(async () => {
     const trimmed = prompt.trim();
     const isBlankSession = (isNewSession || !selectedSessionId) && !trimmed;
@@ -185,6 +212,14 @@ export function useSessionSubmit({
       if (textareaRef.current) textareaRef.current.style.height = "auto";
       onDeleteSession(selectedSessionId);
       return;
+    }
+
+    if (prompt.startsWith("!") && !isNewSession && selectedSessionId) {
+      const scriptName = trimmed.slice(1).trim();
+      if (sessionScripts.some((s) => s.name === scriptName)) {
+        handleScriptCommand(trimmed);
+        return;
+      }
     }
 
     const agentMsg = resolveAgentCommand(trimmed, agentCommands);
@@ -246,7 +281,7 @@ export function useSessionSubmit({
     } catch (err) {
       console.error(err);
     }
-  }, [prompt, repoPath, agentType, runnerId, isNewSession, selectedSessionId, loadProjects, setTaskQueue, handleNewSessionCommand, sendAgentMessage]);
+  }, [prompt, repoPath, agentType, runnerId, isNewSession, selectedSessionId, loadProjects, setTaskQueue, handleNewSessionCommand, sendAgentMessage, sessionScripts, handleScriptCommand, agentCommands]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return;
@@ -293,5 +328,5 @@ export function useSessionSubmit({
     }
   };
 
-  return { handlePromptChange, handleNewSessionCommand, handleAgentCommand, handleSubmit, handleKeyDown, commandMenuIndex };
+  return { handlePromptChange, handleNewSessionCommand, handleAgentCommand, handleScriptCommand, handleSubmit, handleKeyDown, commandMenuIndex };
 }
