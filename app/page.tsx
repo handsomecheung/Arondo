@@ -24,7 +24,7 @@ import ConfirmDialog from "@/components/modals/ConfirmDialog";
 import InfoDialog from "@/components/modals/InfoDialog";
 import {
   formatTime, formatRelative, formatDuration, readUrlState,
-  parseExecCommand, execCardInfoToItem,
+  parseExecCommand, execCardInfoToItem, resolveRepoFilePath,
 } from "@/lib/homeUtils";
 import type { ExecCardInfo } from "@/lib/homeUtils";
 import { useFileSystem } from "@/lib/hooks/useFileSystem";
@@ -141,6 +141,7 @@ export default function HomePage() {
   const [promptModalText, setPromptModalText] = useState<string | null>(null);
   const [shellModalOpen, setShellModalOpen] = useState(false);
   const [fileBrowserOpen, setFileBrowserOpen] = useState(false);
+  const [fileBrowserTargetPath, setFileBrowserTargetPath] = useState<string | undefined>(undefined);
 
   const activeLogMsgIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -972,6 +973,11 @@ export default function HomePage() {
             onDeleteSession={handleDeleteSession}
             onOpenShellModal={() => setShellModalOpen(true)}
             onOpenFileBrowser={() => setFileBrowserOpen(true)}
+            onOpenFilePath={(path) => {
+              const base = selectedSession?.repoPath ?? repoPath;
+              setFileBrowserTargetPath(resolveRepoFilePath(base, path));
+              setFileBrowserOpen(true);
+            }}
             onOpenRenameModal={() => {
               if (selectedSession && selectedSessionId) {
                 setRenameModal({ sessionId: selectedSessionId, currentName: selectedSession.name || selectedSession.prompt });
@@ -1046,9 +1052,10 @@ export default function HomePage() {
 
       <FileBrowserModal
         open={fileBrowserOpen}
-        onClose={() => setFileBrowserOpen(false)}
+        onClose={() => { setFileBrowserOpen(false); setFileBrowserTargetPath(undefined); }}
         runnerId={selectedSession?.runnerId ?? runnerId}
         initialPath={selectedSession?.repoPath ?? "/"}
+        initialFilePath={fileBrowserTargetPath}
       />
 
       <CommandModal

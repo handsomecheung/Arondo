@@ -62,6 +62,36 @@ func (h *Handler) handleFsRead(msg *Message) {
 	})
 }
 
+type fsExistsRequest struct {
+	Paths []string `json:"paths"`
+}
+
+type fsExistsResponse struct {
+	OK      bool            `json:"ok"`
+	Results map[string]bool `json:"results"`
+}
+
+func (h *Handler) handleFsExists(msg *Message) {
+	req, err := parsePayload[fsExistsRequest](msg)
+	if err != nil {
+		h.sendError(msg.ID, "INTERNAL", "invalid payload: "+err.Error())
+		return
+	}
+
+	results := make(map[string]bool, len(req.Paths))
+	for _, p := range req.Paths {
+		absPath, err := filepath.Abs(p)
+		if err != nil {
+			results[p] = false
+			continue
+		}
+		_, statErr := os.Stat(absPath)
+		results[p] = statErr == nil
+	}
+
+	h.sendResponse(msg.ID, fsExistsResponse{OK: true, Results: results})
+}
+
 type fsListRequest struct {
 	Path string `json:"path"`
 }

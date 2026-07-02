@@ -1,13 +1,24 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
+import remarkFileLinks, { extractCandidatePaths, candidateToPath } from "@/lib/remarkFileLinks";
+import { resolveRepoFilePath } from "@/lib/homeUtils";
 import ExecCard, { ExecCardProps } from "@/components/ExecCard";
-import { IconTerminal, IconFileText } from "@/components/Icons";
+import { IconTerminal, IconFileText, IconCode } from "@/components/Icons";
 
 // Terminal mode-control sequences (cursor visibility, mouse tracking, bracketed paste, etc.)
 // leak into agent PTY output but carry no visual meaning outside a real terminal emulator.
 function stripAnsi(text: string): string {
-  return text.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/\r/g, "");
+  return text
+    .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "")
+    .replace(/\r/g, "")
+    // agy occasionally emits U+FFFD replacement characters when a multi-byte
+    // UTF-8 sequence gets split across PTY output chunks; drop them rather
+    // than render mojibake in the markdown output.
+    .replace(/�/g, "");
 }
 
 
@@ -15,14 +26,19 @@ interface AgentExecCardProps extends ExecCardProps {
   sessionId: string;
   projectId?: string;
   ws: WebSocket | null;
+  repoPath?: string;
+  runnerId?: string;
   onShowPrompt?: () => void;
   onViewLog?: () => void;
+  onOpenFilePath?: (path: string) => void;
 }
 
-export default function AgentExecCard({ sessionId, projectId, ws, onShowPrompt, onViewLog, ...props }: AgentExecCardProps) {
+export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runnerId, onShowPrompt, onViewLog, onOpenFilePath, ...props }: AgentExecCardProps) {
   const isLive = props.item.status === "running";
   const [log, setLog] = useState("");
-  const outputRef = useRef<HTMLPreElement>(null);
+  const [showRaw, setShowRaw] = useState(false);
+  const [verifiedPaths, setVerifiedPaths] = useState<Set<string>>(new Set());
+  const outputRef = useRef<HTMLDivElement>(null);
 
 
   useEffect(() => {
@@ -73,8 +89,42 @@ export default function AgentExecCard({ sessionId, projectId, ws, onShowPrompt, 
     outputRef.current.scrollTop = outputRef.current.scrollHeight;
   }, [log, isLive]);
 
+  // Only linkify paths that actually exist on the runner's filesystem.
+  // Debounced so live-streaming output doesn't fire a check per chunk.
+  useEffect(() => {
+    if (!repoPath || !runnerId || !log) return;
+
+    const candidates = extractCandidatePaths(log);
+    if (candidates.length === 0) return;
+
+    const timer = setTimeout(() => {
+      const absPaths = candidates.map((c) => {
+        const path = candidateToPath(c);
+        return path.startsWith("/") ? path : resolveRepoFilePath(repoPath, path);
+      });
+      fetch("/api/fs/exists", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runner: runnerId, paths: absPaths }),
+      })
+        .then((r) => r.json())
+        .then(({ results }: { results?: Record<string, boolean> }) => {
+          if (!results) return;
+          const verified = new Set<string>();
+          candidates.forEach((c, i) => {
+            if (results[absPaths[i]]) verified.add(c);
+          });
+          setVerifiedPaths(verified);
+        })
+        .catch(() => {});
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [log, repoPath, runnerId]);
+
   const hasLog = !!props.item.messageId;
-  const extraMenuItems = (onShowPrompt || (hasLog && onViewLog))
+  const canToggleRaw = !onViewLog && hasLog && !!log;
+  const extraMenuItems = (onShowPrompt || (hasLog && onViewLog) || canToggleRaw)
     ? (closeMenu: () => void) => (
         <>
           {hasLog && onViewLog && (
@@ -84,6 +134,15 @@ export default function AgentExecCard({ sessionId, projectId, ws, onShowPrompt, 
             >
               <IconTerminal />
               <span>Show Log</span>
+            </button>
+          )}
+          {canToggleRaw && (
+            <button
+              className="task-menu-item"
+              onClick={() => { closeMenu(); setShowRaw((v) => !v); }}
+            >
+              <IconCode />
+              <span>{showRaw ? "Show HTML" : "Show Raw Output"}</span>
             </button>
           )}
           {onShowPrompt && (
@@ -104,10 +163,42 @@ export default function AgentExecCard({ sessionId, projectId, ws, onShowPrompt, 
       {...props}
       extraMenuItems={extraMenuItems}
     >
-      {!onViewLog && props.item.messageId && log && (
-        <pre ref={outputRef} className="agent-exec-output">
-          {log}
-        </pre>
+      {!onViewLog && props.item.messageId && log && showRaw && (
+        <div ref={outputRef} className="agent-exec-output agent-exec-output-raw">
+          <pre>{log}</pre>
+        </div>
+      )}
+      {!onViewLog && props.item.messageId && log && !showRaw && (
+        <div ref={outputRef} className="agent-exec-output">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, [remarkFileLinks, { verified: verifiedPaths }]]}
+            rehypePlugins={[rehypeHighlight]}
+            urlTransform={(url) => url}
+            components={{
+              a: ({ href, children, ...rest }) => {
+                if (href?.startsWith("filelink:")) {
+                  const path = href.slice("filelink:".length);
+                  return (
+                    <button
+                      type="button"
+                      className="agent-filelink-btn"
+                      onClick={() => onOpenFilePath?.(path)}
+                    >
+                      {children}
+                    </button>
+                  );
+                }
+                return (
+                  <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>
+                    {children}
+                  </a>
+                );
+              },
+            }}
+          >
+            {log}
+          </ReactMarkdown>
+        </div>
       )}
     </ExecCard>
   );

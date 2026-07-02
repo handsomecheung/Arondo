@@ -1428,7 +1428,6 @@ body {
   display: block;
   width: 100%;
   box-sizing: border-box;
-  margin: 0;
   max-height: 480px;
   overflow-x: hidden;
   overflow-y: auto;
@@ -1437,12 +1436,147 @@ body {
   border-radius: 0 0 var(--radius-md) var(--radius-md);
   background: var(--bg-tertiary);
   color: var(--text-primary);
-  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, monospace;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.55;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.agent-exec-output-raw pre {
+  margin: 0;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, monospace;
+  font-size: 12px;
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
+}
+
+.agent-exec-output > *:first-child { margin-top: 0; }
+.agent-exec-output > *:last-child { margin-bottom: 0; }
+
+.agent-exec-output p,
+.agent-exec-output ul,
+.agent-exec-output ol,
+.agent-exec-output blockquote {
+  margin: 8px 0;
+}
+
+.agent-exec-output ul,
+.agent-exec-output ol {
+  padding-left: 22px;
+}
+
+.agent-exec-output h1,
+.agent-exec-output h2,
+.agent-exec-output h3,
+.agent-exec-output h4,
+.agent-exec-output h5,
+.agent-exec-output h6 {
+  margin: 14px 0 6px;
+  font-weight: 600;
+}
+
+.agent-exec-output blockquote {
+  padding-left: 10px;
+  border-left: 2px solid var(--border);
+  color: var(--text-muted);
+}
+
+.agent-exec-output code {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, monospace;
+  font-size: 12px;
+  background: var(--bg-elevated);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
+.agent-exec-output pre {
+  margin: 8px 0;
+  padding: 10px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+}
+
+.agent-exec-output pre code {
+  background: none;
+  padding: 0;
+  font-size: 12px;
+}
+
+.agent-exec-output table {
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 12px;
+}
+
+.agent-exec-output th,
+.agent-exec-output td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+}
+
+.agent-exec-output a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.agent-filelink-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  vertical-align: -2px;
+  margin: 0;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.agent-filelink-btn::before {
+  content: "";
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+  background-color: var(--accent);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z'/%3E%3Cpolyline points='13 2 13 9 20 9'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z'/%3E%3Cpolyline points='13 2 13 9 20 9'/%3E%3C/svg%3E");
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  transition: background-color 0.15s ease;
+}
+
+.agent-filelink-btn code {
+  color: var(--accent);
+  background: var(--accent-glow);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.agent-filelink-btn:hover code,
+.agent-filelink-btn:focus-visible code {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  text-decoration-style: solid;
+}
+
+.agent-filelink-btn:hover::before,
+.agent-filelink-btn:focus-visible::before {
+  background-color: #fff;
 }
 
 /* Legacy: keep for modal badge */

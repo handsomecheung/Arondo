@@ -14,11 +14,12 @@ interface Props {
   onClose: () => void;
   runnerId: string;
   initialPath?: string;
+  initialFilePath?: string;
 }
 
 type View = "list" | "file";
 
-export default function FileBrowserModal({ open, onClose, runnerId, initialPath = "/" }: Props) {
+export default function FileBrowserModal({ open, onClose, runnerId, initialPath = "/", initialFilePath }: Props) {
   const [currentPath, setCurrentPath] = useState(initialPath);
   const [parentPath, setParentPath] = useState<string | null>(null);
   const [entries, setEntries] = useState<FsEntry[]>([]);
@@ -56,10 +57,16 @@ export default function FileBrowserModal({ open, onClose, runnerId, initialPath 
   }, [runnerId]);
 
   useEffect(() => {
-    if (open && runnerId) {
+    if (!open || !runnerId) return;
+    if (initialFilePath) {
+      const lastSlash = initialFilePath.lastIndexOf("/");
+      const dir = lastSlash > 0 ? initialFilePath.slice(0, lastSlash) : "/";
+      loadDir(dir);
+      openFile(initialFilePath);
+    } else {
       loadDir(initialPath);
     }
-  }, [open, runnerId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, runnerId, initialFilePath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const navigateTo = (path: string) => {
     setCurrentPath(path);

@@ -77,6 +77,7 @@ interface SessionViewProps {
   onDeleteSession: (id: string) => void;
   onOpenShellModal: () => void;
   onOpenFileBrowser: () => void;
+  onOpenFilePath: (path: string) => void;
   onOpenRenameModal: () => void;
   onManageScripts: () => void;
   onNewSession: () => void;
@@ -147,6 +148,7 @@ export default function SessionView({
   onDeleteSession,
   onOpenShellModal,
   onOpenFileBrowser,
+  onOpenFilePath,
   onOpenRenameModal,
   onManageScripts,
   agentCommands,
@@ -628,7 +630,10 @@ export default function SessionView({
                 {...sharedProps}
                 sessionId={selectedSessionId!}
                 ws={ws}
+                repoPath={selectedSession?.repoPath}
+                runnerId={selectedSession?.runnerId}
                 onShowPrompt={cardInfo.prompt ? () => onShowPrompt(cardInfo.prompt!) : undefined}
+                onOpenFilePath={onOpenFilePath}
               />
             );
           }

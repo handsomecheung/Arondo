@@ -1,6 +1,11 @@
 import type { ExecCardItem } from "@/components/ExecCard";
 import type { Message } from "@/types/home";
 
+export function resolveRepoFilePath(repoPath: string, path: string): string {
+  if (path.startsWith("/")) return path;
+  return `${repoPath.replace(/\/$/, "")}/${path}`;
+}
+
 export function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], {
     hour: "2-digit",
