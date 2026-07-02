@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from "react";
 import ScriptExecCard from "@/components/ScriptExecCard";
 import AgentExecCard from "@/components/AgentExecCard";
-import UserScriptQuickCard from "@/components/UserScriptQuickCard";
 import ExecCard, { ExecCardItem } from "@/components/ExecCard";
 import UserAgentCommandCard from "@/components/UserAgentCommandCard";
 import type { Session, ProjectScript, Runner, Message } from "@/types/home";
@@ -610,17 +609,6 @@ export default function SessionView({
               onStopTask: isCardRunning ? () => onStopExecCard(cardInfo.runMsg.id) : undefined,
               onRetryTask: isCardFailed ? () => onRetryCard(cardInfo) : undefined,
             };
-            if (cardInfo.isQuickCard) {
-              return (
-                <UserScriptQuickCard
-                  key={msg.id}
-                  cardInfo={cardInfo}
-                  sessionId={selectedSessionId!}
-                  ws={ws}
-                  onViewLog={() => onViewLog(msg.id)}
-                />
-              );
-            }
             if (cardInfo.isScript) {
               return (
                 <ScriptExecCard
@@ -628,6 +616,9 @@ export default function SessionView({
                   {...sharedProps}
                   onViewLog={() => onViewLog(msg.id)}
                   onRestartScript={isCardRunning ? () => onRestartScriptCard(cardInfo.runMsg.id, cardInfo.commandLabel) : undefined}
+                  showLogInline={cardInfo.isQuickCard}
+                  sessionId={selectedSessionId!}
+                  ws={ws}
                 />
               );
             }
