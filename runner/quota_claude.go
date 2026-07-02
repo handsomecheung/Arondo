@@ -126,8 +126,11 @@ func parseClaudeUsage(text string) *ClaudeQuota {
 		switch {
 		case strings.HasPrefix(line, "Current session"):
 			section = "session"
-		case strings.HasPrefix(line, "Current week"):
+		case strings.HasPrefix(line, "Current week (all models)"):
 			section = "week"
+		case strings.HasPrefix(line, "Current week"):
+			// e.g. "Current week (Fable)" is a separate per-model quota we don't track.
+			section = ""
 		default:
 			if m := claudeUsedRe.FindStringSubmatch(line); m != nil {
 				if f := pctToFloat(m[1]); f != nil {
