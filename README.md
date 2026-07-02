@@ -17,9 +17,9 @@ All execution goes through a Runner — there is no local fallback on the server
 
 ## Features
 
-- **Multi-Machine Runners**: Install Go runners on any development machine. The UI lets you pick which runner runs each session.
-- **Session-Based Workspaces**: Each task is encapsulated inside a self-contained session under `data/sessions/[sessionId]/`, tracking history, settings, and outputs.
-- **Granular Execution Logging**: Outputs for every CLI command execution are logged separately under `data/sessions/[sessionId]/logs/[messageId].log`.
+- **Multi-Machine Runners**: Install Go runners on any development machine. The UI lets you pick which runner runs each session. Supports deleting disconnected runners from the settings dashboard.
+- **Session-Based Workspaces**: Each task is encapsulated inside a self-contained session under the configuration directory (`~/.arondo/sessions/[sessionId]/` by default), tracking history, settings, and outputs.
+- **Granular Execution Logging**: Outputs for every CLI command execution are logged separately under `~/.arondo/sessions/[sessionId]/logs/[messageId].log`.
 - **Multiple AI Agents Support**: Supports **Antigravity CLI (agy)** and **Claude Code** for code generation tasks.
 - **Interactive Terminal (PTY)**: Both agent and script execution run in a full pseudo-terminal via Go's `creack/pty`, rendered in the browser with `xterm.js`. Supports interactive stdin, ANSI colors, and cursor control. PTY ensures reliable process cleanup on runner exit (SIGHUP). Interactive shell terminals are spawned directly on the runner rather than the server.
 - **Dedicated Execution Cards & Plain Text View**: Script execution uses `ScriptExecCard` with `xterm.js` for interactive output, while agent execution uses `AgentExecCard` with a lightweight, plain wrapped text view for better readability of agent outputs. Supports agent-specific icons (Claude, Antigravity, Codex, Shell) and a 'script-running' status.
@@ -31,14 +31,15 @@ All execution goes through a Runner — there is no local fallback on the server
 - **Secure Prompt Passing**: Prompts are passed to agents using temporary files and environment variables (using the `ARONDO_PROMPT_FILE` environment variable), avoiding shell command-line length limits and exposing sensitive prompts in command arguments. Displays the real resolved prompt instead of original raw inputs in the "Show Prompt" panel.
 - **Concurrent Script Execution**: Allows running multiple scripts simultaneously within a single session. The user can continue chatting while background scripts are running.
 - **Global & Session-scoped Scripts**: Supports running project-scoped custom scripts either globally (independent of a session, directly from the project panel) or within a specific session.
-- **Config-driven & Custom Slash Commands**: Slash commands (like `/new`, `/commit`, `/delete`) are config-driven and customizable. You can configure user-defined agent slash commands via the **Agent Commands** management UI in Settings (saved in `data/agent-commands.json`) with regex matcher and replacement expansion support.
+- **Config-driven & Custom Slash Commands**: Slash commands (like `/new`, `/commit`, `/delete`) are config-driven and customizable. You can configure user-defined agent slash commands via the **Agent Commands** management UI in Settings (saved in `~/.arondo/agent-commands.json` by default) with regex matcher and replacement expansion support.
 - **Smart Chat Input**: Supports Tab completion to cycle through slash commands in the command menu. Supports typing `@` symbol trigger to open a file/directory selector modal and insert the relative path into the chat input. Keyboard behavior is streamlined: send messages on `Enter`, insert a newline on `Ctrl+Enter` / `Meta+Enter`.
 - **Remote File Browsing & File Browser**: Browse directories on any connected runner directly from the UI when selecting a project path. Open a Remote File Browser with syntax highlighting (highlight.js) and a word wrap toggle option from the session's three-dot menu.
-- **Global Agent Rules Sync**: Configure global agent rules in the Settings UI, which are automatically synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on the runner nodes.
+- **Global Agent Rules Sync**: Configure global agent rules in the Settings UI, which are automatically synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on the runner nodes. Global rules are stored in `~/.arondo/global-rules.md`.
 - **Integrated Diff Viewer (diff2html)**: View visual code changes directly from the browser.
 - **Task Queue & Live Tracking**: Active task queue in the header with PID tracking and live log inspection. Clicking a task opens its dedicated console log modal. Each task can be killed from the queue.
 - **Task Grouping & Filtering**: In the Tasks dashboard, tasks can be filtered by type (Agent/Script) and grouped by either Scope (Session or Project for global tasks) or Status (Running, Completed, Stopped, Failed) for easier monitoring.
 - **Task Persistence**: Active task contexts are persisted by serializing execution metadata directly into the session and project `messages.json` files and dynamically restored on server restart. Runner IDs are stable across reconnections.
+- **Automated Data Lifecycle**: Automatically purges sessions or projects during listing queries if their parent references (e.g. project or runner) no longer exist.
 - **Mobile-Friendly UI**: Designed with collapsible panels, modal logs, responsive menus, and touch-friendly actions.
 - **Project Management**: Scopes and tracks sessions within resolved repository paths. Supports custom project scripts and AI auto-script discovery.
 
@@ -71,6 +72,7 @@ Open [http://localhost:3251](http://localhost:3251) in your browser. Select the 
 
 ## Configuration & Environment Variables
 
+- `ARONDO_CONFIG_DIR` – (Optional) Custom directory to store configuration and runtime data. Defaults to `~/.arondo` in both development and production.
 - `GITHUB_TOKEN` – (Optional) Personal access token used to automatically create/submit PRs from the browser.
 - `PORT` – (Optional) Server port. Defaults to `3251` in development, `3250` in production.
 

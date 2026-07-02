@@ -67,7 +67,7 @@ app/
     sessions/
       route.ts          # POST: create session & run agent via runner; GET: list sessions
       [id]/
-        route.ts        # DELETE: delete session (moves to data/deleted-sessions/)
+        route.ts        # DELETE: delete session (moves to ~/.arondo/deleted-sessions/)
         diff/
           route.ts      # GET: generate and serve visual HTML diff via runner + diff2html
         log/
@@ -110,6 +110,7 @@ components/
   Terminal.tsx          # xterm.js terminal component (live WS mode + history replay mode)
   ShellTerminal.tsx     # Interactive shell terminal component (spawns server-side PTY via WebSocket)
 lib/
+  config.ts             # Configuration helpers, resolves data directory (defaults to ~/.arondo)
   store.ts              # File-based JSON storage (sessions, messages, logs, projects, scripts)
   agentCommands.ts      # Merges built-in and user-defined agent slash commands, resolves matches
   event-bus.ts          # In-memory pub/sub (singleton on `process` for cross-context sharing)
@@ -126,7 +127,7 @@ scripts/
   run.server.sh         # Start the Next.js dev server
   run.runner1.sh        # Start Go runner 1 in dev mode (connects to localhost:3251)
   run.runner2.sh        # Start Go runner 2 in dev mode (connects to localhost:3251)
-data/                   # Runtime data (gitignored)
+~/.arondo/              # Runtime configuration & data directory (overridden by ARONDO_CONFIG_DIR)
   agent-commands.json   # Persisted custom agent slash commands
   global-rules.md       # Global agent rules written from Settings
   agy-sessions.json     # Map file matching Arondo sessionIds with agy conversation UUIDs
@@ -141,6 +142,8 @@ data/                   # Runtime data (gitignored)
       project.json      # Project metadata (id, repoPath, runnerId, createdAt, updatedAt)
       settings/
         scripts.json    # Configured custom scripts list for the project
+      logs/
+        [taskId].log    # Project-scoped execution output logs
   deleted-sessions/     # Soft-deleted sessions moved here upon deletion
 ```
 
@@ -215,13 +218,13 @@ Two WebSocket endpoints:
 **Cross-context singleton pattern:** The event bus and runner manager use `process` (not `global`) as the singleton carrier. This is required because `server.ts` runs via `tsx` while API routes run via Next.js Turbopack — they share the same `process` object but have separate `global` scopes.
 
 ## Core Logging & Session Lifecycle Features
-- **Message-specific execution logs**: Every agent or script execution creates a specific system message (e.g. `⚙️ Executing command...`). The resulting terminal outputs are streamed via the runner and stored in `data/sessions/[sessionId]/logs/[systemMsgId].log`.
+- **Message-specific execution logs**: Every agent or script execution creates a specific system message (e.g. `⚙️ Executing command...`). The resulting terminal outputs are streamed via the runner and stored in `~/.arondo/sessions/[sessionId]/logs/[systemMsgId].log`.
 - **Interactive Terminal (PTY)**: Script execution uses Go's `creack/pty` on the runner for full pseudo-terminal support (stdin, ANSI colors, cursor control). The frontend renders output via `xterm.js` (`components/Terminal.tsx`) in two modes: live (WebSocket-connected for running scripts, with historical log pre-loaded) and history (loads saved log data for completed scripts).
 - **Task Queue & Log Popup**: Tasks are tracked in a global header queue grouped by session, with session names always visible. Completed tasks are retained for 7 days. Clicking any task switches to its session and opens the log modal. Each running task has a kill button that sends SIGTERM via the runner.
 - **User-stopped vs Failed distinction**: When a task is killed via the UI, `TaskContext.stoppedByUser` is set, producing a 🛑 "Stopped by user" completion message and `errorMessage` instead of an ❌ error. The terminal shows a “─── stopped by user ───” separator.
 - **Dedicated Execution Cards & Plain Text View**: Unified `ExecCard` is split into `ScriptExecCard` (using `xterm.js` for interactive output) and `AgentExecCard` (using a plain wrapped text view for lightweight and readable agent execution output). Supports agent-specific icons (Claude, Antigravity, Codex, Shell) and a 'script-running' status.
 - **Restart/Retry actions**: `ScriptExecCard` shows a Restart button for script tasks (calls `restart-script` API → `exec.restart` on the runner) and `AgentExecCard` shows a Retry button for failed agent tasks (calls `rerun-agent` API). The terminal/view shows a “─── restarting ───” separator inline in the existing log.
-- **Slash commands in chat**: Slash commands are config-driven and customizable (managed via Settings UI and stored in `data/agent-commands.json`). Built-in commands include `/new [name]` (opens a new session) and `/delete` (deletes the current session). Custom agent commands can define regex matchers and message expansion templates (e.g. `/commit <msg>` expanding into a commit prompt).
+- **Slash commands in chat**: Slash commands are config-driven and customizable (managed via Settings UI and stored in `~/.arondo/agent-commands.json`). Built-in commands include `/new [name]` (opens a new session) and `/delete` (deletes the current session). Custom agent commands can define regex matchers and message expansion templates (e.g. `/commit <msg>` expanding into a commit prompt).
 - **Tab Completion & Keyboard UX**: Chat input supports Tab completion to cycle through slash commands. Send messages via `Enter`, and insert a newline via `Ctrl+Enter` / `Meta+Enter`.
 - **Open Terminal in session menu**: The three-dot dropdown in a session includes an "Open Terminal" option that opens a `ShellTerminal` modal for that session's runner.
 - **Real-time Streaming**: Both agent and script output stream via WebSocket `terminal:output` (base64-encoded PTY data), forwarded through the event bus. The frontend renders script logs via xterm.js and agent logs via the plain wrapped text view.
@@ -229,8 +232,8 @@ Two WebSocket endpoints:
 - **Task Persistence**: Active task contexts survive server restarts by restoring metadata from session and project `messages.json`. On runner reconnect, the `task.status` event reconciles running vs exited tasks.
 - **Runner Disconnect Handling**: When a runner disconnects, orphaned tasks are automatically failed with exit code -1, updating session status and notifying the UI.
 - **Agent Session Continuity**: ClaudeCodeAgent supports `--session-id` (bind to a session) and `--resume` (resume an existing session) flags, enabling multi-turn conversations within the same agent session.
-- **Global Agent Rules Sync**: Settings screen allows specifying global agent rules. These are stored in `data/global-rules.md` and automatically synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on runner nodes upon connection.
-- **AI Agent Quota Monitoring**: Runner nodes collect agent quota usage from Claude and Antigravity via tmux pane capture, which is saved locally under `data/agents/` on the server and displayed with progress bars in the Settings dashboard.
+- **Global Agent Rules Sync**: Settings screen allows specifying global agent rules. These are stored in `~/.arondo/global-rules.md` and automatically synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on runner nodes upon connection.
+- **AI Agent Quota Monitoring**: Runner nodes collect agent quota usage from Claude and Antigravity via tmux pane capture, which is saved locally under `~/.arondo/agents/` on the server and displayed with progress bars in the Settings dashboard.
 - **Secure Prompt Passing**: Instead of command line arguments, prompts are passed to agents using temporary files on the runner node. The file path is stored in the `ARONDO_PROMPT_FILE` environment variable (and resolved using shell redirection `$(< "$ARONDO_PROMPT_FILE")`), which mitigates command length constraints and process command argument exposure. The UI "Show Prompt" panel displays the real resolved prompt instead of the original raw inputs.
 - **AI Agent Auto-Selection (Auto Mode)**: Automatically selects the best agent and model based on hourly and weekly quota availability retrieved from the runner node.
   - **Choices**:
@@ -243,12 +246,14 @@ Two WebSocket endpoints:
     3. **Final Order**: Sort active choices by score in descending order and prepend them to the low-quota choices. The first candidate is selected and spawned with the mapped `--model` parameter.
 - **Manual Agent Switching**: Allows switching the active agent (Antigravity CLI, Claude Code, or Auto Model) of an existing session via a dropdown selector in the session header when no command is currently running.
 - **Inline Runner Node Details**: The settings screen is refactored to show the runner node details panel inline directly below the selected runner card for better usability.
+- **Disconnected Runner Deletion**: Allows deleting registered but disconnected runner nodes from the Settings UI, which purges their corresponding metadata and directories.
+- **Automated Data Lifecycle**: Automatically purges orphan sessions or projects on load if their parent references (e.g. project or runner) no longer exist.
 - **@ Path Selector Modal**: Typing `@` in the chat textarea opens a file and directory selector modal to easily select a path and insert its relative path into the input field.
 - **File Browser with Syntax Highlighting**: A Remote File Browser can be opened from the session's three-dot menu, featuring file previews (up to 512KB) with code syntax highlighting and a word wrap toggle option.
 
 ## Project & Custom Scripts Management
-- **Project Scoping**: Sessions are mapped to projects by repository path + runnerId. Projects store metadata at `data/projects/[projectId]/project.json`.
-- **Custom Project Scripts**: Commands (build, test, deploy) scoped to repositories, stored under `data/projects/[projectId]/settings/scripts.json`. Can be executed globally (sessionless, directly from the project panel) or inside a session.
+- **Project Scoping**: Sessions are mapped to projects by repository path + runnerId. Projects store metadata at `~/.arondo/projects/[projectId]/project.json`.
+- **Custom Project Scripts**: Commands (build, test, deploy) scoped to repositories, stored under `~/.arondo/projects/[projectId]/settings/scripts.json`. Can be executed globally (sessionless, directly from the project panel) or inside a session.
 - **AI Auto-Script Discovery**: Background process using `agy` to auto-detect and register project scripts.
 
 <!-- BEGIN:nextjs-agent-rules -->
