@@ -1388,7 +1388,15 @@ export default function SettingsPage() {
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDeleteCommand(cmd.command)}
+                        onClick={() => {
+                          setConfirmDialog({
+                            message: `Are you sure you want to delete the agent command "/${cmd.command}"?`,
+                            onConfirm: async () => {
+                              setConfirmDialog(null);
+                              await handleDeleteCommand(cmd.command);
+                            },
+                          });
+                        }}
                         title="Delete command"
                         style={{
                           padding: "4px 10px",
