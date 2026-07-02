@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import ScriptExecCard from "@/components/ScriptExecCard";
 import AgentExecCard from "@/components/AgentExecCard";
+import ExecCard, { ExecCardItem } from "@/components/ExecCard";
+import UserAgentCommandCard from "@/components/UserAgentCommandCard";
 import type { Session, ProjectScript, Runner, Message } from "@/types/home";
 import type { ExecCardInfo } from "@/lib/homeUtils";
 import { formatTime, execCardInfoToItem } from "@/lib/homeUtils";
@@ -10,7 +12,7 @@ import {
   IconBolt, IconPlus, IconSend, IconCheck,
   IconGitPullRequest, IconPlay, IconTerminal, IconEdit, IconTrash,
   IconMoreVertical, IconFolder, IconChevronDown, IconFileSearch,
-  IconClaude, IconAntigravity, IconCodex,
+  IconClaude, IconAntigravity, IconCodex, IconFileText,
 } from "@/components/Icons";
 import { getTriggerWord, resolveAgentCommand } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
@@ -624,6 +626,18 @@ export default function SessionView({
                 sessionId={selectedSessionId!}
                 ws={ws}
                 onShowPrompt={cardInfo.prompt ? () => onShowPrompt(cardInfo.prompt!) : undefined}
+              />
+            );
+          }
+
+          if (msg.role === "user" && msg.content.startsWith("/")) {
+            const cmdWord = msg.content.trim().split(/\s+/)[0];
+            return (
+              <UserAgentCommandCard
+                key={msg.id}
+                title={cmdWord}
+                statusText="Sent"
+                timestamp={formatTime(msg.createdAt)}
               />
             );
           }

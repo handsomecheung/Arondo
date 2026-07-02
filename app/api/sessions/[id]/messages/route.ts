@@ -22,12 +22,13 @@ export async function POST(
     return NextResponse.json({ error: "Agent is already running for this session" }, { status: 400 });
   }
 
-  const { message, type } = await req.json();
+  const { message, type, prompt } = await req.json();
   if (!message || !message.trim()) {
     return NextResponse.json({ error: "message is required" }, { status: 400 });
   }
 
   const trimmedMessage = message.trim();
+  const trimmedPrompt = prompt?.trim();
 
   try {
     const messages = await getMessages(id);
@@ -36,6 +37,7 @@ export async function POST(
       sessionId: id,
       role: "user",
       content: trimmedMessage,
+      prompt: trimmedPrompt || undefined,
       type: type || "chat-user",
     });
     eventBus.publish({ type: "message_added", payload: userMsg });
@@ -55,10 +57,10 @@ export async function POST(
       : messages.some((m) => m.type === "agent-run");
 
     // On agent switch, prepend the previous agent's conversation as context.
-    let effectivePrompt = trimmedMessage;
+    let effectivePrompt = trimmedPrompt || trimmedMessage;
     if (isAgentSwitch) {
       const ctx = await buildCrossAgentContext(id, resolvedType, messages);
-      if (ctx) effectivePrompt = `${ctx}\n\n${trimmedMessage}`;
+      if (ctx) effectivePrompt = `${ctx}\n\n${effectivePrompt}`;
     }
 
     const agent = getAgent(resolvedType);

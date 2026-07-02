@@ -1292,6 +1292,16 @@ body {
   margin: 2px 0;
 }
 
+.exec-card.user-agent-command-card {
+  background: rgba(79, 70, 229, 0.1);
+  border-color: rgba(79, 70, 229, 0.3);
+}
+
+.exec-card.user-agent-command-card .exec-card-icon {
+  background: var(--accent);
+  color: white;
+}
+
 .exec-card-running {
   border-color: rgba(99, 102, 241, 0.3);
 }

@@ -149,7 +149,7 @@ export function useSessionSubmit({
     loadProjects();
   }, [selectedSession, loadProjects]);
 
-  const sendAgentMessage = useCallback(async (agentMessage: string) => {
+  const sendAgentMessage = useCallback(async (originalMessage: string, agentMessage: string) => {
     if (!selectedSessionId) return;
     setPrompt("");
     setShowCommandMenu(false);
@@ -157,13 +157,13 @@ export function useSessionSubmit({
     const tempTaskId = `agent-${selectedSessionId}-${Date.now()}`;
     setTaskQueue((prev) => [
       ...prev,
-      { id: tempTaskId, type: "agent", name: `Agent: ${agentMessage}`, sessionId: selectedSessionId, status: "running", createdAt: Date.now() },
+      { id: tempTaskId, type: "agent", name: `Agent: ${originalMessage}`, sessionId: selectedSessionId, status: "running", createdAt: Date.now() },
     ]);
     try {
       const res = await fetch(`/api/sessions/${selectedSessionId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: agentMessage, type: "chat-user" }),
+        body: JSON.stringify({ message: originalMessage, prompt: agentMessage, type: "chat-user" }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -180,7 +180,7 @@ export function useSessionSubmit({
   const handleAgentCommand = useCallback(async (promptText: string) => {
     const agentMessage = resolveAgentCommand(promptText, agentCommands);
     if (agentMessage === null) return;
-    await sendAgentMessage(agentMessage);
+    await sendAgentMessage(promptText, agentMessage);
   }, [sendAgentMessage, agentCommands]);
 
   // Called from SessionView with the raw prompt text (e.g. "!build" or "!ls").
@@ -226,7 +226,7 @@ export function useSessionSubmit({
 
     const agentMsg = resolveAgentCommand(trimmed, agentCommands);
     if (agentMsg !== null && !isNewSession && selectedSessionId) {
-      await sendAgentMessage(agentMsg);
+      await sendAgentMessage(trimmed, agentMsg);
       return;
     }
 

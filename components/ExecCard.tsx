@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { IconClaude, IconAntigravity } from "@/components/Icons";
+import { IconClaude, IconAntigravity, IconTerminal } from "@/components/Icons";
 
 export interface ExecCardItem {
   id: string;
-  type: "agent" | "script";
+  type: "agent" | "script" | "command";
   agentType?: string;
   title: string;
   subtitle?: string;
@@ -118,6 +118,8 @@ export default function ExecCard({ item, onShowCommand, onStopTask, onRestartScr
         <div className="exec-card-icon">
           {isRunning ? (
             <span className="exec-card-spinner" />
+          ) : item.type === "command" ? (
+            <IconTerminal />
           ) : item.type === "script" ? (
             <IconShell />
           ) : item.agentType === "claude" ? (
@@ -128,7 +130,7 @@ export default function ExecCard({ item, onShowCommand, onStopTask, onRestartScr
         </div>
         <div className="exec-card-info">
           <div className="exec-card-title">
-            {item.type === "script" ? "Script" : "Agent"}: {item.title}
+            {item.type === "script" ? "Script" : item.type === "command" ? "Command" : "Agent"}: {item.title}
           </div>
           {item.subtitle && (
             <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
