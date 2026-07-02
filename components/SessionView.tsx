@@ -80,6 +80,7 @@ interface SessionViewProps {
   onOpenFilePath: (path: string) => void;
   onOpenRenameModal: () => void;
   onManageScripts: () => void;
+  onGoToProject: () => void;
   onNewSession: () => void;
   agentCommands: AgentCommand[];
   onNewSessionCommand: (name?: string) => void;
@@ -151,6 +152,7 @@ export default function SessionView({
   onOpenFilePath,
   onOpenRenameModal,
   onManageScripts,
+  onGoToProject,
   agentCommands,
   onNewSession,
   onNewSessionCommand,
@@ -529,6 +531,19 @@ export default function SessionView({
                 >
                   <IconTerminal /> Open Terminal
                 </button>
+
+                {selectedSession.projectId && (
+                  <button
+                    className="menu-item"
+                    onClick={() => {
+                      onGoToProject();
+                      onSetMenuOpen(false);
+                    }}
+                    id="menu-go-to-project"
+                  >
+                    <IconFolder /> Go to Project
+                  </button>
+                )}
 
                 <button
                   className="menu-item"

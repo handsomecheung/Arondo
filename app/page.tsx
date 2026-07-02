@@ -991,6 +991,9 @@ export default function HomePage() {
               setSidebarMode("projects");
               setSidebarOpen(true);
             }}
+            onGoToProject={() => {
+              if (selectedSession?.projectId) handleSelectProject(selectedSession.projectId);
+            }}
             agentCommands={agentCommands}
             onNewSession={handleNewSession}
             onNewSessionCommand={handleNewSessionCommand}
