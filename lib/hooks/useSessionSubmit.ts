@@ -183,15 +183,17 @@ export function useSessionSubmit({
     await sendAgentMessage(agentMessage);
   }, [sendAgentMessage, agentCommands]);
 
-  // Called from SessionView with the raw prompt text (e.g. "!build")
+  // Called from SessionView with the raw prompt text (e.g. "!build" or "!ls").
+  // If the text after "!" matches a predefined script, that script runs; otherwise
+  // it's executed as a raw shell command.
   const handleScriptCommand = useCallback((promptText: string) => {
-    const scriptName = promptText.trim().replace(/^!/, "");
-    const match = sessionScripts.find((s) => s.name === scriptName);
-    if (!match) return;
+    const rest = promptText.trim().replace(/^!/, "").trim();
+    if (!rest) return;
     setPrompt("");
     setShowCommandMenu(false);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
-    onRunScript(match.name);
+    const match = sessionScripts.find((s) => s.name === rest);
+    onRunScript(match ? match.name : rest);
   }, [sessionScripts, onRunScript]);
 
   const handleSubmit = useCallback(async () => {
@@ -215,8 +217,8 @@ export function useSessionSubmit({
     }
 
     if (prompt.startsWith("!") && !isNewSession && selectedSessionId) {
-      const scriptName = trimmed.slice(1).trim();
-      if (sessionScripts.some((s) => s.name === scriptName)) {
+      const rest = trimmed.slice(1).trim();
+      if (rest) {
         handleScriptCommand(trimmed);
         return;
       }

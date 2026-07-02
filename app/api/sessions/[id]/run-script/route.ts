@@ -29,10 +29,8 @@ export async function POST(
   const runningScripts = session.runningScripts || [];
 
   const scripts = await getProjectScripts(session.projectId);
-  const script = scripts.find((s) => s.name === scriptName);
-  if (!script) {
-    return NextResponse.json({ error: `Script "${scriptName}" not found` }, { status: 404 });
-  }
+  // Not a predefined script -> treat scriptName as a raw shell command entered via "!" in chat.
+  const script = scripts.find((s) => s.name === scriptName) ?? { name: scriptName, command: scriptName };
 
   const systemMsg = await addMessage({
     sessionId: id,
