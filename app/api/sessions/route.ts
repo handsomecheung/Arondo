@@ -1,6 +1,6 @@
 import path from "path";
 import { NextRequest, NextResponse } from "next/server";
-import { getSessions, createSession, updateSession, addMessage, clearSessionLog } from "@/lib/store";
+import { getSessions, getProjects, deleteSession, createSession, updateSession, addMessage, clearSessionLog } from "@/lib/store";
 import { getAgent, AgentType, resolveAgentType, PROMPT_ENV_VAR } from "@/lib/agents";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
@@ -20,7 +20,22 @@ function deriveSessionName(prompt: string, repoPath: string): string {
 
 export async function GET() {
   const sessions = await getSessions();
-  return NextResponse.json(sessions);
+  const projects = await getProjects();
+  const projectIds = new Set(projects.map((p) => p.id));
+
+  const valid: typeof sessions = [];
+  for (const session of sessions) {
+    if (session.projectId && !projectIds.has(session.projectId)) {
+      console.log(`[sessions] project ${session.projectId} for session ${session.id} no longer exists, deleting session`);
+      runnerManager.removeTasksForSession(session.id);
+      await deleteSession(session.id);
+      eventBus.publish({ type: "session_deleted", payload: { id: session.id } });
+      continue;
+    }
+    valid.push(session);
+  }
+
+  return NextResponse.json(valid);
 }
 
 export async function POST(req: NextRequest) {
