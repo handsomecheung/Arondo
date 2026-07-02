@@ -67,6 +67,7 @@ export interface ExecCardInfo {
   command: string;
   agentType?: string;
   prompt?: string;
+  isQuickCard?: boolean;
 }
 
 export function execCardInfoToItem(info: ExecCardInfo): ExecCardItem {

@@ -288,7 +288,7 @@ export function useScripts({
     });
   };
 
-  const handleRunScript = async (scriptName: string) => {
+  const handleRunScript = async (scriptName: string, promptText?: string) => {
     if (!selectedSessionId) return;
     setMenuOpen(false);
     setScriptSubMenuOpen(false);
@@ -309,7 +309,7 @@ export function useScripts({
       const res = await fetch(`/api/sessions/${selectedSessionId}/run-script`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scriptName }),
+        body: JSON.stringify({ scriptName, prompt: promptText }),
       });
       if (!res.ok) {
         const data = await res.json();

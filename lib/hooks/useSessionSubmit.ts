@@ -29,7 +29,7 @@ interface UseSessionSubmitParams {
   loadProjects: () => void;
   agentCommands: AgentCommand[];
   sessionScripts: ProjectScript[];
-  onRunScript: (name: string) => void;
+  onRunScript: (name: string, promptText?: string) => void;
   onDeleteSession: (id: string) => void;
   onTriggerFsModal?: () => void;
 }
@@ -193,7 +193,7 @@ export function useSessionSubmit({
     setShowCommandMenu(false);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
     const match = sessionScripts.find((s) => s.name === rest);
-    onRunScript(match ? match.name : rest);
+    onRunScript(match ? match.name : rest, promptText);
   }, [sessionScripts, onRunScript]);
 
   const handleSubmit = useCallback(async () => {

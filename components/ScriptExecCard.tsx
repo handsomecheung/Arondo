@@ -18,5 +18,5 @@ export default function ScriptExecCard({ onViewLog, ...props }: ScriptExecCardPr
     )
     : undefined;
 
-  return <ExecCard {...props} extraMenuItems={extraMenuItems} />;
+  return <ExecCard {...props} extraMenuItems={extraMenuItems} className="script-exec-card" />;
 }

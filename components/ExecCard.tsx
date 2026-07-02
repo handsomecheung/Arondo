@@ -18,6 +18,7 @@ export interface ExecCardItem {
 
 export interface ExecCardProps {
   item: ExecCardItem;
+  className?: string;
   onShowCommand?: () => void;
   onStopTask?: () => void;
   onRestartScript?: () => void;
@@ -79,7 +80,7 @@ function IconShell() {
   );
 }
 
-export default function ExecCard({ item, onShowCommand, onStopTask, onRestartScript, onRetryTask, extraMenuItems, children }: ExecCardProps) {
+export default function ExecCard({ item, className, onShowCommand, onStopTask, onRestartScript, onRetryTask, extraMenuItems, children }: ExecCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -113,7 +114,7 @@ export default function ExecCard({ item, onShowCommand, onStopTask, onRestartScr
     (isFailed && !!onRetryTask);
 
   return (
-    <div className={`exec-card ${statusClass}`}>
+    <div className={`exec-card ${statusClass} ${className || ""}`}>
       <div className="exec-card-header">
         <div className="exec-card-icon">
           {isRunning ? (

@@ -21,7 +21,7 @@ export async function POST(
     );
   }
 
-  const { scriptName } = await req.json();
+  const { scriptName, prompt } = await req.json();
   if (!scriptName) {
     return NextResponse.json({ error: "scriptName is required" }, { status: 400 });
   }
@@ -37,6 +37,7 @@ export async function POST(
     role: "system",
     content: `⚙️ Running script: **${script.name}**\n\`\`\`bash\n${script.command}\n\`\`\``,
     type: "script-run",
+    prompt,
   });
   eventBus.publish({ type: "message_added", payload: systemMsg });
 

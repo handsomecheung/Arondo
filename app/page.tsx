@@ -358,6 +358,7 @@ export default function HomePage() {
           command: parsed.command,
           agentType: msg.resolvedAgentType,
           prompt: msg.prompt || lastUserPrompt || undefined,
+          isQuickCard: msg.type === "script-run" && !!msg.prompt && msg.prompt.startsWith("!"),
         });
         if (msg.type === "script-run") {
           unmatchedScript.push(msg.id);
