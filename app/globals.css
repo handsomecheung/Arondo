@@ -1668,6 +1668,14 @@ body {
   overflow: hidden;
 }
 
+/* Mobile single-view body */
+.fb-mobile-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 @media (min-width: 641px) {
   .fb-desktop-body {
     display: flex;
@@ -1675,14 +1683,6 @@ body {
   .fb-mobile-body {
     display: none;
   }
-}
-
-/* Mobile single-view body */
-.fb-mobile-body {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
 }
 
 .fb-list-panel {
