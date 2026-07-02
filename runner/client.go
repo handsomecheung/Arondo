@@ -138,9 +138,6 @@ func (c *Client) sendAgentStatus(queryAgents []string) error {
 
 func (c *Client) sendTaskStatus() error {
 	tasks := c.handler.taskManager.ListTasks()
-	if len(tasks) == 0 {
-		return nil
-	}
 
 	type taskStatus struct {
 		TaskID   string `json:"taskId"`
@@ -148,7 +145,10 @@ func (c *Client) sendTaskStatus() error {
 		ExitCode *int   `json:"exitCode,omitempty"`
 	}
 
-	var statuses []taskStatus
+	// Always report, even when empty: the server relies on this event (including
+	// an empty task list) to detect tasks it still thinks are running but that
+	// this runner has lost track of (e.g. after a runner process restart).
+	statuses := make([]taskStatus, 0, len(tasks))
 	for _, t := range tasks {
 		ts := taskStatus{TaskID: t.ID}
 		if t.Done {
