@@ -64,7 +64,7 @@ func (tm *TaskManager) Spawn(opts SpawnOptions) (int, error) {
 			t.ptyFile.Close()
 		}
 		if t.cmd != nil && t.cmd.Process != nil {
-			t.cmd.Process.Signal(syscall.SIGKILL)
+			killTaskProcess(t.cmd, syscall.SIGKILL)
 		}
 		delete(tm.tasks, opts.TaskID)
 	}
@@ -76,7 +76,6 @@ func (tm *TaskManager) Spawn(opts SpawnOptions) (int, error) {
 	} else {
 		cmd.Env = os.Environ()
 	}
-
 	t := &task{
 		id:        opts.TaskID,
 		cmd:       cmd,
@@ -195,7 +194,7 @@ func (tm *TaskManager) Restart(taskID, command, workDir string, cols, rows uint1
 	t.isRestarting = true
 	procDoneC := t.procDoneC
 	if t.cmd.Process != nil {
-		t.cmd.Process.Signal(syscall.SIGTERM)
+		killTaskProcess(t.cmd, syscall.SIGTERM)
 	}
 	t.mu.Unlock()
 
@@ -206,7 +205,7 @@ func (tm *TaskManager) Restart(taskID, command, workDir string, cols, rows uint1
 		// Escalate to SIGKILL.
 		t.mu.Lock()
 		if !t.done && t.cmd.Process != nil {
-			t.cmd.Process.Signal(syscall.SIGKILL)
+			killTaskProcess(t.cmd, syscall.SIGKILL)
 		}
 		t.mu.Unlock()
 		select {
@@ -231,7 +230,6 @@ func (tm *TaskManager) Restart(taskID, command, workDir string, cols, rows uint1
 	cmd := execCommand("bash", "-c", command)
 	cmd.Dir = workDir
 	cmd.Env = os.Environ()
-
 	t.mu.Lock()
 	t.cmd = cmd
 	t.done = false
@@ -301,7 +299,7 @@ func (tm *TaskManager) Kill(taskID string, signal syscall.Signal) error {
 	if t.cmd.Process == nil {
 		return fmt.Errorf("task %s process not started", taskID)
 	}
-	return t.cmd.Process.Signal(signal)
+	return killTaskProcess(t.cmd, signal)
 }
 
 func (tm *TaskManager) GetBuffer(taskID string) ([]byte, error) {
@@ -343,4 +341,17 @@ func (tm *TaskManager) Cleanup(taskID string) {
 		}
 		delete(tm.tasks, taskID)
 	}
+}
+
+// killTaskProcess sends the specified signal to the process group of the command if possible,
+// falling back to the process itself.
+func killTaskProcess(cmd *exec.Cmd, sig syscall.Signal) error {
+	if cmd == nil || cmd.Process == nil {
+		return fmt.Errorf("process not started")
+	}
+	pgid, err := syscall.Getpgid(cmd.Process.Pid)
+	if err == nil {
+		return syscall.Kill(-pgid, sig)
+	}
+	return cmd.Process.Signal(sig)
 }
