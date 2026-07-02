@@ -113,7 +113,10 @@ export function useWebSocket({
             if (msg.sessionId === selectedSessionId) {
               setMessages((prev) => {
                 if (prev.find((m) => m.id === msg.id)) return prev;
-                return [...prev, msg];
+                const filtered = prev.filter(
+                  (m) => !(m.parentId === msg.parentId && m.id.startsWith("optimistic-stopped-"))
+                );
+                return [...filtered, msg];
               });
             }
 

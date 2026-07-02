@@ -390,6 +390,20 @@ export default function TasksPage() {
   const handleKillTask = async (task: TaskItem) => {
     if (!task.messageId) return;
     try {
+      // Optimistic update: instantly set task status to 'stopped' to update UI
+      setTaskQueue((prev) =>
+        prev.map((t) => {
+          if (t.id === task.id) {
+            return {
+              ...t,
+              status: "stopped" as const,
+              completedAt: Date.now(),
+            };
+          }
+          return t;
+        })
+      );
+
       await fetch("/api/tasks/kill", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

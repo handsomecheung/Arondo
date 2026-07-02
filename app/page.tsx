@@ -604,6 +604,25 @@ export default function HomePage() {
   const handleStopExecCard = async (msgId: string) => {
     if (!selectedSessionId) return;
     try {
+      // Optimistic update: instantly add a stopped message to the state to refresh ExecCard
+      const isScript = execCards.get(msgId)?.isScript ?? false;
+      const optimisticReturnMsg: Message = {
+        id: `optimistic-stopped-${msgId}`,
+        sessionId: selectedSessionId,
+        role: "system",
+        content: "🛑 Stopped by user",
+        type: isScript ? "script-return" : "agent-return",
+        parentId: msgId,
+        createdAt: new Date().toISOString(),
+      };
+
+      setMessages((prev) => {
+        if (prev.some((m) => m.parentId === msgId && (m.type === "agent-return" || m.type === "script-return"))) {
+          return prev;
+        }
+        return [...prev, optimisticReturnMsg];
+      });
+
       await fetch("/api/tasks/kill", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
