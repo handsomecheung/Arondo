@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/store";
 import { runnerManager } from "@/lib/runner-manager";
+import * as Diff2Html from "diff2html";
+import fs from "fs";
+import path from "path";
 
+let diff2htmlCss = "";
+try {
+  const cssPath = path.join(process.cwd(), "node_modules/diff2html/bundles/css/diff2html.min.css");
+  diff2htmlCss = fs.readFileSync(cssPath, "utf8");
+} catch (e) {
+  console.warn("Failed to read diff2html css from node_modules, falling back to CDN:", e);
+}
 
 export async function GET(
   req: NextRequest,
@@ -9,6 +19,8 @@ export async function GET(
 ) {
   const { id } = await params;
   const session = await getSession(id);
+  const { searchParams } = new URL(req.url);
+  const wrap = searchParams.get("wrap") === "true";
 
   if (!session) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
@@ -40,7 +52,7 @@ export async function GET(
       justify-content: center;
       height: 100vh;
       margin: 0;
-      background-color: #f6f8fa;
+      background-color: #f8fafc;
       color: #57606a;
     }
     .container { text-align: center; }
@@ -59,13 +71,101 @@ export async function GET(
       });
     }
 
-    if (result.html) {
-      return new NextResponse(result.html, {
+    if (result.diff) {
+      const diffHtml = Diff2Html.html(result.diff, {
+        drawFileList: true,
+        matching: "lines",
+        outputFormat: "line-by-line",
+      });
+
+      const fullHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Git Diff</title>
+  ${diff2htmlCss ? `<style>${diff2htmlCss}</style>` : `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css" />`}
+  <style>
+    body {
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    .d2h-wrapper {
+      background-color: #ffffff;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 10px;
+      box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+      padding: 10px;
+      border: none !important;
+    }
+    .d2h-file-wrapper {
+      border: 1px solid rgba(15, 23, 42, 0.08) !important;
+      border-radius: 8px !important;
+      margin-bottom: 20px !important;
+      overflow: hidden;
+    }
+    .d2h-file-header {
+      background-color: #f1f5f9 !important;
+      border-bottom: 1px solid rgba(15, 23, 42, 0.08) !important;
+      padding: 3px 6px !important;
+      height: auto !important;
+      font-size: 10px !important;
+    }
+    .d2h-diff-table {
+      font-size: 9px !important;
+      line-height: 12px !important;
+    }
+    .d2h-code-line {
+      line-height: 12px !important;
+    }
+    .d2h-code-line-ctn {
+      padding-left: 4px !important;
+    }
+    .d2h-file-name {
+      font-size: 10px !important;
+    }
+    .d2h-file-list-title {
+      font-size: 11px !important;
+    }
+    /* Maximize horizontal space on mobile devices */
+    @media (max-width: 640px) {
+      body {
+        padding: 0 !important;
+      }
+      .d2h-wrapper {
+        padding: 0 !important;
+      }
+      .d2h-file-wrapper {
+        border-left: none !important;
+        border-right: none !important;
+        border-radius: 0 !important;
+        margin-bottom: 10px !important;
+      }
+      .d2h-file-header {
+        border-radius: 0 !important;
+      }
+    }
+    ${wrap ? `
+    .d2h-code-line-ctn {
+      white-space: pre-wrap !important;
+      word-break: break-all !important;
+    }
+    ` : ""}
+  </style>
+</head>
+<body>
+  ${diffHtml}
+</body>
+</html>`;
+
+      return new NextResponse(fullHtml, {
         headers: { "Content-Type": "text/html; charset=utf-8" },
       });
     }
 
-    // diff2html not available on runner — return raw diff as preformatted HTML
+    // Fallback: diff2html not available or error — return raw diff as preformatted HTML
     const rawHtml = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Diff</title>
 <style>body{font-family:monospace;white-space:pre-wrap;padding:1em;background:#f8fafc;color:#0f172a;}</style>

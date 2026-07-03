@@ -15,6 +15,7 @@ import ChatFileSelectorModal from "@/components/modals/ChatFileSelectorModal";
 import LogConsoleModal from "@/components/modals/LogConsoleModal";
 import ShellTerminalModal from "@/components/modals/ShellTerminalModal";
 import FileBrowserModal from "@/components/modals/FileBrowserModal";
+import DiffModal from "@/components/modals/DiffModal";
 import CommandModal from "@/components/modals/CommandModal";
 import AddScriptModal from "@/components/modals/AddScriptModal";
 import ToastNotification from "@/components/modals/ToastNotification";
@@ -142,6 +143,7 @@ export default function HomePage() {
   const [shellModalOpen, setShellModalOpen] = useState(false);
   const [fileBrowserOpen, setFileBrowserOpen] = useState(false);
   const [fileBrowserTargetPath, setFileBrowserTargetPath] = useState<string | undefined>(undefined);
+  const [diffModalOpen, setDiffModalOpen] = useState(false);
 
   const activeLogMsgIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -967,6 +969,7 @@ export default function HomePage() {
             onDeleteSession={handleDeleteSession}
             onOpenShellModal={() => setShellModalOpen(true)}
             onOpenFileBrowser={() => setFileBrowserOpen(true)}
+            onShowDiff={() => setDiffModalOpen(true)}
             onOpenFilePath={(path) => {
               const base = selectedSession?.repoPath ?? repoPath;
               setFileBrowserTargetPath(resolveRepoFilePath(base, path));
@@ -1053,6 +1056,12 @@ export default function HomePage() {
         runnerId={selectedSession?.runnerId ?? runnerId}
         initialPath={selectedSession?.repoPath ?? "/"}
         initialFilePath={fileBrowserTargetPath}
+      />
+
+      <DiffModal
+        open={diffModalOpen}
+        onClose={() => setDiffModalOpen(false)}
+        sessionId={selectedSessionId || ""}
       />
 
       <CommandModal

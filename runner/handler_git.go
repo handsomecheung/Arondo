@@ -95,22 +95,10 @@ func (h *Handler) handleGitDiff(msg *Message) {
 		}
 	}
 
-	var html string
-	if strings.TrimSpace(diff) != "" {
-		diff2htmlCmd := execCommand("diff2html", "-i", "stdin", "-o", "stdout")
-		diff2htmlCmd.Dir = req.WorkDir
-		diff2htmlCmd.Stdin = strings.NewReader(diff)
-		htmlOut, err := diff2htmlCmd.Output()
-		if err == nil {
-			html = string(htmlOut)
-		}
-	}
-
 	h.sendResponse(msg.ID, gitDiffResponse{
 		OK:         true,
 		HasChanges: strings.TrimSpace(diff) != "",
 		Diff:       diff,
-		HTML:       html,
 	})
 }
 

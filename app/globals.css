@@ -2581,3 +2581,22 @@ body {
     transform: scale(0.95);
   }
 }
+
+/* ─── Diff Modal ────────────────────────────────────────────────────────────── */
+.diff-modal {
+  width: 90vw;
+  max-width: 1200px;
+  height: 85vh;
+  max-height: 85dvh;
+}
+
+@media (max-width: 640px) {
+  .diff-modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
+}

@@ -74,6 +74,7 @@ interface SessionViewProps {
   onDeleteSession: (id: string) => void;
   onOpenShellModal: () => void;
   onOpenFileBrowser: () => void;
+  onShowDiff: () => void;
   onOpenFilePath: (path: string) => void;
   onOpenRenameModal: () => void;
   onManageScripts: () => void;
@@ -143,6 +144,7 @@ export default function SessionView({
   onDeleteSession,
   onOpenShellModal,
   onOpenFileBrowser,
+  onShowDiff,
   onOpenFilePath,
   onOpenRenameModal,
   onManageScripts,
@@ -399,16 +401,16 @@ export default function SessionView({
                     🔍 Show Diff
                   </button>
                 ) : (
-                  <a
-                    href={`/api/sessions/${selectedSessionId}/diff`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
                     className="menu-item"
-                    onClick={() => onSetMenuOpen(false)}
+                    onClick={() => {
+                      onSetMenuOpen(false);
+                      onShowDiff();
+                    }}
                     id="menu-show-diff"
                   >
                     🔍 Show Diff
-                  </a>
+                  </button>
                 )}
 
                 {selectedSession?.projectId && (
