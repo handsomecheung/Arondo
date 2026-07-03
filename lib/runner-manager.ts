@@ -60,6 +60,7 @@ export interface TaskContext {
   command?: string;
   projectId?: string;
   prompt?: string;
+  isChat?: boolean;
 }
 
 interface PendingRequest {
@@ -171,6 +172,7 @@ class RunnerManager {
             command: m.command,
             projectId: s.projectId,
             prompt: m.prompt,
+            isChat: !!(m.prompt && m.prompt.startsWith("!")),
           };
           this.tasks.set(taskId, ctx);
           const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
@@ -212,6 +214,7 @@ class RunnerManager {
             command: m.command,
             projectId: p.id,
             prompt: m.prompt,
+            isChat: !!(m.prompt && m.prompt.startsWith("!")),
           };
           this.tasks.set(taskId, ctx);
           const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;

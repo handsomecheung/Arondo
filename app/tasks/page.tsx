@@ -61,6 +61,7 @@ interface ServerTask {
   command?: string;
   projectId?: string;
   prompt?: string;
+  isChat?: boolean;
 }
 
 interface TaskItem {
@@ -78,6 +79,7 @@ interface TaskItem {
   projectId?: string;
   prompt?: string;
   agentType?: string;
+  isChat?: boolean;
 }
 
 interface SessionGroup {
@@ -149,7 +151,9 @@ export default function TasksPage() {
         }),
       );
 
-      const initTasks: TaskItem[] = serverTasks.map((t) => {
+      const initTasks: TaskItem[] = serverTasks
+        .filter((t) => !t.isChat)
+        .map((t) => {
         const session = sessionMap.get(t.sessionId);
         let name: string;
         if (t.type === "agent") {

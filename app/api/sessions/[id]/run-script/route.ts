@@ -61,6 +61,7 @@ export async function POST(
     type: "script",
     scriptName,
     createdAt: Date.now(),
+    isChat: !!(prompt && prompt.startsWith("!")),
   });
 
   await clearSessionLog(id, systemMsg.id);
