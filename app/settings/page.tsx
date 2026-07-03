@@ -919,10 +919,10 @@ export default function SettingsPage() {
                                     model={agentsQuota.antigravity.DefaultModel}
                                     updatedAt={agentsQuota.antigravity.updatedAt}
                                     rows={[
-                                      { label: "Gemini Weekly", used: agentsQuota.antigravity.GeminiWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.GeminiWeeklyRemain, remaining: agentsQuota.antigravity.GeminiWeeklyRemain, resetsAt: agentsQuota.antigravity.GeminiWeeklyResetsAt },
                                       { label: "Gemini Hour", used: agentsQuota.antigravity.GeminiHourRemain == null ? null : 1 - agentsQuota.antigravity.GeminiHourRemain, remaining: agentsQuota.antigravity.GeminiHourRemain, resetsAt: agentsQuota.antigravity.GeminiHourResetsAt },
-                                      { label: "Other Weekly", used: agentsQuota.antigravity.OtherWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.OtherWeeklyRemain, remaining: agentsQuota.antigravity.OtherWeeklyRemain, resetsAt: agentsQuota.antigravity.OtherWeeklyResetsAt },
+                                      { label: "Gemini Weekly", used: agentsQuota.antigravity.GeminiWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.GeminiWeeklyRemain, remaining: agentsQuota.antigravity.GeminiWeeklyRemain, resetsAt: agentsQuota.antigravity.GeminiWeeklyResetsAt },
                                       { label: "Other Hour", used: agentsQuota.antigravity.OtherHourRemain == null ? null : 1 - agentsQuota.antigravity.OtherHourRemain, remaining: agentsQuota.antigravity.OtherHourRemain, resetsAt: agentsQuota.antigravity.OtherHourResetsAt },
+                                      { label: "Other Weekly", used: agentsQuota.antigravity.OtherWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.OtherWeeklyRemain, remaining: agentsQuota.antigravity.OtherWeeklyRemain, resetsAt: agentsQuota.antigravity.OtherWeeklyResetsAt },
                                     ]}
                                   />
                                 )}

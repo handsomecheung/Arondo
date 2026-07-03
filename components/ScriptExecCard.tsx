@@ -72,7 +72,7 @@ export default function ScriptExecCard({
     ? (closeMenu: () => void) => (
       <button className="task-menu-item" onClick={() => { closeMenu(); onViewLog(); }}>
         <IconTerminal />
-        <span>View Log</span>
+        <span>Open Terminal</span>
       </button>
     )
     : undefined;
@@ -89,4 +89,3 @@ export default function ScriptExecCard({
     </ExecCard>
   );
 }
-

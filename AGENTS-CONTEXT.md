@@ -247,7 +247,7 @@ Two WebSocket endpoints:
     1. **Hourly Quota Filtering**: If any choice's remaining hourly ratio (`HourRemain`, `GeminiHourRemain`, `OtherHourRemain`) is below `0.15`, it is appended to the end of the candidate list and excluded from step 2. Exception: If *all* choices are below `0.15`, they are all kept for step 2 comparison.
     2. **Weekly Time-Remaining Score**: For active choices, calculate `score = WeekRemain - WeekTimeRemain`, where `WeekTimeRemain = max(0, min(1, (ResetsAt - Now) / 604800))`. This compares the remaining quota ratio against the remaining time ratio of the quota week.
     3. **Final Order**: Sort active choices by score in descending order and prepend them to the low-quota choices. The first candidate is selected and spawned with the mapped `--model` parameter.
-- **Manual Agent Switching**: Allows switching the active agent (Antigravity CLI, Claude Code, or Auto Model) of an existing session via a dropdown selector in the session header when no command is currently running.
+- **Manual Agent Switching**: Allows switching the active agent (Antigravity CLI, Claude Code, or Auto) of an existing session via a dropdown selector in the session header when no command is currently running.
 - **Inline Runner Node Details**: The settings screen is refactored to show the runner node details panel inline directly below the selected runner card for better usability.
 - **Disconnected Runner Deletion**: Allows deleting registered but disconnected runner nodes from the Settings UI, which purges their corresponding metadata and directories.
 - **Automated Data Lifecycle**: Automatically purges orphan sessions or projects on load if their parent references (e.g. project or runner) no longer exist.

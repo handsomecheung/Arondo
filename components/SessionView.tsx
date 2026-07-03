@@ -181,7 +181,7 @@ export default function SessionView({
     if (type === "antigravity") return "Antigravity CLI";
     if (type === "claude") return "Claude Code";
     if (type === "codex") return "Codex";
-    if (type === "auto") return "Auto Model";
+    if (type === "auto") return "Auto";
     return type;
   }
 
@@ -340,7 +340,7 @@ export default function SessionView({
                       ).filter(({ cmd }) => isAgentAvailable(cmd));
                       const showAuto = concreteAgents.length > 1;
                       const items: { value: string; label: string }[] = [
-                        ...(showAuto ? [{ value: "auto", label: "Auto Model" }] : []),
+                        ...(showAuto ? [{ value: "auto", label: "Auto" }] : []),
                         ...concreteAgents,
                       ];
                       return items.map(({ value, label }) => (
@@ -806,7 +806,7 @@ export default function SessionView({
 
                     const showAuto = concreteAgents.length > 1;
                     const items: { value: string; label: string }[] = [
-                      ...(showAuto ? [{ value: "auto", label: "Auto Model" }] : []),
+                      ...(showAuto ? [{ value: "auto", label: "Auto" }] : []),
                       ...concreteAgents,
                     ];
 

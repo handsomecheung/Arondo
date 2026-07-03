@@ -27,7 +27,7 @@ All execution goes through a Runner — there is no local fallback on the server
 - **Quota & Session Limit Detection**: Automatically detects AI agent API limits (such as Claude's session limit hit or `agy` quota exhaustion) and displays human-readable error messages.
 - **AI Agent Quota Monitoring**: Automatically collects quota usage data for Claude and Antigravity via tmux on the runner nodes and displays remaining quota with progress bars in the Settings UI.
 - **AI Agent Auto-Selection (Auto Mode)**: Automatically selects the best agent and model based on hourly and weekly quota availability retrieved from the runner node.
-- **Manual Agent Switching**: Switch the active agent (Antigravity CLI, Claude Code, or Auto Model) on-the-fly within an existing session when the agent is idle.
+- **Manual Agent Switching**: Switch the active agent (Antigravity CLI, Claude Code, or Auto) on-the-fly within an existing session when the agent is idle.
 - **Secure Prompt Passing**: Prompts are passed to agents using temporary files and environment variables (using the `ARONDO_PROMPT_FILE` environment variable), avoiding shell command-line length limits and exposing sensitive prompts in command arguments. Displays the real resolved prompt instead of original raw inputs in the "Show Prompt" panel.
 - **Concurrent Script Execution**: Allows running multiple scripts simultaneously within a single session. The user can continue chatting while background scripts are running.
 - **Global & Session-scoped Scripts**: Supports running project-scoped custom scripts either globally (independent of a session, directly from the project panel) or within a specific session.
