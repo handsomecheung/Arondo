@@ -104,7 +104,7 @@ func (c *Client) sendRegister() error {
 			"exec.agent", "exec.script", "exec.cancel",
 			"pty.input", "pty.resize",
 			"fs.list",
-			"git.status", "git.diff", "git.pr.create",
+			"git.status", "git.diff",
 		},
 		// agents list is empty on register; the server will send queryAgents
 		// in the connected event, and we respond with agent.status.
