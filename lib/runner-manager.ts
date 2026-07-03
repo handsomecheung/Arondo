@@ -137,18 +137,26 @@ class RunnerManager {
       const sessions = await getSessions();
       const projects = await getProjects();
       
+      const now = Date.now();
       let restoredCount = 0;
 
       // 1. Restore tasks from sessions
       for (const s of sessions) {
         const msgs = await getMessages(s.id);
-        const activeRunMsgs = msgs.filter((m: any) => {
+        const runMsgs = msgs.filter((m: any) => {
           if (m.type !== "agent-run" && m.type !== "script-run") return false;
-          const hasReturn = msgs.some((ret: any) => ret.parentId === m.id);
-          return !hasReturn;
+          const returnMsg = msgs.find((ret: any) => ret.parentId === m.id);
+          if (returnMsg) {
+            const completedAt = new Date(returnMsg.createdAt).getTime();
+            // Only restore completed tasks within the retention window (7 days)
+            if (now - completedAt > TASK_RETENTION_MS) {
+              return false;
+            }
+          }
+          return true;
         });
 
-        for (const m of activeRunMsgs) {
+        for (const m of runMsgs) {
           const taskId = m.taskId || m.id;
           const runnerId = m.runnerId || s.runnerId || "";
           
@@ -159,6 +167,9 @@ class RunnerManager {
           } else if (m.type === "agent-run" && m.command === "Auto Scripts Analysis") {
             scriptName = "Auto Scripts Analysis";
           }
+
+          const returnMsg = msgs.find((ret: any) => ret.parentId === m.id);
+          const completedAt = returnMsg ? new Date(returnMsg.createdAt).getTime() : undefined;
 
           const ctx: TaskContext = {
             taskId,
@@ -173,6 +184,9 @@ class RunnerManager {
             projectId: s.projectId,
             prompt: m.prompt,
             isChat: !!(m.prompt && m.prompt.startsWith("!")),
+            completedAt,
+            exitCode: m.exitCode,
+            stoppedByUser: m.stoppedByUser,
           };
           this.tasks.set(taskId, ctx);
           const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
@@ -184,13 +198,20 @@ class RunnerManager {
       // 2. Restore tasks from projects
       for (const p of projects) {
         const msgs = await getMessages("", p.id);
-        const activeRunMsgs = msgs.filter((m: any) => {
+        const runMsgs = msgs.filter((m: any) => {
           if (m.type !== "agent-run" && m.type !== "script-run") return false;
-          const hasReturn = msgs.some((ret: any) => ret.parentId === m.id);
-          return !hasReturn;
+          const returnMsg = msgs.find((ret: any) => ret.parentId === m.id);
+          if (returnMsg) {
+            const completedAt = new Date(returnMsg.createdAt).getTime();
+            // Only restore completed tasks within the retention window (7 days)
+            if (now - completedAt > TASK_RETENTION_MS) {
+              return false;
+            }
+          }
+          return true;
         });
 
-        for (const m of activeRunMsgs) {
+        for (const m of runMsgs) {
           const taskId = m.taskId || m.id;
           const runnerId = m.runnerId || p.runnerId || "";
           
@@ -201,6 +222,9 @@ class RunnerManager {
           } else if (m.type === "agent-run" && m.command === "Auto Scripts Analysis") {
             scriptName = "Auto Scripts Analysis";
           }
+
+          const returnMsg = msgs.find((ret: any) => ret.parentId === m.id);
+          const completedAt = returnMsg ? new Date(returnMsg.createdAt).getTime() : undefined;
 
           const ctx: TaskContext = {
             taskId,
@@ -215,6 +239,9 @@ class RunnerManager {
             projectId: p.id,
             prompt: m.prompt,
             isChat: !!(m.prompt && m.prompt.startsWith("!")),
+            completedAt,
+            exitCode: m.exitCode,
+            stoppedByUser: m.stoppedByUser,
           };
           this.tasks.set(taskId, ctx);
           const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
