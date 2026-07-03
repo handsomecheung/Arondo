@@ -96,7 +96,7 @@ func (c *Client) sendRegister() error {
 
 	payload := map[string]any{
 		"name":     c.name,
-		"version":  "0.1.8",
+		"version":  "0.1.9",
 		"hostname": hostname,
 		"os":       runtime.GOOS,
 		"arch":     runtime.GOARCH,
