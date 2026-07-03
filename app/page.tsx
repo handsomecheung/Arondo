@@ -981,9 +981,9 @@ export default function HomePage() {
             onManageScripts={() => {
               setMenuOpen(false);
               setScriptSubMenuOpen(false);
-              if (selectedSession?.projectId) setSelectedProjectId(selectedSession.projectId);
-              setSidebarMode("projects");
-              setSidebarOpen(true);
+              if (selectedSession?.projectId) {
+                handleSelectProject(selectedSession.projectId);
+              }
             }}
             onGoToProject={() => {
               if (selectedSession?.projectId) handleSelectProject(selectedSession.projectId);

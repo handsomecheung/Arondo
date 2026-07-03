@@ -411,7 +411,7 @@ export default function SessionView({
                   </a>
                 )}
 
-                {sessionScripts.length > 0 && (
+                {selectedSession?.projectId && (
                   <div
                     className="menu-item-with-sub"
                     onMouseEnter={() => onSetScriptSubMenuOpen(true)}
@@ -440,7 +440,7 @@ export default function SessionView({
                             {s.name}
                           </button>
                         ))}
-                        <div className="script-submenu-divider" />
+                        {sessionScripts.length > 0 && <div className="script-submenu-divider" />}
                         <button
                           className="menu-item script-submenu-manage"
                           id="menu-manage-scripts"
