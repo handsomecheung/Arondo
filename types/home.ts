@@ -9,7 +9,6 @@ export interface Session {
   repoPath: string;
   projectId: string;
   runnerId: string;
-  prUrl?: string;
   errorMessage?: string;
   command?: string;
   createdAt: string;

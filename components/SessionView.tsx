@@ -38,8 +38,6 @@ interface SessionViewProps {
   showCommandMenu: boolean;
   commandMenuIndex: number;
   sessionScripts: ProjectScript[];
-  githubConfigured: boolean;
-  isCreatingPr: boolean;
   isCheckingGitChanges: boolean;
   hasGitChanges: boolean;
   isGitRepo: boolean;
@@ -72,7 +70,6 @@ interface SessionViewProps {
   onSubmit: () => void;
   onPromptChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
-  onCreatePr: () => void;
   onRunScript: (name: string) => void;
   onDeleteSession: (id: string) => void;
   onOpenShellModal: () => void;
@@ -110,8 +107,6 @@ export default function SessionView({
   showCommandMenu,
   commandMenuIndex,
   sessionScripts,
-  githubConfigured,
-  isCreatingPr,
   isCheckingGitChanges,
   hasGitChanges,
   isGitRepo,
@@ -144,7 +139,6 @@ export default function SessionView({
   onSubmit,
   onPromptChange,
   onKeyDown,
-  onCreatePr,
   onRunScript,
   onDeleteSession,
   onOpenShellModal,
@@ -415,45 +409,6 @@ export default function SessionView({
                   >
                     🔍 Show Diff
                   </a>
-                )}
-
-                {selectedSession.prUrl ? (
-                  <a
-                    href={selectedSession.prUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="menu-item"
-                    onClick={() => onSetMenuOpen(false)}
-                    id="menu-view-pr"
-                  >
-                    <IconGitPullRequest /> View PR
-                  </a>
-                ) : (
-                  selectedSession.status === "done" && (
-                    <button
-                      className="menu-item"
-                      onClick={() => {
-                        onCreatePr();
-                        onSetMenuOpen(false);
-                      }}
-                      disabled={
-                        !isGitRepo || !githubConfigured || isCreatingPr
-                      }
-                      title={
-                        !isGitRepo
-                          ? "Not a git repository"
-                          : !githubConfigured
-                            ? "GitHub not configured"
-                            : isCreatingPr
-                              ? "Creating pull request in progress..."
-                              : undefined
-                      }
-                      id="menu-create-pr"
-                    >
-                      <IconGitPullRequest />{" "}
-                      {isCreatingPr ? "Creating PR…" : "Create PR"}
-                    </button>
-                  )
                 )}
 
                 {sessionScripts.length > 0 && (

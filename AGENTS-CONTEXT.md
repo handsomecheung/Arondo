@@ -176,7 +176,6 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 | `fs.list` | S→R request | List directories at a path |
 | `git.status` | S→R request | Run `git status --porcelain` |
 | `git.diff` | S→R request | Run `git diff HEAD` |
-| `git.pr.create` | S→R request | Push branch and create PR via `gh` |
 
 ## Runner Manager
 

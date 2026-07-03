@@ -9,7 +9,6 @@ interface UseInitialLoadParams {
   setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
   setSelectedSessionId: React.Dispatch<React.SetStateAction<string | null>>;
   setTaskQueue: React.Dispatch<React.SetStateAction<TaskItem[]>>;
-  setGithubConfigured: (v: boolean) => void;
   setAgentCommands: (v: AgentCommand[]) => void;
   loadProjects: () => void;
   loadRunners: () => void;
@@ -20,7 +19,6 @@ export function useInitialLoad({
   setSessions,
   setSelectedSessionId,
   setTaskQueue,
-  setGithubConfigured,
   setAgentCommands,
   loadProjects,
   loadRunners,
@@ -67,11 +65,6 @@ export function useInitialLoad({
     loadRunners();
 
     const runnerPoll = setInterval(loadRunners, 10_000);
-
-    fetch("/api/config")
-      .then((r) => r.json())
-      .then((data) => setGithubConfigured(!!data.githubToken))
-      .catch(console.error);
 
     fetch("/api/agent-commands")
       .then((r) => r.json())

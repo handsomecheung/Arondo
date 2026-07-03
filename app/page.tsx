@@ -130,7 +130,7 @@ export default function HomePage() {
   } | null>(null);
 
   const [agentCommands, setAgentCommands] = useState<AgentCommand[]>(AGENT_COMMANDS);
-  const [githubConfigured, setGithubConfigured] = useState(false);
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [scriptSubMenuOpen, setScriptSubMenuOpen] = useState(false);
 
@@ -165,11 +165,9 @@ export default function HomePage() {
     fsEntries: chatFsEntries, fsParentPath: chatFsParentPath, fsLoading: chatFsLoading,
   } = useFileSystem(runnerId);
 
-  const { isCreatingPr, isCheckingGitChanges, hasGitChanges, isGitRepo, handleCreatePr } = useGitHub({
+  const { isCheckingGitChanges, hasGitChanges, isGitRepo } = useGitHub({
     selectedSessionId,
     menuOpen,
-    setSessions,
-    setApiError,
   });
 
   const { connected, wsInstance } = useWebSocket({
@@ -433,7 +431,6 @@ export default function HomePage() {
     setSessions,
     setSelectedSessionId,
     setTaskQueue,
-    setGithubConfigured,
     setAgentCommands,
     loadProjects,
     loadRunners,
@@ -934,8 +931,6 @@ export default function HomePage() {
             showCommandMenu={showCommandMenu}
             commandMenuIndex={commandMenuIndex}
             sessionScripts={sessionScripts}
-            githubConfigured={githubConfigured}
-            isCreatingPr={isCreatingPr}
             isCheckingGitChanges={isCheckingGitChanges}
             hasGitChanges={hasGitChanges}
             isGitRepo={isGitRepo}
@@ -968,7 +963,6 @@ export default function HomePage() {
             onSubmit={handleSubmit}
             onPromptChange={handlePromptChange}
             onKeyDown={handleKeyDown}
-            onCreatePr={handleCreatePr}
             onRunScript={handleRunScript}
             onDeleteSession={handleDeleteSession}
             onOpenShellModal={() => setShellModalOpen(true)}

@@ -26,16 +26,7 @@ type gitDiffResponse struct {
 	HTML       string `json:"html,omitempty"`
 }
 
-type gitPrCreateRequest struct {
-	WorkDir string `json:"workDir"`
-	Title   string `json:"title"`
-	Body    string `json:"body"`
-}
 
-type gitPrCreateResponse struct {
-	OK    bool   `json:"ok"`
-	PrURL string `json:"prUrl"`
-}
 
 func (h *Handler) handleGitStatus(msg *Message) {
 	req, err := parsePayload[gitWorkDirRequest](msg)
@@ -156,59 +147,4 @@ func buildNewFileDiff(workDir, filePath string) string {
 	return b.String()
 }
 
-func (h *Handler) handleGitPrCreate(msg *Message) {
-	req, err := parsePayload[gitPrCreateRequest](msg)
-	if err != nil {
-		h.sendError(msg.ID, "INTERNAL", "invalid payload: "+err.Error())
-		return
-	}
 
-	branchCmd := execCommand("git", "branch", "--show-current")
-	branchCmd.Dir = req.WorkDir
-	branchOut, err := branchCmd.Output()
-	if err != nil {
-		h.sendError(msg.ID, "INTERNAL", "failed to get branch: "+err.Error())
-		return
-	}
-	branchName := strings.TrimSpace(string(branchOut))
-	if branchName == "" {
-		h.sendError(msg.ID, "INTERNAL", "could not detect current git branch")
-		return
-	}
-
-	pushCmd := execCommand("git", "push", "-u", "origin", branchName)
-	pushCmd.Dir = req.WorkDir
-	if out, err := pushCmd.CombinedOutput(); err != nil {
-		h.sendError(msg.ID, "INTERNAL", "git push failed: "+string(out)+err.Error())
-		return
-	}
-
-	prCmd := execCommand("gh", "pr", "create",
-		"--title", req.Title,
-		"--body", req.Body,
-		"--head", branchName,
-	)
-	prCmd.Dir = req.WorkDir
-	prOut, err := prCmd.CombinedOutput()
-	if err != nil {
-		h.sendError(msg.ID, "INTERNAL", "gh pr create failed: "+string(prOut)+err.Error())
-		return
-	}
-
-	prURL := ""
-	for _, line := range strings.Split(string(prOut), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "https://github.com/") && strings.Contains(line, "/pull/") {
-			prURL = line
-			break
-		}
-	}
-	if prURL == "" {
-		prURL = strings.TrimSpace(string(prOut))
-	}
-
-	h.sendResponse(msg.ID, gitPrCreateResponse{
-		OK:    true,
-		PrURL: prURL,
-	})
-}

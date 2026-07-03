@@ -56,8 +56,6 @@ func (h *Handler) handleRequest(msg *Message) {
 		h.handleGitStatus(msg)
 	case "git.diff":
 		h.handleGitDiff(msg)
-	case "git.pr.create":
-		h.handleGitPrCreate(msg)
 	case "rules.sync":
 		h.handleRulesSync(msg)
 	case "info.fetch":
