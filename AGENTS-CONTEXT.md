@@ -52,7 +52,7 @@ runner/                  # Go runner binary
   handler.go            # Request dispatcher by method string, response helpers
   handler_exec.go       # exec.agent, exec.script, exec.cancel, exec.restart (all PTY-based)
   handler_fs.go         # fs.list: directory listing
-  handler_git.go        # git.status, git.diff, git.pr.create
+  handler_git.go        # git.status, git.diff
   handler_pty.go        # pty.input (write to PTY), pty.resize
   pty.go                # TaskManager: spawn processes with PTY, scrollback buffer, auto-cleanup on exit
 app/
@@ -81,9 +81,7 @@ app/
         restart-script/
           route.ts      # POST: restart a specific script task in-place via exec.restart
         rerun-agent/
-          route.ts      # POST: re-run the agent from scratch for a session (isResume: false)
-        pr/
-          route.ts      # POST: trigger GitHub Pull Request creation via runner
+          route.ts        # POST: re-run the agent from scratch for a session (isResume: false)
     projects/
       route.ts          # GET: list all projects
       [id]/
@@ -221,14 +219,14 @@ Two WebSocket endpoints:
 
 ## Core Logging & Session Lifecycle Features
 - **Message-specific execution logs**: Every agent or script execution creates a specific system message (e.g. `⚙️ Executing command...`). The resulting terminal outputs are streamed via the runner and stored in `~/.arondo/sessions/[sessionId]/logs/[systemMsgId].log`.
-- **Interactive Terminal (PTY)**: Script execution uses Go's `creack/pty` on the runner for full pseudo-terminal support (stdin, ANSI colors, cursor control). The frontend renders output via `xterm.js` (`components/Terminal.tsx`) in two modes: live (WebSocket-connected for running scripts, with historical log pre-loaded) and history (loads saved log data for completed scripts).
+- **Interactive Terminal (PTY) & Mobile Keyboard Bar**: Script execution uses Go's `creack/pty` on the runner for full pseudo-terminal support (stdin, ANSI colors, cursor control). The frontend renders output via `xterm.js` (`components/Terminal.tsx`) in two modes: live (WebSocket-connected for running scripts, with historical log pre-loaded) and history (loads saved log data for completed scripts). It includes a mobile-specific special-keys bar (`components/TerminalKeyboardBar.tsx`) containing ESC/TAB/CTRL/ALT, arrow keys, and an FN layer (F1-F12), dynamically positioning itself above the mobile software keyboard to prevent obstruction.
 - **Task Queue & Log Popup**: Tasks are tracked in a global header queue grouped by session, with session names always visible. Completed tasks are retained for 7 days. Clicking any task switches to its session and opens the log modal. Each running task has a kill button that sends SIGTERM via the runner.
 - **User-stopped vs Failed distinction**: When a task is killed via the UI, `TaskContext.stoppedByUser` is set, producing a 🛑 "Stopped by user" completion message and `errorMessage` instead of an ❌ error. The terminal shows a “─── stopped by user ───” separator.
 - **Dedicated Execution Cards, Rich Markdown & Inline Logs**: Unified `ExecCard` is split into `ScriptExecCard` (using `xterm.js` for interactive output, and supporting inline log streaming for quick-run commands) and `AgentExecCard` (rendering outputs in Markdown with syntax highlighting and clickable file/URL links). Clicking verified file paths opens them in the Remote File Browser. Users can toggle between Markdown and raw text views.
 - **Restart/Retry actions**: `ScriptExecCard` shows a Restart button for script tasks (calls `restart-script` API → `exec.restart` on the runner) and `AgentExecCard` shows a Retry button for failed agent tasks (calls `rerun-agent` API). The terminal/view shows a “─── restarting ───” separator inline in the existing log.
 - **Slash commands & Quick Exec Triggers**: Slash commands are config-driven and customizable (stored in `~/.arondo/agent-commands.json`). Custom slash commands display as blue `UserAgentCommandCard` nodes in the session timeline and track both the raw command and resolved prompt separately. Additionally, users can use `!` in the chat input to execute project-scoped scripts or arbitrary shell commands inline, with execution logs streamed directly within the card.
 - **Tab Completion & Keyboard UX**: Chat input supports Tab completion to cycle through slash commands. Send messages via `Enter`, and insert a newline via `Ctrl+Enter` / `Meta+Enter`.
-- **Open Terminal in session menu**: The three-dot dropdown in a session includes an "Open Terminal" option that opens a `ShellTerminal` modal for that session's runner.
+- **Session Navigation & Shell Terminal**: The three-dot dropdown in a session includes an "Open Terminal" option to open a `ShellTerminal` modal, and a "Go to Project" button to navigate back to the parent project interface.
 - **Real-time Streaming**: Both agent and script output stream via WebSocket `terminal:output` (base64-encoded PTY data), forwarded through the event bus. The frontend renders script logs via xterm.js and agent logs via the plain wrapped text view.
 - **Concurrency**: Multiple background scripts can run concurrently in a single session. The chat prompt stays active during execution.
 - **Task Persistence**: Active task contexts survive server restarts by restoring metadata from session and project `messages.json`. On runner reconnect, the `task.status` event reconciles running vs exited tasks.

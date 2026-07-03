@@ -22,6 +22,7 @@ All execution goes through a Runner — there is no local fallback on the server
 - **Granular Execution Logging**: Outputs for every CLI command execution are logged separately under `~/.arondo/sessions/[sessionId]/logs/[messageId].log`.
 - **Multiple AI Agents Support**: Supports **Antigravity CLI (agy)** and **Claude Code** for code generation tasks.
 - **Interactive Terminal (PTY)**: Both agent and script execution run in a full pseudo-terminal via Go's `creack/pty`, rendered in the browser with `xterm.js`. Supports interactive stdin, ANSI colors, and cursor control. PTY ensures reliable process cleanup on runner exit (SIGHUP). Interactive shell terminals are spawned directly on the runner rather than the server.
+- **Mobile Terminal Keyboard Bar**: Includes a mobile-specific special-keys bar (ESC, TAB, CTRL, ALT, arrows, and an FN layer for F1-F12) for the terminal modal. It dynamically tracks visualViewport to pin itself above the virtual keyboard, preventing keyboard obstruction.
 - **Dedicated Execution Cards & Rich Markdown View**: Script execution uses `ScriptExecCard` (supporting inline log streaming for quick-run commands), while agent execution uses `AgentExecCard` which renders output as Markdown with syntax highlighting (`rehype-highlight`) and clickable file/URL links. Clicking a verified file path automatically opens the Remote File Browser. Users can toggle between Markdown rendering and raw output view from the card's menu.
 - **Terminal Session Persistence & Reattaching**: Terminal sessions persist across browser refreshes or close events. Re-opening a terminal automatically reattaches to the active PTY session on the runner and replays the output buffer.
 - **Quota & Session Limit Detection**: Automatically detects AI agent API limits (such as Claude's session limit hit or `agy` quota exhaustion) and displays human-readable error messages.
@@ -73,7 +74,6 @@ Open [http://localhost:3251](http://localhost:3251) in your browser. Select the 
 ## Configuration & Environment Variables
 
 - `ARONDO_CONFIG_DIR` – (Optional) Custom directory to store configuration and runtime data. Defaults to `~/.arondo` in both development and production.
-- `GITHUB_TOKEN` – (Optional) Personal access token used to automatically create/submit PRs from the browser.
 - `PORT` – (Optional) Server port. Defaults to `3251` in development, `3250` in production.
 
 ## Runner CLI
