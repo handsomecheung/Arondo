@@ -2533,6 +2533,62 @@ body {
   display: none !important;
 }
 
+/* ─── Mobile terminal special-keys bar ─────────────────────────────────────── */
+.term-keybar {
+  display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 150;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 6px max(6px, env(safe-area-inset-bottom));
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border);
+}
+.term-keybar-row {
+  display: grid;
+  gap: 4px;
+}
+.term-keybar-key {
+  min-width: 0;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, monospace;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+.term-keybar-key:active {
+  background: var(--bg-elevated);
+}
+.term-keybar-key.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.term-keybar-key-group {
+  grid-column: span 2;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  min-width: 0;
+}
+@media (pointer: coarse), (max-width: 768px) {
+  .term-keybar {
+    display: flex;
+  }
+}
+
 /* Agent icon blink/pulse animation */
 .agent-pulse {
   animation: agentPulseKeyframe 1.5s ease-in-out infinite;

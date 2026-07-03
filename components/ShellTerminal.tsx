@@ -4,6 +4,18 @@ import { useEffect, useRef, useState } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
+import TerminalKeyboardBar from "./TerminalKeyboardBar";
+
+const CTRL_MAP: Record<string, string> = {
+  "@": "\x00", "[": "\x1b", "\\": "\x1c", "]": "\x1d", "^": "\x1e", "_": "\x1f", "?": "\x7f",
+};
+
+function applyCtrl(ch: string): string {
+  if (CTRL_MAP[ch]) return CTRL_MAP[ch];
+  const code = ch.toLowerCase().charCodeAt(0);
+  if (code >= 97 && code <= 122) return String.fromCharCode(code - 96);
+  return ch;
+}
 
 interface ShellTerminalProps {
   ws: WebSocket | null;
@@ -20,6 +32,12 @@ export default function ShellTerminal({ ws, cwd, runnerId, sessionId, open, onCl
   const fitRef = useRef<FitAddon | null>(null);
   const shellIdRef = useRef<string | null>(null);
   const [wsReady, setWsReady] = useState(ws?.readyState === WebSocket.OPEN);
+  const [ctrlActive, setCtrlActive] = useState(false);
+  const [altActive, setAltActive] = useState(false);
+  const [keybarHeight, setKeybarHeight] = useState(0);
+  const ctrlActiveRef = useRef(false);
+  const altActiveRef = useRef(false);
+  const sendInputRef = useRef<(data: string) => void>(() => {});
 
   useEffect(() => {
     if (open && termRef.current) {
@@ -120,10 +138,24 @@ export default function ShellTerminal({ ws, cwd, runnerId, sessionId, open, onCl
     const { cols, rows } = term;
     ws.send(JSON.stringify({ type: "shell:spawn", runnerId, sessionId, cwd, cols, rows }));
 
-    const onData = term.onData((data) => {
+    const sendInput = (data: string) => {
       if (ws.readyState === WebSocket.OPEN && shellIdRef.current) {
         ws.send(JSON.stringify({ type: "shell:input", shellId: shellIdRef.current, data }));
       }
+    };
+    sendInputRef.current = sendInput;
+
+    const onData = term.onData((data) => {
+      let out = data;
+      if (data.length === 1 && (ctrlActiveRef.current || altActiveRef.current)) {
+        if (ctrlActiveRef.current) out = applyCtrl(out);
+        if (altActiveRef.current) out = "\x1b" + out;
+        ctrlActiveRef.current = false;
+        altActiveRef.current = false;
+        setCtrlActive(false);
+        setAltActive(false);
+      }
+      sendInput(out);
     });
 
     const onResize = term.onResize(({ cols, rows }) => {
@@ -158,10 +190,49 @@ export default function ShellTerminal({ ws, cwd, runnerId, sessionId, open, onCl
     };
   }, [ws, wsReady, cwd, runnerId, sessionId]);
 
+  const handleToolbarKey = (data: string) => {
+    termRef.current?.focus();
+    sendInputRef.current(data);
+  };
+
+  const handleToggleCtrl = () => {
+    ctrlActiveRef.current = !ctrlActiveRef.current;
+    setCtrlActive(ctrlActiveRef.current);
+    termRef.current?.focus();
+  };
+
+  const handleToggleAlt = () => {
+    altActiveRef.current = !altActiveRef.current;
+    setAltActive(altActiveRef.current);
+    termRef.current?.focus();
+  };
+
+  const handleToggleNativeKeyboard = () => {
+    const term = termRef.current;
+    if (!term) return;
+    const textarea = (term as unknown as { textarea?: HTMLTextAreaElement }).textarea;
+    if (textarea && document.activeElement === textarea) {
+      textarea.blur();
+    } else {
+      term.focus();
+    }
+  };
+
   return (
-    <div
-      ref={containerRef}
-      style={{ width: "100%", height: "100%", minHeight: 300 }}
-    />
+    <div style={{ width: "100%", height: "100%", minHeight: 300 }}>
+      <div
+        ref={containerRef}
+        style={{ width: "100%", height: `calc(100% - ${keybarHeight}px)` }}
+      />
+      <TerminalKeyboardBar
+        onKey={handleToolbarKey}
+        ctrlActive={ctrlActive}
+        altActive={altActive}
+        onToggleCtrl={handleToggleCtrl}
+        onToggleAlt={handleToggleAlt}
+        onToggleNativeKeyboard={handleToggleNativeKeyboard}
+        onHeightChange={setKeybarHeight}
+      />
+    </div>
   );
 }
