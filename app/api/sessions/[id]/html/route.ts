@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionHtml, saveSessionHtml } from "@/lib/store";
+import { getSessionHtml, saveSessionHtml, saveSessionDiffs } from "@/lib/store";
 
 export async function GET(
   req: NextRequest,
@@ -32,12 +32,18 @@ export async function POST(
   }
 
   try {
-    const { html } = await req.json();
+    const { html, diffs } = await req.json();
     if (typeof html !== "string") {
       return NextResponse.json({ error: "html body parameter is required" }, { status: 400 });
     }
 
-    await saveSessionHtml(id === "global" ? "" : id, messageId, html, projectId);
+    const sessId = id === "global" ? "" : id;
+    await saveSessionHtml(sessId, messageId, html, projectId);
+    
+    if (diffs && typeof diffs === "object") {
+      await saveSessionDiffs(sessId, messageId, diffs, projectId);
+    }
+
     return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Failed to save HTML" }, { status: 500 });

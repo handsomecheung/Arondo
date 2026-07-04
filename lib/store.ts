@@ -403,6 +403,31 @@ export async function getSessionHtml(sessionId: string, messageId: string, proje
   }
 }
 
+function getDiffsFilePath(sessionId: string, messageId: string, projectId?: string): string {
+  if (!sessionId) {
+    if (!projectId) {
+      throw new Error("getDiffsFilePath: projectId is required for project-scoped (sessionless) logs");
+    }
+    return path.join(getProjectDir(projectId), "logs", `${messageId}_diffs.json`);
+  }
+  return path.join(getSessionDir(sessionId), "logs", `${messageId}_diffs.json`);
+}
+
+export async function saveSessionDiffs(sessionId: string, messageId: string, diffs: Record<string, string>, projectId?: string): Promise<void> {
+  const diffsPath = getDiffsFilePath(sessionId, messageId, projectId);
+  await ensureDir(path.dirname(diffsPath));
+  await fs.writeFile(diffsPath, JSON.stringify(diffs, null, 2), "utf-8");
+}
+
+export async function getSessionDiffs(sessionId: string, messageId: string, projectId?: string): Promise<Record<string, string>> {
+  try {
+    const raw = await fs.readFile(getDiffsFilePath(sessionId, messageId, projectId), "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
 export async function deleteSession(id: string): Promise<void> {
   const sessionDir = getSessionDir(id);
   await fs.rm(sessionDir, { recursive: true, force: true });

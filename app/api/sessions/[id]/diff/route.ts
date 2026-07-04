@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/store";
+import { getSession, getSessionDiffs } from "@/lib/store";
 import { runnerManager } from "@/lib/runner-manager";
 import * as Diff2Html from "diff2html";
 import fs from "fs";
@@ -18,10 +18,142 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const session = await getSession(id);
   const { searchParams } = new URL(req.url);
   const wrap = searchParams.get("wrap") === "true";
+  const messageId = searchParams.get("messageId");
+  const filePath = searchParams.get("path");
+  const projectId = searchParams.get("projectId") || undefined;
 
+  if (messageId && filePath) {
+    try {
+      const diffs = await getSessionDiffs(id === "global" ? "" : id, messageId, projectId);
+      const fileDiff = diffs[filePath];
+
+      if (!fileDiff) {
+        const emptyHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>No Diff</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #f8fafc;
+      color: #57606a;
+    }
+  </style>
+</head>
+<body>
+  <div style="text-align:center;">No diff found for this file.</div>
+</body>
+</html>`;
+        return new NextResponse(emptyHtml, {
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        });
+      }
+
+      const diffHtml = Diff2Html.html(fileDiff, {
+        drawFileList: false,
+        matching: "lines",
+        outputFormat: "line-by-line",
+      });
+
+      const fullHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Git Diff - ${path.basename(filePath)}</title>
+  ${diff2htmlCss ? `<style>${diff2htmlCss}</style>` : `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css" />`}
+  <style>
+    body {
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    .d2h-wrapper {
+      background-color: #ffffff;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 10px;
+      box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+      padding: 10px;
+      border: none !important;
+    }
+    .d2h-file-wrapper {
+      border: 1px solid rgba(15, 23, 42, 0.08) !important;
+      border-radius: 8px !important;
+      margin-bottom: 20px !important;
+      overflow: hidden;
+    }
+    .d2h-file-header {
+      background-color: #f1f5f9 !important;
+      border-bottom: 1px solid rgba(15, 23, 42, 0.08) !important;
+      padding: 3px 6px !important;
+      height: auto !important;
+      font-size: 10px !important;
+    }
+    .d2h-diff-table {
+      font-size: 9px !important;
+      line-height: 12px !important;
+    }
+    .d2h-code-line {
+      line-height: 12px !important;
+    }
+    .d2h-code-line-ctn {
+      padding-left: 4px !important;
+    }
+    .d2h-file-name {
+      font-size: 10px !important;
+    }
+    ${wrap ? `
+    .d2h-code-line-ctn {
+      white-space: pre-wrap !important;
+      word-break: break-all !important;
+    }
+    ` : ""}
+    /* Maximize horizontal space on mobile devices */
+    @media (max-width: 640px) {
+      body {
+        padding: 0 !important;
+      }
+      .d2h-wrapper {
+        padding: 0 !important;
+      }
+      .d2h-file-wrapper {
+        border-left: none !important;
+        border-right: none !important;
+        border-radius: 0 !important;
+        margin-bottom: 10px !important;
+      }
+      .d2h-file-header {
+        border-radius: 0 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  ${diffHtml}
+</body>
+</html>`;
+
+      return new NextResponse(fullHtml, {
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    } catch (error: any) {
+      return NextResponse.json(
+        { error: error.message || "Failed to generate file diff" },
+        { status: 500 }
+      );
+    }
+  }
+
+  const session = await getSession(id);
   if (!session) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }

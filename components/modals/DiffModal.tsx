@@ -7,13 +7,20 @@ interface Props {
   open: boolean;
   onClose: () => void;
   sessionId: string;
+  messageId?: string;
+  filePath?: string;
+  projectId?: string;
 }
 
-export default function DiffModal({ open, onClose, sessionId }: Props) {
+export default function DiffModal({ open, onClose, sessionId, messageId, filePath, projectId }: Props) {
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [wordWrap, setWordWrap] = useState(false);
 
   if (!open) return null;
+
+  const iframeSrc = filePath && messageId
+    ? `/api/sessions/${sessionId}/diff?wrap=${wordWrap}&messageId=${messageId}&path=${encodeURIComponent(filePath)}&projectId=${projectId || ""}`
+    : `/api/sessions/${sessionId}/diff?wrap=${wordWrap}`;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -36,7 +43,7 @@ export default function DiffModal({ open, onClose, sessionId }: Props) {
           }}
         >
           <span className="modal-title" style={{ fontSize: "1.1rem", fontWeight: 600 }}>
-            Git Diff
+            {filePath ? `Diff: ${filePath.split("/").pop()}` : "Git Diff"}
           </span>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <button
@@ -96,7 +103,7 @@ export default function DiffModal({ open, onClose, sessionId }: Props) {
           }}
         >
           <iframe
-            src={`/api/sessions/${sessionId}/diff?wrap=${wordWrap}`}
+            src={iframeSrc}
             style={{
               width: "100%",
               height: "100%",

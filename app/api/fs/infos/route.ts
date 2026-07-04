@@ -27,14 +27,14 @@ export async function POST(request: NextRequest) {
   try {
     const result = await runnerManager.sendRequest(
       runnerId,
-      "fs.exists",
+      "fs.infos",
       { paths }
     );
 
     return NextResponse.json({ results: result.results });
   } catch (error: any) {
     return NextResponse.json(
-      { error: error.message || "Failed to check paths" },
+      { error: error.message || "Failed to get path infos" },
       { status: 500 }
     );
   }

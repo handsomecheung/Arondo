@@ -1500,6 +1500,9 @@ body {
   margin: 0;
   border: none;
   background: none;
+  background-color: transparent;
+  -webkit-appearance: none;
+  appearance: none;
   padding: 0;
   font: inherit;
   cursor: pointer;
@@ -1547,6 +1550,33 @@ body {
 .agent-filelink-btn:hover::before,
 .agent-filelink-btn:focus-visible::before {
   background-color: #fff;
+}
+
+.agent-filelink-diff-btn {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 1px solid var(--accent, #4f46e5);
+  background-color: var(--accent-glow, rgba(79, 70, 229, 0.08));
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234f46e5' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2'/%3E%3Crect x='8' y='2' width='8' height='4' rx='1' ry='1'/%3E%3Cpath d='M9 12h6'/%3E%3Cpath d='M12 9v6'/%3E%3C/svg%3E");
+  background-size: 10px 10px;
+  background-repeat: no-repeat;
+  background-position: center;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 0;
+  transition: background-color 0.15s ease, border-color 0.15s ease, background-image 0.15s ease;
+  vertical-align: middle;
+}
+
+.agent-filelink-diff-btn:hover,
+.agent-filelink-diff-btn:focus-visible {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2'/%3E%3Crect x='8' y='2' width='8' height='4' rx='1' ry='1'/%3E%3Cpath d='M9 12h6'/%3E%3Cpath d='M12 9v6'/%3E%3C/svg%3E");
 }
 
 /* Legacy: keep for modal badge */

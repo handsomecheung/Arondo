@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -66,30 +67,84 @@ type fsExistsRequest struct {
 	Paths []string `json:"paths"`
 }
 
-type fsExistsResponse struct {
-	OK      bool            `json:"ok"`
-	Results map[string]bool `json:"results"`
+type FileInfo struct {
+	Exists bool   `json:"exists"`
+	Diff   string `json:"diff,omitempty"`
 }
 
-func (h *Handler) handleFsExists(msg *Message) {
+type fsInfosResponse struct {
+	OK      bool                `json:"ok"`
+	Results map[string]FileInfo `json:"results"`
+}
+
+func (h *Handler) handleFsInfos(msg *Message) {
 	req, err := parsePayload[fsExistsRequest](msg)
 	if err != nil {
 		h.sendError(msg.ID, "INTERNAL", "invalid payload: "+err.Error())
 		return
 	}
 
-	results := make(map[string]bool, len(req.Paths))
+	results := make(map[string]FileInfo, len(req.Paths))
 	for _, p := range req.Paths {
 		absPath, err := filepath.Abs(p)
 		if err != nil {
-			results[p] = false
+			results[p] = FileInfo{Exists: false}
 			continue
 		}
-		_, statErr := os.Stat(absPath)
-		results[p] = statErr == nil
+		info, statErr := os.Stat(absPath)
+		if statErr != nil || info.IsDir() {
+			results[p] = FileInfo{Exists: false}
+			continue
+		}
+
+		diffText := ""
+		dir := filepath.Dir(absPath)
+
+		cmd := execCommand("git", "diff", "HEAD", "--", absPath)
+		cmd.Dir = dir
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		err = cmd.Run()
+
+		if err == nil {
+			diffText = stdout.String()
+		} else {
+			cmd2 := execCommand("git", "diff", "--", absPath)
+			cmd2.Dir = dir
+			var stdout2, stderr2 bytes.Buffer
+			cmd2.Stdout = &stdout2
+			cmd2.Stderr = &stderr2
+			err2 := cmd2.Run()
+			if err2 == nil {
+				diffText = stdout2.String()
+			}
+		}
+
+		statusCmd := execCommand("git", "status", "--porcelain", "--", absPath)
+		statusCmd.Dir = dir
+		if statusOut, statusErr := statusCmd.Output(); statusErr == nil {
+			statusStr := strings.TrimSpace(string(statusOut))
+			if strings.HasPrefix(statusStr, "??") {
+				repoRootCmd := execCommand("git", "rev-parse", "--show-toplevel")
+				repoRootCmd.Dir = dir
+				if repoRootOut, repoRootErr := repoRootCmd.Output(); repoRootErr == nil {
+					repoRoot := strings.TrimSpace(string(repoRootOut))
+					relPath, relErr := filepath.Rel(repoRoot, absPath)
+					if relErr == nil {
+						diffText = buildNewFileDiff(repoRoot, relPath)
+					}
+				}
+			}
+		}
+
+		results[p] = FileInfo{
+			Exists: true,
+			Diff:   diffText,
+		}
 	}
 
-	h.sendResponse(msg.ID, fsExistsResponse{OK: true, Results: results})
+	h.sendResponse(msg.ID, fsInfosResponse{OK: true, Results: results})
 }
 
 type fsListRequest struct {

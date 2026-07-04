@@ -972,7 +972,8 @@ export default function HomePage() {
             onShowDiff={() => setDiffModalOpen(true)}
             onOpenFilePath={(path) => {
               const base = selectedSession?.repoPath ?? repoPath;
-              setFileBrowserTargetPath(resolveRepoFilePath(base, path));
+              const decoded = decodeURIComponent(path);
+              setFileBrowserTargetPath(resolveRepoFilePath(base, decoded));
               setFileBrowserOpen(true);
             }}
             onOpenRenameModal={() => {

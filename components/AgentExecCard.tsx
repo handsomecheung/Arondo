@@ -8,6 +8,7 @@ import remarkFileLinks, { extractCandidatePaths, candidateToPath } from "@/lib/r
 import { resolveRepoFilePath } from "@/lib/homeUtils";
 import ExecCard, { ExecCardProps } from "@/components/ExecCard";
 import { IconTerminal, IconFileText, IconCode } from "@/components/Icons";
+import DiffModal from "@/components/modals/DiffModal";
 
 // Terminal mode-control sequences (cursor visibility, mouse tracking, bracketed paste, etc.)
 // leak into agent PTY output but carry no visual meaning outside a real terminal emulator.
@@ -18,7 +19,7 @@ function stripAnsi(text: string): string {
     // agy occasionally emits U+FFFD replacement characters when a multi-byte
     // UTF-8 sequence gets split across PTY output chunks; drop them rather
     // than render mojibake in the markdown output.
-    .replace(/�/g, "");
+    .replace(/\uFFFD/g, "");
 }
 
 
@@ -37,10 +38,13 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
   const isLive = props.item.status === "running";
   const [log, setLog] = useState("");
   const [showRaw, setShowRaw] = useState(false);
-  const [verifiedPaths, setVerifiedPaths] = useState<Set<string>>(new Set());
+  const [pathInfos, setPathInfos] = useState<Record<string, { exists: boolean; diff?: string }>>({});
+  const [diffsToSave, setDiffsToSave] = useState<Record<string, string>>({});
   const [hasVerified, setHasVerified] = useState(false);
   const [cachedHtml, setCachedHtml] = useState<string | null>(null);
   const [isHtmlLoaded, setIsHtmlLoaded] = useState(false);
+  const [diffModalOpen, setDiffModalOpen] = useState(false);
+  const [selectedDiffPath, setSelectedDiffPath] = useState("");
   const outputRef = useRef<HTMLDivElement>(null);
 
   // Fetch cached HTML if exists
@@ -112,6 +116,8 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
     if (isLive) {
       setHasVerified(false);
       setCachedHtml(null);
+      setPathInfos({});
+      setDiffsToSave({});
     }
   }, [isLive]);
 
@@ -133,25 +139,40 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
 
     const absPaths = candidates.map((c) => {
       const path = candidateToPath(c);
-      return path.startsWith("/") ? path : resolveRepoFilePath(repoPath, path);
+      const decoded = decodeURIComponent(path);
+      return decoded.startsWith("/") ? decoded : resolveRepoFilePath(repoPath, decoded);
     });
 
-    fetch("/api/fs/exists", {
+    fetch("/api/fs/infos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ runner: runnerId, paths: absPaths }),
     })
       .then((r) => r.json())
-      .then(({ results }: { results?: Record<string, boolean> }) => {
+      .then(({ results }: { results?: Record<string, { exists: boolean; diff?: string }> }) => {
         if (!results) {
           setHasVerified(true);
           return;
         }
-        const verified = new Set<string>();
+        const infos: Record<string, { exists: boolean; diff?: string }> = {};
+        const diffMap: Record<string, string> = {};
         candidates.forEach((c, i) => {
-          if (results[absPaths[i]]) verified.add(c);
+          const res = results[absPaths[i]];
+          if (res && res.exists) {
+            const cleanPath = candidateToPath(c);
+            const infoObj = {
+              exists: true,
+              diff: res.diff,
+            };
+            infos[cleanPath] = infoObj;
+            infos[c] = infoObj;
+            if (res.diff) {
+              diffMap[absPaths[i]] = res.diff;
+            }
+          }
         });
-        setVerifiedPaths(verified);
+        setPathInfos(infos);
+        setDiffsToSave(diffMap);
         setHasVerified(true);
       })
       .catch(() => {
@@ -175,7 +196,7 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
       fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ html }),
+        body: JSON.stringify({ html, diffs: diffsToSave }),
       })
         .then((r) => r.json())
         .then((res) => {
@@ -187,18 +208,35 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [isLive, hasVerified, cachedHtml, showRaw, sessionId, props.item.messageId, projectId]);
+  }, [isLive, hasVerified, cachedHtml, showRaw, sessionId, props.item.messageId, projectId, diffsToSave]);
 
   const handleOutputClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
-    const btn = target.closest(".agent-filelink-btn");
-    if (btn) {
-      const path = btn.getAttribute("data-path");
+    const fileBtn = target.closest(".agent-filelink-btn, .agent-filelink-view-btn");
+    if (fileBtn) {
+      const path = fileBtn.getAttribute("data-path");
       if (path && onOpenFilePath) {
-        onOpenFilePath(path);
+        onOpenFilePath(decodeURIComponent(path));
+      }
+      return;
+    }
+
+    const diffBtn = target.closest(".agent-filelink-diff-btn");
+    if (diffBtn) {
+      const path = diffBtn.getAttribute("data-path");
+      if (path) {
+        const absPath = path.startsWith("/") ? path : (repoPath ? resolveRepoFilePath(repoPath, path) : path);
+        setSelectedDiffPath(decodeURIComponent(absPath));
+        setDiffModalOpen(true);
       }
     }
   };
+
+  const verifiedPaths = new Set(
+    Object.entries(pathInfos)
+      .filter(([_, info]) => info.exists)
+      .map(([path]) => path)
+  );
 
   const hasLog = !!props.item.messageId;
   const canToggleRaw = !onViewLog && hasLog && !!log;
@@ -237,60 +275,94 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
     : undefined;
 
   return (
-    <ExecCard
-      {...props}
-      extraMenuItems={extraMenuItems}
-    >
-      {!onViewLog && props.item.messageId && log && showRaw && (
-        <div ref={outputRef} className="agent-exec-output agent-exec-output-raw">
-          <pre>{log}</pre>
-        </div>
-      )}
-      {!onViewLog && props.item.messageId && cachedHtml && !showRaw && (
-        <div 
-          ref={outputRef} 
-          className="agent-exec-output"
-          onClick={handleOutputClick}
-          dangerouslySetInnerHTML={{ __html: cachedHtml }}
-        />
-      )}
-      {!onViewLog && props.item.messageId && !cachedHtml && log && !showRaw && (
-        <div 
-          ref={outputRef} 
-          className="agent-exec-output"
-          onClick={handleOutputClick}
-        >
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm, [remarkFileLinks, { verified: verifiedPaths }]]}
-            rehypePlugins={[rehypeHighlight]}
-            urlTransform={(url) => url}
-            components={{
-              a: ({ href, children, ...rest }) => {
-                if (href?.startsWith("filelink:")) {
-                  const path = href.slice("filelink:".length);
-                  return (
-                    <button
-                      type="button"
-                      className="agent-filelink-btn"
-                      data-path={path}
-                    >
-                      {children}
-                    </button>
-                  );
-                }
-                return (
-                  <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>
-                    {children}
-                  </a>
-                );
-              },
-            }}
+    <>
+      <ExecCard
+        {...props}
+        extraMenuItems={extraMenuItems}
+      >
+        {!onViewLog && props.item.messageId && log && showRaw && (
+          <div ref={outputRef} className="agent-exec-output agent-exec-output-raw">
+            <pre>{log}</pre>
+          </div>
+        )}
+        {!onViewLog && props.item.messageId && cachedHtml && !showRaw && (
+          <div 
+            ref={outputRef} 
+            className="agent-exec-output"
+            onClick={handleOutputClick}
+            dangerouslySetInnerHTML={{ __html: cachedHtml }}
+          />
+        )}
+        {!onViewLog && props.item.messageId && !cachedHtml && log && !showRaw && (
+          <div 
+            ref={outputRef} 
+            className="agent-exec-output"
+            onClick={handleOutputClick}
           >
-            {log}
-          </ReactMarkdown>
-        </div>
-      )}
-    </ExecCard>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm, [remarkFileLinks, { verified: verifiedPaths }]]}
+              rehypePlugins={[rehypeHighlight]}
+              urlTransform={(url) => url}
+              components={{
+                a: ({ href, children, ...rest }) => {
+                  if (href?.startsWith("filelink:")) {
+                    const path = href.slice("filelink:".length);
+                    const info = pathInfos[path];
+                    const hasDiff = !!info?.diff;
+
+                    if (hasDiff) {
+                      return (
+                        <span className="agent-filelink-wrapper" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                          <button
+                            type="button"
+                            className="agent-filelink-btn"
+                            data-path={path}
+                          >
+                            {children}
+                          </button>
+                          <button
+                            type="button"
+                            className="agent-filelink-diff-btn"
+                            data-path={path}
+                            title="Show Diff"
+                            aria-label="Show Diff"
+                          />
+                        </span>
+                      );
+                    }
+
+                    return (
+                      <button
+                        type="button"
+                        className="agent-filelink-btn"
+                        data-path={path}
+                      >
+                        {children}
+                      </button>
+                    );
+                  }
+                  return (
+                    <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>
+                      {children}
+                    </a>
+                  );
+                },
+              }}
+            >
+              {log}
+            </ReactMarkdown>
+          </div>
+        )}
+      </ExecCard>
+      <DiffModal
+        open={diffModalOpen}
+        onClose={() => setDiffModalOpen(false)}
+        sessionId={sessionId}
+        messageId={props.item.messageId}
+        filePath={selectedDiffPath}
+        projectId={projectId}
+      />
+    </>
   );
 }
 
