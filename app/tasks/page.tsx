@@ -374,6 +374,7 @@ export default function TasksPage() {
   }, []);
 
   const filteredTasks = taskQueue.filter((task) => {
+    if (task.status === "done") return false;
     if (filterType === "both") return true;
     return task.type === filterType;
   });
@@ -577,17 +578,28 @@ export default function TasksPage() {
               alignItems: "center",
             }}
           >
-            <h2
-              style={{
-                fontSize: 16,
-                fontWeight: 600,
-                color: "var(--text-primary)",
-                margin: 0,
-              }}
-            >
-              Task Queue
-            </h2>
-            {taskQueue.length > 0 && (
+            <div>
+              <h2
+                style={{
+                  fontSize: 16,
+                  fontWeight: 600,
+                  color: "var(--text-primary)",
+                  margin: 0,
+                }}
+              >
+                Task Queue
+              </h2>
+              <p
+                style={{
+                  fontSize: 11,
+                  color: "var(--text-muted)",
+                  margin: "4px 0 0 0",
+                }}
+              >
+                Only running, failed, or stopped tasks from the last 3 days are displayed.
+              </p>
+            </div>
+            {filteredTasks.length > 0 && (
               <span
                 style={{
                   fontSize: 12,
@@ -595,7 +607,7 @@ export default function TasksPage() {
                   fontWeight: 500,
                 }}
               >
-                {taskQueue.filter((t) => t.status === "running").length} active / {taskQueue.length} total
+                {filteredTasks.filter((t) => t.status === "running").length} active / {filteredTasks.length} total
               </span>
             )}
           </div>
@@ -749,7 +761,7 @@ export default function TasksPage() {
                 No tasks
               </p>
               <p style={{ color: "var(--text-muted)", fontSize: 12, margin: "4px 0 0" }}>
-                Tasks will appear here when agents or scripts run. Records are kept for 7 days.
+                Only running, failed, or stopped tasks from the last 3 days are displayed.
               </p>
             </div>
           ) : filteredTasks.length === 0 ? (

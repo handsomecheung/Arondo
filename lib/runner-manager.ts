@@ -21,7 +21,7 @@ import { getConfigDir } from "./config";
 
 const CONFIG_DIR = getConfigDir();
 const RUNNERS_DIR = path.join(CONFIG_DIR, "runners");
-const TASK_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const TASK_RETENTION_MS = 3 * 24 * 60 * 60 * 1000;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
