@@ -4,6 +4,7 @@ import { getSessions, getProjects, deleteSession, createSession, updateSession, 
 import { getAgent, AgentType, resolveAgentType, PROMPT_ENV_VAR } from "@/lib/agents";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
+import { getArondoToken, isValidToken } from "@/lib/auth";
 
 const MAX_SESSION_NAME_LENGTH = 80;
 
@@ -18,13 +19,23 @@ function deriveSessionName(prompt: string, repoPath: string): string {
   return path.basename(repoPath) || "Untitled";
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const token = getArondoToken(request);
+  if (!isValidToken(token)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const sessions = await getSessions();
   const projects = await getProjects();
   const projectIds = new Set(projects.map((p) => p.id));
 
   const valid: typeof sessions = [];
   for (const session of sessions) {
+    const isAllowed = await runnerManager.isTokenAllowedForRunnerId(session.runnerId, token);
+    if (!isAllowed) {
+      continue;
+    }
+
     if (session.projectId && !projectIds.has(session.projectId)) {
       console.log(`[sessions] project ${session.projectId} for session ${session.id} no longer exists, deleting session`);
       runnerManager.removeTasksForSession(session.id);
@@ -39,6 +50,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const token = getArondoToken(req);
   const body = await req.json();
   const { prompt, repoPath, agentType = "antigravity", runnerId, name } = body as {
     prompt: string;
@@ -55,6 +67,11 @@ export async function POST(req: NextRequest) {
   }
   if (!runnerId) {
     return NextResponse.json({ error: "runnerId is required" }, { status: 400 });
+  }
+
+  const isAllowed = await runnerManager.isTokenAllowedForRunnerId(runnerId, token);
+  if (!isAllowed) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const run = runnerManager.getRunner(runnerId);

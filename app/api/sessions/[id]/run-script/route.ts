@@ -2,12 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, getProjectScripts, addMessage, updateSession, clearSessionLog } from "@/lib/store";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
+import { getArondoToken, verifySessionPermission } from "@/lib/auth";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const token = getArondoToken(req);
+
+  if (!(await verifySessionPermission(id, token))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const session = await getSession(id);
 
   if (!session) {

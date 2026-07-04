@@ -38,6 +38,7 @@ export interface RunnerInfo {
   agents: string[];
   connected: boolean;
   lastSeenAt?: number;
+  allowedTokens?: string[];
 }
 
 interface RunnerConnection {
@@ -86,6 +87,7 @@ class RunnerManager {
   private tasks = new Map<string, TaskContext>();
   private ptyKeyToTaskId = new Map<string, string>();
   private pending = new Map<string, PendingRequest>();
+  private cachedAllowedTokens = new Map<string, string[]>();
   private idCounter = 0;
 
   private nextId(): string {
@@ -116,6 +118,7 @@ class RunnerManager {
           const info: RunnerInfo = JSON.parse(raw);
           const stableKey = `${info.name}@${info.hostname}`;
           this.knownIds.set(stableKey, info.id);
+          this.cachedAllowedTokens.set(info.id, info.allowedTokens || []);
         } catch {
           // Ignore corrupt runner files
         }
@@ -319,6 +322,7 @@ class RunnerManager {
       agents: registerPayload.agents || [],
       connected: true,
       lastSeenAt: Date.now(),
+      allowedTokens: this.cachedAllowedTokens.get(id) || [],
     };
     this.runners.set(id, { id, ws, info });
     this.persistRunner(info).catch(() => {});
@@ -390,6 +394,7 @@ class RunnerManager {
     if (stableKeyToDelete) {
       this.knownIds.delete(stableKeyToDelete);
     }
+    this.cachedAllowedTokens.delete(id);
 
     const runnerDir = path.join(RUNNERS_DIR, id);
     try {
@@ -400,6 +405,61 @@ class RunnerManager {
       console.error(`[runner-manager] failed to delete runner directory ${runnerDir}:`, err);
       return false;
     }
+  }
+
+  isTokenRequired(): boolean {
+    return true;
+  }
+
+  isTokenAllowedForRunner(info: RunnerInfo, token: string | null): boolean {
+    const allowed = info.allowedTokens || [];
+    if (allowed.length === 0) {
+      return true;
+    }
+    if (!token) return false;
+    return allowed.includes(token);
+  }
+
+  async isTokenAllowedForRunnerId(runnerId: string, token: string | null): Promise<boolean> {
+    try {
+      const filePath = this.runnerFilePath(runnerId);
+      let allowed: string[] = [];
+      try {
+        const raw = await fs.readFile(filePath, "utf-8");
+        const info: RunnerInfo = JSON.parse(raw);
+        allowed = info.allowedTokens || [];
+      } catch {
+        allowed = this.cachedAllowedTokens.get(runnerId) || [];
+      }
+
+      if (allowed.length === 0) {
+        return true;
+      }
+      if (!token) return false;
+      return allowed.includes(token);
+    } catch {
+      return false;
+    }
+  }
+
+  async updateRunnerAllowedTokens(runnerId: string, allowedTokens: string[]): Promise<boolean> {
+    this.cachedAllowedTokens.set(runnerId, allowedTokens);
+    
+    const conn = this.runners.get(runnerId);
+    if (conn) {
+      conn.info.allowedTokens = allowedTokens;
+      await this.persistRunner(conn.info);
+      return true;
+    }
+    
+    const runners = await this.getAllKnownRunners();
+    const info = runners.find((r) => r.id === runnerId);
+    if (info) {
+      info.allowedTokens = allowedTokens;
+      await this.persistRunner(info);
+      return true;
+    }
+    return false;
   }
 
   getRunners(): RunnerInfo[] {

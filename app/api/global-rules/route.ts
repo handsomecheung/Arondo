@@ -1,13 +1,19 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import { runnerManager } from "../../../lib/runner-manager";
 import { getConfigDir } from "../../../lib/config";
+import { getArondoToken, getRoleByToken, isValidToken } from "../../../lib/auth";
 
 const CONFIG_DIR = getConfigDir();
 const GLOBAL_RULES_FILE = path.join(CONFIG_DIR, "global-rules.md");
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const token = getArondoToken(request);
+  if (!isValidToken(token)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const content = await fs.readFile(GLOBAL_RULES_FILE, "utf-8");
     return NextResponse.json({ content });
@@ -19,8 +25,14 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const token = getArondoToken(request);
+    const role = getRoleByToken(token);
+    if (role !== "admin") {
+      return NextResponse.json({ error: "Admin role required" }, { status: 403 });
+    }
+
     const { content } = await request.json();
     await fs.mkdir(CONFIG_DIR, { recursive: true });
     await fs.writeFile(GLOBAL_RULES_FILE, content, "utf-8");

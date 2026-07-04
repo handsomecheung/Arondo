@@ -5,12 +5,19 @@ import { runnerManager } from "@/lib/runner-manager";
 import fs from "fs/promises";
 import path from "path";
 import { getConfigDir } from "@/lib/config";
+import { getArondoToken, verifyProjectPermission } from "@/lib/auth";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: projectId } = await params;
+  const token = getArondoToken(req);
+
+  if (!(await verifyProjectPermission(projectId, token))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const project = await getProject(projectId);
 
   if (!project) {

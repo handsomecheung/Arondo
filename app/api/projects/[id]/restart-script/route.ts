@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getProject, getProjectScripts } from "@/lib/store";
 import { runnerManager } from "@/lib/runner-manager";
+import { getArondoToken, verifyProjectPermission } from "@/lib/auth";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: projectId } = await params;
+  const token = getArondoToken(req);
+
+  if (!(await verifyProjectPermission(projectId, token))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const project = await getProject(projectId);
 
   if (!project) {

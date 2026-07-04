@@ -36,7 +36,9 @@ export function useWebSocket({
 
     function connect() {
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
-      ws = new WebSocket(`${proto}//${location.host}/ws`);
+      const token = typeof window !== "undefined" ? localStorage.getItem("arondo_token") : "";
+      const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
+      ws = new WebSocket(`${proto}//${location.host}/ws${tokenParam}`);
       wsRef.current = ws;
 
       ws.onopen = () => {

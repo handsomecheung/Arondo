@@ -47,6 +47,7 @@ interface Runner {
   capabilities?: string[];
   agents?: string[];
   lastSeenAt?: number;
+  allowedTokens?: string[];
 }
 
 interface Project {
@@ -309,6 +310,15 @@ export default function SettingsPage() {
   const [savingCommand, setSavingCommand] = useState(false);
   const [editingCommand, setEditingCommand] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<AgentCommand>(EMPTY_COMMAND);
+  const [newTokenMap, setNewTokenMap] = useState<Record<string, string>>({});
+  const [userRole, setUserRole] = useState<"admin" | "user" | null>(null);
+  const [systemTokens, setSystemTokens] = useState<{ admin: Record<string, string>; user: Record<string, string> }>({ admin: {}, user: {} });
+  const [generatedUserToken, setGeneratedUserToken] = useState<string | null>(null);
+  const [generatingToken, setGeneratingToken] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [newTokenName, setNewTokenName] = useState("");
+  const [editingTokenKey, setEditingTokenKey] = useState<string | null>(null);
+  const [editingTokenName, setEditingTokenName] = useState("");
 
   const [agentsQuota, setAgentsQuota] = useState<AgentsQuota | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -341,6 +351,84 @@ export default function SettingsPage() {
       .catch(console.error);
   }, []);
 
+  const loadSystemTokens = useCallback(() => {
+    fetch("/api/auth/tokens")
+      .then((r) => {
+        if (r.ok) return r.json();
+        return null;
+      })
+      .then((data) => {
+        if (data) setSystemTokens(data);
+      })
+      .catch(console.error);
+  }, []);
+
+  const handleGenerateUserToken = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTokenName.trim()) return;
+
+    setGeneratingToken(true);
+    setGeneratedUserToken(null);
+    try {
+      const res = await fetch("/api/auth/tokens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newTokenName.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setGeneratedUserToken(data.token);
+        setNewTokenName("");
+        loadSystemTokens();
+      } else {
+        alert("Failed to generate user token");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error occurred while generating token");
+    } finally {
+      setGeneratingToken(false);
+    }
+  };
+
+  const handleRenameToken = async (role: "admin" | "user", tokenKey: string, newName: string) => {
+    if (!newName.trim()) return;
+    try {
+      const res = await fetch("/api/auth/tokens", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role, token: tokenKey, name: newName.trim() }),
+      });
+      if (res.ok) {
+        setEditingTokenKey(null);
+        loadSystemTokens();
+      } else {
+        alert("Failed to update token name");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteUserToken = (tokenKey: string, name: string) => {
+    setConfirmDialog({
+      message: `Are you sure you want to delete the user token for "${name}"?`,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        try {
+          const res = await fetch(`/api/auth/tokens?role=user&token=${encodeURIComponent(tokenKey)}`, {
+            method: "DELETE"
+          });
+          if (res.ok) {
+            loadSystemTokens();
+          }
+        } catch (err) {
+          console.error("Failed to delete token:", err);
+        }
+      }
+    });
+  };
+
   const handleSaveGlobalRules = useCallback(async () => {
     setSavingRules(true);
     setSaveRulesSuccess(false);
@@ -361,7 +449,62 @@ export default function SettingsPage() {
     }
   }, [globalRules]);
 
+  const saveRunnerTokens = useCallback(async (runnerId: string, allowedTokens: string[]) => {
+    try {
+      const res = await fetch("/api/runners", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: runnerId, allowedTokens }),
+      });
+      if (res.ok) {
+        setRunners((prev) => prev.map((r) => (r.id === runnerId ? { ...r, allowedTokens } : r)));
+        setNewTokenMap((prev) => ({ ...prev, [runnerId]: "" }));
+      } else {
+        const errData = await res.json();
+        alert(errData.error || "Failed to update tokens");
+      }
+    } catch (err) {
+      console.error("Failed to save runner tokens:", err);
+    }
+  }, []);
+
+  const handleAddToken = useCallback(async (runnerId: string) => {
+    const tokenToAdd = newTokenMap[runnerId]?.trim();
+    if (!tokenToAdd) return;
+
+    const runner = runners.find((r) => r.id === runnerId);
+    if (!runner) return;
+
+    const currentTokens = runner.allowedTokens || [];
+    if (currentTokens.includes(tokenToAdd)) return;
+
+    const updatedTokens = [...currentTokens, tokenToAdd];
+    await saveRunnerTokens(runnerId, updatedTokens);
+  }, [newTokenMap, runners, saveRunnerTokens]);
+
+  const handleRemoveToken = useCallback(async (runnerId: string, tokenToRemove: string) => {
+    const runner = runners.find((r) => r.id === runnerId);
+    if (!runner) return;
+
+    const currentTokens = runner.allowedTokens || [];
+    const updatedTokens = currentTokens.filter((t) => t !== tokenToRemove);
+    await saveRunnerTokens(runnerId, updatedTokens);
+  }, [runners, saveRunnerTokens]);
+
   useEffect(() => {
+    if (userRole === "admin") {
+      loadSystemTokens();
+    }
+  }, [userRole, loadSystemTokens]);
+
+  useEffect(() => {
+    fetch("/api/auth/verify")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.valid) setUserRole(data.role);
+      })
+      .catch(console.error);
+
     loadRunners();
     loadCustomCommands();
     loadGlobalRules();
@@ -517,6 +660,27 @@ export default function SettingsPage() {
         >
           Settings
         </span>
+        <button
+          onClick={() => {
+            if (confirm("Are you sure you want to reset your access token?")) {
+              localStorage.removeItem("arondo_token");
+              window.location.reload();
+            }
+          }}
+          style={{
+            marginLeft: "auto",
+            padding: "6px 12px",
+            fontSize: 12,
+            fontWeight: 500,
+            color: "var(--text-secondary)",
+            background: "transparent",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-sm)",
+            cursor: "pointer",
+          }}
+        >
+          Reset Token
+        </button>
       </header>
 
       <main
@@ -526,6 +690,26 @@ export default function SettingsPage() {
           padding: 24,
         }}
       >
+        {userRole === "user" && (
+          <div
+            style={{
+              maxWidth: 720,
+              margin: "0 auto 16px auto",
+              padding: "12px 16px",
+              backgroundColor: "rgba(245, 158, 11, 0.1)",
+              border: "1px solid rgba(245, 158, 11, 0.3)",
+              borderRadius: "var(--radius-md)",
+              color: "#f59e0b",
+              fontSize: 13,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <span>⚠️</span>
+            <span><strong>Read-only Mode (User Access):</strong> Settings cannot be modified by user tokens.</span>
+          </div>
+        )}
         <div
           style={{
             maxWidth: 720,
@@ -661,7 +845,7 @@ export default function SettingsPage() {
                             >
                               {r.os} ({r.arch})
                             </span>
-                            {!r.connected && (
+                            {!r.connected && userRole === "admin" && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -876,6 +1060,125 @@ export default function SettingsPage() {
                                 )}
                               </div>
                             </div>
+
+                            {/* Access Control (Allowed Tokens) */}
+                            <div
+                              style={{
+                                background: "var(--bg-surface)",
+                                border: "1px solid var(--border)",
+                                borderRadius: "var(--radius-md)",
+                                padding: 16,
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 12,
+                              }}
+                            >
+                              <h3
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  color: "var(--text-secondary)",
+                                  marginBottom: 0,
+                                }}
+                              >
+                                Access Control (Allowed Users)
+                              </h3>
+                              <p style={{ fontSize: 11, color: "var(--text-muted)", margin: 0 }}>
+                                Select users allowed to access this node. If none are selected, it allows public access.
+                              </p>
+
+                              {userRole === "admin" ? (
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 8,
+                                    maxHeight: 180,
+                                    overflowY: "auto",
+                                    paddingRight: 4,
+                                    marginTop: 4,
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {Object.keys({ ...(systemTokens.admin || {}), ...(systemTokens.user || {}) }).length === 0 ? (
+                                    <span style={{ fontSize: 11, color: "var(--text-muted)", fontStyle: "italic" }}>
+                                      No system tokens configured. Go to Token Manager below to create one.
+                                    </span>
+                                  ) : (
+                                    Object.entries({ ...(systemTokens.admin || {}), ...(systemTokens.user || {}) }).map(([tokenKey, name]) => {
+                                      const isAllowed = (r.allowedTokens || []).includes(tokenKey);
+                                      const isUserToken = tokenKey.startsWith("user_");
+                                      const masked = tokenKey.substring(0, 9) + "...";
+                                      return (
+                                        <label
+                                          key={tokenKey}
+                                          style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 8,
+                                            fontSize: 12,
+                                            color: "var(--text-primary)",
+                                            cursor: "pointer",
+                                            padding: "2px 0",
+                                          }}
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={isAllowed}
+                                            onChange={async (e) => {
+                                              const current = r.allowedTokens || [];
+                                              let updated: string[];
+                                              if (e.target.checked) {
+                                                updated = [...current, tokenKey];
+                                              } else {
+                                                updated = current.filter((t) => t !== tokenKey);
+                                              }
+                                              await saveRunnerTokens(r.id, updated);
+                                            }}
+                                            style={{ cursor: "pointer" }}
+                                          />
+                                          <span style={{ fontWeight: 500 }}>{name}</span>
+                                          <span style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "monospace" }}>
+                                            ({isUserToken ? "User" : "Admin"}: {masked})
+                                          </span>
+                                        </label>
+                                      );
+                                    })
+                                  )}
+                                </div>
+                              ) : (
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, minHeight: 24, alignItems: "center" }}>
+                                  {!r.allowedTokens || r.allowedTokens.length === 0 ? (
+                                    <span style={{ fontSize: 11, color: "var(--text-muted)", fontStyle: "italic" }}>
+                                      Public access (No tokens configured)
+                                    </span>
+                                  ) : (
+                                    r.allowedTokens.map((token) => {
+                                      const name = (systemTokens.admin || {})[token] || (systemTokens.user || {})[token] || token.substring(0, 9) + "...";
+                                      return (
+                                        <span
+                                          key={token}
+                                          style={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            fontSize: 11,
+                                            background: "var(--bg-elevated)",
+                                            border: "1px solid var(--border)",
+                                            padding: "2px 8px",
+                                            borderRadius: "4px",
+                                            color: "var(--text-primary)",
+                                          }}
+                                        >
+                                          {name}
+                                        </span>
+                                      );
+                                    })
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           {/* Agent Quota */}
@@ -1027,25 +1330,27 @@ export default function SettingsPage() {
                   Custom slash commands that expand into agent instructions.
                 </p>
               </div>
-              <button
-                onClick={() => {
-                  setShowAddCommand(true);
-                  setNewCommand(EMPTY_COMMAND);
-                }}
-                style={{
-                  padding: "6px 14px",
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: "var(--accent)",
-                  background: "var(--accent-glow)",
-                  border: "1px solid var(--border-accent)",
-                  borderRadius: "var(--radius-sm)",
-                  cursor: "pointer",
-                  flexShrink: 0,
-                }}
-              >
-                + Add
-              </button>
+              {userRole === "admin" && (
+                <button
+                  onClick={() => {
+                    setShowAddCommand(true);
+                    setNewCommand(EMPTY_COMMAND);
+                  }}
+                  style={{
+                    padding: "6px 14px",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: "var(--accent)",
+                    background: "var(--accent-glow)",
+                    border: "1px solid var(--border-accent)",
+                    borderRadius: "var(--radius-sm)",
+                    cursor: "pointer",
+                    flexShrink: 0,
+                  }}
+                >
+                  + Add
+                </button>
+              )}
             </div>
 
             {showAddCommand && (
@@ -1368,49 +1673,51 @@ export default function SettingsPage() {
                         </div>
                       )}
                     </div>
-                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                      <button
-                        onClick={() => {
-                          setEditingCommand(cmd.command);
-                          setEditDraft({ ...cmd });
-                        }}
-                        title="Edit command"
-                        style={{
-                          padding: "4px 10px",
-                          fontSize: 12,
-                          color: "var(--text-secondary)",
-                          background: "transparent",
-                          border: "1px solid var(--border)",
-                          borderRadius: "var(--radius-sm)",
-                          cursor: "pointer",
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => {
-                          setConfirmDialog({
-                            message: `Are you sure you want to delete the agent command "/${cmd.command}"?`,
-                            onConfirm: async () => {
-                              setConfirmDialog(null);
-                              await handleDeleteCommand(cmd.command);
-                            },
-                          });
-                        }}
-                        title="Delete command"
-                        style={{
-                          padding: "4px 10px",
-                          fontSize: 12,
-                          color: "var(--error, #e74c3c)",
-                          background: "transparent",
-                          border: "1px solid var(--border)",
-                          borderRadius: "var(--radius-sm)",
-                          cursor: "pointer",
-                        }}
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    {userRole === "admin" && (
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                        <button
+                          onClick={() => {
+                            setEditingCommand(cmd.command);
+                            setEditDraft({ ...cmd });
+                          }}
+                          title="Edit command"
+                          style={{
+                            padding: "4px 10px",
+                            fontSize: 12,
+                            color: "var(--text-secondary)",
+                            background: "transparent",
+                            border: "1px solid var(--border)",
+                            borderRadius: "var(--radius-sm)",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => {
+                            setConfirmDialog({
+                              message: `Are you sure you want to delete the agent command "/${cmd.command}"?`,
+                              onConfirm: async () => {
+                                setConfirmDialog(null);
+                                await handleDeleteCommand(cmd.command);
+                              },
+                            });
+                          }}
+                          title="Delete command"
+                          style={{
+                            padding: "4px 10px",
+                            fontSize: 12,
+                            color: "var(--error, #e74c3c)",
+                            background: "transparent",
+                            border: "1px solid var(--border)",
+                            borderRadius: "var(--radius-sm)",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ),
               )}
@@ -1449,6 +1756,7 @@ export default function SettingsPage() {
             <textarea
               value={globalRules}
               onChange={(e) => setGlobalRules(e.target.value)}
+              readOnly={userRole === "user"}
               placeholder="# Global Agent Rules&#10;&#10;- Prefer clean code without comments.&#10;- Use bash scripts for system automation."
               style={{
                 width: "100%",
@@ -1466,31 +1774,363 @@ export default function SettingsPage() {
                 marginBottom: 12,
               }}
             />
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <button
-                onClick={handleSaveGlobalRules}
-                disabled={savingRules}
+            {userRole === "admin" && (
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <button
+                  onClick={handleSaveGlobalRules}
+                  disabled={savingRules}
+                  style={{
+                    padding: "7px 18px",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#fff",
+                    background: "var(--accent)",
+                    border: "none",
+                    borderRadius: "var(--radius-sm)",
+                    cursor: "pointer",
+                    opacity: savingRules ? 0.5 : 1,
+                  }}
+                >
+                  {savingRules ? "Saving…" : "Save Rules"}
+                </button>
+                {saveRulesSuccess && (
+                  <span style={{ fontSize: 13, color: "var(--accent)", fontWeight: 500 }}>
+                    ✓ Rules saved and synced successfully!
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* System Access Tokens Section (Only for Admin) */}
+          {userRole === "admin" && (
+            <div
+              style={{
+                background: "var(--bg-surface)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-md)",
+                padding: 16,
+              }}
+            >
+              <h2
                 style={{
-                  padding: "7px 18px",
-                  fontSize: 13,
+                  fontSize: 16,
                   fontWeight: 600,
-                  color: "#fff",
-                  background: "var(--accent)",
-                  border: "none",
-                  borderRadius: "var(--radius-sm)",
-                  cursor: "pointer",
-                  opacity: savingRules ? 0.5 : 1,
+                  color: "var(--text-primary)",
+                  marginBottom: 4,
                 }}
               >
-                {savingRules ? "Saving…" : "Save Rules"}
-              </button>
-              {saveRulesSuccess && (
-                <span style={{ fontSize: 13, color: "var(--accent)", fontWeight: 500 }}>
-                  ✓ Rules saved and synced successfully!
-                </span>
-              )}
+                System Access Tokens
+              </h2>
+              <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
+                Manage system-wide access tokens. For security, existing tokens are only partially shown.
+              </p>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+                <div>
+                  <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8 }}>
+                    Admin Tokens (Name / Token)
+                  </h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {Object.entries(systemTokens.admin || {}).map(([tokenKey, name]) => {
+                      const isEditing = editingTokenKey === tokenKey;
+                      const masked = tokenKey.substring(0, 9) + "...";
+                      return (
+                        <div
+                          key={tokenKey}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            fontSize: 12,
+                            background: "var(--bg-elevated)",
+                            border: "1px solid var(--border)",
+                            padding: "6px 12px",
+                            borderRadius: "6px",
+                          }}
+                        >
+                          <span style={{ fontSize: 11, fontFamily: "monospace", color: "var(--text-muted)", flexShrink: 0 }}>
+                            {masked}
+                          </span>
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              value={editingTokenName}
+                              onChange={(e) => setEditingTokenName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  handleRenameToken("admin", tokenKey, editingTokenName);
+                                } else if (e.key === "Escape") {
+                                  setEditingTokenKey(null);
+                                }
+                              }}
+                              autoFocus
+                              style={{
+                                flex: 1,
+                                padding: "2px 6px",
+                                fontSize: 12,
+                                backgroundColor: "var(--bg-base)",
+                                border: "1px solid var(--accent)",
+                                borderRadius: "4px",
+                                color: "var(--text-primary)",
+                              }}
+                            />
+                          ) : (
+                            <span
+                              onClick={() => {
+                                setEditingTokenKey(tokenKey);
+                                setEditingTokenName(name);
+                              }}
+                              title="Click to rename"
+                              style={{
+                                flex: 1,
+                                cursor: "pointer",
+                                fontWeight: 500,
+                                color: "var(--text-primary)",
+                                textDecoration: "underline",
+                                textDecorationStyle: "dotted",
+                              }}
+                            >
+                              {name}
+                            </span>
+                          )}
+                          {isEditing && (
+                            <button
+                              onClick={() => handleRenameToken("admin", tokenKey, editingTokenName)}
+                              style={{
+                                padding: "2px 6px",
+                                fontSize: 11,
+                                background: "var(--accent)",
+                                border: "none",
+                                borderRadius: "4px",
+                                color: "#fff",
+                                cursor: "pointer",
+                              }}
+                            >
+                              Save
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8 }}>
+                    User Tokens (Name / Token)
+                  </h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {Object.keys(systemTokens.user || {}).length === 0 ? (
+                      <span style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>
+                        No user tokens configured
+                      </span>
+                    ) : (
+                      Object.entries(systemTokens.user || {}).map(([tokenKey, name]) => {
+                        const isEditing = editingTokenKey === tokenKey;
+                        const masked = tokenKey.substring(0, 9) + "...";
+                        return (
+                          <div
+                            key={tokenKey}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              fontSize: 12,
+                              background: "var(--bg-elevated)",
+                              border: "1px solid var(--border)",
+                              padding: "6px 12px",
+                              borderRadius: "6px",
+                            }}
+                          >
+                            <span style={{ fontSize: 11, fontFamily: "monospace", color: "var(--text-muted)", flexShrink: 0 }}>
+                              {masked}
+                            </span>
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                value={editingTokenName}
+                                onChange={(e) => setEditingTokenName(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    handleRenameToken("user", tokenKey, editingTokenName);
+                                  } else if (e.key === "Escape") {
+                                    setEditingTokenKey(null);
+                                  }
+                                }}
+                                autoFocus
+                                style={{
+                                  flex: 1,
+                                  padding: "2px 6px",
+                                  fontSize: 12,
+                                  backgroundColor: "var(--bg-base)",
+                                  border: "1px solid var(--accent)",
+                                  borderRadius: "4px",
+                                  color: "var(--text-primary)",
+                                }}
+                              />
+                            ) : (
+                              <span
+                                onClick={() => {
+                                  setEditingTokenKey(tokenKey);
+                                  setEditingTokenName(name);
+                                }}
+                                title="Click to rename"
+                                style={{
+                                  flex: 1,
+                                  cursor: "pointer",
+                                  fontWeight: 500,
+                                  color: "var(--text-primary)",
+                                  textDecoration: "underline",
+                                  textDecorationStyle: "dotted",
+                                }}
+                              >
+                                {name}
+                              </span>
+                            )}
+                            {isEditing ? (
+                              <button
+                                onClick={() => handleRenameToken("user", tokenKey, editingTokenName)}
+                                style={{
+                                  padding: "2px 6px",
+                                  fontSize: 11,
+                                  background: "var(--accent)",
+                                  border: "none",
+                                  borderRadius: "4px",
+                                  color: "#fff",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Save
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleDeleteUserToken(tokenKey, name)}
+                                style={{
+                                  padding: "2px 8px",
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  color: "var(--error, #e74c3c)",
+                                  background: "transparent",
+                                  border: "1px solid var(--border)",
+                                  borderRadius: "var(--radius-sm)",
+                                  cursor: "pointer",
+                                  transition: "opacity 0.2s",
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.7"; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+                <form onSubmit={handleGenerateUserToken} style={{ display: "flex", gap: 12, alignItems: "flex-end", maxWidth: 400 }}>
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 600 }}>
+                      New User Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. John Doe"
+                      value={newTokenName}
+                      onChange={(e) => setNewTokenName(e.target.value)}
+                      style={{
+                        padding: "7px 10px",
+                        fontSize: 13,
+                        backgroundColor: "var(--bg-base)",
+                        border: "1px solid var(--border)",
+                        borderRadius: "4px",
+                        color: "var(--text-primary)",
+                        outline: "none"
+                      }}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={generatingToken || !newTokenName.trim()}
+                    style={{
+                      padding: "8px 16px",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "#fff",
+                      background: "var(--accent)",
+                      border: "none",
+                      borderRadius: "var(--radius-sm)",
+                      cursor: generatingToken || !newTokenName.trim() ? "not-allowed" : "pointer",
+                      opacity: generatingToken || !newTokenName.trim() ? 0.5 : 1,
+                    }}
+                  >
+                    {generatingToken ? "Generating..." : "Generate User Token"}
+                  </button>
+                </form>
+
+                {generatedUserToken && (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      padding: 12,
+                      backgroundColor: "rgba(59, 130, 246, 0.1)",
+                      border: "1px solid rgba(59, 130, 246, 0.2)",
+                      borderRadius: "var(--radius-sm)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 600 }}>
+                      Generated User Token (Copy now! This will disappear on page refresh):
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <input
+                        type="text"
+                        readOnly
+                        value={generatedUserToken}
+                        style={{
+                          flex: 1,
+                          padding: "6px 10px",
+                          fontSize: 12,
+                          backgroundColor: "var(--bg-base)",
+                          border: "1px solid var(--border)",
+                          borderRadius: "4px",
+                          fontFamily: "monospace",
+                          color: "var(--text-primary)",
+                        }}
+                        onClick={(e) => (e.target as HTMLInputElement).select()}
+                      />
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(generatedUserToken);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 3000);
+                        }}
+                        style={{
+                          padding: "6px 12px",
+                          fontSize: 12,
+                          fontWeight: 500,
+                          background: copied ? "var(--accent-glow)" : "var(--bg-elevated)",
+                          border: "1px solid " + (copied ? "var(--border-accent)" : "var(--border)"),
+                          borderRadius: "4px",
+                          color: copied ? "var(--accent)" : "var(--text-primary)",
+                          cursor: "pointer",
+                          minWidth: 70,
+                          transition: "all 0.2s ease",
+                        }}
+                      >
+                        {copied ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
         </div>
       </main>

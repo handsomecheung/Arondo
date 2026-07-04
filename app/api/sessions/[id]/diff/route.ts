@@ -4,6 +4,7 @@ import { runnerManager } from "@/lib/runner-manager";
 import * as Diff2Html from "diff2html";
 import fs from "fs";
 import path from "path";
+import { getArondoToken, verifySessionPermission, verifyProjectPermission, isValidToken } from "@/lib/auth";
 
 let diff2htmlCss = "";
 try {
@@ -23,6 +24,23 @@ export async function GET(
   const messageId = searchParams.get("messageId");
   const filePath = searchParams.get("path");
   const projectId = searchParams.get("projectId") || undefined;
+
+  const token = getArondoToken(req);
+  if (id === "global") {
+    if (projectId) {
+      if (!(await verifyProjectPermission(projectId, token))) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    } else {
+      if (!isValidToken(token)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+  } else {
+    if (!(await verifySessionPermission(id, token))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
 
   if (messageId && filePath) {
     try {

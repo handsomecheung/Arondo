@@ -1,6 +1,9 @@
+import { IncomingMessage } from "http";
+import url from "url";
 import { WebSocketServer, WebSocket } from "ws";
 import { eventBus, SseEvent } from "./event-bus";
 import { runnerManager } from "./runner-manager";
+import { isValidToken } from "./auth";
 
 const shellToRunner = new Map<string, string>();
 const pendingSpawns = new Map<string, Promise<any>>();
@@ -18,7 +21,7 @@ const EVENT_TYPE_MAP: Record<string, string> = {
 const HEARTBEAT_INTERVAL = 30_000;
 
 export function setupWebSocketServer(wss: WebSocketServer): void {
-  const clients = new Set<WebSocket>();
+  const wsClients = new Map<WebSocket, string | null>();
 
   eventBus.subscribe((event: SseEvent) => {
     if (event.type === "session_deleted") {
@@ -50,19 +53,52 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
         ? { type: wsType, ...event.payload }
         : { type: wsType, payload: event.payload }
     );
-    const openClients = Array.from(clients).filter((ws) => ws.readyState === WebSocket.OPEN);
+    const openClients = Array.from(wsClients.entries()).filter(
+      ([ws]) => ws.readyState === WebSocket.OPEN
+    );
     if (wsType === "terminal:output") {
       if (openClients.length === 0) {
         console.warn(`[ws-server] ${wsType} event but no connected browser clients`);
       }
     }
-    for (const ws of openClients) {
-      ws.send(msg);
-    }
+
+    // Resolve runnerId for authorization checks
+    let runnerId: string | undefined = event.payload.runnerId;
+
+    const resolveAndBroadcast = async () => {
+      if (!runnerId) {
+        if (event.payload.sessionId) {
+          const { getSession } = require("./store");
+          const session = await getSession(event.payload.sessionId);
+          if (session) runnerId = session.runnerId;
+        } else if (event.payload.projectId) {
+          const { getProject } = require("./store");
+          const project = await getProject(event.payload.projectId);
+          if (project) runnerId = project.runnerId;
+        }
+      }
+
+      for (const [ws, clientToken] of openClients) {
+        let allowed = true;
+        if (runnerId) {
+          allowed = await runnerManager.isTokenAllowedForRunnerId(runnerId, clientToken);
+        } else {
+          allowed = !runnerManager.isTokenRequired();
+        }
+
+        if (allowed) {
+          ws.send(msg);
+        }
+      }
+    };
+
+    resolveAndBroadcast().catch((err) => {
+      console.error("[ws-server] broadcast error:", err);
+    });
   });
 
   const heartbeat = setInterval(() => {
-    for (const ws of clients) {
+    for (const ws of wsClients.keys()) {
       if (ws.readyState === WebSocket.OPEN) {
         ws.ping();
       }
@@ -71,12 +107,19 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
 
   wss.on("close", () => clearInterval(heartbeat));
 
-  wss.on("connection", (ws) => {
-    clients.add(ws);
+  wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
+    const parsedUrl = url.parse(req.url || "", true);
+    const token = (parsedUrl.query.token as string) || null;
+    if (!isValidToken(token)) {
+      ws.close(4001, "Unauthorized: Invalid access token");
+      return;
+    }
+    wsClients.set(ws, token);
+
     const shellIds = new Set<string>();
     ws.send(JSON.stringify({ type: "connected" }));
 
-    ws.on("message", (raw) => {
+    ws.on("message", async (raw) => {
       let msg: any;
       try {
         msg = JSON.parse(raw.toString());
@@ -98,6 +141,13 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
             console.warn(`[ws-server] terminal:input: no runner for task ${taskId}`);
             break;
           }
+
+          const isAllowed = await runnerManager.isTokenAllowedForRunnerId(runnerId, token);
+          if (!isAllowed) {
+            console.warn(`[ws-server] unauthorized terminal:input for runner ${runnerId}`);
+            break;
+          }
+
           runnerManager.sendFire(runnerId, "pty.input", {
             taskId,
             data: msg.data,
@@ -109,6 +159,12 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
           if (taskId) {
             const runnerId = runnerManager.getRunnerForTask(taskId);
             if (runnerId) {
+              const isAllowed = await runnerManager.isTokenAllowedForRunnerId(runnerId, token);
+              if (!isAllowed) {
+                console.warn(`[ws-server] unauthorized terminal:resize for runner ${runnerId}`);
+                break;
+              }
+
               runnerManager.sendFire(runnerId, "pty.resize", {
                 taskId,
                 cols: msg.cols,
@@ -129,6 +185,12 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
           const runnerId = msg.runnerId ? runnerManager.resolveRunnerId(msg.runnerId) : undefined;
 
           if (runnerId) {
+            const isAllowed = await runnerManager.isTokenAllowedForRunnerId(runnerId, token);
+            if (!isAllowed) {
+              console.warn(`[ws-server] unauthorized shell:spawn for runner ${runnerId}`);
+              break;
+            }
+
             if (pendingSpawns.has(shellId)) {
               console.warn(`[ws-server] spawn request ignored because spawning is already in progress for shell ${shellId}`);
               break;
@@ -225,6 +287,12 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
           if (msg.shellId) {
             const runnerId = shellToRunner.get(msg.shellId);
             if (runnerId) {
+              const isAllowed = await runnerManager.isTokenAllowedForRunnerId(runnerId, token);
+              if (!isAllowed) {
+                console.warn(`[ws-server] unauthorized shell:input for runner ${runnerId}`);
+                break;
+              }
+
               runnerManager.sendFire(runnerId, "pty.input", {
                 taskId: msg.shellId,
                 data: msg.data,
@@ -237,6 +305,12 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
           if (msg.shellId) {
             const runnerId = shellToRunner.get(msg.shellId);
             if (runnerId) {
+              const isAllowed = await runnerManager.isTokenAllowedForRunnerId(runnerId, token);
+              if (!isAllowed) {
+                console.warn(`[ws-server] unauthorized shell:resize for runner ${runnerId}`);
+                break;
+              }
+
               runnerManager.sendFire(runnerId, "pty.resize", {
                 taskId: msg.shellId,
                 cols: msg.cols,
@@ -250,6 +324,12 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
           if (msg.shellId) {
             const runnerId = shellToRunner.get(msg.shellId);
             if (runnerId) {
+              const isAllowed = await runnerManager.isTokenAllowedForRunnerId(runnerId, token);
+              if (!isAllowed) {
+                console.warn(`[ws-server] unauthorized shell:kill for runner ${runnerId}`);
+                break;
+              }
+
               runnerManager.sendFire(runnerId, "exec.cancel", {
                 taskId: msg.shellId,
                 signal: "SIGKILL",
@@ -265,7 +345,7 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
 
     ws.on("close", () => {
       shellIds.clear();
-      clients.delete(ws);
+      wsClients.delete(ws);
     });
   });
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionHtml, saveSessionHtml, saveSessionDiffs } from "@/lib/store";
+import { getArondoToken, verifySessionPermission, verifyProjectPermission, isValidToken } from "@/lib/auth";
 
 export async function GET(
   req: NextRequest,
@@ -9,6 +10,23 @@ export async function GET(
   const { searchParams } = new URL(req.url);
   const messageId = searchParams.get("messageId");
   const projectId = searchParams.get("projectId") || undefined;
+
+  const token = getArondoToken(req);
+  if (id === "global") {
+    if (projectId) {
+      if (!(await verifyProjectPermission(projectId, token))) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    } else {
+      if (!isValidToken(token)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+  } else {
+    if (!(await verifySessionPermission(id, token))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
 
   if (!messageId) {
     return NextResponse.json({ error: "messageId query parameter is required" }, { status: 400 });
@@ -26,6 +44,23 @@ export async function POST(
   const { searchParams } = new URL(req.url);
   const messageId = searchParams.get("messageId");
   const projectId = searchParams.get("projectId") || undefined;
+
+  const token = getArondoToken(req);
+  if (id === "global") {
+    if (projectId) {
+      if (!(await verifyProjectPermission(projectId, token))) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    } else {
+      if (!isValidToken(token)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+  } else {
+    if (!(await verifySessionPermission(id, token))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
 
   if (!messageId) {
     return NextResponse.json({ error: "messageId query parameter is required" }, { status: 400 });

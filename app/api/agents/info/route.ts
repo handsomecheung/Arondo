@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import { getConfigDir } from "@/lib/config";
+import { getArondoToken, verifyRunnerPermission } from "@/lib/auth";
 
 const CONFIG_DIR = getConfigDir();
 
@@ -9,6 +10,11 @@ export async function GET(req: NextRequest) {
   const runnerId = req.nextUrl.searchParams.get("runnerId");
   if (!runnerId) {
     return NextResponse.json({ claude: null, antigravity: null });
+  }
+
+  const token = getArondoToken(req);
+  if (!(await verifyRunnerPermission(runnerId, token))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const agentDir = path.join(CONFIG_DIR, "agents", runnerId);

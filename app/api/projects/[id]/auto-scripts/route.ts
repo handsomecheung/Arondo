@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getProject } from "@/lib/store";
 import { exec, spawn } from "child_process";
 import { promisify } from "util";
+import { getArondoToken, verifyProjectPermission } from "@/lib/auth";
 
 const execAsync = promisify(exec);
 
@@ -218,6 +219,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+  const token = getArondoToken(req);
+  if (!(await verifyProjectPermission(id, token))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const statusInfo = autoScriptsStatus.get(id) || { status: "idle" };
   return NextResponse.json(statusInfo);
 }
@@ -227,6 +233,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+  const token = getArondoToken(req);
+  if (!(await verifyProjectPermission(id, token))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const project = await getProject(id);
   if (!project) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });

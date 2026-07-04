@@ -7,13 +7,16 @@ import { setupWebSocketServer } from "./lib/ws-server";
 import { setupRunnerServer } from "./lib/runner-server";
 import { startQuotaAggregator } from "./lib/quota-aggregator";
 
+import { initializeAuth } from "./lib/auth";
+
 const port = parseInt(process.env.PORT || (process.env.NODE_ENV === "production" ? "3250" : "3251"), 10);
 const dev = process.env.NODE_ENV !== "production";
 const app = next({ dev, port });
 const handle = app.getRequestHandler();
 
-app.prepare().then(() => {
-  const server = createServer((req, res) => {
+initializeAuth().then(() => {
+  app.prepare().then(() => {
+    const server = createServer((req, res) => {
     handle(req, res);
   });
 
@@ -42,4 +45,5 @@ app.prepare().then(() => {
       `> Server listening at http://localhost:${port} as ${dev ? "development" : "production"}`
     );
   });
+});
 });

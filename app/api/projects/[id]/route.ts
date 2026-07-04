@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getProject, getSessions, deleteProject } from "@/lib/store";
 import { eventBus } from "@/lib/event-bus";
+import { getArondoToken, verifyProjectPermission } from "@/lib/auth";
 
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const token = getArondoToken(req);
+
+  if (!(await verifyProjectPermission(id, token))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const project = await getProject(id);
 
   if (!project) {

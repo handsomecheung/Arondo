@@ -4,6 +4,7 @@ import { getAgent, AgentType, resolveAgentType, PROMPT_ENV_VAR } from "@/lib/age
 import { buildCrossAgentContext } from "@/lib/autoselect";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
+import { getArondoToken, verifySessionPermission } from "@/lib/auth";
 
 const MAX_SESSION_NAME_LENGTH = 80;
 
@@ -12,6 +13,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const token = getArondoToken(req);
+  if (!(await verifySessionPermission(id, token))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   const session = await getSession(id);
 
   if (!session) {

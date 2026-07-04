@@ -341,7 +341,8 @@ export default function HomePage() {
     const unmatchedScript: string[] = [];
     let lastUserPrompt = "";
 
-    for (const msg of messages) {
+    const validMessages = Array.isArray(messages) ? messages : [];
+    for (const msg of validMessages) {
       if (msg.role === "user" && msg.type === "chat-user") {
         lastUserPrompt = msg.content;
       }
@@ -444,9 +445,12 @@ export default function HomePage() {
       return;
     }
     fetch(`/api/messages?sessionId=${selectedSessionId}`)
-      .then((r) => r.json())
-      .then((data: Message[]) => setMessages(data))
-      .catch(console.error);
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: Message[]) => setMessages(Array.isArray(data) ? data : []))
+      .catch((err) => {
+        console.error(err);
+        setMessages([]);
+      });
   }, [selectedSessionId]);
 
   useEffect(() => {

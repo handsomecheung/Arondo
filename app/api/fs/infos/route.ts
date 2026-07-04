@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runnerManager } from "@/lib/runner-manager";
+import { getArondoToken, verifyRunnerPermission } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
@@ -10,6 +11,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { error: "runner is required" },
       { status: 400 }
+    );
+  }
+
+  const token = getArondoToken(request);
+  if (!(await verifyRunnerPermission(runnerId, token))) {
+    return NextResponse.json(
+      { error: "Forbidden" },
+      { status: 403 }
     );
   }
 

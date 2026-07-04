@@ -34,6 +34,7 @@ export interface Runner {
   version?: string;
   capabilities?: string[];
   agents?: string[];
+  allowedTokens?: string[];
 }
 
 export interface ProjectScript {
