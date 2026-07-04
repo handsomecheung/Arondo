@@ -19,7 +19,7 @@ export default function ScriptExecCard({
   onViewLog,
   sessionId,
   ws,
-  showLogInline = false,
+  showLogInline = true,
   ...props
 }: ScriptExecCardProps) {
   const hasLog = !!props.item.messageId;

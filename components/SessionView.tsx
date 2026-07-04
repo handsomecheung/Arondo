@@ -590,7 +590,6 @@ export default function SessionView({
                   {...sharedProps}
                   onViewLog={() => onViewLog(msg.id)}
                   onRestartScript={isCardRunning ? () => onRestartScriptCard(cardInfo.runMsg.id, cardInfo.commandLabel) : undefined}
-                  showLogInline={cardInfo.isQuickCard}
                   sessionId={selectedSessionId!}
                   ws={ws}
                 />
