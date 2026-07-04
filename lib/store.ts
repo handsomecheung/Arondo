@@ -379,6 +379,30 @@ export async function getSessionLog(sessionId: string, messageId: string, projec
   }
 }
 
+function getHtmlFilePath(sessionId: string, messageId: string, projectId?: string): string {
+  if (!sessionId) {
+    if (!projectId) {
+      throw new Error("getHtmlFilePath: projectId is required for project-scoped (sessionless) logs");
+    }
+    return path.join(getProjectDir(projectId), "logs", `${messageId}.html`);
+  }
+  return path.join(getSessionDir(sessionId), "logs", `${messageId}.html`);
+}
+
+export async function saveSessionHtml(sessionId: string, messageId: string, html: string, projectId?: string): Promise<void> {
+  const htmlPath = getHtmlFilePath(sessionId, messageId, projectId);
+  await ensureDir(path.dirname(htmlPath));
+  await fs.writeFile(htmlPath, html, "utf-8");
+}
+
+export async function getSessionHtml(sessionId: string, messageId: string, projectId?: string): Promise<string> {
+  try {
+    return await fs.readFile(getHtmlFilePath(sessionId, messageId, projectId), "utf-8");
+  } catch {
+    return "";
+  }
+}
+
 export async function deleteSession(id: string): Promise<void> {
   const sessionDir = getSessionDir(id);
   await fs.rm(sessionDir, { recursive: true, force: true });
