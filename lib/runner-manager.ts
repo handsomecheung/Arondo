@@ -60,7 +60,6 @@ export interface TaskContext {
   command?: string;
   projectId?: string;
   prompt?: string;
-  isChat?: boolean;
 }
 
 interface PendingRequest {
@@ -183,7 +182,6 @@ class RunnerManager {
             command: m.command,
             projectId: s.projectId,
             prompt: m.prompt,
-            isChat: !!(m.prompt && m.prompt.startsWith("!")),
             completedAt,
             exitCode: m.exitCode,
             stoppedByUser: m.stoppedByUser,
@@ -238,7 +236,6 @@ class RunnerManager {
             command: m.command,
             projectId: p.id,
             prompt: m.prompt,
-            isChat: !!(m.prompt && m.prompt.startsWith("!")),
             completedAt,
             exitCode: m.exitCode,
             stoppedByUser: m.stoppedByUser,
