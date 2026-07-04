@@ -61,6 +61,7 @@ interface ServerTask {
   command?: string;
   projectId?: string;
   prompt?: string;
+  agentType?: string;
 }
 
 interface TaskItem {
@@ -181,7 +182,7 @@ export default function TasksPage() {
           scriptName: t.scriptName,
           projectId: t.projectId || session?.projectId,
           prompt: t.prompt || session?.prompt,
-          agentType: session?.agentType,
+          agentType: t.agentType || session?.agentType,
         };
       });
 

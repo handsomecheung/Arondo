@@ -9,6 +9,7 @@ import {
   getSessionLog,
   getSessions,
   updateMessage,
+  getMessages,
 } from "./store";
 import {
   getAgySessionId,
@@ -60,6 +61,7 @@ export interface TaskContext {
   command?: string;
   projectId?: string;
   prompt?: string;
+  agentType?: string;
 }
 
 interface PendingRequest {
@@ -883,7 +885,11 @@ class RunnerManager {
     const success = exitCode === 0;
 
     const session = await getSession(ctx.sessionId);
-    if (session?.agentType === "antigravity") {
+    const messages = await getMessages(ctx.sessionId);
+    const systemMsg = messages.find((m) => m.id === ctx.messageId);
+    const resolvedAgentType = systemMsg?.resolvedAgentType || session?.agentType;
+
+    if (resolvedAgentType === "antigravity") {
       try {
         const existingAgyId = await getAgySessionId(ctx.sessionId);
         if (!existingAgyId) {
@@ -902,12 +908,12 @@ class RunnerManager {
 
     // Detect quota exhaustion: agy exits 0 but produces no output; claude logs session limit hit
     let quotaExhausted = false;
-    if (session?.agentType === "antigravity" && success) {
+    if (resolvedAgentType === "antigravity" && success) {
       const log = await getSessionLog(ctx.sessionId, ctx.messageId);
       if (!log.trim()) {
         quotaExhausted = true;
       }
-    } else if (session?.agentType === "claude") {
+    } else if (resolvedAgentType === "claude") {
       const log = await getSessionLog(ctx.sessionId, ctx.messageId);
       if (log.includes("You've hit your session limit")) {
         quotaExhausted = true;
@@ -927,7 +933,7 @@ class RunnerManager {
     const updated = await updateSession(ctx.sessionId, {
       status: nextStatus as any,
       errorMessage: quotaExhausted
-        ? session?.agentType === "claude"
+        ? resolvedAgentType === "claude"
           ? "Claude session limit hit"
           : "agy quota exhausted — no output was produced"
         : success
