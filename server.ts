@@ -20,7 +20,15 @@ initializeAuth().then(() => {
     handle(req, res);
   });
 
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = new WebSocketServer({
+    noServer: true,
+    handleProtocols: (protocols) => {
+      if (protocols.has("arondo-token")) {
+        return "arondo-token";
+      }
+      return false;
+    }
+  });
   setupWebSocketServer(wss);
 
   const runnerWss = new WebSocketServer({ noServer: true });

@@ -108,8 +108,15 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
   wss.on("close", () => clearInterval(heartbeat));
 
   wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
-    const parsedUrl = url.parse(req.url || "", true);
-    const token = (parsedUrl.query.token as string) || null;
+    const protocolHeader = req.headers["sec-websocket-protocol"];
+    let token: string | null = null;
+    if (typeof protocolHeader === "string") {
+      const parts = protocolHeader.split(",").map((p) => p.trim());
+      if (parts[0] === "arondo-token" && parts[1]) {
+        token = parts[1];
+      }
+    }
+
     if (!isValidToken(token)) {
       ws.close(4001, "Unauthorized: Invalid access token");
       return;

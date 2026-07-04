@@ -213,8 +213,9 @@ export default function TasksPage() {
     function connect() {
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
       const token = typeof window !== "undefined" ? localStorage.getItem("arondo_token") : "";
-      const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
-      ws = new WebSocket(`${proto}//${location.host}/ws${tokenParam}`);
+      const wsUrl = `${proto}//${location.host}/ws`;
+      const protocols = token ? ["arondo-token", token] : [];
+      ws = new WebSocket(wsUrl, protocols);
       wsRef.current = ws;
 
       ws.onopen = () => {
