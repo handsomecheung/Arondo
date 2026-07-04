@@ -104,7 +104,7 @@ app/
         route.ts        # POST: kill a running task by sessionId + messageId
     messages/route.ts   # GET: list messages for a session
     fs/route.ts         # GET: browse directories on a runner
-    fs/exists/route.ts  # POST: batch check path existence on the runner (used for markdown file link verification)
+    fs/infos/route.ts   # POST: batch check path existence and git diff status on the runner (used for markdown file link verification and inline diff triggering)
 components/
   Terminal.tsx          # xterm.js terminal component (live WS mode + history replay mode)
   ShellTerminal.tsx     # Interactive shell terminal component (spawns server-side PTY via WebSocket)
@@ -172,6 +172,8 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 | `pty.input` | S→R request | Write stdin data to PTY |
 | `pty.resize` | S→R request | Resize PTY terminal |
 | `fs.list` | S→R request | List directories at a path |
+| `fs.read` | S→R request | Read file content |
+| `fs.infos` | S→R request | Batch check path existence and git diff status |
 | `git.status` | S→R request | Run `git status --porcelain` |
 | `git.diff` | S→R request | Run `git diff HEAD` |
 
@@ -181,8 +183,8 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 
 - **Connection management**: Tracks connected runners (including IP address). Runner IDs are stable across reconnections (derived from `name@hostname`). `RunnerInfo.lastSeenAt` is stamped on both connect and disconnect.
 - **Task routing**: Maps `taskId` → `TaskContext` (sessionId, messageId, runnerId, type, pid, completedAt, exitCode, stoppedByUser). Maps `sessionId:messageId` → `taskId` for PTY input routing.
-- **Task persistence & retention**: Active task contexts are persisted by saving execution metadata directly to `messages.json` (for both sessions and projects). Completed tasks are retained for 7 days (`TASK_RETENTION_MS`), then purged on startup. On server restart, active tasks are restored and re-associated to the reconnecting runner.
-- **Task cleanup**: `removeTasksForSession()` cleans up tasks when a session is deleted. `getAllTasks()` returns all tasks (active + retained). `purgeExpiredTasks()` removes completed tasks older than 7 days.
+- **Task persistence & retention**: Active task contexts are persisted by saving execution metadata directly to `messages.json` (for both sessions and projects). Completed tasks are retained for 3 days (`TASK_RETENTION_MS`), then purged on startup. On server restart, active tasks are restored and re-associated to the reconnecting runner.
+- **Task cleanup**: `removeTasksForSession()` cleans up tasks when a session is deleted. `getAllTasks()` returns all tasks (active + retained). `purgeExpiredTasks()` removes completed tasks older than 3 days.
 - **Runner discovery**: `getAllKnownRunners()` returns both connected runners and disconnected runners persisted on disk, used by the `/api/runners` route.
 - **Task restart**: `restartTask()` sends `exec.restart` to the runner, killing the current process and re-spawning it with a new command within the same task slot.
 - **Runner resolution**: `resolveRunnerId()` falls back to any connected runner when a session's stored runnerId is stale.
@@ -220,16 +222,16 @@ Two WebSocket endpoints:
 ## Core Logging & Session Lifecycle Features
 - **Message-specific execution logs**: Every agent or script execution creates a specific system message (e.g. `⚙️ Executing command...`). The resulting terminal outputs are streamed via the runner and stored in `~/.arondo/sessions/[sessionId]/logs/[systemMsgId].log`.
 - **Interactive Terminal (PTY) & Mobile Keyboard Bar**: Script execution uses Go's `creack/pty` on the runner for full pseudo-terminal support (stdin, ANSI colors, cursor control). The frontend renders output via `xterm.js` (`components/Terminal.tsx`) in two modes: live (WebSocket-connected for running scripts, with historical log pre-loaded) and history (loads saved log data for completed scripts). It includes a mobile-specific special-keys bar (`components/TerminalKeyboardBar.tsx`) containing ESC/TAB/CTRL/ALT, arrow keys, and an FN layer (F1-F12), dynamically positioning itself above the mobile software keyboard to prevent obstruction.
-- **Task Queue & Log Popup**: Tasks are tracked in a global header queue grouped by session, with session names always visible. Completed tasks are retained for 7 days. Clicking any task switches to its session and opens the log modal. Each running task has a kill button that sends SIGTERM via the runner.
+- **Task Queue & Log Popup**: Tasks are tracked in a global header queue grouped by session, with session names always visible. Completed tasks are retained for 3 days. Clicking any task switches to its session and opens the log modal. Each running task has a kill button that sends SIGTERM via the runner. In the Tasks dashboard, users can toggle to display only non-completed tasks (active/running/stopped) and view execution logs inline.
 - **User-stopped vs Failed distinction**: When a task is killed via the UI, `TaskContext.stoppedByUser` is set, producing a 🛑 "Stopped by user" completion message and `errorMessage` instead of an ❌ error. The terminal shows a “─── stopped by user ───” separator.
-- **Dedicated Execution Cards, Rich Markdown & Inline Logs**: Unified `ExecCard` is split into `ScriptExecCard` (using `xterm.js` for interactive output, and supporting inline log streaming for quick-run commands) and `AgentExecCard` (rendering outputs in Markdown with syntax highlighting and clickable file/URL links). Clicking verified file paths opens them in the Remote File Browser. Users can toggle between Markdown and raw text views.
+- **Dedicated Execution Cards, Rich Markdown & Inline Logs**: Unified `ExecCard` is split into `ScriptExecCard` (using `xterm.js` for interactive output, and supporting inline log streaming for quick-run commands) and `AgentExecCard` (rendering outputs in Markdown with syntax highlighting and clickable file/URL links). Clicking verified file paths opens them in the Remote File Browser. If a file has git modifications, a diff button is displayed next to the path to trigger an inline visual diff viewer modal. Card rendering performance is optimized by caching generated HTML to the backend on the first render. Users can toggle between Markdown and raw text views.
 - **Restart/Retry actions**: `ScriptExecCard` shows a Restart button for script tasks (calls `restart-script` API → `exec.restart` on the runner) and `AgentExecCard` shows a Retry button for failed agent tasks (calls `rerun-agent` API). The terminal/view shows a “─── restarting ───” separator inline in the existing log.
 - **Slash commands & Quick Exec Triggers**: Slash commands are config-driven and customizable (stored in `~/.arondo/agent-commands.json`). Custom slash commands display as blue `UserAgentCommandCard` nodes in the session timeline and track both the raw command and resolved prompt separately. Additionally, users can use `!` in the chat input to execute project-scoped scripts or arbitrary shell commands inline, with execution logs streamed directly within the card.
 - **Tab Completion & Keyboard UX**: Chat input supports Tab completion to cycle through slash commands. Send messages via `Enter`, and insert a newline via `Ctrl+Enter` / `Meta+Enter`.
 - **Session Navigation & Shell Terminal**: The three-dot dropdown in a session includes an "Open Terminal" option to open a `ShellTerminal` modal, and a "Go to Project" button to navigate back to the parent project interface.
 - **Real-time Streaming**: Both agent and script output stream via WebSocket `terminal:output` (base64-encoded PTY data), forwarded through the event bus. The frontend renders script logs via xterm.js and agent logs via the plain wrapped text view.
 - **Concurrency**: Multiple background scripts can run concurrently in a single session. The chat prompt stays active during execution.
-- **Task Persistence**: Active task contexts survive server restarts by restoring metadata from session and project `messages.json`. On runner reconnect, the `task.status` event reconciles running vs exited tasks.
+- **Task Persistence**: Active task contexts survive server restarts by restoring metadata from session and project `messages.json`. Both active tasks and completed tasks within the 3-day retention period are restored. On runner reconnect, the `task.status` event reconciles running vs exited tasks.
 - **Runner Disconnect Handling**: When a runner disconnects, orphaned tasks are automatically failed with exit code -1, updating session status and notifying the UI.
 - **Agent Session Continuity**: ClaudeCodeAgent supports `--session-id` (bind to a session) and `--resume` (resume an existing session) flags, enabling multi-turn conversations within the same agent session.
 - **Global Agent Rules Sync**: Settings screen allows specifying global agent rules. These are stored in `~/.arondo/global-rules.md` and automatically synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on runner nodes upon connection.
