@@ -934,6 +934,7 @@ export default function TasksPage() {
                                   messageId: task.messageId,
                                 }}
                                 sessionId={task.sessionId || ""}
+                                projectId={task.projectId}
                                 ws={wsInstance}
                                 onViewLog={task.messageId ? () => setTerminalTask(task) : undefined}
                                 onShowCommand={task.command ? () => setCommandTask(task) : undefined}
@@ -1084,6 +1085,7 @@ export default function TasksPage() {
                                   messageId: task.messageId,
                                 }}
                                 sessionId={task.sessionId || ""}
+                                projectId={task.projectId}
                                 ws={wsInstance}
                                 onViewLog={task.messageId ? () => setTerminalTask(task) : undefined}
                                 onShowCommand={task.command ? () => setCommandTask(task) : undefined}

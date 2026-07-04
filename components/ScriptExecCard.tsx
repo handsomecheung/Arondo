@@ -11,6 +11,7 @@ function stripAnsi(text: string): string {
 interface ScriptExecCardProps extends ExecCardProps {
   onViewLog?: () => void;
   sessionId?: string;
+  projectId?: string;
   ws?: WebSocket | null;
   showLogInline?: boolean;
 }
@@ -18,6 +19,7 @@ interface ScriptExecCardProps extends ExecCardProps {
 export default function ScriptExecCard({
   onViewLog,
   sessionId,
+  projectId,
   ws,
   showLogInline = true,
   ...props
@@ -27,28 +29,34 @@ export default function ScriptExecCard({
   const [log, setLog] = useState("");
   const outputRef = useRef<HTMLPreElement>(null);
 
+  const isGlobal = !sessionId && !!projectId;
+  const logSessionId = isGlobal ? "global" : sessionId;
+  const hasLogSource = !!props.item.messageId && (!!sessionId || isGlobal);
+
   // Initial fetch of logs
   useEffect(() => {
-    if (!showLogInline || !props.item.messageId || !sessionId) return;
-    const url = `/api/sessions/${sessionId}/log?messageId=${props.item.messageId}`;
+    if (!showLogInline || !props.item.messageId || !logSessionId) return;
+    const url = isGlobal
+      ? `/api/sessions/global/log?messageId=${props.item.messageId}&projectId=${projectId}`
+      : `/api/sessions/${logSessionId}/log?messageId=${props.item.messageId}`;
     fetch(url)
       .then((r) => r.json())
       .then(({ log }: { log: string }) => {
         if (log) setLog(stripAnsi(log));
       })
       .catch(() => {});
-  }, [showLogInline, props.item.messageId, sessionId]);
+  }, [showLogInline, props.item.messageId, logSessionId, isGlobal, projectId]);
 
   // Stream logs over WS
   useEffect(() => {
-    if (!showLogInline || !isRunning || !ws || !props.item.messageId || !sessionId) return;
+    if (!showLogInline || !isRunning || !ws || !props.item.messageId || !hasLogSource) return;
 
     const onMessage = (e: MessageEvent) => {
       try {
         const msg = JSON.parse(e.data);
         if (
           msg.type === "terminal:output" &&
-          msg.sessionId === sessionId &&
+          msg.sessionId === (sessionId ?? "") &&
           msg.messageId === props.item.messageId
         ) {
           setLog((prev) => prev + stripAnsi(msg.data));
@@ -60,7 +68,7 @@ export default function ScriptExecCard({
 
     ws.addEventListener("message", onMessage);
     return () => ws.removeEventListener("message", onMessage);
-  }, [showLogInline, isRunning, ws, sessionId, props.item.messageId]);
+  }, [showLogInline, isRunning, ws, sessionId, props.item.messageId, hasLogSource]);
 
   // Auto scroll to bottom
   useEffect(() => {
@@ -81,7 +89,7 @@ export default function ScriptExecCard({
 
   return (
     <ExecCard {...props} extraMenuItems={extraMenuItems} className={className}>
-      {showLogInline && props.item.messageId && (
+      {showLogInline && hasLogSource && (
         <pre ref={outputRef} className="agent-exec-output" style={{ maxHeight: "250px" }}>
           {log || "Running command..."}
         </pre>
