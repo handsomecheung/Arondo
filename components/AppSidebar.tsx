@@ -138,7 +138,22 @@ export default function AppSidebar({
                 <p>No projects yet.<br />Create a session to initialize a project.</p>
               </div>
             ) : (
-              projects.map((project, index) => {
+              [...projects]
+              .sort((a, b) => {
+                const lastActivity = (p: typeof a) => {
+                  const sessionUpdatedAt = sortedSessions
+                    .filter((s) => s.projectId === p.id)
+                    .map((s) => s.updatedAt)
+                    .sort()
+                    .at(-1);
+                  return Math.max(
+                    new Date(p.updatedAt).getTime(),
+                    sessionUpdatedAt ? new Date(sessionUpdatedAt).getTime() : 0,
+                  );
+                };
+                return lastActivity(b) - lastActivity(a);
+              })
+              .map((project, index) => {
                 const projectSessions = sortedSessions.filter((s) => s.projectId === project.id);
                 const folderName = project.repoPath.split("/").pop() || project.repoPath;
                 const projectRunner = runners.find((r) => r.id === project.runnerId);
