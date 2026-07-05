@@ -208,7 +208,9 @@ export default function RunnersPage() {
   const loadRunners = useCallback(() => {
     fetch("/api/runners")
       .then((r) => r.json())
-      .then((data: Runner[]) => setRunners(data))
+      .then((data: Runner[]) => {
+        if (Array.isArray(data)) setRunners(data);
+      })
       .catch(console.error);
   }, []);
 
@@ -223,11 +225,15 @@ export default function RunnersPage() {
     loadRunners();
     fetch("/api/projects")
       .then((r) => r.json())
-      .then((data: Project[]) => setProjects(data))
+      .then((data: Project[]) => {
+        if (Array.isArray(data)) setProjects(data);
+      })
       .catch(console.error);
     fetch("/api/sessions")
       .then((r) => r.json())
-      .then((data: Session[]) => setSessions(data))
+      .then((data: Session[]) => {
+        if (Array.isArray(data)) setSessions(data);
+      })
       .catch(console.error);
 
     const poll = setInterval(loadRunners, 10_000);

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { IconPlus, IconX, IconInbox, IconSettings, IconServer } from "@/components/Icons";
 import { formatRelative } from "@/lib/homeUtils";
@@ -32,6 +33,17 @@ export default function AppSidebar({
   onSelectProject,
   onNewSession,
 }: Props) {
+  const [userRole, setUserRole] = useState<"admin" | "user" | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/verify")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.valid) setUserRole(data.role);
+      })
+      .catch(console.error);
+  }, []);
+
   return (
     <>
       <div
@@ -200,10 +212,12 @@ export default function AppSidebar({
             <IconServer />
             <span>Runners</span>
           </Link>
-          <Link href="/settings" className="sidebar-settings-link" onClick={onCloseSidebar}>
-            <IconSettings />
-            <span>Settings</span>
-          </Link>
+          {userRole === "admin" && (
+            <Link href="/settings" className="sidebar-settings-link" onClick={onCloseSidebar}>
+              <IconSettings />
+              <span>Settings</span>
+            </Link>
+          )}
         </div>
       </aside>
     </>

@@ -27,6 +27,7 @@ export function useInitialLoad({
     fetch("/api/sessions")
       .then((r) => r.json())
       .then((data: Session[]) => {
+        if (!Array.isArray(data)) return;
         setSessions(data);
         const urlSession = initUrl.session;
         const urlProject = initUrl.project;
@@ -41,6 +42,7 @@ export function useInitialLoad({
     fetch("/api/tasks")
       .then((r) => r.json())
       .then((tasks: any[]) => {
+        if (!Array.isArray(tasks)) return;
         const runningTasks = tasks.filter((t) => !t.completedAt);
         const initTasks: TaskItem[] = runningTasks.map((t) => ({
           id: t.taskId,
@@ -68,7 +70,9 @@ export function useInitialLoad({
 
     fetch("/api/agent-commands")
       .then((r) => r.json())
-      .then((data: AgentCommand[]) => setAgentCommands(data))
+      .then((data: AgentCommand[]) => {
+        if (Array.isArray(data)) setAgentCommands(data);
+      })
       .catch(console.error);
 
     return () => clearInterval(runnerPoll);

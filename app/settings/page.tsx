@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import ConfirmDialog from "@/components/modals/ConfirmDialog";
 
 interface Runner {
@@ -145,6 +146,7 @@ function IconInbox() {
 }
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [runners, setRunners] = useState<Runner[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -176,7 +178,9 @@ export default function SettingsPage() {
   const loadRunners = useCallback(() => {
     fetch("/api/runners")
       .then((r) => r.json())
-      .then((data: Runner[]) => setRunners(data))
+      .then((data: Runner[]) => {
+        if (Array.isArray(data)) setRunners(data);
+      })
       .catch(console.error);
   }, []);
 
@@ -344,20 +348,31 @@ export default function SettingsPage() {
     fetch("/api/auth/verify")
       .then((r) => r.json())
       .then((data) => {
-        if (data.valid) setUserRole(data.role);
+        if (data.valid && data.role === "admin") {
+          setUserRole(data.role);
+        } else {
+          router.replace("/");
+        }
       })
-      .catch(console.error);
+      .catch((err) => {
+        console.error(err);
+        router.replace("/");
+      });
 
     loadRunners();
     loadCustomCommands();
     loadGlobalRules();
     fetch("/api/projects")
       .then((r) => r.json())
-      .then((data: Project[]) => setProjects(data))
+      .then((data: Project[]) => {
+        if (Array.isArray(data)) setProjects(data);
+      })
       .catch(console.error);
     fetch("/api/sessions")
       .then((r) => r.json())
-      .then((data: Session[]) => setSessions(data))
+      .then((data: Session[]) => {
+        if (Array.isArray(data)) setSessions(data);
+      })
       .catch(console.error);
 
     const poll = setInterval(loadRunners, 10_000);
@@ -425,6 +440,10 @@ export default function SettingsPage() {
     if (a.connected !== b.connected) return a.connected ? -1 : 1;
     return (b.lastSeenAt ?? 0) - (a.lastSeenAt ?? 0);
   });
+
+  if (userRole !== "admin") {
+    return null;
+  }
 
   return (
     <div
@@ -502,26 +521,6 @@ export default function SettingsPage() {
           padding: 24,
         }}
       >
-        {userRole === "user" && (
-          <div
-            style={{
-              maxWidth: 720,
-              margin: "0 auto 16px auto",
-              padding: "12px 16px",
-              backgroundColor: "rgba(245, 158, 11, 0.1)",
-              border: "1px solid rgba(245, 158, 11, 0.3)",
-              borderRadius: "var(--radius-md)",
-              color: "#f59e0b",
-              fontSize: 13,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <span>⚠️</span>
-            <span><strong>Read-only Mode (User Access):</strong> Settings cannot be modified by user tokens.</span>
-          </div>
-        )}
         <div
           style={{
             maxWidth: 720,
@@ -1148,7 +1147,7 @@ export default function SettingsPage() {
             <textarea
               value={globalRules}
               onChange={(e) => setGlobalRules(e.target.value)}
-              readOnly={userRole === "user"}
+              readOnly={false}
               placeholder="# Global Agent Rules&#10;&#10;- Prefer clean code without comments.&#10;- Use bash scripts for system automation."
               style={{
                 width: "100%",

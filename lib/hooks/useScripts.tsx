@@ -91,7 +91,9 @@ export function useScripts({
   const loadProjectScripts = useCallback((projectId: string) => {
     fetch(`/api/projects/${projectId}/scripts`)
       .then((r) => r.json())
-      .then((data: ProjectScript[]) => setProjectScripts(data))
+      .then((data: ProjectScript[]) => {
+        if (Array.isArray(data)) setProjectScripts(data);
+      })
       .catch(console.error);
   }, []);
 
@@ -124,7 +126,7 @@ export function useScripts({
     if (selectedSessionProjectId) {
       fetch(`/api/projects/${selectedSessionProjectId}/scripts`)
         .then((r) => r.json())
-        .then((data: ProjectScript[]) => setSessionScripts(data))
+        .then((data: ProjectScript[]) => setSessionScripts(Array.isArray(data) ? data : []))
         .catch(() => setSessionScripts([]));
     } else {
       setSessionScripts([]);

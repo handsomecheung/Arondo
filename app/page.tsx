@@ -400,6 +400,7 @@ export default function HomePage() {
     fetch("/api/runners")
       .then((r) => r.json())
       .then((data: Runner[]) => {
+        if (!Array.isArray(data)) return;
         setRunners(data);
         if (data.length > 0 && !runnerId) {
           const onlineRunner = data.find((r) => r.connected);
@@ -416,7 +417,9 @@ export default function HomePage() {
   const loadProjects = useCallback(() => {
     fetch("/api/projects")
       .then((r) => r.json())
-      .then((data: Project[]) => setProjects(data))
+      .then((data: Project[]) => {
+        if (Array.isArray(data)) setProjects(data);
+      })
       .catch(console.error);
   }, []);
 
