@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { IconPlus, IconX, IconInbox, IconSettings } from "@/components/Icons";
+import { IconPlus, IconX, IconInbox, IconSettings, IconServer } from "@/components/Icons";
 import { formatRelative } from "@/lib/homeUtils";
 import type { Session, Project, Runner } from "@/types/home";
 
@@ -195,7 +195,11 @@ export default function AppSidebar({
             )
           )}
         </div>
-        <div className="sidebar-footer">
+        <div className="sidebar-footer" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <Link href="/runners" className="sidebar-settings-link" onClick={onCloseSidebar}>
+            <IconServer />
+            <span>Runners</span>
+          </Link>
           <Link href="/settings" className="sidebar-settings-link" onClick={onCloseSidebar}>
             <IconSettings />
             <span>Settings</span>
