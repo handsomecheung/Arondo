@@ -18,9 +18,12 @@ export default function DiffModal({ open, onClose, sessionId, messageId, filePat
 
   if (!open) return null;
 
+  const token = typeof window !== "undefined" ? localStorage.getItem("arondo_token") : null;
+  const tokenParam = token ? `&token=${encodeURIComponent(token)}` : "";
+
   const iframeSrc = filePath && messageId
-    ? `/api/sessions/${sessionId}/diff?wrap=${wordWrap}&messageId=${messageId}&path=${encodeURIComponent(filePath)}&projectId=${projectId || ""}`
-    : `/api/sessions/${sessionId}/diff?wrap=${wordWrap}`;
+    ? `/api/sessions/${sessionId}/diff?wrap=${wordWrap}&messageId=${messageId}&path=${encodeURIComponent(filePath)}&projectId=${projectId || ""}${tokenParam}`
+    : `/api/sessions/${sessionId}/diff?wrap=${wordWrap}${tokenParam}`;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>

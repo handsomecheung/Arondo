@@ -92,7 +92,9 @@ export async function reloadTokens(): Promise<void> {
 }
 
 export function getArondoToken(req: NextRequest): string | null {
-  return req.headers.get("x-arondo-token");
+  const header = req.headers.get("x-arondo-token");
+  if (header) return header;
+  return req.nextUrl.searchParams.get("token");
 }
 
 export function getRoleByToken(token: string | null): "admin" | "user" | null {
