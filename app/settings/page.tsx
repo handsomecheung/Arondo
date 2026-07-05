@@ -736,7 +736,7 @@ export default function SettingsPage() {
             </p>
           </div>
 
-          {/* Nodes Section */}
+          {/* Runners Section */}
           <div>
             <h2
               style={{
@@ -746,7 +746,7 @@ export default function SettingsPage() {
                 marginBottom: 12,
               }}
             >
-              Nodes
+              Runners
             </h2>
 
             {sortedRunners.length === 0 ? (
@@ -1086,7 +1086,7 @@ export default function SettingsPage() {
                                 Access Control (Allowed Users)
                               </h3>
                               <p style={{ fontSize: 11, color: "var(--text-muted)", margin: 0 }}>
-                                Select users allowed to access this node. If none are selected, it allows public access.
+                                Select users allowed to access this runner. If none are selected, it allows public access.
                               </p>
 
                               {userRole === "admin" ? (
@@ -1256,9 +1256,9 @@ export default function SettingsPage() {
                                   fontSize: 13,
                                 }}
                               >
-                                No active projects are configured for this node.
+                                No active projects are configured for this runner.
                                 <br />
-                                Create a new project session selecting this runner node.
+                                Create a new project session selecting this runner.
                               </div>
                             ) : (
                               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -1751,7 +1751,7 @@ export default function SettingsPage() {
               }}
             >
               Define global rules that automatically apply to all AI Agents.
-              These will be synced to <code>~/.gemini/GEMINI.md</code> (agy) and <code>~/.claude/CLAUDE.md</code> (claude) on the runner nodes.
+              These will be synced to <code>~/.gemini/GEMINI.md</code> (agy) and <code>~/.claude/CLAUDE.md</code> (claude) on the runners.
             </p>
             <textarea
               value={globalRules}

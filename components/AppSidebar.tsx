@@ -83,7 +83,7 @@ export default function AppSidebar({
                 const project = projects.find((p) => p.id === session.projectId);
                 const projectName = project ? project.repoPath.split("/").pop() || project.repoPath : "";
                 const runner = runners.find((r) => r.id === session.runnerId);
-                const nodeName = runner ? runner.name : session.runnerId || "";
+                const runnerName = runner ? runner.name : session.runnerId || "";
                 return (
                   <div
                     key={session.id ? `session-${session.id}` : `session-idx-${index}`}
@@ -110,10 +110,10 @@ export default function AppSidebar({
                           {projectName}
                         </span>
                       )}
-                      {nodeName && (
+                      {runnerName && (
                         <span
-                          className="task-item-node-badge"
-                          title={runner ? `Node: ${runner.name} (${runner.hostname})` : `Node: ${session.runnerId}`}
+                          className="task-item-runner-badge"
+                          title={runner ? `Runner: ${runner.name} (${runner.hostname})` : `Runner: ${session.runnerId}`}
                           style={{
                             fontSize: 10, fontWeight: 500, color: "var(--text-secondary)",
                             backgroundColor: "rgba(255, 255, 255, 0.06)", border: "1px solid var(--border)",
@@ -121,7 +121,7 @@ export default function AppSidebar({
                             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                           }}
                         >
-                          {nodeName}
+                          {runnerName}
                         </span>
                       )}
                     </div>
@@ -170,8 +170,8 @@ export default function AppSidebar({
                       </span>
                       {projectRunner && (
                         <span
-                          className="task-item-node-badge"
-                          title={`Node: ${projectRunner.name} (${projectRunner.hostname})`}
+                          className="task-item-runner-badge"
+                          title={`Runner: ${projectRunner.name} (${projectRunner.hostname})`}
                           style={{
                             fontSize: 10, fontWeight: 500, color: "var(--text-secondary)",
                             backgroundColor: "rgba(255, 255, 255, 0.06)", border: "1px solid var(--border)",

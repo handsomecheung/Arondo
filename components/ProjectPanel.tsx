@@ -184,7 +184,7 @@ export default function ProjectPanel({
                   marginBottom: 4,
                 }}
               >
-                NODE
+                RUNNER
               </span>
               {projectRunner ? (
                 <div
