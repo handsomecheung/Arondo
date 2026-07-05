@@ -543,8 +543,8 @@ export default function SessionView({
             </div>
             <h1 className="welcome-title">Welcome to Arondo</h1>
             <p className="welcome-desc">
-              Delegate coding tasks to AI agents, review GitHub PRs on
-              your phone, and ship software from anywhere — no laptop
+              Delegate coding tasks to AI agents, run tests, build and
+              deploy projects, and ship software from anywhere — no laptop
               required.
             </p>
             <button
@@ -552,7 +552,7 @@ export default function SessionView({
               onClick={onNewSession}
               style={{ padding: "8px 16px", fontSize: 13 }}
             >
-              <IconPlus /> Create your first session
+              <IconPlus /> Create your session
             </button>
           </div>
         )}
