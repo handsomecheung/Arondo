@@ -17,7 +17,9 @@ All execution goes through a Runner — there is no local fallback on the server
 
 ## Features
 
-- **Multi-Machine Runners**: Install Go runners on any development machine. The UI lets you pick which runner runs each session. Supports deleting disconnected runners from the settings dashboard.
+- **Multi-Machine Runners**: Install Go runners on any development machine. The UI lets you pick which runner runs each session. Supports deleting disconnected runners from the Runners dashboard.
+- **Multi-User Token-Based Authentication**: Secure the application with token-based authentication supporting `admin` and `user` roles. Automatically generates an admin access token on first startup if not already configured. Admins can manage access tokens and configure runner-specific access control lists (restricting runners to specific user token UUIDs) from the Settings dashboard.
+- **Secure WebSocket Communication**: Browser-to-server WebSocket connections are secured by passing the authentication token via the `Sec-WebSocket-Protocol` header (`arondo-token`), preventing exposure of sensitive credentials in query parameters or server logs.
 - **Session-Based Workspaces**: Each task is encapsulated inside a self-contained session under the configuration directory (`~/.arondo/sessions/[sessionId]/` by default), tracking history, settings, and outputs.
 - **Granular Execution Logging**: Outputs for every CLI command execution are logged separately under `~/.arondo/sessions/[sessionId]/logs/[messageId].log`.
 - **Multiple AI Agents Support**: Supports **Antigravity CLI (agy)** and **Claude Code** for code generation tasks.
@@ -26,8 +28,8 @@ All execution goes through a Runner — there is no local fallback on the server
 - **Dedicated Execution Cards & Rich Markdown View**: Script execution uses `ScriptExecCard` (supporting inline log streaming for quick-run commands), while agent execution uses `AgentExecCard` which renders output as Markdown with syntax highlighting (`rehype-highlight`) and clickable file/URL links. Clicking a verified file path automatically opens the Remote File Browser. Users can toggle between Markdown rendering and raw output view from the card's menu.
 - **Terminal Session Persistence & Reattaching**: Terminal sessions persist across browser refreshes or close events. Re-opening a terminal automatically reattaches to the active PTY session on the runner and replays the output buffer.
 - **Quota & Session Limit Detection**: Automatically detects AI agent API limits (such as Claude's session limit hit or `agy` quota exhaustion) and displays human-readable error messages.
-- **AI Agent Quota Monitoring**: Automatically collects quota usage data for Claude and Antigravity via tmux on the runner nodes and displays remaining quota with progress bars in the Settings UI.
-- **AI Agent Auto-Selection (Auto Mode)**: Automatically selects the best agent and model based on hourly and weekly quota availability retrieved from the runner node.
+- **AI Agent Quota Monitoring**: Automatically collects quota usage data for Claude and Antigravity via tmux on the runners and displays remaining quota with progress bars in the Runners dashboard.
+- **AI Agent Auto-Selection (Auto Mode)**: Automatically selects the best agent and model based on hourly and weekly quota availability retrieved from the runner.
 - **Manual Agent Switching**: Switch the active agent (Antigravity CLI, Claude Code, or Auto) on-the-fly within an existing session when the agent is idle.
 - **Secure Prompt Passing**: Prompts are passed to agents using temporary files and environment variables (using the `ARONDO_PROMPT_FILE` environment variable), avoiding shell command-line length limits and exposing sensitive prompts in command arguments. Displays the real resolved prompt instead of original raw inputs in the "Show Prompt" panel.
 - **Concurrent Script Execution**: Allows running multiple scripts simultaneously within a single session. The user can continue chatting while background scripts are running.
@@ -35,7 +37,7 @@ All execution goes through a Runner — there is no local fallback on the server
 - **Config-driven & Custom Slash Commands**: Slash commands (like `/new`, `/commit`, `/delete`) are config-driven and customizable. You can configure user-defined agent slash commands via the **Agent Commands** management UI in Settings (saved in `~/.arondo/agent-commands.json` by default) with regex matcher and replacement expansion support.
 - **Smart Chat Input**: Supports Tab completion to cycle through slash commands in the command menu. Supports typing `@` symbol trigger to open a file/directory selector modal and insert the relative path into the chat input. Typing `!` trigger allows quick execution of project-scoped scripts (with autocompletion) or fallback to arbitrary shell commands. Keyboard behavior is streamlined: send messages on `Enter`, insert a newline on `Ctrl+Enter` / `Meta+Enter`.
 - **Remote File Browsing & File Browser**: Browse directories on any connected runner directly from the UI when selecting a project path. Open a Remote File Browser with syntax highlighting (highlight.js) and a word wrap toggle option from the session's three-dot menu.
-- **Global Agent Rules Sync**: Configure global agent rules in the Settings UI, which are automatically synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on the runner nodes. Global rules are stored in `~/.arondo/global-rules.md`.
+- **Global Agent Rules Sync**: Configure global agent rules in the Settings UI, which are automatically synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on the runners. Global rules are stored in `~/.arondo/global-rules.md`.
 - **Integrated Diff Viewer (diff2html)**: View visual code changes directly from the browser, supporting session-wide diffs and single-file inline diff viewer modals triggered directly from file links in agent execution cards.
 - **Task Queue & Live Tracking**: Active task queue in the header with PID tracking and live log inspection. Clicking a task opens its dedicated console log modal. Each task can be killed from the queue. Completed tasks are retained for 3 days.
 - **Task Grouping, Filtering & Inline Logs**: In the Tasks dashboard, tasks can be filtered by type (Agent/Script), toggled to show only non-completed tasks by default, and grouped by Scope or Status. Script execution logs are now also viewable inline.
@@ -75,6 +77,23 @@ Open [http://localhost:3251](http://localhost:3251) in your browser. Select the 
 
 - `ARONDO_CONFIG_DIR` – (Optional) Custom directory to store configuration and runtime data. Defaults to `~/.arondo` in both development and production.
 - `PORT` – (Optional) Server port. Defaults to `3251` in development, `3250` in production.
+
+### Configuration Files (in `ARONDO_CONFIG_DIR` or `~/.arondo/`)
+
+- `tokens.json` – Multi-user access tokens database. Stored as an array of token information:
+  ```json
+  [
+    {
+      "token": "32-character-hex-string",
+      "uuid": "canonical-uuid-string",
+      "name": "Display Name",
+      "type": "admin"
+    }
+  ]
+  ```
+  If no token with `type: "admin"` exists on startup, an admin token is generated automatically and printed in the server log.
+- `global-rules.md` – Rules synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on connected runners.
+- `agent-commands.json` – User-defined agent slash commands.
 
 ## Runner CLI
 

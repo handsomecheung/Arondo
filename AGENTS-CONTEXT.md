@@ -57,6 +57,10 @@ runner/                  # Go runner binary
   pty.go                # TaskManager: spawn processes with PTY, scrollback buffer, auto-cleanup on exit
 app/
   page.tsx              # Main UI (runner selector, chat, status tracking, terminal modals, 3-dot dropdown)
+  login/
+    page.tsx            # Login UI page
+  runners/
+    page.tsx            # Standalone page for monitoring and deleting runners, and viewing quota details
   tasks/
     page.tsx            # Tasks management page (session list, shell terminal, status monitoring)
   layout.tsx            # Root layout
@@ -105,11 +109,18 @@ app/
     messages/route.ts   # GET: list messages for a session
     fs/route.ts         # GET: browse directories on a runner
     fs/infos/route.ts   # POST: batch check path existence and git diff status on the runner (used for markdown file link verification and inline diff triggering)
+    auth/
+      tokens/
+        route.ts        # GET/POST/DELETE: manage access tokens (admin role only)
+      verify/
+        route.ts        # POST: verify token validity
 components/
   Terminal.tsx          # xterm.js terminal component (live WS mode + history replay mode)
   ShellTerminal.tsx     # Interactive shell terminal component (spawns server-side PTY via WebSocket)
   UserAgentCommandCard.tsx # Exec card representing a user-initiated agent slash command in the timeline
+  ClientInit.tsx        # Performs client-side session token checking and login redirects
 lib/
+  auth.ts               # Core authentication library (token verification, UUID lookup, token generation/migration)
   config.ts             # Configuration helpers, resolves data directory (defaults to ~/.arondo)
   store.ts              # File-based JSON storage (sessions, messages, logs, projects, scripts)
   agentCommands.ts      # Merges built-in and user-defined agent slash commands, resolves matches
@@ -129,6 +140,7 @@ scripts/
   run.runner1.sh        # Start Go runner 1 in dev mode (connects to localhost:3251)
   run.runner2.sh        # Start Go runner 2 in dev mode (connects to localhost:3251)
 ~/.arondo/              # Runtime configuration & data directory (overridden by ARONDO_CONFIG_DIR)
+  tokens.json           # Persisted multi-user access tokens (admin and user roles)
   agent-commands.json   # Persisted custom agent slash commands
   global-rules.md       # Global agent rules written from Settings
   agy-sessions.json     # Map file matching Arondo sessionIds with agy conversation UUIDs
@@ -219,6 +231,32 @@ Two WebSocket endpoints:
 
 **Cross-context singleton pattern:** The event bus and runner manager use `process` (not `global`) as the singleton carrier. This is required because `server.ts` runs via `tsx` while API routes run via Next.js Turbopack — they share the same `process` object but have separate `global` scopes.
 
+## Multi-User Token-Based Authentication
+
+The application enforces token-based authentication on all API routes and WebSocket connections to restrict access.
+
+- **Tokens Registry (`tokens.json`)**: Stored in `~/.arondo/tokens.json` as a JSON array of `TokenInfo` objects:
+  ```json
+  [
+    {
+      "token": "32-character-hex-string",
+      "uuid": "canonical-uuid-string",
+      "name": "User Name",
+      "type": "admin"
+    }
+  ]
+  ```
+- **Automatic Initialization**: On server startup, `initializeAuth()` in `lib/auth.ts` verifies if at least one token of type `admin` exists. If not, it automatically generates a 32-character hexadecimal admin token, writes it to `tokens.json`, and outputs it to the server console.
+- **Roles & Permissions**:
+  - `admin`: Has unrestricted access to all runners, settings, custom agent commands, global rules, and user token management (generating, renaming, deleting user tokens).
+  - `user`: Restricted role. Can only access sessions, projects, and runners that they are explicitly allowed to access.
+- **Granular Access Control**:
+  - Admins can configure runner-specific access control lists in the Settings dashboard. Each runner maintains an `allowedUserTokenUuids` list containing UUIDs of authorized user tokens.
+  - The API router verifies permissions via `verifyRunnerPermission()`, `verifySessionPermission()`, and `verifyProjectPermission()` in `lib/auth.ts` using the client's token.
+- **Secure WebSocket Authentication**:
+  - To prevent exposing sensitive authentication tokens in query strings or server reverse-proxy logs, the browser client passes the token inside the standard `Sec-WebSocket-Protocol` subprotocol header (`arondo-token`) during the handshake.
+  - The WebSocket server on `/ws` parses this subprotocol, extracts the token, and validates it before accepting the connection.
+
 ## Core Logging & Session Lifecycle Features
 - **Message-specific execution logs**: Every agent or script execution creates a specific system message (e.g. `⚙️ Executing command...`). The resulting terminal outputs are streamed via the runner and stored in `~/.arondo/sessions/[sessionId]/logs/[systemMsgId].log`.
 - **Interactive Terminal (PTY) & Mobile Keyboard Bar**: Script execution uses Go's `creack/pty` on the runner for full pseudo-terminal support (stdin, ANSI colors, cursor control). The frontend renders output via `xterm.js` (`components/Terminal.tsx`) in two modes: live (WebSocket-connected for running scripts, with historical log pre-loaded) and history (loads saved log data for completed scripts). It includes a mobile-specific special-keys bar (`components/TerminalKeyboardBar.tsx`) containing ESC/TAB/CTRL/ALT, arrow keys, and an FN layer (F1-F12), dynamically positioning itself above the mobile software keyboard to prevent obstruction.
@@ -234,10 +272,10 @@ Two WebSocket endpoints:
 - **Task Persistence**: Active task contexts survive server restarts by restoring metadata from session and project `messages.json`. Both active tasks and completed tasks within the 3-day retention period are restored. On runner reconnect, the `task.status` event reconciles running vs exited tasks.
 - **Runner Disconnect Handling**: When a runner disconnects, orphaned tasks are automatically failed with exit code -1, updating session status and notifying the UI.
 - **Agent Session Continuity**: ClaudeCodeAgent supports `--session-id` (bind to a session) and `--resume` (resume an existing session) flags, enabling multi-turn conversations within the same agent session.
-- **Global Agent Rules Sync**: Settings screen allows specifying global agent rules. These are stored in `~/.arondo/global-rules.md` and automatically synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on runner nodes upon connection.
-- **AI Agent Quota Monitoring**: Runner nodes collect agent quota usage from Claude and Antigravity via tmux pane capture, which is saved locally under `~/.arondo/agents/` on the server and displayed with progress bars in the Settings dashboard.
-- **Secure Prompt Passing**: Instead of command line arguments, prompts are passed to agents using temporary files on the runner node. The file path is stored in the `ARONDO_PROMPT_FILE` environment variable (and resolved using shell redirection `$(< "$ARONDO_PROMPT_FILE")`), which mitigates command length constraints and process command argument exposure. The UI "Show Prompt" panel displays the real resolved prompt instead of the original raw inputs.
-- **AI Agent Auto-Selection (Auto Mode)**: Automatically selects the best agent and model based on hourly and weekly quota availability retrieved from the runner node.
+- **Global Agent Rules Sync**: Settings screen allows specifying global agent rules. These are stored in `~/.arondo/global-rules.md` and automatically synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on runners upon connection.
+- **AI Agent Quota Monitoring**: Runners collect agent quota usage from Claude and Antigravity via tmux pane capture, which is saved locally under `~/.arondo/agents/` on the server and displayed with progress bars in the Runners dashboard.
+- **Secure Prompt Passing**: Instead of command line arguments, prompts are passed to agents using temporary files on the runner. The file path is stored in the `ARONDO_PROMPT_FILE` environment variable (and resolved using shell redirection `$(< "$ARONDO_PROMPT_FILE")`), which mitigates command length constraints and process command argument exposure. The UI "Show Prompt" panel displays the real resolved prompt instead of the original raw inputs.
+- **AI Agent Auto-Selection (Auto Mode)**: Automatically selects the best agent and model based on hourly and weekly quota availability retrieved from the runner.
   - **Choices**:
     - **Choice A**: Antigravity (`agy`) + `Gemini 3.5 Flash (Medium)` (Quota: `GeminiHourRemain`, `GeminiWeeklyRemain`)
     - **Choice B**: Antigravity (`agy`) + `Claude Sonnet 4.6 (Thinking)` (Quota: `OtherHourRemain`, `OtherWeeklyRemain`)
@@ -247,8 +285,8 @@ Two WebSocket endpoints:
     2. **Weekly Time-Remaining Score**: For active choices, calculate `score = WeekRemain - WeekTimeRemain`, where `WeekTimeRemain = max(0, min(1, (ResetsAt - Now) / 604800))`. This compares the remaining quota ratio against the remaining time ratio of the quota week.
     3. **Final Order**: Sort active choices by score in descending order and prepend them to the low-quota choices. The first candidate is selected and spawned with the mapped `--model` parameter.
 - **Manual Agent Switching**: Allows switching the active agent (Antigravity CLI, Claude Code, or Auto) of an existing session via a dropdown selector in the session header when no command is currently running.
-- **Inline Runner Node Details**: The settings screen is refactored to show the runner node details panel inline directly below the selected runner card for better usability.
-- **Disconnected Runner Deletion**: Allows deleting registered but disconnected runner nodes from the Settings UI, which purges their corresponding metadata and directories.
+- **Inline Runner Details**: The Runners dashboard displays the runner details panel inline directly below the selected runner card for better usability.
+- **Disconnected Runner Deletion**: Allows deleting registered but disconnected runners from the Runners dashboard, which purges their corresponding metadata and directories.
 - **Automated Data Lifecycle**: Automatically purges orphan sessions or projects on load if their parent references (e.g. project or runner) no longer exist.
 - **@ Path Selector Modal**: Typing `@` in the chat textarea opens a file and directory selector modal to easily select a path and insert its relative path into the input field.
 - **File Browser with Syntax Highlighting**: A Remote File Browser can be opened from the session's three-dot menu, featuring file previews (up to 512KB) with code syntax highlighting and a word wrap toggle option.
