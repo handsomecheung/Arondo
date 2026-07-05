@@ -38,7 +38,7 @@ export interface RunnerInfo {
   agents: string[];
   connected: boolean;
   lastSeenAt?: number;
-  allowedTokens?: string[];
+  allowedUserTokenUuids?: string[];
 }
 
 interface RunnerConnection {
@@ -87,7 +87,7 @@ class RunnerManager {
   private tasks = new Map<string, TaskContext>();
   private ptyKeyToTaskId = new Map<string, string>();
   private pending = new Map<string, PendingRequest>();
-  private cachedAllowedTokens = new Map<string, string[]>();
+  private cachedAllowedUserTokenUuids = new Map<string, string[]>();
   private idCounter = 0;
 
   private nextId(): string {
@@ -115,10 +115,19 @@ class RunnerManager {
         const filePath = path.join(RUNNERS_DIR, entry.name, "runner.json");
         try {
           const raw = await fs.readFile(filePath, "utf-8");
-          const info: RunnerInfo = JSON.parse(raw);
+          let info: any = JSON.parse(raw);
+
+          // Migrate allowedTokens/allowedTokenUuids to allowedUserTokenUuids if legacy properties exist
+          if ((info.allowedTokens || info.allowedTokenUuids) && !info.allowedUserTokenUuids) {
+            info.allowedUserTokenUuids = info.allowedTokens || info.allowedTokenUuids;
+            delete info.allowedTokens;
+            delete info.allowedTokenUuids;
+            await fs.writeFile(filePath, JSON.stringify(info, null, 2), "utf-8");
+          }
+
           const stableKey = `${info.name}@${info.hostname}`;
           this.knownIds.set(stableKey, info.id);
-          this.cachedAllowedTokens.set(info.id, info.allowedTokens || []);
+          this.cachedAllowedUserTokenUuids.set(info.id, info.allowedUserTokenUuids || []);
         } catch {
           // Ignore corrupt runner files
         }
@@ -322,7 +331,7 @@ class RunnerManager {
       agents: registerPayload.agents || [],
       connected: true,
       lastSeenAt: Date.now(),
-      allowedTokens: this.cachedAllowedTokens.get(id) || [],
+      allowedUserTokenUuids: this.cachedAllowedUserTokenUuids.get(id) || [],
     };
     this.runners.set(id, { id, ws, info });
     this.persistRunner(info).catch(() => {});
@@ -394,7 +403,7 @@ class RunnerManager {
     if (stableKeyToDelete) {
       this.knownIds.delete(stableKeyToDelete);
     }
-    this.cachedAllowedTokens.delete(id);
+    this.cachedAllowedUserTokenUuids.delete(id);
 
     const runnerDir = path.join(RUNNERS_DIR, id);
     try {
@@ -411,43 +420,57 @@ class RunnerManager {
     return true;
   }
 
-  isTokenAllowedForRunner(info: RunnerInfo, token: string | null): boolean {
-    const allowed = info.allowedTokens || [];
-    if (allowed.length === 0) {
+  async isTokenAllowedForRunner(info: RunnerInfo, token: string | null): Promise<boolean> {
+    const { getRoleByToken, getUuidByToken } = await import("./auth");
+    const role = getRoleByToken(token);
+    if (role === "admin") {
       return true;
     }
+    const allowed = info.allowedUserTokenUuids || [];
+    if (allowed.length === 0) {
+      return false;
+    }
     if (!token) return false;
-    return allowed.includes(token);
+    const uuid = getUuidByToken(token);
+    if (!uuid) return false;
+    return allowed.includes(uuid);
   }
 
   async isTokenAllowedForRunnerId(runnerId: string, token: string | null): Promise<boolean> {
     try {
+      const { getRoleByToken, getUuidByToken } = await import("./auth");
+      const role = getRoleByToken(token);
+      if (role === "admin") {
+        return true;
+      }
       const filePath = this.runnerFilePath(runnerId);
       let allowed: string[] = [];
       try {
         const raw = await fs.readFile(filePath, "utf-8");
         const info: RunnerInfo = JSON.parse(raw);
-        allowed = info.allowedTokens || [];
+        allowed = info.allowedUserTokenUuids || [];
       } catch {
-        allowed = this.cachedAllowedTokens.get(runnerId) || [];
+        allowed = this.cachedAllowedUserTokenUuids.get(runnerId) || [];
       }
 
       if (allowed.length === 0) {
-        return true;
+        return false;
       }
       if (!token) return false;
-      return allowed.includes(token);
+      const uuid = getUuidByToken(token);
+      if (!uuid) return false;
+      return allowed.includes(uuid);
     } catch {
       return false;
     }
   }
 
-  async updateRunnerAllowedTokens(runnerId: string, allowedTokens: string[]): Promise<boolean> {
-    this.cachedAllowedTokens.set(runnerId, allowedTokens);
+  async updateRunnerAllowedUserTokenUuids(runnerId: string, allowedUserTokenUuids: string[]): Promise<boolean> {
+    this.cachedAllowedUserTokenUuids.set(runnerId, allowedUserTokenUuids);
     
     const conn = this.runners.get(runnerId);
     if (conn) {
-      conn.info.allowedTokens = allowedTokens;
+      conn.info.allowedUserTokenUuids = allowedUserTokenUuids;
       await this.persistRunner(conn.info);
       return true;
     }
@@ -455,7 +478,7 @@ class RunnerManager {
     const runners = await this.getAllKnownRunners();
     const info = runners.find((r) => r.id === runnerId);
     if (info) {
-      info.allowedTokens = allowedTokens;
+      info.allowedUserTokenUuids = allowedUserTokenUuids;
       await this.persistRunner(info);
       return true;
     }

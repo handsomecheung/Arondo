@@ -17,7 +17,7 @@ interface Runner {
   capabilities?: string[];
   agents?: string[];
   lastSeenAt?: number;
-  allowedTokens?: string[];
+  allowedUserTokenUuids?: string[];
 }
 
 interface Project {
@@ -303,19 +303,17 @@ export default function SettingsPage() {
     }
   }, [globalRules]);
 
-  const saveRunnerTokens = useCallback(async (runnerId: string, allowedTokens: string[]) => {
+  const saveRunnerUserTokenUuids = useCallback(async (runnerId: string, allowedUserTokenUuids: string[]) => {
     try {
       const res = await fetch("/api/runners", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: runnerId, allowedTokens }),
+        body: JSON.stringify({ id: runnerId, allowedUserTokenUuids }),
       });
       if (res.ok) {
-        setRunners((prev) => prev.map((r) => (r.id === runnerId ? { ...r, allowedTokens } : r)));
-        setNewTokenMap((prev) => ({ ...prev, [runnerId]: "" }));
+        setRunners((prev) => prev.map((r) => (r.id === runnerId ? { ...r, allowedUserTokenUuids } : r)));
       } else {
-        const errData = await res.json();
-        alert(errData.error || "Failed to update tokens");
+        alert("Failed to update allowed tokens");
       }
     } catch (err) {
       console.error("Failed to save runner tokens:", err);
@@ -329,21 +327,21 @@ export default function SettingsPage() {
     const runner = runners.find((r) => r.id === runnerId);
     if (!runner) return;
 
-    const currentTokens = runner.allowedTokens || [];
-    if (currentTokens.includes(tokenToAdd)) return;
+    const currentTokenUuids = runner.allowedUserTokenUuids || [];
+    if (currentTokenUuids.includes(tokenToAdd)) return;
 
-    const updatedTokens = [...currentTokens, tokenToAdd];
-    await saveRunnerTokens(runnerId, updatedTokens);
-  }, [newTokenMap, runners, saveRunnerTokens]);
+    const updatedTokenUuids = [...currentTokenUuids, tokenToAdd];
+    await saveRunnerUserTokenUuids(runnerId, updatedTokenUuids);
+  }, [newTokenMap, runners, saveRunnerUserTokenUuids]);
 
   const handleRemoveToken = useCallback(async (runnerId: string, tokenToRemove: string) => {
     const runner = runners.find((r) => r.id === runnerId);
     if (!runner) return;
 
-    const currentTokens = runner.allowedTokens || [];
-    const updatedTokens = currentTokens.filter((t) => t !== tokenToRemove);
-    await saveRunnerTokens(runnerId, updatedTokens);
-  }, [runners, saveRunnerTokens]);
+    const currentTokenUuids = runner.allowedUserTokenUuids || [];
+    const updatedTokenUuids = currentTokenUuids.filter((t) => t !== tokenToRemove);
+    await saveRunnerUserTokenUuids(runnerId, updatedTokenUuids);
+  }, [runners, saveRunnerUserTokenUuids]);
 
   useEffect(() => {
     if (userRole === "admin") {
@@ -615,18 +613,18 @@ export default function SettingsPage() {
                     <div>
                       {userRole === "admin" ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
-                          {systemTokens.length === 0 ? (
+                          {systemTokens.filter(t => t.type === "user").length === 0 ? (
                             <span style={{ fontSize: 11, color: "var(--text-muted)", fontStyle: "italic" }}>
-                              No system tokens configured. Go to Token Manager below to create one.
+                              No user tokens configured. Go to Token Manager below to create one.
                             </span>
                           ) : (
-                            systemTokens.map(({ token: tokenKey, name, type }) => {
-                              const isAllowed = (r.allowedTokens || []).includes(tokenKey);
+                            systemTokens.filter(t => t.type === "user").map(({ token: tokenKey, uuid: tokenUuid, name, type }) => {
+                              const isAllowed = (r.allowedUserTokenUuids || []).includes(tokenUuid);
                               const isUserToken = type === "user";
                               const masked = tokenKey.substring(0, 9) + "...";
                               return (
                                 <label
-                                  key={tokenKey}
+                                  key={tokenUuid}
                                   style={{
                                     display: "flex",
                                     alignItems: "center",
@@ -641,14 +639,14 @@ export default function SettingsPage() {
                                     type="checkbox"
                                     checked={isAllowed}
                                     onChange={async (e) => {
-                                      const current = r.allowedTokens || [];
+                                      const current = r.allowedUserTokenUuids || [];
                                       let updated: string[];
                                       if (e.target.checked) {
-                                        updated = [...current, tokenKey];
+                                        updated = [...current, tokenUuid];
                                       } else {
-                                        updated = current.filter((t) => t !== tokenKey);
+                                        updated = current.filter((t) => t !== tokenUuid);
                                       }
-                                      await saveRunnerTokens(r.id, updated);
+                                      await saveRunnerUserTokenUuids(r.id, updated);
                                     }}
                                     style={{ cursor: "pointer" }}
                                   />
@@ -663,16 +661,16 @@ export default function SettingsPage() {
                         </div>
                       ) : (
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, minHeight: 24, alignItems: "center" }}>
-                          {!r.allowedTokens || r.allowedTokens.length === 0 ? (
+                          {!r.allowedUserTokenUuids || r.allowedUserTokenUuids.length === 0 ? (
                             <span style={{ fontSize: 11, color: "var(--text-muted)", fontStyle: "italic" }}>
                               Public access (No tokens configured)
                             </span>
                           ) : (
-                            r.allowedTokens.map((token) => {
-                              const name = systemTokens.find(t => t.token === token)?.name || token.substring(0, 9) + "...";
+                            r.allowedUserTokenUuids.map((tokenUuid) => {
+                              const name = systemTokens.find(t => t.uuid === tokenUuid)?.name || tokenUuid.substring(0, 9) + "...";
                               return (
                                 <span
-                                  key={token}
+                                  key={tokenUuid}
                                   style={{
                                     display: "inline-flex",
                                     alignItems: "center",

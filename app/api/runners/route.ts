@@ -9,9 +9,13 @@ export async function GET(request: NextRequest) {
   }
 
   const runners = await runnerManager.getAllKnownRunners();
-  const filtered = runners.filter((r) =>
-    runnerManager.isTokenAllowedForRunner(r, token)
+  const results = await Promise.all(
+    runners.map(async (r) => {
+      const allowed = await runnerManager.isTokenAllowedForRunner(r, token);
+      return { r, allowed };
+    })
   );
+  const filtered = results.filter((res) => res.allowed).map((res) => res.r);
   return NextResponse.json(filtered);
 }
 
@@ -24,8 +28,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, allowedTokens } = body;
-    if (!id || !Array.isArray(allowedTokens)) {
+    const { id, allowedUserTokenUuids } = body;
+    if (!id || !Array.isArray(allowedUserTokenUuids)) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
@@ -34,7 +38,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const success = await runnerManager.updateRunnerAllowedTokens(id, allowedTokens);
+    const success = await runnerManager.updateRunnerAllowedUserTokenUuids(id, allowedUserTokenUuids);
     return NextResponse.json({ success });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });

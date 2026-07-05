@@ -48,7 +48,7 @@ interface Runner {
   capabilities?: string[];
   agents?: string[];
   lastSeenAt?: number;
-  allowedTokens?: string[];
+  allowedUserTokenUuids?: string[];
 }
 
 interface Project {
