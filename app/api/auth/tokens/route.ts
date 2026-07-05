@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getArondoToken, getRoleByToken, TokenInfo, migrateConfig } from "@/lib/auth";
+import { getArondoToken, getRoleByToken, TokenInfo, migrateConfig, generateToken } from "@/lib/auth";
 import { getConfigDir } from "@/lib/config";
 import fs from "fs/promises";
 import fsSync from "fs";
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate a secure user token
-    const generatedUserToken = `user_${crypto.randomBytes(16).toString("hex")}`;
+    const generatedUserToken = generateToken();
     config.push({
       token: generatedUserToken,
       uuid: generateUUID(),

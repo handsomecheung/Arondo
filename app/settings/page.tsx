@@ -621,7 +621,7 @@ export default function SettingsPage() {
                             systemTokens.filter(t => t.type === "user").map(({ token: tokenKey, uuid: tokenUuid, name, type }) => {
                               const isAllowed = (r.allowedUserTokenUuids || []).includes(tokenUuid);
                               const isUserToken = type === "user";
-                              const masked = tokenKey.substring(0, 9) + "...";
+                              const masked = tokenKey.substring(0, 3) + "...";
                               return (
                                 <label
                                   key={tokenUuid}
@@ -1230,7 +1230,7 @@ export default function SettingsPage() {
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {systemTokens.filter(t => t.type === "admin").map(({ token: tokenKey, name }) => {
                       const isEditing = editingTokenKey === tokenKey;
-                      const masked = tokenKey.substring(0, 9) + "...";
+                      const masked = tokenKey.substring(0, 3) + "...";
                       return (
                         <div
                           key={tokenKey}
@@ -1323,7 +1323,7 @@ export default function SettingsPage() {
                     ) : (
                       systemTokens.filter(t => t.type === "user").map(({ token: tokenKey, name }) => {
                         const isEditing = editingTokenKey === tokenKey;
-                        const masked = tokenKey.substring(0, 9) + "...";
+                        const masked = tokenKey.substring(0, 3) + "...";
                         return (
                           <div
                             key={tokenKey}

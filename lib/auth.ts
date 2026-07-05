@@ -23,6 +23,10 @@ function generateUUID(): string {
   if (typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
+  return generateToken();
+}
+
+export function generateToken(): string {
   return crypto.randomBytes(16).toString("hex");
 }
 
@@ -110,7 +114,7 @@ export async function initializeAuth(): Promise<void> {
 
     const hasAdmin = config.some(t => t.type === "admin");
     if (!hasAdmin) {
-      const generatedAdminToken = `admin_${crypto.randomBytes(16).toString("hex")}`;
+      const generatedAdminToken = generateToken();
       config.push({
         token: generatedAdminToken,
         uuid: generateUUID(),
