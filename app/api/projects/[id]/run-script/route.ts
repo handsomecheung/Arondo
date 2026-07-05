@@ -5,7 +5,7 @@ import { runnerManager } from "@/lib/runner-manager";
 import fs from "fs/promises";
 import path from "path";
 import { getConfigDir } from "@/lib/config";
-import { getArondoToken, verifyProjectPermission } from "@/lib/auth";
+import { getArondoToken, verifyProjectPermission, getUuidByToken } from "@/lib/auth";
 
 export async function POST(
   req: NextRequest,
@@ -46,6 +46,7 @@ export async function POST(
     role: "system",
     content: `⚙️ Running script: **${scriptName}**\n\`\`\`bash\n${script.command}\n\`\`\``,
     type: "script-run",
+    tokenUuid: getUuidByToken(token) || undefined,
   });
   eventBus.publish({ type: "message_added", payload: systemMsg });
 

@@ -4,7 +4,7 @@ import { getAgent, AgentType, resolveAgentType, PROMPT_ENV_VAR } from "@/lib/age
 import { buildCrossAgentContext } from "@/lib/autoselect";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
-import { getArondoToken, verifySessionPermission } from "@/lib/auth";
+import { getArondoToken, verifySessionPermission, getUuidByToken } from "@/lib/auth";
 
 const MAX_SESSION_NAME_LENGTH = 80;
 
@@ -44,6 +44,7 @@ export async function POST(
       content: trimmedMessage,
       prompt: trimmedPrompt || undefined,
       type: type || "chat-user",
+      tokenUuid: getUuidByToken(token) || undefined,
     });
     eventBus.publish({ type: "message_added", payload: userMsg });
     const runnerConn = runnerManager.getRunner(session.runnerId);

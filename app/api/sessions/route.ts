@@ -4,7 +4,7 @@ import { getSessions, getProjects, deleteSession, createSession, updateSession, 
 import { getAgent, AgentType, resolveAgentType, PROMPT_ENV_VAR } from "@/lib/agents";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
-import { getArondoToken, isValidToken } from "@/lib/auth";
+import { getArondoToken, isValidToken, getUuidByToken } from "@/lib/auth";
 
 const MAX_SESSION_NAME_LENGTH = 80;
 
@@ -110,7 +110,13 @@ export async function POST(req: NextRequest) {
   await updateSession(session.id, { command });
   session.command = command;
 
-  const userMessage = await addMessage({ sessionId: session.id, role: "user", content: prompt, type: "chat-user" });
+  const userMessage = await addMessage({
+    sessionId: session.id,
+    role: "user",
+    content: prompt,
+    type: "chat-user",
+    tokenUuid: getUuidByToken(token) || undefined,
+  });
   eventBus.publish({ type: "message_added", payload: userMessage });
 
   const systemMsg = await addMessage({

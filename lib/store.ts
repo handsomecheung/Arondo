@@ -59,6 +59,7 @@ export interface Message {
   taskId?: string;
   resolvedAgentType?: string;
   prompt?: string;
+  tokenUuid?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

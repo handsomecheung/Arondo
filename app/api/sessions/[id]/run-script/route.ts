@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, getProjectScripts, addMessage, updateSession, clearSessionLog } from "@/lib/store";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
-import { getArondoToken, verifySessionPermission } from "@/lib/auth";
+import { getArondoToken, verifySessionPermission, getUuidByToken } from "@/lib/auth";
 
 export async function POST(
   req: NextRequest,
@@ -45,6 +45,7 @@ export async function POST(
     content: `⚙️ Running script: **${script.name}**\n\`\`\`bash\n${script.command}\n\`\`\``,
     type: "script-run",
     prompt,
+    tokenUuid: getUuidByToken(token) || undefined,
   });
   eventBus.publish({ type: "message_added", payload: systemMsg });
 

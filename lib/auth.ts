@@ -171,6 +171,27 @@ export function getRoleByToken(token: string | null): "admin" | "user" | null {
   return null;
 }
 
+export function getUuidByToken(token: string | null): string | null {
+  if (!token) return null;
+
+  try {
+    if (fsSync.existsSync(TOKENS_FILE)) {
+      const raw = fsSync.readFileSync(TOKENS_FILE, "utf-8");
+      const parsed = JSON.parse(raw);
+      const config = migrateConfig(parsed);
+      
+      const found = config.find(t => t.token === token);
+      if (found) return found.uuid;
+    }
+  } catch (err) {
+    console.error("[auth] Failed to read tokens.json dynamically for UUID:", err);
+  }
+
+  const foundCached = cachedTokens.find(t => t.token === token);
+  if (foundCached) return foundCached.uuid;
+  return null;
+}
+
 export function isValidToken(token: string | null): boolean {
   return getRoleByToken(token) !== null;
 }
