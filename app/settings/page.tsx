@@ -1218,7 +1218,7 @@ export default function SettingsPage() {
                 Manage system-wide access tokens. For security, existing tokens are only partially shown.
               </p>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 20 }}>
                 <div>
                   <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8 }}>
                     Admin Tokens (Name / Token)
