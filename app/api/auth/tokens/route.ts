@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getArondoToken, getRoleByToken } from "@/lib/auth";
+import { getArondoToken, getRoleByToken, TokenInfo, migrateConfig } from "@/lib/auth";
 import { getConfigDir } from "@/lib/config";
 import fs from "fs/promises";
 import fsSync from "fs";
@@ -9,31 +9,11 @@ import crypto from "crypto";
 const CONFIG_DIR = getConfigDir();
 const TOKENS_FILE = path.join(CONFIG_DIR, "tokens.json");
 
-interface TokenConfig {
-  admin: Record<string, string>;
-  user: Record<string, string>;
-}
-
-function migrateConfig(rawConfig: any): TokenConfig {
-  const config: TokenConfig = { admin: {}, user: {} };
-  if (rawConfig && typeof rawConfig === "object") {
-    if (Array.isArray(rawConfig.admin)) {
-      rawConfig.admin.forEach((t: string) => {
-        config.admin[t] = "Default Admin";
-      });
-    } else if (rawConfig.admin && typeof rawConfig.admin === "object") {
-      config.admin = rawConfig.admin;
-    }
-
-    if (Array.isArray(rawConfig.user)) {
-      rawConfig.user.forEach((t: string) => {
-        config.user[t] = "Default User";
-      });
-    } else if (rawConfig.user && typeof rawConfig.user === "object") {
-      config.user = rawConfig.user;
-    }
+function generateUUID(): string {
+  if (typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
   }
-  return config;
+  return crypto.randomBytes(16).toString("hex");
 }
 
 export async function GET(request: NextRequest) {
@@ -45,7 +25,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    let config: TokenConfig = { admin: {}, user: {} };
+    let config: TokenInfo[] = [];
     if (fsSync.existsSync(TOKENS_FILE)) {
       const raw = await fs.readFile(TOKENS_FILE, "utf-8");
       const parsed = JSON.parse(raw);
@@ -71,7 +51,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
-    let config: TokenConfig = { admin: {}, user: {} };
+    let config: TokenInfo[] = [];
     if (fsSync.existsSync(TOKENS_FILE)) {
       const raw = await fs.readFile(TOKENS_FILE, "utf-8");
       const parsed = JSON.parse(raw);
@@ -80,7 +60,12 @@ export async function POST(request: NextRequest) {
 
     // Generate a secure user token
     const generatedUserToken = `user_${crypto.randomBytes(16).toString("hex")}`;
-    config.user[generatedUserToken] = name.trim();
+    config.push({
+      token: generatedUserToken,
+      uuid: generateUUID(),
+      name: name.trim(),
+      type: "user"
+    });
 
     await fs.mkdir(CONFIG_DIR, { recursive: true });
     await fs.writeFile(TOKENS_FILE, JSON.stringify(config, null, 2), "utf-8");
@@ -108,26 +93,19 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "role, token and name are required" }, { status: 400 });
     }
 
-    let config: TokenConfig = { admin: {}, user: {} };
+    let config: TokenInfo[] = [];
     if (fsSync.existsSync(TOKENS_FILE)) {
       const raw = await fs.readFile(TOKENS_FILE, "utf-8");
       const parsed = JSON.parse(raw);
       config = migrateConfig(parsed);
     }
 
-    if (targetRole === "admin") {
-      if (config.admin[targetToken] === undefined) {
-        return NextResponse.json({ error: "Admin token not found" }, { status: 404 });
-      }
-      config.admin[targetToken] = name.trim();
-    } else if (targetRole === "user") {
-      if (config.user[targetToken] === undefined) {
-        return NextResponse.json({ error: "User token not found" }, { status: 404 });
-      }
-      config.user[targetToken] = name.trim();
-    } else {
-      return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+    const tokenIndex = config.findIndex(t => t.token === targetToken && t.type === targetRole);
+    if (tokenIndex === -1) {
+      return NextResponse.json({ error: "Token not found" }, { status: 404 });
     }
+
+    config[tokenIndex].name = name.trim();
 
     await fs.mkdir(CONFIG_DIR, { recursive: true });
     await fs.writeFile(TOKENS_FILE, JSON.stringify(config, null, 2), "utf-8");
@@ -155,26 +133,19 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Missing role or token" }, { status: 400 });
     }
 
-    let config: TokenConfig = { admin: {}, user: {} };
+    let config: TokenInfo[] = [];
     if (fsSync.existsSync(TOKENS_FILE)) {
       const raw = await fs.readFile(TOKENS_FILE, "utf-8");
       const parsed = JSON.parse(raw);
       config = migrateConfig(parsed);
     }
 
-    if (targetRole === "admin") {
-      if (config.admin[targetToken] === undefined) {
-        return NextResponse.json({ error: "Admin token not found" }, { status: 404 });
-      }
-      delete config.admin[targetToken];
-    } else if (targetRole === "user") {
-      if (config.user[targetToken] === undefined) {
-        return NextResponse.json({ error: "User token not found" }, { status: 404 });
-      }
-      delete config.user[targetToken];
-    } else {
-      return NextResponse.json({ error: "Invalid role specified" }, { status: 400 });
+    const tokenIndex = config.findIndex(t => t.token === targetToken && t.type === targetRole);
+    if (tokenIndex === -1) {
+      return NextResponse.json({ error: "Token not found" }, { status: 404 });
     }
+
+    config.splice(tokenIndex, 1);
 
     await fs.mkdir(CONFIG_DIR, { recursive: true });
     await fs.writeFile(TOKENS_FILE, JSON.stringify(config, null, 2), "utf-8");

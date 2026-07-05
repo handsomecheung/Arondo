@@ -46,6 +46,13 @@ interface AgentCommand {
   send: string;
 }
 
+interface TokenInfo {
+  token: string;
+  uuid: string;
+  name: string;
+  type: "admin" | "user";
+}
+
 const EMPTY_COMMAND: AgentCommand = {
   command: "",
   menuLabel: "",
@@ -158,7 +165,7 @@ export default function SettingsPage() {
   const [editDraft, setEditDraft] = useState<AgentCommand>(EMPTY_COMMAND);
   const [newTokenMap, setNewTokenMap] = useState<Record<string, string>>({});
   const [userRole, setUserRole] = useState<"admin" | "user" | null>(null);
-  const [systemTokens, setSystemTokens] = useState<{ admin: Record<string, string>; user: Record<string, string> }>({ admin: {}, user: {} });
+  const [systemTokens, setSystemTokens] = useState<TokenInfo[]>([]);
   const [generatedUserToken, setGeneratedUserToken] = useState<string | null>(null);
   const [generatingToken, setGeneratingToken] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -608,14 +615,14 @@ export default function SettingsPage() {
                     <div>
                       {userRole === "admin" ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
-                          {Object.keys({ ...(systemTokens.admin || {}), ...(systemTokens.user || {}) }).length === 0 ? (
+                          {systemTokens.length === 0 ? (
                             <span style={{ fontSize: 11, color: "var(--text-muted)", fontStyle: "italic" }}>
                               No system tokens configured. Go to Token Manager below to create one.
                             </span>
                           ) : (
-                            Object.entries({ ...(systemTokens.admin || {}), ...(systemTokens.user || {}) }).map(([tokenKey, name]) => {
+                            systemTokens.map(({ token: tokenKey, name, type }) => {
                               const isAllowed = (r.allowedTokens || []).includes(tokenKey);
-                              const isUserToken = tokenKey.startsWith("user_");
+                              const isUserToken = type === "user";
                               const masked = tokenKey.substring(0, 9) + "...";
                               return (
                                 <label
@@ -662,7 +669,7 @@ export default function SettingsPage() {
                             </span>
                           ) : (
                             r.allowedTokens.map((token) => {
-                              const name = (systemTokens.admin || {})[token] || (systemTokens.user || {})[token] || token.substring(0, 9) + "...";
+                              const name = systemTokens.find(t => t.token === token)?.name || token.substring(0, 9) + "...";
                               return (
                                 <span
                                   key={token}
@@ -1223,7 +1230,7 @@ export default function SettingsPage() {
                     Admin Tokens (Name / Token)
                   </h3>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {Object.entries(systemTokens.admin || {}).map(([tokenKey, name]) => {
+                    {systemTokens.filter(t => t.type === "admin").map(({ token: tokenKey, name }) => {
                       const isEditing = editingTokenKey === tokenKey;
                       const masked = tokenKey.substring(0, 9) + "...";
                       return (
@@ -1311,12 +1318,12 @@ export default function SettingsPage() {
                     User Tokens (Name / Token)
                   </h3>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {Object.keys(systemTokens.user || {}).length === 0 ? (
+                    {systemTokens.filter(t => t.type === "user").length === 0 ? (
                       <span style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>
                         No user tokens configured
                       </span>
                     ) : (
-                      Object.entries(systemTokens.user || {}).map(([tokenKey, name]) => {
+                      systemTokens.filter(t => t.type === "user").map(({ token: tokenKey, name }) => {
                         const isEditing = editingTokenKey === tokenKey;
                         const masked = tokenKey.substring(0, 9) + "...";
                         return (

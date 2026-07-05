@@ -10,38 +10,82 @@ import { getConfigDir } from "./config";
 const CONFIG_DIR = getConfigDir();
 const TOKENS_FILE = path.join(CONFIG_DIR, "tokens.json");
 
-interface TokenConfig {
-  admin: Record<string, string>; // token -> name
-  user: Record<string, string>;  // token -> name
+export interface TokenInfo {
+  token: string;
+  uuid: string;
+  name: string;
+  type: "admin" | "user";
 }
 
-let cachedTokens: TokenConfig = { admin: {}, user: {} };
+let cachedTokens: TokenInfo[] = [];
 
-// Convert legacy array structure to new dictionary structure if needed
-function migrateConfig(rawConfig: any): TokenConfig {
-  const config: TokenConfig = { admin: {}, user: {} };
+function generateUUID(): string {
+  if (typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return crypto.randomBytes(16).toString("hex");
+}
 
+export function migrateConfig(rawConfig: any): TokenInfo[] {
+  if (Array.isArray(rawConfig)) {
+    return rawConfig.map((item: any) => ({
+      token: String(item.token || ""),
+      uuid: String(item.uuid || generateUUID()),
+      name: String(item.name || ""),
+      type: item.type === "admin" ? "admin" : "user",
+    }));
+  }
+
+  const list: TokenInfo[] = [];
   if (rawConfig && typeof rawConfig === "object") {
     // Migrate admin
-    if (Array.isArray(rawConfig.admin)) {
-      rawConfig.admin.forEach((t: string) => {
-        config.admin[t] = "Default Admin";
-      });
-    } else if (rawConfig.admin && typeof rawConfig.admin === "object") {
-      config.admin = rawConfig.admin;
+    if (rawConfig.admin) {
+      if (Array.isArray(rawConfig.admin)) {
+        rawConfig.admin.forEach((t: string) => {
+          list.push({
+            token: t,
+            uuid: generateUUID(),
+            name: "Default Admin",
+            type: "admin",
+          });
+        });
+      } else if (typeof rawConfig.admin === "object") {
+        for (const [t, name] of Object.entries(rawConfig.admin)) {
+          list.push({
+            token: t,
+            uuid: generateUUID(),
+            name: String(name || "Default Admin"),
+            type: "admin",
+          });
+        }
+      }
     }
 
     // Migrate user
-    if (Array.isArray(rawConfig.user)) {
-      rawConfig.user.forEach((t: string) => {
-        config.user[t] = "Default User";
-      });
-    } else if (rawConfig.user && typeof rawConfig.user === "object") {
-      config.user = rawConfig.user;
+    if (rawConfig.user) {
+      if (Array.isArray(rawConfig.user)) {
+        rawConfig.user.forEach((t: string) => {
+          list.push({
+            token: t,
+            uuid: generateUUID(),
+            name: "Default User",
+            type: "user",
+          });
+        });
+      } else if (typeof rawConfig.user === "object") {
+        for (const [t, name] of Object.entries(rawConfig.user)) {
+          list.push({
+            token: t,
+            uuid: generateUUID(),
+            name: String(name || "Default User"),
+            type: "user",
+          });
+        }
+      }
     }
   }
 
-  return config;
+  return list;
 }
 
 export async function initializeAuth(): Promise<void> {
@@ -53,7 +97,7 @@ export async function initializeAuth(): Promise<void> {
       exists = true;
     } catch {}
 
-    let config: TokenConfig = { admin: {}, user: {} };
+    let config: TokenInfo[] = [];
     if (exists) {
       const raw = await fs.readFile(TOKENS_FILE, "utf-8");
       try {
@@ -64,15 +108,24 @@ export async function initializeAuth(): Promise<void> {
       }
     }
 
-    if (Object.keys(config.admin).length === 0) {
+    const hasAdmin = config.some(t => t.type === "admin");
+    if (!hasAdmin) {
       const generatedAdminToken = `admin_${crypto.randomBytes(16).toString("hex")}`;
-      config.admin[generatedAdminToken] = "Default Admin";
+      config.push({
+        token: generatedAdminToken,
+        uuid: generateUUID(),
+        name: "Default Admin",
+        type: "admin"
+      });
       await fs.writeFile(TOKENS_FILE, JSON.stringify(config, null, 2), "utf-8");
       
       console.log("\n========================================================");
       console.log(`🔑 GENERATED ADMIN ACCESS TOKEN:\n\n   ${generatedAdminToken}\n`);
       console.log("   Please save this token. It has been written to tokens.json");
       console.log("========================================================\n");
+    } else {
+      // Write back migrated config to enforce new format on start
+      await fs.writeFile(TOKENS_FILE, JSON.stringify(config, null, 2), "utf-8");
     }
 
     cachedTokens = config;
@@ -106,15 +159,15 @@ export function getRoleByToken(token: string | null): "admin" | "user" | null {
       const parsed = JSON.parse(raw);
       const config = migrateConfig(parsed);
       
-      if (config.admin[token] !== undefined) return "admin";
-      if (config.user[token] !== undefined) return "user";
+      const found = config.find(t => t.token === token);
+      if (found) return found.type;
     }
   } catch (err) {
     console.error("[auth] Failed to read tokens.json dynamically:", err);
   }
 
-  if (cachedTokens.admin[token] !== undefined) return "admin";
-  if (cachedTokens.user[token] !== undefined) return "user";
+  const foundCached = cachedTokens.find(t => t.token === token);
+  if (foundCached) return foundCached.type;
   return null;
 }
 
