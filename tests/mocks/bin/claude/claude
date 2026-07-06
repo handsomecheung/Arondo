@@ -53,9 +53,13 @@ if (sessionId !== null || prompt !== null) {
   const isLastLineWhatDoISaid = lines.length > 0 && lines[lines.length - 1].trim() === 'what do I said before?';
 
   const histFile = path.join(claudeDirLog, `${sessionId}.log`);
+  if (prompt && prompt.includes('[Previous conversation context from')) {
+    fs.appendFileSync(histFile, prompt + '\n');
+  }
+
   if (!isLastLineWhatDoISaid) {
-    if (prompt !== null) {
-      fs.writeFileSync(histFile, prompt + '\n');
+    if (prompt !== null && !prompt.includes('[Previous conversation context from')) {
+      fs.appendFileSync(histFile, prompt + '\n');
     }
   }
 

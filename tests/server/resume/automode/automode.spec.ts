@@ -110,6 +110,18 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
   test('C -> C: should carry session ID (--resume) on second call in auto mode', async ({ request }) => {
     await runSameChoiceResumeTest(request, 'C', quotaPath);
   });
+
+  test('A -> A -> B -> A: should carry conversation ID and context between model changes of the same agent', async ({ request }) => {
+    await runXXYXTest(request, 'A', 'B', quotaPath);
+  });
+
+  test('B -> B -> C -> B: should carry conversation ID/session ID and context when switching back and forth', async ({ request }) => {
+    await runXXYXTest(request, 'B', 'C', quotaPath);
+  });
+
+  test('C -> C -> A -> C: should carry session ID/conversation ID and context when switching back and forth', async ({ request }) => {
+    await runXXYXTest(request, 'C', 'A', quotaPath);
+  });
 });
 
 function getQuotaForChoice(choiceId: 'A' | 'B' | 'C') {
@@ -359,6 +371,166 @@ async function runSameChoiceResumeTest(
       expect(secondCmd).not.toContain('--prompt "$(< "$ARONDO_PROMPT_FILE") --add-dir');
     }
 
+    await request.delete(`/api/sessions/${sessionId}`, {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+  } finally {
+    await teardownRunner(runnerProcess);
+    await fs.rm(agyLogDir, { recursive: true, force: true }).catch(() => {});
+    await fs.rm(claudeLogDir, { recursive: true, force: true }).catch(() => {});
+    await fs.rm('/tmp/test-repo', { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+async function runXXYXTest(
+  request: any,
+  X: 'A' | 'B' | 'C',
+  Y: 'A' | 'B' | 'C',
+  quotaPath: string
+) {
+  const mockBinDir = `${path.resolve(__dirname, '../../../mocks/bin/agy')}:${path.resolve(__dirname, '../../../mocks/bin/claude')}`;
+  const agyLogDir = path.join(os.tmpdir(), `mock_automode_agy_xxyx_${X}_${Y}_${Math.random().toString(36).slice(2)}`);
+  const claudeLogDir = path.join(os.tmpdir(), `mock_automode_claude_xxyx_${X}_${Y}_${Math.random().toString(36).slice(2)}`);
+
+  await fs.mkdir(agyLogDir, { recursive: true }).catch(() => {});
+  await fs.mkdir(claudeLogDir, { recursive: true }).catch(() => {});
+  await fs.mkdir('/tmp/test-repo', { recursive: true }).catch(() => {});
+
+  const getAgentInfo = (choice: 'A' | 'B' | 'C') => {
+    if (choice === 'C') return { agent: 'claude', model: undefined };
+    if (choice === 'A') return { agent: 'antigravity', model: 'Gemini 3.5 Flash (Medium)' };
+    return { agent: 'antigravity', model: 'Claude Sonnet 4.6 (Thinking)' };
+  };
+
+  const xInfo = getAgentInfo(X);
+  const yInfo = getAgentInfo(Y);
+
+  // Setup runner with choice X first
+  await fs.writeFile(quotaPath, JSON.stringify(getQuotaForChoice(X), null, 2), 'utf-8');
+
+  const name = `runner-${X}-${Y}`;
+  const result = await setupRunner(request, name, mockBinDir, {
+    AGY_DIR_LOG: agyLogDir,
+    CLAUDE_DIR_LOG: claudeLogDir,
+  });
+  const runnerProcess = result.runnerProcess;
+  const runnerId = result.runnerId;
+
+  try {
+    // 1. First call: X ("Hello X1")
+    const createRes = await request.post('/api/sessions', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        prompt: `Hello ${X}1`,
+        repoPath: '/tmp/test-repo',
+        runnerId: runnerId,
+        agentType: 'auto',
+      }
+    });
+    expect(createRes.status()).toBe(201);
+    const session = await createRes.json();
+    const sessionId = session.id;
+
+    await waitForSessionNotRunning(request, sessionId);
+
+    // Verify Call 1 ran X
+    const msgsRes1 = await request.get(`/api/messages?sessionId=${sessionId}`, {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+    const messages1 = await msgsRes1.json();
+    const runMsgs1 = messages1.filter((m: any) => m.type === 'agent-run');
+    expect(runMsgs1.length).toBe(1);
+    expect(runMsgs1[0].resolvedAgentType).toBe(xInfo.agent);
+    if (xInfo.model) {
+      expect(runMsgs1[0].content).toContain(`--model "${xInfo.model}"`);
+    }
+
+    if (xInfo.agent === 'antigravity') {
+      await waitForAgySessionMapped(sessionId);
+    }
+
+    // 2. Second call: X ("Hello X2")
+    const msgRes2 = await request.post(`/api/sessions/${sessionId}/messages`, {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: { message: `Hello ${X}2` }
+    });
+    expect(msgRes2.status()).toBe(200);
+    await waitForSessionNotRunning(request, sessionId);
+
+    // Verify Call 2 carried X's conversation ID or session ID
+    const msgsRes2 = await request.get(`/api/messages?sessionId=${sessionId}`, {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+    const messages2 = await msgsRes2.json();
+    const runMsgs2 = messages2.filter((m: any) => m.type === 'agent-run');
+    expect(runMsgs2.length).toBe(2);
+    if (xInfo.agent === 'antigravity') {
+      expect(runMsgs2[1].content).toContain('--conversation');
+    } else {
+      expect(runMsgs2[1].content).toContain(`--resume "${sessionId}"`);
+    }
+
+    // 3. Third call: Y ("Hello Y")
+    // Write choice Y quota
+    await fs.writeFile(quotaPath, JSON.stringify(getQuotaForChoice(Y), null, 2), 'utf-8');
+
+    const msgRes3 = await request.post(`/api/sessions/${sessionId}/messages`, {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: { message: `Hello ${Y}` }
+    });
+    expect(msgRes3.status()).toBe(200);
+    await waitForSessionNotRunning(request, sessionId);
+
+    // Verify Call 3 ran Y with its corresponding model
+    const msgsRes3 = await request.get(`/api/messages?sessionId=${sessionId}`, {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+    const messages3 = await msgsRes3.json();
+    const runMsgs3 = messages3.filter((m: any) => m.type === 'agent-run');
+    expect(runMsgs3.length).toBe(3);
+    expect(runMsgs3[2].resolvedAgentType).toBe(yInfo.agent);
+    if (yInfo.model) {
+      expect(runMsgs3[2].content).toContain(`--model "${yInfo.model}"`);
+    }
+
+    // 4. Fourth call: X ("what do I said before?")
+    // Write choice X quota back
+    await fs.writeFile(quotaPath, JSON.stringify(getQuotaForChoice(X), null, 2), 'utf-8');
+
+    const msgRes4 = await request.post(`/api/sessions/${sessionId}/messages`, {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: { message: 'what do I said before?' }
+    });
+    expect(msgRes4.status()).toBe(200);
+    await waitForSessionNotRunning(request, sessionId);
+
+    // Verify Call 4 ran X with X's resume properties and recalled Y's context
+    const msgsRes4 = await request.get(`/api/messages?sessionId=${sessionId}`, {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+    const messages4 = await msgsRes4.json();
+    const runMsgs4 = messages4.filter((m: any) => m.type === 'agent-run');
+    expect(runMsgs4.length).toBe(4);
+    
+    expect(runMsgs4[3].resolvedAgentType).toBe(xInfo.agent);
+    if (xInfo.agent === 'antigravity') {
+      expect(runMsgs4[3].content).toContain('--conversation');
+    } else {
+      expect(runMsgs4[3].content).toContain(`--resume "${sessionId}"`);
+    }
+
+    // Get the log for call 4 to check if mock output has Y's prompt
+    const logRes = await request.get(`/api/sessions/${sessionId}/log?messageId=${runMsgs4[3].id}`, {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+    expect(logRes.status()).toBe(200);
+    const logText = await logRes.text();
+
+    expect(logText).toContain(`Hello ${X}1`);
+    expect(logText).toContain(`Hello ${X}2`);
+    expect(logText).toContain(`Hello ${Y}`);
+
+    // Cleanup session
     await request.delete(`/api/sessions/${sessionId}`, {
       headers: { 'x-arondo-token': 'test-token-123456' }
     });
