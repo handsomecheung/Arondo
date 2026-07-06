@@ -31,6 +31,7 @@ All execution goes through a Runner — there is no local fallback on the server
 - **AI Agent Quota Monitoring**: Automatically collects quota usage data for Claude and Antigravity via tmux on the runners and displays remaining quota with progress bars in the Runners dashboard.
 - **AI Agent Auto-Selection (Auto Mode)**: Automatically selects the best agent and model based on hourly and weekly quota availability retrieved from the runner.
 - **Manual Agent Switching**: Switch the active agent (Antigravity CLI, Claude Code, or Auto) on-the-fly within an existing session when the agent is idle.
+- **Agent Session Continuity (Resume)**: Conversations in the same session retain their agent-specific history. For Claude Code, it leverages native `--resume` functionality. For Antigravity CLI (agy), the Go runner monitors the process on exit, automatically extracts the conversation ID from its local logs, and supplies it via `--conversation` on subsequent runs.
 - **Secure Prompt Passing**: Prompts are passed to agents using temporary files and environment variables (using the `ARONDO_PROMPT_FILE` environment variable), avoiding shell command-line length limits and exposing sensitive prompts in command arguments. Displays the real resolved prompt instead of original raw inputs in the "Show Prompt" panel.
 - **Concurrent Script Execution**: Allows running multiple scripts simultaneously within a single session. The user can continue chatting while background scripts are running.
 - **Global & Session-scoped Scripts**: Supports running project-scoped custom scripts either globally (independent of a session, directly from the project panel) or within a specific session.
@@ -44,7 +45,7 @@ All execution goes through a Runner — there is no local fallback on the server
 - **Task Persistence**: Active task contexts are persisted by serializing execution metadata directly into the session and project `messages.json` files and dynamically restored on server restart. Runner IDs are stable across reconnections.
 - **Automated Data Lifecycle**: Automatically purges sessions or projects during listing queries if their parent references (e.g. project or runner) no longer exist.
 - **Mobile-Friendly UI**: Designed with collapsible panels, modal logs, responsive menus, and touch-friendly actions.
-- **Project Management**: Scopes and tracks sessions within resolved repository paths. Supports custom project scripts and AI auto-script discovery.
+- **Project Management**: Scopes and tracks sessions within resolved repository paths. Supports custom project scripts and AI auto-script discovery (executed safely on the selected runner).
 
 ## Getting Started
 

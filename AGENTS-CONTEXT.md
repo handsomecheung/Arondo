@@ -126,7 +126,6 @@ lib/
   agentCommands.ts      # Merges built-in and user-defined agent slash commands, resolves matches
   remarkFileLinks.ts    # Custom remark plugin to scan, verify, and linkify file paths inside markdown output
   event-bus.ts          # In-memory pub/sub (singleton on `process` for cross-context sharing)
-  pty-manager.ts        # Server-side PTY manager for local shell sessions (node-pty, scrollback buffer)
   runner-manager.ts     # Manages runner connections, task routing, and task persistence
   runner-server.ts      # WebSocket handler for /runner endpoint (registration, heartbeat)
   ws-server.ts          # WebSocket handler for /ws endpoint: event bus broadcast + PTY I/O + shell PTY bridging
@@ -239,9 +238,9 @@ Two WebSocket endpoints:
 **Browser WebSocket protocol (`/ws`):**
 - Server → Client: `session:updated`, `message:added`, `session:deleted`, `terminal:output`, `terminal:exit`
 - Client → Server: `terminal:input`, `terminal:resize`, `terminal:attach`
-- Shell PTY (local server-side terminals via `lib/pty-manager.ts`):
-  - Client → Server: `shell:spawn`, `shell:input`, `shell:resize`, `shell:kill`
-  - Server → Client: `shell:spawned`, `shell:output`, `shell:exit`
+- Shell PTY (remote runner-side terminals managed via RunnerManager):
+  - Client → Server: `shell:spawn` (includes `runnerId`, `sessionId`, `cwd`, etc.), `shell:input`, `shell:resize`, `shell:kill`
+  - Server → Client: `shell:spawned`, `shell:output` (includes `runnerId`), `shell:exit` (includes `runnerId`)
 
 **Cross-context singleton pattern:** The event bus and runner manager use `process` (not `global`) as the singleton carrier. This is required because `server.ts` runs via `tsx` while API routes run via Next.js Turbopack — they share the same `process` object but have separate `global` scopes.
 
@@ -285,11 +284,13 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **Concurrency**: Multiple background scripts can run concurrently in a single session. The chat prompt stays active during execution.
 - **Task Persistence**: Active task contexts survive server restarts by restoring metadata from session and project `messages.json`. Both active tasks and completed tasks within the 3-day retention period are restored. On runner reconnect, the `task.status` event reconciles running vs exited tasks.
 - **Runner Disconnect Handling**: When a runner disconnects, orphaned tasks are automatically failed with exit code -1, updating session status and notifying the UI.
-- **Agent Session Continuity**: ClaudeCodeAgent supports `--session-id` (bind to a session) and `--resume` (resume an existing session) flags, enabling multi-turn conversations within the same agent session.
+- **Agent Session Continuity (Session Resume)**: Retains conversation context for AI agents across different runs.
+  - **Claude Code**: Supports `--session-id` (bound to the session) and `--resume` flags for native session continuity.
+  - **Antigravity CLI (agy)**: On task exit, the Go runner scans its local logs via process ID (`detectAgyConvIdByPid`) to extract the generated conversation UUID. This UUID is passed back in the `exec.exit` event and saved by the server. Subsequent runs of `agy` within the same session will automatically pass `--conversation <uuid>` to resume the session.
 - **Global Agent Rules Sync**: Settings screen allows specifying global agent rules. These are stored in `~/.arondo/global-rules.md` and automatically synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on runners upon connection.
 - **AI Agent Quota Monitoring**: Runners collect agent quota usage from Claude and Antigravity via tmux pane capture, which is saved locally under `~/.arondo/agents/` on the server and displayed with progress bars in the Runners dashboard.
 - **Secure Prompt Passing**: Instead of command line arguments, prompts are passed to agents using temporary files on the runner. The file path is stored in the `ARONDO_PROMPT_FILE` environment variable (and resolved using shell redirection `$(< "$ARONDO_PROMPT_FILE")`), which mitigates command length constraints and process command argument exposure. The UI "Show Prompt" panel displays the real resolved prompt instead of the original raw inputs.
-- **AI Agent Auto-Selection (Auto Mode)**: Automatically selects the best agent and model based on hourly and weekly quota availability retrieved from the runner.
+- **AI Agent Auto-Selection (Auto Mode)**: Automatically selects the best agent and model based on hourly and weekly quota availability retrieved from the runner. New chat sessions default to using the Auto agent mode.
   - **Choices**:
     - **Choice A**: Antigravity (`agy`) + `Gemini 3.5 Flash (Medium)` (Quota: `GeminiHourRemain`, `GeminiWeeklyRemain`)
     - **Choice B**: Antigravity (`agy`) + `Claude Sonnet 4.6 (Thinking)` (Quota: `OtherHourRemain`, `OtherWeeklyRemain`)
@@ -308,7 +309,7 @@ The application enforces token-based authentication on all API routes and WebSoc
 ## Project & Custom Scripts Management
 - **Project Scoping**: Sessions are mapped to projects by repository path + runnerId. Projects store metadata at `~/.arondo/projects/[projectId]/project.json`.
 - **Custom Project Scripts**: Commands (build, test, deploy) scoped to repositories, stored under `~/.arondo/projects/[projectId]/settings/scripts.json`. Can be executed globally (sessionless, directly from the project panel) or inside a session.
-- **AI Auto-Script Discovery**: Background process using `agy` to auto-detect and register project scripts.
+- **AI Auto-Script Discovery**: Background process using `agy` to auto-detect and register project scripts. This process is executed remotely on the selected runner using the `exec.agent` API, ensuring no local execution happens on the server.
 
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
