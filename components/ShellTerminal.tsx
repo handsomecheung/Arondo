@@ -31,6 +31,11 @@ export default function ShellTerminal({ ws, cwd, runnerId, sessionId, open, onCl
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const shellIdRef = useRef<string | null>(null);
+  const lastSpawnRef = useRef<{ ws: WebSocket | null; sessionId?: string; runnerId?: string }>({
+    ws: null,
+    sessionId: undefined,
+    runnerId: undefined,
+  });
   const [wsReady, setWsReady] = useState(ws?.readyState === WebSocket.OPEN);
   const [ctrlActive, setCtrlActive] = useState(false);
   const [altActive, setAltActive] = useState(false);
@@ -135,15 +140,26 @@ export default function ShellTerminal({ ws, cwd, runnerId, sessionId, open, onCl
     const term = termRef.current;
     if (!term) return;
 
-    const { cols, rows } = term;
-    ws.send(JSON.stringify({ type: "shell:spawn", runnerId, sessionId, cwd, cols, rows }));
-
     const sendInput = (data: string) => {
       if (ws.readyState === WebSocket.OPEN && shellIdRef.current) {
         ws.send(JSON.stringify({ type: "shell:input", shellId: shellIdRef.current, data }));
       }
     };
     sendInputRef.current = sendInput;
+
+    const isSameSpawn =
+      lastSpawnRef.current.ws === ws &&
+      lastSpawnRef.current.sessionId === sessionId &&
+      lastSpawnRef.current.runnerId === runnerId;
+
+    if (!isSameSpawn) {
+      lastSpawnRef.current = { ws, sessionId, runnerId };
+      shellIdRef.current = null;
+
+      const cols = term.cols || 80;
+      const rows = term.rows || 24;
+      ws.send(JSON.stringify({ type: "shell:spawn", runnerId, sessionId, cwd, cols, rows }));
+    }
 
     const onData = term.onData((data) => {
       let out = data;
@@ -169,6 +185,10 @@ export default function ShellTerminal({ ws, cwd, runnerId, sessionId, open, onCl
         const msg = JSON.parse(e.data);
         if (msg.type === "shell:spawned") {
           shellIdRef.current = msg.shellId;
+          const { cols, rows } = term;
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "shell:resize", shellId: msg.shellId, cols, rows }));
+          }
         } else if (msg.type === "shell:output" && msg.shellId === shellIdRef.current) {
           term.write(msg.data);
         } else if (msg.type === "shell:exit" && msg.shellId === shellIdRef.current) {
@@ -182,11 +202,16 @@ export default function ShellTerminal({ ws, cwd, runnerId, sessionId, open, onCl
     };
     ws.addEventListener("message", onMessage);
 
+    // If we already have a shellId, request a resize to make sure it's correct
+    if (shellIdRef.current && ws.readyState === WebSocket.OPEN) {
+      const { cols, rows } = term;
+      ws.send(JSON.stringify({ type: "shell:resize", shellId: shellIdRef.current, cols, rows }));
+    }
+
     return () => {
       onData.dispose();
       onResize.dispose();
       ws.removeEventListener("message", onMessage);
-      shellIdRef.current = null;
     };
   }, [ws, wsReady, cwd, runnerId, sessionId]);
 

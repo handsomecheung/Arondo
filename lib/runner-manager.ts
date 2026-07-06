@@ -771,7 +771,7 @@ class RunnerManager {
         this.handleResponse(msg);
         break;
       case "stream":
-        this.handleStream(msg);
+        this.handleStream(runnerId, msg);
         break;
       case "event":
         this.handleEvent(runnerId, msg);
@@ -807,13 +807,13 @@ class RunnerManager {
     }
   }
 
-  private handleStream(msg: MessageEnvelope): void {
+  private handleStream(runnerId: string, msg: MessageEnvelope): void {
     if (msg.method === "exec.output") {
       this.onExecOutput(msg.payload).catch((err) => {
         console.error("[runner-manager] onExecOutput error:", err);
       });
     } else if (msg.method === "shell.output") {
-      this.onShellOutput(msg.payload);
+      this.onShellOutput(runnerId, msg.payload);
     } else {
       console.warn(`[runner-manager] unknown stream method: ${msg.method}`);
     }
@@ -827,7 +827,7 @@ class RunnerManager {
         });
         break;
       case "shell.exit":
-        this.onShellExit(msg.payload);
+        this.onShellExit(runnerId, msg.payload);
         break;
       case "pong":
         break;
@@ -955,7 +955,7 @@ class RunnerManager {
     }
   }
 
-  private onShellOutput(payload: {
+  private onShellOutput(runnerId: string, payload: {
     taskId: string;
     data: string;
     encoding?: string;
@@ -968,12 +968,13 @@ class RunnerManager {
       type: "shell_output",
       payload: {
         shellId: payload.taskId,
+        runnerId,
         data,
       },
     });
   }
 
-  private onShellExit(payload: {
+  private onShellExit(runnerId: string, payload: {
     taskId: string;
     exitCode: number;
   }): void {
@@ -981,6 +982,7 @@ class RunnerManager {
       type: "shell_exit",
       payload: {
         shellId: payload.taskId,
+        runnerId,
         code: payload.exitCode,
       },
     });
