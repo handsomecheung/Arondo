@@ -4,6 +4,23 @@ import fs from 'fs/promises';
 import os from 'os';
 import { setupRunner, teardownRunner, waitForSessionNotRunning } from '../resume.helper';
 
+const CONFIG_DIR_RUNTIME = process.env.ARONDO_CONFIG_DIR || path.join(os.tmpdir(), 'arondo-test-config');
+const AGY_SESSION_MAP_FILE = path.join(CONFIG_DIR_RUNTIME, 'agy-sessions.json');
+
+/** Wait until agy-sessions.json contains a mapping for sessionId. */
+async function waitForAgySessionMapped(sessionId: string, timeoutMs = 5000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const raw = await fs.readFile(AGY_SESSION_MAP_FILE, 'utf-8');
+      const map = JSON.parse(raw);
+      if (map[sessionId]) return;
+    } catch {}
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  throw new Error(`Timed out waiting for agy session mapping for ${sessionId}`);
+}
+
 test.describe('Automode Session Resume and Handoff Tests', () => {
   const CONFIG_DIR = process.env.ARONDO_CONFIG_DIR || path.join(os.tmpdir(), 'arondo-test-config');
   const quotaPath = path.join(CONFIG_DIR, 'autoselect', 'agent', 'quota.json');
@@ -80,6 +97,18 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
       true,
       quotaPath
     );
+  });
+
+  test('A -> A: should carry agy conversation ID (--conversation) on second call in auto mode', async ({ request }) => {
+    await runSameChoiceResumeTest(request, 'A', quotaPath);
+  });
+
+  test('B -> B: should carry agy conversation ID (--conversation) on second call in auto mode', async ({ request }) => {
+    await runSameChoiceResumeTest(request, 'B', quotaPath);
+  });
+
+  test('C -> C: should carry session ID (--resume) on second call in auto mode', async ({ request }) => {
+    await runSameChoiceResumeTest(request, 'C', quotaPath);
   });
 });
 
@@ -226,6 +255,110 @@ async function runTransitionTest(
     }
 
     // Cleanup session
+    await request.delete(`/api/sessions/${sessionId}`, {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+  } finally {
+    await teardownRunner(runnerProcess);
+    await fs.rm(agyLogDir, { recursive: true, force: true }).catch(() => {});
+    await fs.rm(claudeLogDir, { recursive: true, force: true }).catch(() => {});
+    await fs.rm('/tmp/test-repo', { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+async function runSameChoiceResumeTest(
+  request: any,
+  choice: 'A' | 'B' | 'C',
+  quotaPath: string
+) {
+  const mockBinDir = `${path.resolve(__dirname, '../../../mocks/bin/agy')}:${path.resolve(__dirname, '../../../mocks/bin/claude')}`;
+  const agyLogDir = path.join(os.tmpdir(), `mock_automode_agy_same_${Math.random().toString(36).slice(2)}`);
+  const claudeLogDir = path.join(os.tmpdir(), `mock_automode_claude_same_${Math.random().toString(36).slice(2)}`);
+
+  await fs.mkdir(agyLogDir, { recursive: true }).catch(() => {});
+  await fs.mkdir(claudeLogDir, { recursive: true }).catch(() => {});
+  await fs.mkdir('/tmp/test-repo', { recursive: true }).catch(() => {});
+
+  // Fix quota so the same choice wins both times
+  await fs.writeFile(quotaPath, JSON.stringify(getQuotaForChoice(choice), null, 2), 'utf-8');
+
+  const name = `runner-${choice}-to-${choice}`;
+  const result = await setupRunner(request, name, mockBinDir, {
+    AGY_DIR_LOG: agyLogDir,
+    CLAUDE_DIR_LOG: claudeLogDir,
+  });
+  const runnerProcess = result.runnerProcess;
+  const runnerId = result.runnerId;
+
+  try {
+    // First call
+    const createRes = await request.post('/api/sessions', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        prompt: 'Hello Same Choice 1',
+        repoPath: '/tmp/test-repo',
+        runnerId: runnerId,
+        agentType: 'auto',
+      }
+    });
+    expect(createRes.status()).toBe(201);
+    const session = await createRes.json();
+    const sessionId = session.id;
+
+    await waitForSessionNotRunning(request, sessionId);
+
+    // Verify first run chose the expected choice and has no resume flag yet
+    const msgsRes1 = await request.get(`/api/messages?sessionId=${sessionId}`, {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+    const messages1 = await msgsRes1.json();
+    const runMsgs1 = messages1.filter((m: any) => m.type === 'agent-run');
+    expect(runMsgs1.length).toBe(1);
+
+    const expectedAgent = choice === 'C' ? 'claude' : 'antigravity';
+    expect(runMsgs1[0].resolvedAgentType).toBe(expectedAgent);
+
+    if (choice === 'C') {
+      // Claude: first call has --session-id, not --resume
+      expect(runMsgs1[0].content).toContain(`--session-id "${sessionId}"`);
+      expect(runMsgs1[0].content).not.toContain('--resume');
+    } else {
+      // agy: first call has no --conversation flag
+      expect(runMsgs1[0].content).not.toContain('--conversation');
+      // Wait for saveAgySessionId to finish writing (it runs after DB update)
+      await waitForAgySessionMapped(sessionId);
+    }
+
+    // Second call (same quota → same choice)
+    const msgRes = await request.post(`/api/sessions/${sessionId}/messages`, {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: { message: 'Hello Same Choice 2' }
+    });
+    expect(msgRes.status()).toBe(200);
+
+    await waitForSessionNotRunning(request, sessionId);
+
+    const msgsRes2 = await request.get(`/api/messages?sessionId=${sessionId}`, {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+    const messages2 = await msgsRes2.json();
+    const runMsgs2 = messages2.filter((m: any) => m.type === 'agent-run');
+    expect(runMsgs2.length).toBe(2);
+    expect(runMsgs2[1].resolvedAgentType).toBe(expectedAgent);
+
+    const secondCmd = runMsgs2[1].content;
+    console.log(`[automode-test] ${choice}->${choice} second run command:\n${secondCmd}`);
+
+    if (choice === 'C') {
+      // Claude: second call must use --resume instead of --session-id
+      expect(secondCmd).toContain(`--resume "${sessionId}"`);
+      expect(secondCmd).not.toContain('--session-id');
+    } else {
+      // agy: second call must carry --conversation <agyConversationId>
+      expect(secondCmd).toContain('--conversation');
+      expect(secondCmd).not.toContain('--prompt "$(< "$ARONDO_PROMPT_FILE") --add-dir');
+    }
+
     await request.delete(`/api/sessions/${sessionId}`, {
       headers: { 'x-arondo-token': 'test-token-123456' }
     });

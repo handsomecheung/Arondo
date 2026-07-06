@@ -99,7 +99,10 @@ async function readJson<T>(filePath: string, defaultValue: T): Promise<T> {
   try {
     const raw = await fs.readFile(filePath, "utf-8");
     return JSON.parse(raw) as T;
-  } catch {
+  } catch (err) {
+    if ((err as any).code !== 'ENOENT') {
+      console.error(`[readJson error] path=${filePath}:`, err);
+    }
     return defaultValue;
   }
 }

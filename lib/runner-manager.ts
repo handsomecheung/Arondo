@@ -920,12 +920,22 @@ class RunnerManager {
     }
     
     if (ctx.messageId) {
-      updateMessage(ctx.sessionId, ctx.messageId, {
-        exitCode: ctx.exitCode,
-        stoppedByUser: ctx.stoppedByUser,
-      }, ctx.projectId).catch((err) => {
-        console.error(`[runner-manager] failed to update message with exitCode:`, err);
-      });
+      try {
+        await updateMessage(
+          ctx.sessionId,
+          ctx.messageId,
+          {
+            exitCode: ctx.exitCode,
+            stoppedByUser: ctx.stoppedByUser,
+          },
+          ctx.projectId,
+        );
+      } catch (err) {
+        console.error(
+          `[runner-manager] failed to update message with exitCode:`,
+          err,
+        );
+      }
     }
 
     if (ctx.type === "agent") {

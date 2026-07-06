@@ -3,6 +3,7 @@ import path from 'path';
 import os from 'os';
 
 const testConfigDir = path.join(os.tmpdir(), 'arondo-test-config');
+process.env.ARONDO_CONFIG_DIR = testConfigDir;
 
 export default defineConfig({
   testDir: './tests',
