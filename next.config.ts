@@ -9,7 +9,6 @@ const allowedDevOrigins = process.env.ALLOWED_DEV_ORIGINS
 const nextConfig: NextConfig = {
   distDir: process.env.ARONDO_DIST_DIR || ".next",
   ...(allowedDevOrigins.length > 0 && { allowedDevOrigins }),
-  serverExternalPackages: ["node-pty"],
   async rewrites() {
     return {
       beforeFiles: [
