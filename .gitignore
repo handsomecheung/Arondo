@@ -45,3 +45,11 @@ next-env.d.ts
 
 # Go controller binary
 /controller/arondo-controller
+
+# Integration Testing
+/.arondo-test/
+/.next-test/
+/test-results/
+/playwright-report/
+/runner/arondo-runner
+

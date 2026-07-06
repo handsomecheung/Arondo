@@ -106,3 +106,21 @@ Flags:
 ```
 
 The runner auto-reconnects with exponential backoff if the server connection drops.
+
+## Testing
+
+Integration tests are implemented using Playwright. They spawn a mock-configured server and a Go runner to test API endpoints and WebSocket operations end-to-end.
+
+To run the integration tests:
+
+```bash
+npm run test:integration
+```
+
+The test runner will:
+1. Build the Go runner binary.
+2. Spin up the Next.js server on port `3252` using a temporary config directory (`.arondo-test/`).
+3. Spawn the Go runner to connect to the test server.
+4. Run server API tests (`tests/server/`) and runner-capabilities tests (`tests/runner/`).
+5. Terminate all test processes and clean up temporary test configurations and logs automatically.
+

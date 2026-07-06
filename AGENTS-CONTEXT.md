@@ -139,6 +139,20 @@ scripts/
   run.server.sh         # Start the Next.js dev server
   run.runner1.sh        # Start Go runner 1 in dev mode (connects to localhost:3251)
   run.runner2.sh        # Start Go runner 2 in dev mode (connects to localhost:3251)
+tests/                  # Playwright integration tests
+  global-setup.ts       # Test environment initialization (builds Go runner, writes dummy tokens)
+  global-teardown.ts    # Cleanup of temporary config and build artifacts
+  server/               # Test suites for Server API endpoints
+    auth.spec.ts        # RBAC and token validation tests
+    runners.spec.ts     # Runner registration and authorization management
+    global-rules.spec.ts # Reading and writing global agent rules
+    sessions.spec.ts    # Session lifecycle (create, update, delete) integration
+    server.spec.ts      # Health check and basic connectivity tests
+  runner/               # Test suites for Go Runner handler capabilities
+    fs.spec.ts          # File browsing and read capability tests
+    git.spec.ts         # Git status and visual diff generation tests
+    exec.spec.ts        # PTY script execution and lifecycle tracking
+    runner.spec.ts      # Runner connection and handshake tests
 ~/.arondo/              # Runtime configuration & data directory (overridden by ARONDO_CONFIG_DIR)
   tokens.json           # Persisted multi-user access tokens (admin and user roles)
   agent-commands.json   # Persisted custom agent slash commands
