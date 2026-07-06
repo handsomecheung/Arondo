@@ -108,7 +108,7 @@ export async function POST(
     }
 
     const taskId = `task_${crypto.randomUUID().slice(0, 8)}`;
-    runnerManager.registerTask({
+    await runnerManager.registerTask({
       taskId,
       runnerId,
       sessionId: id,

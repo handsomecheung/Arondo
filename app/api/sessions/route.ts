@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
   eventBus.publish({ type: "session_updated", payload: session });
 
   const taskId = `task_${crypto.randomUUID().slice(0, 8)}`;
-  runnerManager.registerTask({
+  await runnerManager.registerTask({
     taskId,
     runnerId,
     sessionId: session.id,

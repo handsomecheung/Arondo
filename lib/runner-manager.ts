@@ -584,7 +584,7 @@ class RunnerManager {
 
   // ─── Task management ─────────────────────────────────────────────────
 
-  registerTask(ctx: TaskContext): void {
+  async registerTask(ctx: TaskContext): Promise<void> {
     this.tasks.set(ctx.taskId, ctx);
     const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
     this.ptyKeyToTaskId.set(ptyKey, ctx.taskId);
@@ -592,14 +592,24 @@ class RunnerManager {
       `[runner-manager] task registered: ${ctx.taskId} (type=${ctx.type}, total=${this.tasks.size})`,
     );
     if (ctx.messageId) {
-      updateMessage(ctx.sessionId, ctx.messageId, {
-        taskId: ctx.taskId,
-        runnerId: ctx.runnerId,
-        projectId: ctx.projectId,
-        command: ctx.command,
-      }, ctx.projectId).catch((err) => {
-        console.error(`[runner-manager] failed to update message with task metadata:`, err);
-      });
+      try {
+        await updateMessage(
+          ctx.sessionId,
+          ctx.messageId,
+          {
+            taskId: ctx.taskId,
+            runnerId: ctx.runnerId,
+            projectId: ctx.projectId,
+            command: ctx.command,
+          },
+          ctx.projectId,
+        );
+      } catch (err) {
+        console.error(
+          `[runner-manager] failed to update message with task metadata:`,
+          err,
+        );
+      }
     }
   }
 
