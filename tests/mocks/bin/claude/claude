@@ -4,8 +4,16 @@ const path = require('path');
 const execSync = require('child_process').execSync;
 
 const SCRIPT_DIR = __dirname;
-const CLAUDE_STATUS_PATH = path.resolve(SCRIPT_DIR, '../../tmux/claude/arondo-claude-status.txt');
-const CLAUDE_USAGE_PATH = path.resolve(SCRIPT_DIR, '../../tmux/claude/arondo-claude-usage.txt');
+let mocksDir = null;
+if (fs.existsSync('/tmp/arondo-mocks-dir.txt')) {
+  mocksDir = fs.readFileSync('/tmp/arondo-mocks-dir.txt', 'utf8').trim();
+}
+const CLAUDE_STATUS_PATH = mocksDir
+  ? path.join(mocksDir, 'arondo-claude-status.txt')
+  : path.resolve(SCRIPT_DIR, '../../tmux/claude/arondo-claude-status.txt');
+const CLAUDE_USAGE_PATH = mocksDir
+  ? path.join(mocksDir, 'arondo-claude-usage.txt')
+  : path.resolve(SCRIPT_DIR, '../../tmux/claude/arondo-claude-usage.txt');
 
 const args = process.argv.slice(2);
 let sessionId = null;
@@ -41,14 +49,17 @@ if (sessionId !== null || prompt !== null) {
 
   fs.mkdirSync(claudeDirLog, { recursive: true });
 
+  const lines = prompt ? prompt.trim().split('\n') : [];
+  const isLastLineWhatDoISaid = lines.length > 0 && lines[lines.length - 1].trim() === 'what do I said before?';
+
   const histFile = path.join(claudeDirLog, `${sessionId}.log`);
-  if (prompt !== 'what do I said before?') {
+  if (!isLastLineWhatDoISaid) {
     if (prompt !== null) {
       fs.writeFileSync(histFile, prompt + '\n');
     }
   }
 
-  if (prompt === 'what do I said before?') {
+  if (isLastLineWhatDoISaid) {
     if (!resumeMode) {
       console.log("No context, I don't know");
     } else {
@@ -79,6 +90,15 @@ if (sessionId !== null || prompt !== null) {
     console.error(`Error reading mock files: ${e}`);
     process.exit(1);
   }
+
+  const targetDate = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthStr = months[targetDate.getMonth()];
+  const day = targetDate.getDate();
+  const dateStr = `${monthStr} ${day}, 4:59am (Europe/London)`;
+
+  statusContent = statusContent.replace(/__datetime__/g, dateStr);
+  usageContent = usageContent.replace(/__datetime__/g, dateStr);
 
   const statusLines = statusContent.split('\n');
   const initialScreen = statusLines.slice(0, 6).join('\n') + '\n';

@@ -5,7 +5,13 @@ const crypto = require('crypto');
 const execSync = require('child_process').execSync;
 
 const SCRIPT_DIR = __dirname;
-const AGY_USAGE_PATH = path.resolve(SCRIPT_DIR, '../../tmux/agy/arondo-agy-usage.txt');
+let mocksDir = null;
+if (fs.existsSync('/tmp/arondo-mocks-dir.txt')) {
+  mocksDir = fs.readFileSync('/tmp/arondo-mocks-dir.txt', 'utf8').trim();
+}
+const AGY_USAGE_PATH = mocksDir
+  ? path.join(mocksDir, 'arondo-agy-usage.txt')
+  : path.resolve(SCRIPT_DIR, '../../tmux/agy/arondo-agy-usage.txt');
 const TEMPLATE_FILE = path.resolve(SCRIPT_DIR, 'cli-__ts__.log');
 
 const args = process.argv.slice(2);
@@ -57,14 +63,17 @@ if (conversationId !== null || prompt !== null) {
   templateContent = templateContent.replace(/__pid__/g, String(pid)).replace(/__conversation_id__/g, conversationId);
   fs.writeFileSync(logFile, templateContent);
 
+  const lines = prompt ? prompt.trim().split('\n') : [];
+  const isLastLineWhatDoISaid = lines.length > 0 && lines[lines.length - 1].trim() === 'what do I said before?';
+
   const histFile = path.join(agyDirLog, `${conversationId}.log`);
-  if (prompt !== 'what do I said before?') {
+  if (!isLastLineWhatDoISaid) {
     if (prompt !== null) {
       fs.writeFileSync(histFile, prompt + '\n');
     }
   }
 
-  if (prompt === 'what do I said before?') {
+  if (isLastLineWhatDoISaid) {
     if (!resumeMode) {
       console.log("No context, I don't know");
     } else {

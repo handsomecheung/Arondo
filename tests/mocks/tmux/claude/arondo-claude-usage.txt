@@ -22,15 +22,15 @@
 
   Current session
   █                                                  2% used
-  Resets 8:59pm (Europe/London)
+  Resets __datetime__
 
   Current week (all models)
   █████████████████████▌                             43% used
-  Resets Jul 8, 4:59am (Europe/London)
+  Resets __datetime__
 
   Current week (Fable)
   ███████████████████████▌                           47% used
-  Resets Jul 8, 4:59am (Europe/London)
+  Resets __datetime__
 
   What's contributing to your limits usage?
   Approximate, based on local sessions on this machine — does not include other devices or claude.ai
