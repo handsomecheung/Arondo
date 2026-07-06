@@ -1,0 +1,50 @@
+ ▐▛███▜▌   Claude Code v2.1.201
+▝▜█████▛▘  Sonnet 5 with medium effort · Claude Pro
+  ▘▘ ▝▝    /data/arondo
+
+ ⚠ 3 MCP servers need authentication · run /mcp
+
+❯ /status
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Settings  Status   Config   Usage   Stats
+
+  Version:          2.1.201
+  Session name:     /rename to add a name
+  Session ID:       c23e5d8e-9e59-44ae-8000-9f3ff47bedfe
+  cwd:              /data/arondo
+  Login method:     Claude Pro account
+  Organization:     arondo@gmail.com's Organization
+  Email:            arondo@gmail.com
+
+  Model:            Default (Sonnet 5 · Efficient for routine tasks)
+  MCP servers:      3 need auth · /mcp
+  Setting sources:  User settings
+
+  Esc to cancel
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

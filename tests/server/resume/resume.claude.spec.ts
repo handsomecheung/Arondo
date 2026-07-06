@@ -16,7 +16,7 @@ test.describe('Claude Session Resume integration tests', () => {
   });
 
   test('should accurately resume claude session based on CLAUDE_DIR_LOG and mock binary output', async ({ request }) => {
-    const mockBinDir = path.resolve(__dirname, '../../mocks/bin/agy');
+    const mockBinDir = path.resolve(__dirname, '../../mocks/bin/claude');
     const mockLogDir = path.join(os.tmpdir(), `mock_claude_logs_${Math.random().toString(36).slice(2)}`);
     
     // Ensure clean directory

@@ -1,0 +1,50 @@
+ ▐▛███▜▌   Claude Code v2.1.201
+▝▜█████▛▘  Sonnet 5 with medium effort · Claude Pro
+  ▘▘ ▝▝    /data/arondo
+
+ ⚠ 3 MCP servers need authentication · run /mcp
+
+❯ /status
+  ⎿  Settings dialog dismissed
+
+❯ /usage
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Settings  Status   Config   Usage   Stats
+
+  Session
+
+  Total cost:            $0.0000
+  Total duration (API):  0s
+  Total duration (wall): 13s
+  Total code changes:    0 lines added, 0 lines removed
+  Usage:                 0 input, 0 output, 0 cache read, 0 cache write
+
+  Current session
+  █                                                  2% used
+  Resets 8:59pm (Europe/London)
+
+  Current week (all models)
+  █████████████████████▌                             43% used
+  Resets Jul 8, 4:59am (Europe/London)
+
+  Current week (Fable)
+  ███████████████████████▌                           47% used
+  Resets Jul 8, 4:59am (Europe/London)
+
+  What's contributing to your limits usage?
+  Approximate, based on local sessions on this machine — does not include other devices or claude.ai
+
+  Last 24h · these are independent characteristics of your usage, not a breakdown
+
+  Nothing over 10% in this period — try the other window.
+
+  d to day · w to week
+
+  Usage credits
+  Usage credits are off · /usage-credits to turn them on
+
+  Esc to cancel
+
+
+

@@ -10,7 +10,7 @@ test.describe('Session Conversation Resume integration tests', () => {
   let runnerId: string;
 
   test.beforeAll(async ({ request }) => {
-    const mockBinDir = path.resolve(__dirname, '../../mocks/bin/agy');
+    const mockBinDir = `${path.resolve(__dirname, '../../mocks/bin/agy')}:${path.resolve(__dirname, '../../mocks/bin/claude')}`;
     const result = await setupRunner(request, 'resume-test-runner', mockBinDir);
     runnerProcess = result.runnerProcess;
     runnerId = result.runnerId;

@@ -1,63 +1,47 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
 const execSync = require('child_process').execSync;
 
 const SCRIPT_DIR = __dirname;
-const AGY_USAGE_PATH = path.resolve(SCRIPT_DIR, '../../tmux/agy/arondo-agy-usage.txt');
-const TEMPLATE_FILE = path.resolve(SCRIPT_DIR, 'cli-__ts__.log');
+const CLAUDE_STATUS_PATH = path.resolve(SCRIPT_DIR, '../../tmux/claude/arondo-claude-status.txt');
+const CLAUDE_USAGE_PATH = path.resolve(SCRIPT_DIR, '../../tmux/claude/arondo-claude-usage.txt');
 
 const args = process.argv.slice(2);
-let conversationId = null;
+let sessionId = null;
 let prompt = null;
 let resumeMode = false;
 
 for (let i = 0; i < args.length; i++) {
-  if (args[i] === '--conversation') {
-    conversationId = args[i + 1];
+  if (args[i] === '--session-id') {
+    sessionId = args[i + 1];
+    i++;
+  } else if (args[i] === '--resume') {
+    sessionId = args[i + 1];
     resumeMode = true;
     i++;
-  } else if (args[i] === '--prompt') {
+  } else if (args[i] === '--print') {
     prompt = args[i + 1];
     i++;
   }
 }
 
-if (conversationId !== null || prompt !== null) {
+if (sessionId !== null || prompt !== null) {
   // Session / resume mode
-  const agyDirLog = process.env.AGY_DIR_LOG;
-  if (!agyDirLog) {
-    console.error("Error: AGY_DIR_LOG environment variable is not set");
+  const claudeDirLog = process.env.CLAUDE_DIR_LOG;
+  if (!claudeDirLog) {
+    console.error("Error: CLAUDE_DIR_LOG environment variable is not set");
     process.exit(1);
   }
 
-  fs.mkdirSync(agyDirLog, { recursive: true });
-
-  if (!conversationId) {
-    conversationId = crypto.randomUUID();
-  }
-
-  const now = new Date();
-  const timestamp = now.getFullYear() +
-    String(now.getMonth() + 1).padStart(2, '0') +
-    String(now.getDate()).padStart(2, '0') + '_' +
-    String(now.getHours()).padStart(2, '0') +
-    String(now.getMinutes()).padStart(2, '0') +
-    String(now.getSeconds()).padStart(2, '0');
-  const pid = process.pid;
-  const logFile = path.join(agyDirLog, `cli-${timestamp}.log`);
-
-  if (!fs.existsSync(TEMPLATE_FILE)) {
-    console.error(`Error: TEMPLATE_FILE (${TEMPLATE_FILE}) not found`);
+  if (!sessionId) {
+    console.error("Error: SESSION_ID is not set");
     process.exit(1);
   }
 
-  let templateContent = fs.readFileSync(TEMPLATE_FILE, 'utf8');
-  templateContent = templateContent.replace(/__pid__/g, String(pid)).replace(/__conversation_id__/g, conversationId);
-  fs.writeFileSync(logFile, templateContent);
+  fs.mkdirSync(claudeDirLog, { recursive: true });
 
-  const histFile = path.join(agyDirLog, `${conversationId}.log`);
+  const histFile = path.join(claudeDirLog, `${sessionId}.log`);
   if (prompt !== 'what do I said before?') {
     if (prompt !== null) {
       fs.writeFileSync(histFile, prompt + '\n');
@@ -75,27 +59,29 @@ if (conversationId !== null || prompt !== null) {
       }
     }
   } else {
-    console.log(`Mock agy received: ${prompt}`);
+    console.log(`Mock claude received: ${prompt}`);
   }
   process.exit(0);
 } else {
-  // Interactive mode (e.g. running 'agy --add-dir ...')
+  // Interactive mode (e.g. running 'claude')
   if (process.env.TMUX) {
     try {
       execSync('tmux clear-history 2>/dev/null');
     } catch (e) {}
   }
 
+  let statusContent = '';
   let usageContent = '';
   try {
-    usageContent = fs.readFileSync(AGY_USAGE_PATH, 'utf8');
+    statusContent = fs.readFileSync(CLAUDE_STATUS_PATH, 'utf8');
+    usageContent = fs.readFileSync(CLAUDE_USAGE_PATH, 'utf8');
   } catch (e) {
-    console.error(`Error reading usage file: ${e}`);
+    console.error(`Error reading mock files: ${e}`);
     process.exit(1);
   }
 
-  const usageLines = usageContent.split('\n');
-  const initialScreen = usageLines.slice(0, 7).join('\n') + '\n';
+  const statusLines = statusContent.split('\n');
+  const initialScreen = statusLines.slice(0, 6).join('\n') + '\n';
 
   process.stdout.write(initialScreen);
 
@@ -117,11 +103,20 @@ if (conversationId !== null || prompt !== null) {
           } catch (e) {}
         }
         process.stdout.write('\033[H\033[2J');
-        process.stdout.write(initialScreen);
+        const dismissedView = statusLines.slice(0, 6).join('\n') + '\n❯ /status\n  ⎿  Settings dialog dismissed\n\n';
+        process.stdout.write(dismissedView);
       } else if (char === '\r' || char === '\n') {
         const cmd = buffer.trim();
         buffer = '';
-        if (cmd === '/usage') {
+        if (cmd === '/status') {
+          if (process.env.TMUX) {
+            try {
+              execSync('tmux clear-history 2>/dev/null');
+            } catch (e) {}
+          }
+          process.stdout.write('\033[H\033[2J');
+          process.stdout.write(statusContent);
+        } else if (cmd === '/usage') {
           if (process.env.TMUX) {
             try {
               execSync('tmux clear-history 2>/dev/null');
