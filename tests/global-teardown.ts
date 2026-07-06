@@ -1,8 +1,9 @@
 import fs from 'fs/promises';
 import path from 'path';
+import os from 'os';
 
 async function globalTeardown() {
-  const testConfigDir = path.resolve(__dirname, '../.arondo-test');
+  const testConfigDir = path.join(os.tmpdir(), 'arondo-test-config');
   const testDistDir = path.resolve(__dirname, '../.next-test');
   const runnerBinary = path.resolve(__dirname, '../runner/arondo-runner');
 

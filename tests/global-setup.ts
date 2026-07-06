@@ -1,9 +1,10 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { execSync } from 'child_process';
+import os from 'os';
 
 async function globalSetup() {
-  const testConfigDir = path.resolve(__dirname, '../.arondo-test');
+  const testConfigDir = path.join(os.tmpdir(), 'arondo-test-config');
   
   // Ensure config dir exists
   await fs.mkdir(testConfigDir, { recursive: true });

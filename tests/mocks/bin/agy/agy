@@ -1,0 +1,71 @@
+#!/bin/bash
+
+# Parse arguments
+CONVERSATION_ID=""
+PROMPT=""
+RESUME_MODE=false
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --conversation)
+      CONVERSATION_ID="$2"
+      RESUME_MODE=true
+      shift 2
+      ;;
+    --prompt)
+      PROMPT="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+if [ -z "$AGY_DIR_LOG" ]; then
+  echo "Error: AGY_DIR_LOG environment variable is not set" >&2
+  exit 1
+fi
+
+mkdir -p "$AGY_DIR_LOG"
+
+if [ -z "$CONVERSATION_ID" ]; then
+  CONVERSATION_ID=$(cat /proc/sys/kernel/random/uuid)
+fi
+
+# Step 3: Write log file
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+PID=$$
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TEMPLATE_FILE="${SCRIPT_DIR}/cli-__ts__.log"
+LOG_FILE="${AGY_DIR_LOG}/cli-${TIMESTAMP}.log"
+
+if [ ! -f "$TEMPLATE_FILE" ]; then
+  echo "Error: TEMPLATE_FILE ($TEMPLATE_FILE) not found" >&2
+  exit 1
+fi
+
+sed -e "s/__pid__/${PID}/g" -e "s/__conversation_id__/${CONVERSATION_ID}/g" "$TEMPLATE_FILE" > "$LOG_FILE"
+
+# Step 4: Save prompt parameter
+if [ "$PROMPT" != "what do I said before?" ]; then
+  echo "$PROMPT" > "${AGY_DIR_LOG}/${CONVERSATION_ID}.log"
+fi
+
+# Step 5: Output logic
+if [ "$PROMPT" = "what do I said before?" ]; then
+  if [ "$RESUME_MODE" = false ]; then
+    echo "No context, I don't know"
+  else
+    HIST_FILE="${AGY_DIR_LOG}/${CONVERSATION_ID}.log"
+    if [ -f "$HIST_FILE" ]; then
+      cat "$HIST_FILE"
+    else
+      echo "Context not found, I don't know"
+    fi
+  fi
+else
+  echo "Mock agy received: $PROMPT"
+fi
+
+exit 0

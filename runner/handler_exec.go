@@ -120,11 +120,14 @@ func detectAgyConvIdByPid(pid int) string {
 	if pid <= 0 {
 		return ""
 	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
+	logDir := os.Getenv("AGY_DIR_LOG")
+	if logDir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return ""
+		}
+		logDir = filepath.Join(home, ".gemini", "antigravity-cli", "log")
 	}
-	logDir := filepath.Join(home, ".gemini", "antigravity-cli", "log")
 	files, err := ioutil.ReadDir(logDir)
 	if err != nil {
 		return ""

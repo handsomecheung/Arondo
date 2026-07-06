@@ -1,0 +1,110 @@
+I0706 13:02:46.932989 __pid__ server.go:1322] Starting language server process with pid __pid__
+I0706 13:02:46.933827 __pid__ server.go:1362] Language server version: 1.0.16
+I0706 13:02:46.933841 __pid__ server.go:502] Language server will attempt to listen on host localhost
+I0706 13:02:46.934161 __pid__ server.go:517] Language server listening on random port at 43431 for HTTPS (gRPC)
+I0706 13:02:46.934212 __pid__ server.go:525] Language server listening on random port at 46629 for HTTP
+W0706 13:02:47.140488 __pid__ launchmanager.go:69] Entering local chrome mode! This is WRONG unless you are running tests or in eval mode on Linux.
+I0706 13:02:47.141081 __pid__ manager.go:98] Creating trajectory store manager with proto store and SQLite store
+E0706 13:02:47.141606 __pid__ log.go:398] Failed to poll ListExperiments: error getting token source: You are not logged into Antigravity.
+W0706 13:02:47.142174 __pid__ log_context.go:117] Cache(loadCodeAssistResponse): Singleflight refresh failed: error getting token source: You are not logged into Antigravity.
+E0706 13:02:47.142210 __pid__ log.go:398] error getting token source: You are not logged into Antigravity.
+W0706 13:02:47.142612 __pid__ log_context.go:117] Cache(availableModels): Singleflight refresh failed: failed to get load code assist response: error getting token source: You are not logged into Antigravity.
+E0706 13:02:47.142655 __pid__ log.go:398] failed to get load code assist response: error getting token source: You are not logged into Antigravity.
+E0706 13:02:47.142993 __pid__ log.go:398] Failed to poll FetchAvailableModels: failed to get load code assist response: error getting token source: You are not logged into Antigravity.
+I0706 13:02:47.148200 __pid__ manager.go:76] Migration [MIGRATION_ID_SIDECAR_USER_CONFIG_BYPASS] is disabled, skipping entirely
+I0706 13:02:47.148246 __pid__ manager.go:79] Migration [MIGRATION_ID_POPULATE_PROJECT_UPDATED_AT] is enabled
+I0706 13:02:47.148292 __pid__ manager.go:88] Migration [MIGRATION_ID_POPULATE_PROJECT_UPDATED_AT] already has status MIGRATION_STATUS_FAILED, skipping
+I0706 13:02:47.158174 __pid__ server.go:2424] Auth succeeded, refreshing features and managers
+E0706 13:02:47.158293 __pid__ log.go:398] Failed to poll ListExperiments: error getting token source: You are not logged into Antigravity.
+W0706 13:02:47.158585 __pid__ log_context.go:117] Cache(loadCodeAssistResponse): Singleflight refresh failed: error getting token source: You are not logged into Antigravity.
+E0706 13:02:47.158608 __pid__ log.go:398] error getting token source: You are not logged into Antigravity.
+W0706 13:02:47.158922 __pid__ log_context.go:117] Cache(availableModels): Singleflight refresh failed: failed to get load code assist response: error getting token source: You are not logged into Antigravity.
+E0706 13:02:47.158937 __pid__ log.go:398] failed to get load code assist response: error getting token source: You are not logged into Antigravity.
+E0706 13:02:47.159232 __pid__ log.go:398] Failed to poll FetchAvailableModels: failed to get load code assist response: error getting token source: You are not logged into Antigravity.
+I0706 13:02:47.159460 __pid__ server.go:2430] State refresh took 1ms
+I0706 13:02:47.159477 __pid__ server.go:2440] [RemoteControl] Subscription callback triggered.
+I0706 13:02:47.159480 __pid__ server.go:2442] [RemoteControl] RemoteControlEnabled value: false
+I0706 13:02:47.159484 __pid__ server.go:2543] [RemoteControl] Resolved proxyServerURL: ""
+I0706 13:02:47.159723 __pid__ server.go:2062] initialized server successfully in 226.657508ms
+W0706 13:02:47.159771 __pid__ log_context.go:117] Cache(loadCodeAssistResponse): Singleflight refresh failed: error getting token source: You are not logged into Antigravity.
+E0706 13:02:47.159819 __pid__ log.go:398] error getting token source: You are not logged into Antigravity.
+I0706 13:02:47.159940 __pid__ auto_updater.go:207] Last check was less than 15 minutes ago, skipping update
+I0706 13:02:47.160001 __pid__ common.go:116] Launching CLI mode
+E0706 13:02:47.160012 __pid__ common.go:131] Failed to resolve GeminiDir ".gemini": .gemini must be an absolute path: path is not absolute, falling back to default
+W0706 13:02:47.160131 __pid__ log_context.go:117] Cache(userInfo): Singleflight refresh failed: failed to get load code assist response: error getting token source: You are not logged into Antigravity.
+E0706 13:02:47.160150 __pid__ log.go:398] failed to get load code assist response: error getting token source: You are not logged into Antigravity.
+E0706 13:02:47.160382 __pid__ server.go:645] Failed to get OAuth token: error getting token source from auth provider: You are not logged into Antigravity.
+W0706 13:02:47.160392 __pid__ client.go:84] Failed to set auth token
+E0706 13:02:47.160487 __pid__ server.go:645] Failed to get OAuth token: error getting token source from auth provider: You are not logged into Antigravity.
+W0706 13:02:47.160500 __pid__ client.go:84] Failed to set auth token
+I0706 13:02:47.164641 __pid__ common.go:162] CLI app data directory: /home/user/.gemini/antigravity-cli
+I0706 13:02:47.164698 __pid__ server.go:226] Creating CLI server backend: product=antigravity workspaceDirs=[/home/user/.gemini/antigravity-cli/log /data/arondo] appDataDir=/home/user/.gemini/antigravity-cli cascadeManager=true codeAssist=true
+I0706 13:02:47.164784 __pid__ token_storage.go:57] Using file-based token storage because SSH session detected
+I0706 13:02:47.166170 __pid__ server.go:1472] Backend project ID updated dynamically to: default-cli-project
+I0706 13:02:47.166200 __pid__ printmode.go:89] Print mode: starting (promptLength=12, model="", conversationID="")
+I0706 13:02:47.166220 __pid__ manager.go:304] Initializing CLI store manager for workspace /home/user/.gemini/antigravity-cli/log
+I0706 13:02:47.166474 __pid__ cli_setting_manager.go:141] applyUserSettings: no shared config permissions from /home/user/.gemini/config/config.json
+I0706 13:02:47.166495 __pid__ cli_setting_manager.go:835] Skipping telemetry propagation because user is not logged in
+I0706 13:02:47.166501 __pid__ cli_setting_manager.go:84] CLI settings initialized: permissions=&{Allow:[command(git diff) command(file) command(ls) command(git status) command(git log) command(kubectl get) command(kubectl describe) command(hostname) command(ip) command(sleep) command(kubectl logs) command(tail) command(grep) command(find) command(cat) command(head) command(cargo check) command(cargo test) command(echo) command(env) command(node --version) command(npm run build 2>&1) command(npx tsc --noEmit 2>&1) command(npm run) command(git show) command(git -C /home/user/private-workspace/repos/github/Arondo diff --cached --stat) command(git -C /home/user/private-workspace/repos/github/Arondo diff --cached) command(git -C /home/user/private-workspace/repos/github/Arondo status) command(npx) command(go build -v ./runner/...) command(go build) command(./build.sh) command(go test ./...) command(go test ./runner/...)] Deny:[] Ask:[]}, toolPermission=request-review
+I0706 13:02:47.166953 __pid__ manager.go:459] CLI store manager initialized successfully
+I0706 13:02:47.166995 __pid__ printmode.go:223] Print mode: not authenticated, trying silent auth
+I0706 13:02:47.167176 __pid__ keyring.go:59] keyringAuth: loaded token, expiry=2026-07-06 13:38:37.93737282 +0900 JST expired=false
+I0706 13:02:47.253272 __pid__ auth.go:132] ChainedAuth: authenticated via keyring (effective: keyring)
+I0706 13:02:47.253299 __pid__ server_oauth.go:214] applyAuthResult: email=arondo@gmail.com, authMethod=consumer, quotaProject=
+I0706 13:02:47.253305 __pid__ server_oauth.go:219] OAuth: authenticated successfully as arondo@gmail.com
+I0706 13:02:47.253309 __pid__ server_oauth.go:225] b.codeAssistClient.AuthProvider (0x145e4b50dd40) is same as b.cliAuth (0x145e4b50dd40)
+I0706 13:02:48.589504 __pid__ http_helpers.go:208] URL: https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist Trace: 0xbd9d52f394f5dfbb
+I0706 13:02:49.399151 __pid__ http_helpers.go:208] URL: https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels Trace: 0xf399743e8bf9a7a
+I0706 13:02:49.400979 __pid__ model_config_manager.go:157] Propagating selected model override to backend: label="Gemini 3.5 Flash (Medium)"
+I0706 13:02:49.401089 __pid__ quota_manager.go:72] quotaRefreshLoop: starting reload (force=true)
+I0706 13:02:49.884158 __pid__ printmode.go:225] Print mode: silent auth succeeded
+I0706 13:02:49.884275 __pid__ input_loop.go:511] Auth done received, triggering experiment refresh
+I0706 13:02:49.884419 __pid__ experiment_manager.go:35] Starting experiment refresh after login
+I0706 13:02:50.067396 __pid__ experiment_manager.go:39] Experiments refreshed after login
+I0706 13:02:50.067627 __pid__ manager.go:1299] Reloading system slash commands
+I0706 13:02:50.067735 __pid__ conversation_manager.go:306] Starting new conversation (agent=false)
+I0706 13:02:50.067800 __pid__ server.go:793] Creating new cascade trajectory (agentScript=false)
+I0706 13:02:50.067991 __pid__ server.go:796] Conversation using project ID: default-cli-project
+I0706 13:02:50.098797 __pid__ server.go:825] Created conversation __conversation_id__
+I0706 13:02:50.098882 __pid__ server.go:2215] GetConversationDetail: found conversation __conversation_id__ (active=true)
+I0706 13:02:50.113649 __pid__ server.go:2215] GetConversationDetail: found conversation __conversation_id__ (active=true)
+I0706 13:02:50.113898 __pid__ conversation_manager.go:353] project: switching to conversation belonging to project ID: default-cli-project
+I0706 13:02:50.113988 __pid__ server.go:1472] Backend project ID updated dynamically to: default-cli-project
+I0706 13:02:50.114017 __pid__ cli_setting_manager.go:204] ApplyProjectPermissionGrants: no grants for project "Default Project", cleared project permissions
+I0706 13:02:50.114028 __pid__ conversation_manager.go:399] project: synced active project to "Default Project" (id=default-cli-project) from conversation switch
+I0706 13:02:50.114045 __pid__ conversation_manager.go:520] Streaming conversation __conversation_id__
+I0706 13:02:50.114115 __pid__ manager.go:1323] Reloading system slash commands and skills
+I0706 13:02:50.114132 __pid__ manager.go:1299] Reloading system slash commands
+I0706 13:02:50.114442 __pid__ server.go:834] Starting conversation update stream for __conversation_id__
+I0706 13:02:50.114474 __pid__ printmode.go:179] Print mode: conversation=__conversation_id__, sending message
+I0706 13:02:50.114490 __pid__ conversation_manager.go:437] Forwarding user message to conversation __conversation_id__ (items=1, media=0)
+I0706 13:02:50.114496 __pid__ server.go:1170] Sending user message to conversation __conversation_id__ (items=1, media=0)
+I0706 13:02:50.115086 __pid__ manager.go:392] Ignoring IDLE update because we are waiting for RUNNING
+I0706 13:02:50.115346 __pid__ manager.go:1303] Slash commands unchanged, skipping update
+W0706 13:02:50.139506 __pid__ permission_grant_store.go:314] ignoring invalid allow entry "escalate_admin(*)": unknown action "escalate_admin" in grant string: "escalate_admin(*)"
+I0706 13:02:50.352653 __pid__ http_helpers.go:269] Failed to make code assist backend request (writeTrajectoryAcls): {
+  "error": {
+    "code": 400,
+    "message": "Request contains an invalid argument.",
+    "status": "INVALID_ARGUMENT"
+  }
+}
+
+I0706 13:02:51.370407 __pid__ http_helpers.go:208] URL: https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist Trace: 0xc4fe8f1b09c29533
+I0706 13:02:52.131315 __pid__ http_helpers.go:208] URL: https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse Trace: 0x9a301309beaa38d8 ResponseID: 6ihLatrQLpT02roPp7fs4A4
+I0706 13:02:52.642985 __pid__ http_helpers.go:208] URL: https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist Trace: 0xea56f6db0141a1de
+I0706 13:02:52.842200 __pid__ model_config_manager.go:157] Propagating selected model override to backend: label="Gemini 3.5 Flash (Medium)"
+I0706 13:02:52.842487 __pid__ quota_manager.go:72] quotaRefreshLoop: starting reload (force=true)
+I0706 13:02:52.842579 __pid__ model_config_manager.go:157] Propagating selected model override to backend: label="Gemini 3.5 Flash (Medium)"
+I0706 13:02:53.295587 __pid__ http_helpers.go:208] URL: https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse Trace: 0x53ea1a587c4fce93 ResponseID: 7ChLavz2M_jG2roPjLn34AI
+I0706 13:02:53.337952 __pid__ quota_manager.go:72] quotaRefreshLoop: starting reload (force=true)
+I0706 13:02:53.363463 __pid__ input_loop.go:511] Auth done received, triggering experiment refresh
+I0706 13:02:53.363497 __pid__ experiment_manager.go:35] Starting experiment refresh after login
+I0706 13:02:53.372996 __pid__ input_loop.go:511] Auth done received, triggering experiment refresh
+I0706 13:02:53.373037 __pid__ experiment_manager.go:35] Starting experiment refresh after login
+I0706 13:02:53.527672 __pid__ manager.go:619] CLI store manager shutting down
+I0706 13:02:53.528412 __pid__ conversation_manager.go:478] Stopping conversation stream
+I0706 13:02:53.528553 __pid__ server.go:874] Stream goroutine exited for __conversation_id__, sending completion signal
+I0706 13:02:53.528627 __pid__ conversation_manager.go:596] Stream completed for __conversation_id__, clearing ResponsePending
+I0706 13:02:53.529191 __pid__ server.go:2308] Language server shutting down
+I0706 13:02:53.529207 __pid__ server.go:2310] Waiting for migrations to complete to prevent partial migration state...

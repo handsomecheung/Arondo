@@ -3,7 +3,7 @@
   "version": "0.2.1",
   "private": true,
   "scripts": {
-    "dev": "tsx watch server.ts",
+    "dev": "tsx watch --exclude \".arondo-test/**\" --exclude \"tests/**\" server.ts",
     "build": "next build",
     "start": "NODE_ENV=production tsx server.ts",
     "lint": "eslint",
