@@ -81,7 +81,7 @@ export default function HomePage() {
   const [prompt, setPrompt] = useState("");
   const [showCommandMenu, setShowCommandMenu] = useState(false);
   const [repoPath, setRepoPath] = useState("");
-  const [agentType, setAgentType] = useState("antigravity");
+  const [agentType, setAgentType] = useState("auto");
   const [runnerId, setRunnerId] = useState("");
   const [runners, setRunners] = useState<Runner[]>([]);
   const [isNewSession, setIsNewSession] = useState(false);
