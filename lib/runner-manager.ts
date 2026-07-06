@@ -786,9 +786,13 @@ class RunnerManager {
     this.pending.delete(msg.id);
 
     if (msg.payload?.ok === false) {
-      pending.reject(
-        new Error(msg.payload.error?.message || "Runner returned error"),
-      );
+      const errMsg = msg.payload.error?.message || "Runner returned error";
+      const code = msg.payload.error?.code;
+      const err = new Error(code ? `[${code}] ${errMsg}` : errMsg);
+      if (code) {
+        (err as any).code = code;
+      }
+      pending.reject(err);
     } else {
       pending.resolve(msg.payload);
     }
