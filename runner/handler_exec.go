@@ -2,8 +2,13 @@ package main
 
 import (
 	"encoding/base64"
+	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 )
@@ -70,7 +75,8 @@ func (h *Handler) handleExecAgent(msg *Message) {
 		env = append(env, req.PromptEnvVar+"="+promptFile)
 	}
 
-	pid, err := h.taskManager.Spawn(SpawnOptions{
+	var pid int
+	pid, err = h.taskManager.Spawn(SpawnOptions{
 		TaskID:  req.TaskID,
 		Command: command,
 		Args:    args,
@@ -87,10 +93,15 @@ func (h *Handler) handleExecAgent(msg *Message) {
 			if promptFile != "" {
 				os.Remove(promptFile)
 			}
-			h.sendEvent("exec.exit", map[string]any{
+			agyConvID := detectAgyConvIdByPid(pid)
+			payload := map[string]any{
 				"taskId":   req.TaskID,
 				"exitCode": exitCode,
-			})
+			}
+			if agyConvID != "" {
+				payload["agyConversationId"] = agyConvID
+			}
+			h.sendEvent("exec.exit", payload)
 		},
 	})
 
@@ -101,6 +112,51 @@ func (h *Handler) handleExecAgent(msg *Message) {
 
 	log.Printf("started agent task %s (pid=%d): %s", req.TaskID, pid, req.Command)
 	h.sendResponse(msg.ID, execStartResponse{OK: true, TaskID: req.TaskID, PID: pid})
+}
+
+var convIDRe = regexp.MustCompile(`Created conversation ([0-9a-f-]{36})`)
+
+func detectAgyConvIdByPid(pid int) string {
+	if pid <= 0 {
+		return ""
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	logDir := filepath.Join(home, ".gemini", "antigravity-cli", "log")
+	files, err := ioutil.ReadDir(logDir)
+	if err != nil {
+		return ""
+	}
+
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].ModTime().After(files[j].ModTime())
+	})
+
+	pidStr := " " + strconv.Itoa(pid) + " "
+
+	for _, file := range files {
+		if file.IsDir() || !strings.HasPrefix(file.Name(), "cli-") || !strings.HasSuffix(file.Name(), ".log") {
+			continue
+		}
+		path := filepath.Join(logDir, file.Name())
+		contentBytes, err := ioutil.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		content := string(contentBytes)
+
+		if !strings.Contains(content, pidStr) {
+			continue
+		}
+
+		match := convIDRe.FindStringSubmatch(content)
+		if len(match) > 1 {
+			return match[1]
+		}
+	}
+	return ""
 }
 
 func (h *Handler) handleExecScript(msg *Message) {

@@ -1,15 +1,11 @@
 import fs from "fs/promises";
 import fsSync from "fs";
 import path from "path";
-import os from "os";
 import { BaseAgent, AgentRunOptions, PROMPT_ENV_VAR } from "./base";
 import { getConfigDir } from "../config";
 
 const CONFIG_DIR = getConfigDir();
 const AGY_SESSION_MAP_FILE = path.join(CONFIG_DIR, "agy-sessions.json");
-
-const AGY_LOG_DIR = path.join(os.homedir(), ".gemini", "antigravity-cli", "log");
-const CONV_ID_RE = /Created conversation ([0-9a-f-]{36})/;
 
 function getAgySessionIdSync(sessionId: string): string | undefined {
   try {
@@ -43,21 +39,6 @@ export async function saveAgySessionId(sessionId: string, agyId: string): Promis
     await fs.writeFile(AGY_SESSION_MAP_FILE, JSON.stringify(map, null, 2), "utf-8");
   } catch (err) {
     console.error("Failed to save agy session mapping:", err);
-  }
-}
-
-export async function detectAgyConvId(): Promise<string | undefined> {
-  try {
-    const files = await fs.readdir(AGY_LOG_DIR);
-    const logFiles = files.filter(f => f.startsWith("cli-") && f.endsWith(".log")).sort();
-    if (logFiles.length === 0) return undefined;
-
-    const latest = path.join(AGY_LOG_DIR, logFiles[logFiles.length - 1]);
-    const content = await fs.readFile(latest, "utf-8");
-    const match = content.match(CONV_ID_RE);
-    return match?.[1];
-  } catch {
-    return undefined;
   }
 }
 

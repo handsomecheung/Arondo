@@ -13,7 +13,6 @@ import {
 } from "./store";
 import {
   getAgySessionId,
-  detectAgyConvId,
   saveAgySessionId,
 } from "./agents/antigravity";
 import fs from "fs/promises";
@@ -905,6 +904,7 @@ class RunnerManager {
   private async onExecExit(payload: {
     taskId: string;
     exitCode: number;
+    agyConversationId?: string;
   }): Promise<void> {
     const ctx = this.tasks.get(payload.taskId);
     if (!ctx) return;
@@ -914,6 +914,10 @@ class RunnerManager {
     this.ptyKeyToTaskId.delete(ptyKey);
     ctx.completedAt = Date.now();
     ctx.exitCode = payload.exitCode;
+    
+    if (payload.agyConversationId) {
+      (ctx as any).agyConversationId = payload.agyConversationId;
+    }
     
     if (ctx.messageId) {
       updateMessage(ctx.sessionId, ctx.messageId, {
@@ -980,14 +984,14 @@ class RunnerManager {
       try {
         const existingAgyId = await getAgySessionId(ctx.sessionId);
         if (!existingAgyId) {
-          const convId = await detectAgyConvId();
+          const convId = (ctx as any).agyConversationId;
           if (convId) {
             await saveAgySessionId(ctx.sessionId, convId);
           }
         }
       } catch (err) {
         console.error(
-          "[runner-manager] failed to detect agy conversation:",
+          "[runner-manager] failed to save agy conversation:",
           err,
         );
       }
