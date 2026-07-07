@@ -106,6 +106,10 @@ app/
       route.ts        # GET: list all tasks (active + retained)
       kill/
         route.ts        # POST: kill a running task by sessionId + messageId
+    scheduled-tasks/
+      route.ts          # GET: list scheduled tasks; POST: create fixed-time project script task
+      [id]/
+        route.ts        # DELETE: cancel/delete a scheduled task
     messages/route.ts   # GET: list messages for a session
     fs/route.ts         # GET: browse directories on a runner
     fs/infos/route.ts   # POST: batch check path existence and git diff status on the runner (used for markdown file link verification and inline diff triggering)
@@ -119,6 +123,7 @@ components/
   ShellTerminal.tsx     # Interactive shell terminal component (spawns server-side PTY via WebSocket)
   UserAgentCommandCard.tsx # Exec card representing a user-initiated agent slash command in the timeline
   ClientInit.tsx        # Performs client-side session token checking and login redirects
+  ScheduleTaskModal.tsx # Modal to schedule project-scoped scripts at a future fixed time
 lib/
   auth.ts               # Core authentication library (token verification, UUID lookup, token generation/migration)
   config.ts             # Configuration helpers, resolves data directory (defaults to ~/.arondo)
@@ -129,6 +134,9 @@ lib/
   runner-manager.ts     # Manages runner connections, task routing, and task persistence
   runner-server.ts      # WebSocket handler for /runner endpoint (registration, heartbeat)
   ws-server.ts          # WebSocket handler for /ws endpoint: event bus broadcast + PTY I/O + shell PTY bridging
+  scheduler.ts          # Scheduler engine for managing at, afterSession, and quotaAvailable tasks
+  project-actions.ts    # Extracted action helpers for executing project-scoped scripts
+  session-actions.ts    # Extracted action helpers for processing session messages and running agents
   agents/
     base.ts             # Abstract BaseAgent interface
     antigravity.ts      # Antigravity CLI (agy) adapter
@@ -235,6 +243,8 @@ Two WebSocket endpoints:
 - `/ws` — Browser ↔ Server (UI events, terminal I/O)
 - `/runner` — Runner ↔ Server (execution protocol)
 
+- **Runner Connection Stability (Heartbeat & Dead Link Detection)**: The Go runner client (`runner/client.go`) maintains a persistent connection with the server via periodic heartbeats. It detects dead connections using WebSocket ping/pong and a read deadline, automatically initiating reconnection with exponential backoff if the connection is lost.
+
 **Browser WebSocket protocol (`/ws`):**
 - Server → Client: `session:updated`, `message:added`, `session:deleted`, `terminal:output`, `terminal:exit`
 - Client → Server: `terminal:input`, `terminal:resize`, `terminal:attach`
@@ -305,6 +315,8 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **Automated Data Lifecycle**: Automatically purges orphan sessions or projects on load if their parent references (e.g. project or runner) no longer exist.
 - **@ Path Selector Modal**: Typing `@` in the chat textarea opens a file and directory selector modal to easily select a path and insert its relative path into the input field.
 - **File Browser with Syntax Highlighting**: A Remote File Browser can be opened from the session's three-dot menu, featuring file previews (up to 512KB) with code syntax highlighting and a word wrap toggle option.
+- **Scheduled Tasks, Auto-Queue Follow-ups & Quota Retry**: Users can schedule project-scoped scripts to run at a future fixed time. If the agent is currently running when a user sends a follow-up, the message is automatically queued as a scheduled task (`afterSession` trigger) and executed sequentially once the active task finishes. If the agent terminates due to quota limits, a `quotaAvailable` task is scheduled to automatically retry using the last user prompt once the quota becomes available.
+- **Diff View File Collapse/Expand**: The visual HTML diff viewer supports collapsing and expanding individual changed files dynamically, enhancing diff readability.
 
 ## Project & Custom Scripts Management
 - **Project Scoping**: Sessions are mapped to projects by repository path + runnerId. Projects store metadata at `~/.arondo/projects/[projectId]/project.json`.
