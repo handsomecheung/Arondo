@@ -586,6 +586,7 @@ export default function HomePage() {
     setLogModalOpen,
     setTaskQueue,
     setApiError,
+    setToast,
     loadProjects,
     agentCommands,
     sessionScripts,
@@ -747,16 +748,12 @@ export default function HomePage() {
   }, [runners, runnerId, selectedSession]);
 
   const canSubmit =
-    !isAgentRunning &&
     selectedRunnerConnected &&
     (isNewSession
       ? repoPath.trim().length > 0 && !!runnerId
       : prompt.trim().length > 0 && !!selectedSessionId);
 
   const getSendTooltip = () => {
-    if (isAgentRunning) {
-      return "Agent is working…";
-    }
     if (!selectedRunnerConnected) {
       return "Runner is offline";
     }
@@ -777,6 +774,9 @@ export default function HomePage() {
       }
       if (prompt.trim().length === 0) {
         return "Please enter a message";
+      }
+      if (isAgentRunning) {
+        return "Agent is working — message will be sent once it finishes";
       }
       return "Send (Enter)";
     }

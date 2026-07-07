@@ -110,20 +110,33 @@ interface ScheduledTask {
   lastError?: string;
 }
 
-function describeScheduledTask(task: ScheduledTask, sessionMap: Map<string, Session>): string {
+function describeScheduledTask(
+  task: ScheduledTask,
+  sessionMap: Map<string, Session>,
+  projectMap: Map<string, Project>,
+): string {
   const actionText =
     task.action.kind === "sendMessage"
       ? `Send: "${task.action.message.slice(0, 60)}${task.action.message.length > 60 ? "…" : ""}"`
       : `Run script: ${task.action.scriptName}`;
-  const sessionId = task.action.kind === "sendMessage" ? task.action.sessionId : task.action.sessionId;
-  const sessionName = sessionId ? sessionMap.get(sessionId)?.name || sessionMap.get(sessionId)?.prompt || sessionId : "";
+
+  let targetName = "";
+  if (task.action.kind === "sendMessage") {
+    targetName = sessionMap.get(task.action.sessionId)?.name || sessionMap.get(task.action.sessionId)?.prompt || task.action.sessionId;
+  } else if (task.action.projectId) {
+    const project = projectMap.get(task.action.projectId);
+    targetName = project ? project.repoPath.split("/").pop() || project.repoPath : task.action.projectId;
+  } else if (task.action.sessionId) {
+    targetName = sessionMap.get(task.action.sessionId)?.name || task.action.sessionId;
+  }
+
   const triggerText =
     task.trigger.kind === "at"
       ? `at ${new Date(task.trigger.timestamp).toLocaleString()}`
       : task.trigger.kind === "afterSession"
         ? "after the current run finishes"
         : `when ${task.trigger.agentType ? agentTypeLabel(task.trigger.agentType) : "any agent"} quota is available`;
-  return `${actionText}${sessionName ? ` → ${sessionName}` : ""} — ${triggerText}`;
+  return `${actionText}${targetName ? ` → ${targetName}` : ""} — ${triggerText}`;
 }
 
 
@@ -683,7 +696,7 @@ export default function TasksPage() {
               )}
               <button
                 onClick={() => setShowScheduleModal(true)}
-                disabled={sessions.length === 0}
+                disabled={projects.length === 0}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -695,8 +708,8 @@ export default function TasksPage() {
                   color: "var(--text-primary)",
                   fontSize: 12,
                   fontWeight: 600,
-                  cursor: sessions.length === 0 ? "default" : "pointer",
-                  opacity: sessions.length === 0 ? 0.5 : 1,
+                  cursor: projects.length === 0 ? "default" : "pointer",
+                  opacity: projects.length === 0 ? 0.5 : 1,
                 }}
               >
                 <IconPlus />
@@ -727,6 +740,7 @@ export default function TasksPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {scheduledTasks.map((task) => {
                   const sessionMap = new Map(sessions.map((s) => [s.id, s]));
+                  const projectMap = new Map(projects.map((p) => [p.id, p]));
                   return (
                     <div
                       key={task.id}
@@ -741,7 +755,7 @@ export default function TasksPage() {
                       }}
                     >
                       <span style={{ flex: 1, fontSize: 12, color: "var(--text-secondary)" }}>
-                        {describeScheduledTask(task, sessionMap)}
+                        {describeScheduledTask(task, sessionMap, projectMap)}
                       </span>
                       <button
                         onClick={() => handleCancelScheduledTask(task.id)}
@@ -1354,7 +1368,7 @@ export default function TasksPage() {
 
       {showScheduleModal && (
         <ScheduleTaskModal
-          sessions={sessions}
+          projects={projects}
           onClose={() => setShowScheduleModal(false)}
           onCreated={() => {
             setShowScheduleModal(false);

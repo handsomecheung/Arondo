@@ -887,7 +887,7 @@ export default function SessionView({
               isRunnerOffline
                 ? "Runner is offline. Chat is disabled."
                 : isAgentRunning
-                  ? "Agent is working…"
+                  ? "Agent is working… your message will be queued until it finishes"
                   : isNewSession
                     ? "Describe what you want the agent to build or fix in this project…"
                     : "Send a message or follow-up feedback to the agent…"
@@ -895,7 +895,7 @@ export default function SessionView({
             value={prompt}
             onChange={onPromptChange}
             onKeyDown={onKeyDown}
-            disabled={isAgentRunning || isRunnerOffline}
+            disabled={isRunnerOffline}
             rows={1}
             id="chat-input"
           />

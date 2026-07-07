@@ -26,6 +26,7 @@ interface UseSessionSubmitParams {
   setLogModalOpen: (v: boolean) => void;
   setTaskQueue: React.Dispatch<React.SetStateAction<TaskItem[]>>;
   setApiError: (v: { title: string; message: string } | null) => void;
+  setToast: (v: { message: string; type: "success" | "info" | "error" } | null) => void;
   loadProjects: () => void;
   agentCommands: AgentCommand[];
   sessionScripts: ProjectScript[];
@@ -55,6 +56,7 @@ export function useSessionSubmit({
   setLogModalOpen,
   setTaskQueue,
   setApiError,
+  setToast,
   loadProjects,
   agentCommands,
   sessionScripts,
@@ -149,11 +151,42 @@ export function useSessionSubmit({
     loadProjects();
   }, [selectedSession, loadProjects]);
 
+  // When the agent is already running, a follow-up chat message can't start
+  // immediately — queue it as a scheduled task that fires once the current
+  // run finishes, instead of blocking the input.
+  const queueFollowupMessage = useCallback(async (originalMessage: string, agentMessage?: string) => {
+    if (!selectedSessionId) return;
+    try {
+      const res = await fetch("/api/scheduled-tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          trigger: { kind: "afterSession", sessionId: selectedSessionId },
+          action: { kind: "sendMessage", sessionId: selectedSessionId, message: originalMessage, prompt: agentMessage },
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setApiError({ title: "Schedule Error", message: data.error || "Failed to queue message" });
+        return;
+      }
+      setToast({ message: "Message queued — will send once the current run finishes.", type: "info" });
+    } catch (err: any) {
+      setApiError({ title: "Schedule Error", message: err.message || "Failed to queue message" });
+    }
+  }, [selectedSessionId, setApiError, setToast]);
+
   const sendAgentMessage = useCallback(async (originalMessage: string, agentMessage: string) => {
     if (!selectedSessionId) return;
     setPrompt("");
     setShowCommandMenu(false);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
+
+    if (selectedSession?.status === "running") {
+      await queueFollowupMessage(originalMessage, agentMessage);
+      return;
+    }
+
     const tempTaskId = `agent-${selectedSessionId}-${Date.now()}`;
     setTaskQueue((prev) => [
       ...prev,
@@ -174,7 +207,7 @@ export function useSessionSubmit({
       console.error(err);
       setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
     }
-  }, [selectedSessionId, setTaskQueue]);
+  }, [selectedSessionId, selectedSession, setTaskQueue, queueFollowupMessage]);
 
   // Called from SessionView with the raw prompt text (e.g. "/commit foo")
   const handleAgentCommand = useCallback(async (promptText: string) => {
@@ -258,6 +291,8 @@ export function useSessionSubmit({
         setActiveLogMsgId(null);
         setLogModalOpen(false);
         loadProjects();
+      } else if (selectedSession?.status === "running") {
+        await queueFollowupMessage(trimmed);
       } else {
         const tempTaskId = `agent-${selectedSessionId}-${Date.now()}`;
         setTaskQueue((prev) => [
@@ -283,7 +318,7 @@ export function useSessionSubmit({
     } catch (err) {
       console.error(err);
     }
-  }, [prompt, repoPath, agentType, runnerId, isNewSession, selectedSessionId, loadProjects, setTaskQueue, handleNewSessionCommand, sendAgentMessage, sessionScripts, handleScriptCommand, agentCommands]);
+  }, [prompt, repoPath, agentType, runnerId, isNewSession, selectedSessionId, selectedSession, loadProjects, setTaskQueue, handleNewSessionCommand, sendAgentMessage, sessionScripts, handleScriptCommand, agentCommands, queueFollowupMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return;

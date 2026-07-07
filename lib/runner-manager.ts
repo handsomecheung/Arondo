@@ -10,6 +10,7 @@ import {
   getSessions,
   updateMessage,
   getMessages,
+  addScheduledTask,
 } from "./store";
 import {
   getAgySessionId,
@@ -1073,6 +1074,28 @@ class RunnerManager {
 
     eventBus.publish({ type: "message_added", payload: agentMsg });
     eventBus.publish({ type: "session_updated", payload: updated });
+
+    if (quotaExhausted && !stoppedByUser) {
+      const msgIdx = messages.findIndex((m) => m.id === ctx.messageId);
+      const lastUserMsg = [...messages.slice(0, msgIdx)].reverse().find((m) => m.role === "user");
+      if (lastUserMsg) {
+        try {
+          await addScheduledTask({
+            trigger: { kind: "quotaAvailable", agentType: resolvedAgentType },
+            action: {
+              kind: "sendMessage",
+              sessionId: ctx.sessionId,
+              message: lastUserMsg.content,
+              prompt: lastUserMsg.prompt,
+            },
+            label: "Auto-retry after quota exhausted",
+          });
+          console.log(`[runner-manager] scheduled quota-wait retry for session ${ctx.sessionId}`);
+        } catch (err) {
+          console.error("[runner-manager] failed to schedule quota-wait retry:", err);
+        }
+      }
+    }
   }
 
   private async handleScriptExit(
