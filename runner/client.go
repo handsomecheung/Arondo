@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/exec"
 	"runtime"
@@ -11,6 +12,18 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+)
+
+const (
+	// pongWait must exceed the server's heartbeat ping interval (30s, see
+	// lib/runner-server.ts HEARTBEAT_INTERVAL) with margin for jitter/latency.
+	pongWait = 90 * time.Second
+	// pingPeriod is how often the client itself pings the server. Sending our
+	// own pings (in addition to replying to the server's) means a broken
+	// write side is detected immediately via a WriteControl error, instead of
+	// waiting up to pongWait for the read side to time out.
+	pingPeriod = 25 * time.Second
+	writeWait  = 10 * time.Second
 )
 
 type Client struct {
@@ -76,6 +89,26 @@ func (c *Client) connect() error {
 	}
 	c.conn = conn
 	log.Println("connected")
+
+	// A connection can go silently dead (e.g. after the host sleeps/wakes or
+	// switches networks) without the TCP stack ever surfacing an error, which
+	// would otherwise leave readLoop blocked in ReadMessage forever and the
+	// client stuck thinking it's still connected. Track liveness via WebSocket
+	// ping/pong control frames and a read deadline so a dead connection gets
+	// detected and reconnected instead of hanging indefinitely.
+	conn.SetReadDeadline(time.Now().Add(pongWait))
+	conn.SetPingHandler(func(appData string) error {
+		conn.SetReadDeadline(time.Now().Add(pongWait))
+		err := conn.WriteControl(websocket.PongMessage, []byte(appData), time.Now().Add(writeWait))
+		if err == websocket.ErrCloseSent {
+			return nil
+		}
+		return err
+	})
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
 
 	if err := c.sendRegister(); err != nil {
 		conn.Close()
@@ -184,7 +217,9 @@ func (c *Client) readLoop() {
 	for {
 		_, data, err := c.conn.ReadMessage()
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				log.Printf("read error: connection timed out waiting for server ping (%v)", err)
+			} else if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
 				log.Printf("read error: %v", err)
 			}
 			return
@@ -201,14 +236,18 @@ func (c *Client) readLoop() {
 }
 
 func (c *Client) heartbeatLoop() {
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(pingPeriod)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			msg, _ := NewEvent("pong", map[string]any{})
-			if err := c.Send(msg); err != nil {
+			c.sendMu.Lock()
+			err := c.conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeWait))
+			c.sendMu.Unlock()
+			if err != nil {
+				// Write side is broken; close so readLoop unblocks and Run() reconnects.
+				c.conn.Close()
 				return
 			}
 		case <-c.done:
