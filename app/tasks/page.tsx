@@ -694,27 +694,6 @@ export default function TasksPage() {
                   {filteredTasks.filter((t) => t.status === "running").length} active / {filteredTasks.length} total
                 </span>
               )}
-              <button
-                onClick={() => setShowScheduleModal(true)}
-                disabled={projects.length === 0}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "7px 12px",
-                  borderRadius: "var(--radius-md)",
-                  border: "1px solid var(--border)",
-                  background: "var(--bg-surface)",
-                  color: "var(--text-primary)",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: projects.length === 0 ? "default" : "pointer",
-                  opacity: projects.length === 0 ? 0.5 : 1,
-                }}
-              >
-                <IconPlus />
-                Schedule
-              </button>
             </div>
           </div>
 
@@ -917,6 +896,29 @@ export default function TasksPage() {
                   </div>
                 )}
               </div>
+
+              <button
+                onClick={() => setShowScheduleModal(true)}
+                disabled={projects.length === 0}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "7px 12px",
+                  borderRadius: "var(--radius-md)",
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-surface)",
+                  color: "var(--text-primary)",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: projects.length === 0 ? "default" : "pointer",
+                  opacity: projects.length === 0 ? 0.5 : 1,
+                  marginLeft: "auto",
+                }}
+              >
+                <IconPlus />
+                Schedule
+              </button>
             </div>
           )}
 
