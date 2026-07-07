@@ -14,6 +14,92 @@ try {
   console.warn("Failed to read diff2html css from node_modules, falling back to CDN:", e);
 }
 
+const diffCollapseStyles = `
+  .d2h-file-wrapper.collapsed .d2h-file-diff {
+    display: none !important;
+  }
+  .d2h-file-wrapper.collapsed .d2h-file-header {
+    border-bottom: none !important;
+  }
+  .d2h-file-header {
+    transition: background-color 0.2s ease;
+  }
+`;
+
+const diffCollapseScript = `
+  <script>
+    (function() {
+      function initCollapse() {
+        const headers = document.querySelectorAll('.d2h-file-header');
+        if (headers.length === 0) {
+          // If elements are not found yet, try again shortly
+          setTimeout(initCollapse, 100);
+          return;
+        }
+
+        headers.forEach(header => {
+          header.style.cursor = 'pointer';
+          header.style.userSelect = 'none';
+          
+          header.addEventListener('mouseenter', () => {
+            header.style.backgroundColor = '#e2e8f0';
+          });
+          header.addEventListener('mouseleave', () => {
+            header.style.backgroundColor = '#f1f5f9';
+          });
+
+          const chevron = document.createElement('span');
+          chevron.className = 'collapse-chevron';
+          chevron.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.2s ease; margin-right: 8px; vertical-align: middle; display: inline-block;"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+          
+          header.insertBefore(chevron, header.firstChild);
+
+          header.addEventListener('click', (e) => {
+            if (e.target.tagName === 'A' || e.target.closest('a')) return;
+            
+            const fileWrapper = header.closest('.d2h-file-wrapper');
+            if (fileWrapper) {
+              fileWrapper.classList.toggle('collapsed');
+              const isCollapsed = fileWrapper.classList.contains('collapsed');
+              const svg = chevron.querySelector('svg');
+              if (svg) {
+                svg.style.transform = isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+              }
+            }
+          });
+        });
+
+        const fileListLinks = document.querySelectorAll('.d2h-file-list-line a, .d2h-file-list-title a');
+        fileListLinks.forEach(link => {
+          link.addEventListener('click', (e) => {
+            const href = link.getAttribute('href');
+            if (href && href.startsWith('#')) {
+              const targetId = href.substring(1);
+              const targetElement = document.getElementById(targetId);
+              if (targetElement) {
+                const fileWrapper = targetElement.closest('.d2h-file-wrapper');
+                if (fileWrapper && fileWrapper.classList.contains('collapsed')) {
+                  fileWrapper.classList.remove('collapsed');
+                  const svg = fileWrapper.querySelector('.collapse-chevron svg');
+                  if (svg) {
+                    svg.style.transform = 'rotate(0deg)';
+                  }
+                }
+              }
+            }
+          });
+        });
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initCollapse);
+      } else {
+        initCollapse();
+      }
+    })();
+  </script>
+`;
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -153,10 +239,12 @@ export async function GET(
         border-radius: 0 !important;
       }
     }
+    ${diffCollapseStyles}
   </style>
 </head>
 <body>
   ${diffHtml}
+  ${diffCollapseScript}
 </body>
 </html>`;
 
@@ -303,10 +391,12 @@ export async function GET(
       word-break: break-all !important;
     }
     ` : ""}
+    ${diffCollapseStyles}
   </style>
 </head>
 <body>
   ${diffHtml}
+  ${diffCollapseScript}
 </body>
 </html>`;
 
