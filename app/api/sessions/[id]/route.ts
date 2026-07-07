@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deleteSession, getSession, updateSession } from "@/lib/store";
+import { deleteSession, getSession, updateSession, removeScheduledTasksForSession } from "@/lib/store";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, verifySessionPermission } from "@/lib/auth";
@@ -21,6 +21,7 @@ export async function DELETE(
 
   try {
     runnerManager.removeTasksForSession(id);
+    await removeScheduledTasksForSession(id);
     await deleteSession(id);
     eventBus.publish({ type: "session_deleted", payload: { id } });
     return NextResponse.json({ success: true });

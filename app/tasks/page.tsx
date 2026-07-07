@@ -5,8 +5,9 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import ScriptExecCard from "@/components/ScriptExecCard";
 import AgentExecCard from "@/components/AgentExecCard";
+import ScheduleTaskModal from "@/components/ScheduleTaskModal";
 import {
-  IconArrowLeft, IconBolt, IconX, IconInbox, IconTerminal, IconCode, IconChevronDown,
+  IconArrowLeft, IconBolt, IconX, IconInbox, IconTerminal, IconCode, IconChevronDown, IconClock, IconPlus,
 } from "@/components/Icons";
 import { agentTypeLabel } from "@/lib/homeUtils";
 
@@ -90,6 +91,41 @@ interface SessionGroup {
   tasks: TaskItem[];
 }
 
+type ScheduledTaskTrigger =
+  | { kind: "at"; timestamp: number }
+  | { kind: "afterSession"; sessionId: string }
+  | { kind: "quotaAvailable"; agentType?: string };
+
+type ScheduledTaskAction =
+  | { kind: "runScript"; scriptName: string; sessionId?: string; projectId?: string }
+  | { kind: "sendMessage"; sessionId: string; message: string; prompt?: string };
+
+interface ScheduledTask {
+  id: string;
+  createdAt: number;
+  status: "pending" | "triggered" | "done" | "failed" | "cancelled" | "expired";
+  trigger: ScheduledTaskTrigger;
+  action: ScheduledTaskAction;
+  label?: string;
+  lastError?: string;
+}
+
+function describeScheduledTask(task: ScheduledTask, sessionMap: Map<string, Session>): string {
+  const actionText =
+    task.action.kind === "sendMessage"
+      ? `Send: "${task.action.message.slice(0, 60)}${task.action.message.length > 60 ? "…" : ""}"`
+      : `Run script: ${task.action.scriptName}`;
+  const sessionId = task.action.kind === "sendMessage" ? task.action.sessionId : task.action.sessionId;
+  const sessionName = sessionId ? sessionMap.get(sessionId)?.name || sessionMap.get(sessionId)?.prompt || sessionId : "";
+  const triggerText =
+    task.trigger.kind === "at"
+      ? `at ${new Date(task.trigger.timestamp).toLocaleString()}`
+      : task.trigger.kind === "afterSession"
+        ? "after the current run finishes"
+        : `when ${task.trigger.agentType ? agentTypeLabel(task.trigger.agentType) : "any agent"} quota is available`;
+  return `${actionText}${sessionName ? ` → ${sessionName}` : ""} — ${triggerText}`;
+}
+
 
 function formatDuration(ms: number): string {
   if (ms < 0) return "0s";
@@ -112,6 +148,9 @@ export default function TasksPage() {
   const [commandTask, setCommandTask] = useState<TaskItem | null>(null);
 
   const [projects, setProjects] = useState<Project[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [scheduledTasks, setScheduledTasks] = useState<ScheduledTask[]>([]);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [groupBy, setGroupBy] = useState<"session" | "status">("session");
   const [filterType, setFilterType] = useState<"both" | "agent" | "script">("both");
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
@@ -128,6 +167,7 @@ export default function TasksPage() {
       const sessions: Session[] = await sessionsRes.json();
       const projectsList: Project[] = await projectsRes.json();
       setProjects(projectsList);
+      setSessions(sessions);
       const sessionMap = new Map(sessions.map((s) => [s.id, s]));
 
       const scriptProjectIds = new Set<string>();
@@ -200,9 +240,35 @@ export default function TasksPage() {
     }
   }, []);
 
+  const loadScheduledTasks = useCallback(async () => {
+    try {
+      const res = await fetch("/api/scheduled-tasks");
+      const tasks: ScheduledTask[] = await res.json();
+      setScheduledTasks(tasks.filter((t) => t.status === "pending"));
+    } catch {
+      // ignore
+    }
+  }, []);
+
   useEffect(() => {
     loadInitialTasks();
-  }, [loadInitialTasks]);
+    loadScheduledTasks();
+  }, [loadInitialTasks, loadScheduledTasks]);
+
+  useEffect(() => {
+    const interval = setInterval(loadScheduledTasks, 20000);
+    return () => clearInterval(interval);
+  }, [loadScheduledTasks]);
+
+  const handleCancelScheduledTask = async (id: string) => {
+    setScheduledTasks((prev) => prev.filter((t) => t.id !== id));
+    try {
+      await fetch(`/api/scheduled-tasks/${id}`, { method: "DELETE" });
+    } catch (err) {
+      console.error("Failed to cancel scheduled task:", err);
+      loadScheduledTasks();
+    }
+  };
 
   useEffect(() => {
     let ws: WebSocket;
@@ -603,18 +669,100 @@ export default function TasksPage() {
                 Only running, failed, or stopped tasks from the last 3 days are displayed.
               </p>
             </div>
-            {filteredTasks.length > 0 && (
-              <span
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {filteredTasks.length > 0 && (
+                <span
+                  style={{
+                    fontSize: 12,
+                    color: "var(--text-secondary)",
+                    fontWeight: 500,
+                  }}
+                >
+                  {filteredTasks.filter((t) => t.status === "running").length} active / {filteredTasks.length} total
+                </span>
+              )}
+              <button
+                onClick={() => setShowScheduleModal(true)}
+                disabled={sessions.length === 0}
                 style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "7px 12px",
+                  borderRadius: "var(--radius-md)",
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-surface)",
+                  color: "var(--text-primary)",
                   fontSize: 12,
-                  color: "var(--text-secondary)",
-                  fontWeight: 500,
+                  fontWeight: 600,
+                  cursor: sessions.length === 0 ? "default" : "pointer",
+                  opacity: sessions.length === 0 ? 0.5 : 1,
                 }}
               >
-                {filteredTasks.filter((t) => t.status === "running").length} active / {filteredTasks.length} total
-              </span>
-            )}
+                <IconPlus />
+                Schedule
+              </button>
+            </div>
           </div>
+
+          {scheduledTasks.length > 0 && (
+            <div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 8,
+                  padding: "0 4px",
+                }}
+              >
+                <IconClock size={13} strokeWidth={2.5} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", flex: 1 }}>
+                  Upcoming
+                </span>
+                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                  {scheduledTasks.length} {scheduledTasks.length === 1 ? "task" : "tasks"}
+                </span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {scheduledTasks.map((task) => {
+                  const sessionMap = new Map(sessions.map((s) => [s.id, s]));
+                  return (
+                    <div
+                      key={task.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "10px 12px",
+                        borderRadius: "var(--radius-md)",
+                        border: "1px solid var(--border)",
+                        background: "var(--bg-surface)",
+                      }}
+                    >
+                      <span style={{ flex: 1, fontSize: 12, color: "var(--text-secondary)" }}>
+                        {describeScheduledTask(task, sessionMap)}
+                      </span>
+                      <button
+                        onClick={() => handleCancelScheduledTask(task.id)}
+                        title="Cancel"
+                        style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          color: "var(--text-muted)",
+                          display: "flex",
+                          alignItems: "center",
+                        }}
+                      >
+                        <IconX />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {taskQueue.length > 0 && (
             <div
@@ -1204,6 +1352,16 @@ export default function TasksPage() {
         </div>
       )}
 
+      {showScheduleModal && (
+        <ScheduleTaskModal
+          sessions={sessions}
+          onClose={() => setShowScheduleModal(false)}
+          onCreated={() => {
+            setShowScheduleModal(false);
+            loadScheduledTasks();
+          }}
+        />
+      )}
     </div>
   );
 }

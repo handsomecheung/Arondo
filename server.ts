@@ -6,6 +6,7 @@ import { WebSocketServer } from "ws";
 import { setupWebSocketServer } from "./lib/ws-server";
 import { setupRunnerServer } from "./lib/runner-server";
 import { startQuotaAggregator } from "./lib/quota-aggregator";
+import { startScheduler } from "./lib/scheduler";
 
 import { initializeAuth } from "./lib/auth";
 
@@ -47,6 +48,7 @@ initializeAuth().then(() => {
   });
 
   startQuotaAggregator();
+  startScheduler();
 
   server.listen(port, () => {
     console.log(

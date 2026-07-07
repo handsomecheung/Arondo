@@ -5,6 +5,7 @@ import { getConfigDir } from "./config";
 const CONFIG_DIR = getConfigDir();
 const SESSIONS_DIR = path.join(CONFIG_DIR, "sessions");
 const PROJECTS_DIR = path.join(CONFIG_DIR, "projects");
+const SCHEDULED_TASKS_FILE = path.join(CONFIG_DIR, "scheduled-tasks.json");
 
 export type SessionStatus = "idle" | "running" | "script-running" | "done" | "error";
 
@@ -429,6 +430,90 @@ export async function getSessionDiffs(sessionId: string, messageId: string, proj
     return JSON.parse(raw);
   } catch {
     return {};
+  }
+}
+
+// ─── Scheduled Tasks ────────────────────────────────────────────────────────
+
+export type ScheduledTaskStatus = "pending" | "triggered" | "done" | "failed" | "cancelled" | "expired";
+
+export type ScheduledTaskTrigger =
+  | { kind: "at"; timestamp: number }
+  | { kind: "afterSession"; sessionId: string }
+  | { kind: "quotaAvailable"; agentType?: string };
+
+export type ScheduledTaskAction =
+  | { kind: "runScript"; scriptName: string; sessionId?: string; projectId?: string }
+  | { kind: "sendMessage"; sessionId: string; message: string; prompt?: string };
+
+export interface ScheduledTask {
+  id: string;
+  createdAt: number;
+  status: ScheduledTaskStatus;
+  trigger: ScheduledTaskTrigger;
+  action: ScheduledTaskAction;
+  label?: string;
+  tokenUuid?: string;
+  lastError?: string;
+  resultMessageId?: string;
+}
+
+async function getScheduledTasksRaw(): Promise<ScheduledTask[]> {
+  return readJson<ScheduledTask[]>(SCHEDULED_TASKS_FILE, []);
+}
+
+async function writeScheduledTasks(tasks: ScheduledTask[]): Promise<void> {
+  await writeJson(SCHEDULED_TASKS_FILE, tasks);
+}
+
+export async function getScheduledTasks(): Promise<ScheduledTask[]> {
+  const tasks = await getScheduledTasksRaw();
+  return tasks.sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export async function getScheduledTask(id: string): Promise<ScheduledTask | undefined> {
+  const tasks = await getScheduledTasksRaw();
+  return tasks.find((t) => t.id === id);
+}
+
+export async function addScheduledTask(
+  data: Omit<ScheduledTask, "id" | "createdAt" | "status">
+): Promise<ScheduledTask> {
+  const tasks = await getScheduledTasksRaw();
+  const task: ScheduledTask = {
+    ...data,
+    id: crypto.randomUUID(),
+    createdAt: Date.now(),
+    status: "pending",
+  };
+  tasks.push(task);
+  await writeScheduledTasks(tasks);
+  return task;
+}
+
+export async function updateScheduledTask(
+  id: string,
+  patch: Partial<Omit<ScheduledTask, "id" | "createdAt">>
+): Promise<ScheduledTask | undefined> {
+  const tasks = await getScheduledTasksRaw();
+  const index = tasks.findIndex((t) => t.id === id);
+  if (index === -1) return undefined;
+  const updated: ScheduledTask = { ...tasks[index], ...patch };
+  tasks[index] = updated;
+  await writeScheduledTasks(tasks);
+  return updated;
+}
+
+export async function removeScheduledTasksForSession(sessionId: string): Promise<void> {
+  const tasks = await getScheduledTasksRaw();
+  const filtered = tasks.filter((t) => {
+    if (t.trigger.kind === "afterSession" && t.trigger.sessionId === sessionId) return false;
+    if (t.action.kind === "sendMessage" && t.action.sessionId === sessionId) return false;
+    if (t.action.kind === "runScript" && t.action.sessionId === sessionId) return false;
+    return true;
+  });
+  if (filtered.length !== tasks.length) {
+    await writeScheduledTasks(filtered);
   }
 }
 

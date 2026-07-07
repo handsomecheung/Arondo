@@ -203,6 +203,29 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
   return { agentType: best.agentType, model: best.model };
 }
 
+/**
+ * Returns true if at least one agent (or the given one) has enough hourly
+ * quota left to be worth trying. Mirrors the 0.15 threshold used by selectAgent.
+ * No quota data at all is treated as "available" so we never block forever.
+ */
+export async function isQuotaAvailable(agentType?: ConcreteAgentType): Promise<boolean> {
+  const quota = await readQuota();
+  const entries = Object.values(quota);
+  if (entries.length === 0) return true;
+
+  const relevant = agentType ? entries.filter((e) => e.Type === agentType) : entries;
+  if (relevant.length === 0) return true;
+
+  for (const e of relevant) {
+    if (e.Type === "claude") {
+      if ((e.HourRemain ?? 1) >= 0.15) return true;
+    } else if (e.Type === "antigravity") {
+      if ((e.GeminiHourRemain ?? 1) >= 0.15 || (e.OtherHourRemain ?? 1) >= 0.15) return true;
+    }
+  }
+  return false;
+}
+
 // ─── Cross-agent context injection ────────────────────────────────────────────
 
 const ANSI_RE = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
