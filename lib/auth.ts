@@ -17,7 +17,13 @@ export interface TokenInfo {
   type: "admin" | "user";
 }
 
+export interface TokensConfig {
+  clients: TokenInfo[];
+  runner: string;
+}
+
 let cachedTokens: TokenInfo[] = [];
+let cachedRunnerToken: string = "";
 
 function generateUUID(): string {
   if (typeof crypto.randomUUID === "function") {
@@ -92,6 +98,31 @@ export function migrateConfig(rawConfig: any): TokenInfo[] {
   return list;
 }
 
+export async function readTokensConfig(): Promise<TokensConfig> {
+  let clients: TokenInfo[] = [];
+  let runner = "";
+  try {
+    if (fsSync.existsSync(TOKENS_FILE)) {
+      const raw = await fs.readFile(TOKENS_FILE, "utf-8");
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && "clients" in parsed) {
+        clients = migrateConfig(parsed.clients);
+        runner = typeof parsed.runner === "string" ? parsed.runner : "";
+      } else {
+        clients = migrateConfig(parsed);
+      }
+    }
+  } catch (err) {
+    console.error("[auth] Failed to read tokens config:", err);
+  }
+  return { clients, runner };
+}
+
+export async function writeTokensConfig(config: TokensConfig): Promise<void> {
+  await fs.mkdir(CONFIG_DIR, { recursive: true });
+  await fs.writeFile(TOKENS_FILE, JSON.stringify(config, null, 2), "utf-8");
+}
+
 export async function initializeAuth(): Promise<void> {
   try {
     await fs.mkdir(CONFIG_DIR, { recursive: true });
@@ -101,38 +132,56 @@ export async function initializeAuth(): Promise<void> {
       exists = true;
     } catch {}
 
-    let config: TokenInfo[] = [];
+    let clients: TokenInfo[] = [];
+    let runnerToken = "";
     if (exists) {
       const raw = await fs.readFile(TOKENS_FILE, "utf-8");
       try {
         const parsed = JSON.parse(raw);
-        config = migrateConfig(parsed);
+        if (parsed && typeof parsed === "object" && "clients" in parsed) {
+          clients = migrateConfig(parsed.clients);
+          runnerToken = typeof parsed.runner === "string" ? parsed.runner : "";
+        } else {
+          clients = migrateConfig(parsed);
+        }
       } catch {
         // Fallback for corrupted json
       }
     }
 
-    const hasAdmin = config.some(t => t.type === "admin");
+    const hasAdmin = clients.some(t => t.type === "admin");
     if (!hasAdmin) {
       const generatedAdminToken = generateToken();
-      config.push({
+      clients.push({
         token: generatedAdminToken,
         uuid: generateUUID(),
         name: "Default Admin",
         type: "admin"
       });
-      await fs.writeFile(TOKENS_FILE, JSON.stringify(config, null, 2), "utf-8");
       
       console.log("\n========================================================");
       console.log(`🔑 GENERATED ADMIN ACCESS TOKEN:\n\n   ${generatedAdminToken}\n`);
       console.log("   Please save this token. It has been written to tokens.json");
       console.log("========================================================\n");
-    } else {
-      // Write back migrated config to enforce new format on start
-      await fs.writeFile(TOKENS_FILE, JSON.stringify(config, null, 2), "utf-8");
     }
 
-    cachedTokens = config;
+    if (!runnerToken) {
+      runnerToken = generateToken();
+      
+      console.log("\n========================================================");
+      console.log(`🔑 GENERATED RUNNER ACCESS TOKEN:\n\n   ${runnerToken}\n`);
+      console.log("   Please save this token. It has been written to tokens.json");
+      console.log("========================================================\n");
+    }
+
+    const newConfig: TokensConfig = {
+      clients,
+      runner: runnerToken
+    };
+
+    await fs.writeFile(TOKENS_FILE, JSON.stringify(newConfig, null, 2), "utf-8");
+    cachedTokens = clients;
+    cachedRunnerToken = runnerToken;
   } catch (err) {
     console.error("[auth] Failed to initialize tokens.json:", err);
   }
@@ -143,7 +192,12 @@ export async function reloadTokens(): Promise<void> {
     if (fsSync.existsSync(TOKENS_FILE)) {
       const raw = await fs.readFile(TOKENS_FILE, "utf-8");
       const parsed = JSON.parse(raw);
-      cachedTokens = migrateConfig(parsed);
+      if (parsed && typeof parsed === "object" && "clients" in parsed) {
+        cachedTokens = migrateConfig(parsed.clients);
+        cachedRunnerToken = typeof parsed.runner === "string" ? parsed.runner : "";
+      } else {
+        cachedTokens = migrateConfig(parsed);
+      }
     }
   } catch {}
 }
@@ -161,7 +215,12 @@ export function getRoleByToken(token: string | null): "admin" | "user" | null {
     if (fsSync.existsSync(TOKENS_FILE)) {
       const raw = fsSync.readFileSync(TOKENS_FILE, "utf-8");
       const parsed = JSON.parse(raw);
-      const config = migrateConfig(parsed);
+      let config: TokenInfo[] = [];
+      if (parsed && typeof parsed === "object" && "clients" in parsed) {
+        config = migrateConfig(parsed.clients);
+      } else {
+        config = migrateConfig(parsed);
+      }
       
       const found = config.find(t => t.token === token);
       if (found) return found.type;
@@ -182,7 +241,12 @@ export function getUuidByToken(token: string | null): string | null {
     if (fsSync.existsSync(TOKENS_FILE)) {
       const raw = fsSync.readFileSync(TOKENS_FILE, "utf-8");
       const parsed = JSON.parse(raw);
-      const config = migrateConfig(parsed);
+      let config: TokenInfo[] = [];
+      if (parsed && typeof parsed === "object" && "clients" in parsed) {
+        config = migrateConfig(parsed.clients);
+      } else {
+        config = migrateConfig(parsed);
+      }
       
       const found = config.find(t => t.token === token);
       if (found) return found.uuid;
@@ -194,6 +258,26 @@ export function getUuidByToken(token: string | null): string | null {
   const foundCached = cachedTokens.find(t => t.token === token);
   if (foundCached) return foundCached.uuid;
   return null;
+}
+
+export function getRunnerTokenSync(): string {
+  try {
+    if (fsSync.existsSync(TOKENS_FILE)) {
+      const raw = fsSync.readFileSync(TOKENS_FILE, "utf-8");
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && typeof parsed.runner === "string") {
+        return parsed.runner;
+      }
+    }
+  } catch (err) {
+    console.error("[auth] Failed to read runner token from tokens.json dynamically:", err);
+  }
+  return cachedRunnerToken;
+}
+
+export function isValidRunnerToken(token: string | null): boolean {
+  if (!token) return false;
+  return token === getRunnerTokenSync();
 }
 
 export function isValidToken(token: string | null): boolean {

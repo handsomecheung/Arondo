@@ -12,7 +12,8 @@ test.describe('Sessions API integration tests', () => {
     console.log('[sessions-test] Spawning Go runner process...');
     runnerProcess = spawn(runnerBinary, [
       '--server', 'ws://localhost:3252/runner',
-      '--name', 'sessions-test-runner'
+      '--name', 'sessions-test-runner',
+      '--token', 'test-runner-token-xyz'
     ], {
       stdio: 'pipe',
     });

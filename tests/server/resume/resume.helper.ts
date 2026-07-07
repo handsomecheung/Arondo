@@ -25,7 +25,8 @@ export async function setupRunner(request: any, name: string, mockBinDir: string
   console.log(`[resume-test] Spawning Go runner process for ${name}...`);
   const runnerProcess = spawn(runnerBinary, [
     '--server', 'ws://localhost:3252/runner',
-    '--name', name
+    '--name', name,
+    '--token', 'test-runner-token-xyz'
   ], {
     stdio: 'pipe',
     env: {

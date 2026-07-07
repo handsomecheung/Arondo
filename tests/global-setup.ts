@@ -10,20 +10,23 @@ async function globalSetup() {
   await fs.mkdir(testConfigDir, { recursive: true });
 
   // Setup test tokens
-  const tokens = [
-    {
-      token: 'test-token-123456',
-      uuid: 'test-uuid-1111-2222-3333',
-      name: 'Test Admin User',
-      type: 'admin'
-    },
-    {
-      token: 'test-user-token-7890',
-      uuid: 'test-uuid-4444-5555-6666',
-      name: 'Test Regular User',
-      type: 'user'
-    }
-  ];
+  const tokens = {
+    clients: [
+      {
+        token: 'test-token-123456',
+        uuid: 'test-uuid-1111-2222-3333',
+        name: 'Test Admin User',
+        type: 'admin'
+      },
+      {
+        token: 'test-user-token-7890',
+        uuid: 'test-uuid-4444-5555-6666',
+        name: 'Test Regular User',
+        type: 'user'
+      }
+    ],
+    runner: 'test-runner-token-xyz'
+  };
 
   await fs.writeFile(
     path.join(testConfigDir, 'tokens.json'),

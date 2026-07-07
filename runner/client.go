@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/url"
 	"os"
 	"os/exec"
 	"runtime"
@@ -29,16 +30,18 @@ const (
 type Client struct {
 	serverURL string
 	name      string
+	token     string
 	conn      *websocket.Conn
 	handler   *Handler
 	sendMu    sync.Mutex
 	done      chan struct{}
 }
 
-func NewClient(serverURL, name string) *Client {
+func NewClient(serverURL, name, token string) *Client {
 	c := &Client{
 		serverURL: serverURL,
 		name:      name,
+		token:     token,
 		done:      make(chan struct{}),
 	}
 	c.handler = NewHandler(c)
@@ -83,7 +86,19 @@ func (c *Client) Stop() {
 
 func (c *Client) connect() error {
 	log.Printf("connecting to %s", c.serverURL)
-	conn, _, err := websocket.DefaultDialer.Dial(c.serverURL, nil)
+
+	dialURL := c.serverURL
+	if c.token != "" {
+		u, err := url.Parse(c.serverURL)
+		if err == nil {
+			q := u.Query()
+			q.Set("token", c.token)
+			u.RawQuery = q.Encode()
+			dialURL = u.String()
+		}
+	}
+
+	conn, _, err := websocket.DefaultDialer.Dial(dialURL, nil)
 	if err != nil {
 		return fmt.Errorf("dial: %w", err)
 	}

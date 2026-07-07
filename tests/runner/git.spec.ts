@@ -13,7 +13,8 @@ test.describe('Runner Git API integration tests', () => {
     console.log('[git-test] Spawning Go runner process...');
     runnerProcess = spawn(runnerBinary, [
       '--server', 'ws://localhost:3252/runner',
-      '--name', 'git-test-runner'
+      '--name', 'git-test-runner',
+      '--token', 'test-runner-token-xyz'
     ], {
       stdio: 'pipe',
     });

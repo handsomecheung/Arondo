@@ -12,7 +12,8 @@ test.describe('Runner File System API integration tests', () => {
     console.log('[fs-test] Spawning Go runner process...');
     runnerProcess = spawn(runnerBinary, [
       '--server', 'ws://localhost:3252/runner',
-      '--name', 'fs-test-runner'
+      '--name', 'fs-test-runner',
+      '--token', 'test-runner-token-xyz'
     ], {
       stdio: 'pipe',
     });

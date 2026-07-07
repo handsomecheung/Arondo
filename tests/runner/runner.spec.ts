@@ -12,7 +12,8 @@ test.describe('Runner integration test', () => {
     console.log('Spawning Go runner process...');
     runnerProcess = spawn(runnerBinary, [
       '--server', 'ws://localhost:3252/runner',
-      '--name', 'playwright-test-runner'
+      '--name', 'playwright-test-runner',
+      '--token', 'test-runner-token-xyz'
     ], {
       stdio: 'pipe',
     });
