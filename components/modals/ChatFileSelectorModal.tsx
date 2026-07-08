@@ -28,10 +28,8 @@ export default function ChatFileSelectorModal({
 
   if (!open) return null;
 
-  const isAtRoot = currentPath === projectRoot;
-
   const handleGoUp = () => {
-    if (parentPath && !isAtRoot) {
+    if (parentPath) {
       setSelectedPath(null);
       onChangePath(parentPath);
     }
@@ -68,9 +66,16 @@ export default function ChatFileSelectorModal({
           </button>
         </div>
         <div className="modal-body">
-          <div className="fs-current-path">{currentPath}</div>
+          <div className="fs-current-path">
+            {currentPath}
+            {currentPath !== projectRoot && !currentPath.startsWith(projectRoot + "/") && (
+              <span style={{ marginLeft: 8, fontSize: 11, color: "var(--text-muted)" }}>
+                (outside project)
+              </span>
+            )}
+          </div>
           <div className="fs-list" style={{ maxHeight: "300px", overflowY: "auto" }}>
-            {parentPath !== null && !isAtRoot && (
+            {parentPath !== null && (
               <div className="fs-item fs-parent" onClick={handleGoUp}>
                 <span className="fs-item-icon"><IconCornerLeftUp /></span>
                 <span className="fs-item-name">.. (Go Up)</span>
