@@ -2015,24 +2015,33 @@ body {
 
 .script-submenu {
   position: absolute;
-  top: 0;
-  right: calc(100% + 4px);
+  top: 100%;
+  right: 0;
+  left: auto;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   z-index: 101;
   min-width: 160px;
-  max-width: 260px;
+  max-width: min(260px, calc(100vw - 32px));
+  max-height: min(320px, 60vh);
+  overflow-y: auto;
   padding: 4px 0;
   display: flex;
   flex-direction: column;
 }
 
 .script-submenu .menu-item {
+  padding-top: 20px !important;
+  padding-bottom: 20px !important;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.script-submenu .menu-item:not(:first-child) {
+  border-top: 1px solid var(--border);
 }
 
 .script-submenu-divider {
