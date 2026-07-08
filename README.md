@@ -63,7 +63,11 @@ npm run dev
 ```bash
 cd runner
 go build -o arondo-runner .
-./arondo-runner --server ws://localhost:3251/runner --name my-dev-machine
+# Pass the runner token printed in the server console on startup
+./arondo-runner --server ws://localhost:3251/runner --name my-dev-machine --token <runner_access_token>
+
+# Alternatively, pass it via environment variable:
+# ARONDO_RUNNER_TOKEN=<runner_access_token> ./arondo-runner --server ws://localhost:3251/runner --name my-dev-machine
 ```
 
 Or use the convenience script:
@@ -83,18 +87,21 @@ Open [http://localhost:3251](http://localhost:3251) in your browser. Select the 
 
 ### Configuration Files (in `ARONDO_CONFIG_DIR` or `~/.arondo/`)
 
-- `tokens.json` – Multi-user access tokens database. Stored as an array of token information:
+- `tokens.json` – Multi-user and runner access tokens database. Stored with the following structure:
   ```json
-  [
-    {
-      "token": "32-character-hex-string",
-      "uuid": "canonical-uuid-string",
-      "name": "Display Name",
-      "type": "admin"
-    }
-  ]
+  {
+    "clients": [
+      {
+        "token": "32-character-hex-string",
+        "uuid": "canonical-uuid-string",
+        "name": "Display Name",
+        "type": "admin"
+      }
+    ],
+    "runner": "32-character-runner-access-token"
+  }
   ```
-  If no token with `type: "admin"` exists on startup, an admin token is generated automatically and printed in the server log.
+  If no token with `type: "admin"` exists on startup, or if the `runner` token is missing, they are generated automatically, written to the config, and printed in the server logs.
 - `global-rules.md` – Rules synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on connected runners.
 - `agent-commands.json` – User-defined agent slash commands.
 
@@ -106,6 +113,7 @@ arondo-runner [flags]
 Flags:
   --server string   Server WebSocket URL (default "ws://localhost:3251/runner")
   --name string     Runner display name (default: hostname)
+  --token string    Runner access token (optional, can also set ARONDO_RUNNER_TOKEN)
 ```
 
 The runner auto-reconnects with exponential backoff if the server connection drops.

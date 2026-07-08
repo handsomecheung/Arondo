@@ -258,18 +258,25 @@ Two WebSocket endpoints:
 
 The application enforces token-based authentication on all API routes and WebSocket connections to restrict access.
 
-- **Tokens Registry (`tokens.json`)**: Stored in `~/.arondo/tokens.json` as a JSON array of `TokenInfo` objects:
+- **Tokens Registry (`tokens.json`)**: Stored in `~/.arondo/tokens.json` with the following structure:
   ```json
-  [
-    {
-      "token": "32-character-hex-string",
-      "uuid": "canonical-uuid-string",
-      "name": "User Name",
-      "type": "admin"
-    }
-  ]
+  {
+    "clients": [
+      {
+        "token": "32-character-hex-string",
+        "uuid": "canonical-uuid-string",
+        "name": "User Name",
+        "type": "admin"
+      }
+    ],
+    "runner": "32-character-runner-access-token"
+  }
   ```
-- **Automatic Initialization**: On server startup, `initializeAuth()` in `lib/auth.ts` verifies if at least one token of type `admin` exists. If not, it automatically generates a 32-character hexadecimal admin token, writes it to `tokens.json`, and outputs it to the server console.
+- **Automatic Initialization**: On server startup, `initializeAuth()` in `lib/auth.ts` verifies if at least one token of type `admin` exists in `clients`, and if a `runner` token exists. If not, it automatically generates a 32-character hexadecimal token, writes it to `tokens.json`, and outputs it to the server console.
+- **Runner Connection Authentication**:
+  - The Go runner client must authenticate when connecting to the server `/runner` WebSocket endpoint.
+  - The connection request is validated using the `runner` token from `tokens.json`.
+  - The runner passes the token via the `token` query parameter or `x-runner-token` header. The runner client can configure the token via the `--token` CLI flag or the `ARONDO_RUNNER_TOKEN` environment variable. Invalid or missing tokens result in a `401 Unauthorized` connection rejection.
 - **Roles & Permissions**:
   - `admin`: Has unrestricted access to all runners, settings, custom agent commands, global rules, and user token management (generating, renaming, deleting user tokens).
   - `user`: Restricted role. Can only access sessions, projects, and runners that they are explicitly allowed to access.
