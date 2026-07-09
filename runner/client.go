@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"net/url"
+	"net/http"
 	"os"
 	"os/exec"
 	"runtime"
@@ -87,18 +87,14 @@ func (c *Client) Stop() {
 func (c *Client) connect() error {
 	log.Printf("connecting to %s", c.serverURL)
 
-	dialURL := c.serverURL
+	// Sent as a header rather than a URL query param so the token doesn't
+	// end up in server/proxy access logs.
+	header := http.Header{}
 	if c.token != "" {
-		u, err := url.Parse(c.serverURL)
-		if err == nil {
-			q := u.Query()
-			q.Set("token", c.token)
-			u.RawQuery = q.Encode()
-			dialURL = u.String()
-		}
+		header.Set("x-runner-token", c.token)
 	}
 
-	conn, _, err := websocket.DefaultDialer.Dial(dialURL, nil)
+	conn, _, err := websocket.DefaultDialer.Dial(c.serverURL, header)
 	if err != nil {
 		return fmt.Errorf("dial: %w", err)
 	}

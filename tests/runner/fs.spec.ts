@@ -13,7 +13,7 @@ test.describe('Runner File System API integration tests', () => {
     runnerProcess = spawn(runnerBinary, [
       '--server', 'ws://localhost:3252/runner',
       '--name', 'fs-test-runner',
-      '--token', 'test-runner-token-xyz'
+      '--token', 'test-runner-token-fs'
     ], {
       stdio: 'pipe',
     });

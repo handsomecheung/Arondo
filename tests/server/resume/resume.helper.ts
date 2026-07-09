@@ -21,12 +21,24 @@ export async function waitForSessionNotRunning(request: any, sessionId: string) 
 
 export async function setupRunner(request: any, name: string, mockBinDir: string, extraEnv?: Record<string, string>) {
   const runnerBinary = path.resolve(__dirname, '../../../runner/arondo-runner');
-  
+
+  // A runner token binds to the first runner identity that registers with
+  // it, so each differently-named test runner needs its own dedicated token
+  // (mirrors how an admin would generate one token per real machine).
+  const tokenRes = await request.post('/api/auth/runner-tokens', {
+    headers: { 'x-arondo-token': 'test-token-123456', 'Content-Type': 'application/json' },
+    data: { name },
+  });
+  if (!tokenRes.ok()) {
+    throw new Error(`Failed to generate runner token for ${name}`);
+  }
+  const { token: runnerToken } = await tokenRes.json();
+
   console.log(`[resume-test] Spawning Go runner process for ${name}...`);
   const runnerProcess = spawn(runnerBinary, [
     '--server', 'ws://localhost:3252/runner',
     '--name', name,
-    '--token', 'test-runner-token-xyz'
+    '--token', runnerToken
   ], {
     stdio: 'pipe',
     env: {

@@ -14,7 +14,7 @@ test.describe('Runner Exec API integration tests', () => {
     runnerProcess = spawn(runnerBinary, [
       '--server', 'ws://localhost:3252/runner',
       '--name', 'exec-test-runner',
-      '--token', 'test-runner-token-xyz'
+      '--token', 'test-runner-token-exec'
     ], {
       stdio: 'pipe',
     });

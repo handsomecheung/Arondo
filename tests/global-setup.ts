@@ -25,7 +25,46 @@ async function globalSetup() {
         type: 'user'
       }
     ],
-    runner: 'test-runner-token-xyz'
+    // Each test spec spawns its own Go runner process under a distinct
+    // --name, and a runner token locks to the first runner identity that
+    // registers with it — so every spec needs its own dedicated token.
+    runners: [
+      {
+        id: 'test-runner-token-id-1',
+        token: 'test-runner-token-xyz',
+        name: 'Test Runner',
+        createdAt: Date.now(),
+        boundRunnerId: null
+      },
+      {
+        id: 'test-runner-token-id-2',
+        token: 'test-runner-token-fs',
+        name: 'Test FS Runner',
+        createdAt: Date.now(),
+        boundRunnerId: null
+      },
+      {
+        id: 'test-runner-token-id-3',
+        token: 'test-runner-token-git',
+        name: 'Test Git Runner',
+        createdAt: Date.now(),
+        boundRunnerId: null
+      },
+      {
+        id: 'test-runner-token-id-4',
+        token: 'test-runner-token-exec',
+        name: 'Test Exec Runner',
+        createdAt: Date.now(),
+        boundRunnerId: null
+      },
+      {
+        id: 'test-runner-token-id-5',
+        token: 'test-runner-token-sessions',
+        name: 'Test Sessions Runner',
+        createdAt: Date.now(),
+        boundRunnerId: null
+      }
+    ]
   };
 
   await fs.writeFile(

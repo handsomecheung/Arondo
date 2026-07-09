@@ -13,7 +13,7 @@ test.describe('Sessions API integration tests', () => {
     runnerProcess = spawn(runnerBinary, [
       '--server', 'ws://localhost:3252/runner',
       '--name', 'sessions-test-runner',
-      '--token', 'test-runner-token-xyz'
+      '--token', 'test-runner-token-sessions'
     ], {
       stdio: 'pipe',
     });

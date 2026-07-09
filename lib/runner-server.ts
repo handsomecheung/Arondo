@@ -19,6 +19,14 @@ export function setupRunnerServer(wss: WebSocketServer): void {
 
   wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
     let runnerId: string | null = null;
+    let registering = false;
+    // The runner client fires task.status right after register without
+    // waiting for the ack, and binding a runner token now involves a file
+    // read/write. Messages that land while that await is in flight get
+    // queued here and replayed once runnerId is set, instead of being
+    // rejected as "not a register event".
+    const pendingMessages: string[] = [];
+    const runnerTokenId = (req as any).runnerTokenId as string | undefined;
     const remoteIp =
       (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
       req.socket.remoteAddress ||
@@ -33,22 +41,52 @@ export function setupRunnerServer(wss: WebSocketServer): void {
       }
 
       if (!runnerId) {
-        if (msg.type === "event" && msg.method === "register") {
-          runnerId = runnerManager.addRunner(ws, msg.payload, remoteIp);
+        if (registering) {
+          pendingMessages.push(raw.toString());
+          return;
+        }
 
-          const ack = JSON.stringify({
-            id: msg.id || "ack",
-            type: "event",
-            method: "connected",
-            payload: {
-              runnerId,
-              serverVersion: "0.2.4",
-              // Inform the runner which binaries to detect on its PATH.
-              // The runner responds with an agent.status event.
-              queryAgents: getAgentBinaryNames(),
-            },
-          });
-          ws.send(ack);
+        if (msg.type === "event" && msg.method === "register") {
+          if (!runnerTokenId) {
+            ws.close(4001, "Missing runner token");
+            return;
+          }
+
+          registering = true;
+          runnerManager
+            .addRunner(ws, msg.payload, remoteIp, runnerTokenId)
+            .then((newRunnerId) => {
+              registering = false;
+              if (!newRunnerId) {
+                ws.close(4003, "Runner token is bound to a different runner");
+                return;
+              }
+              runnerId = newRunnerId;
+
+              const ack = JSON.stringify({
+                id: msg.id || "ack",
+                type: "event",
+                method: "connected",
+                payload: {
+                  runnerId,
+                  serverVersion: "0.2.4",
+                  // Inform the runner which binaries to detect on its PATH.
+                  // The runner responds with an agent.status event.
+                  queryAgents: getAgentBinaryNames(),
+                },
+              });
+              ws.send(ack);
+
+              for (const pending of pendingMessages) {
+                runnerManager.handleMessage(runnerId!, pending);
+              }
+              pendingMessages.length = 0;
+            })
+            .catch((err) => {
+              registering = false;
+              console.error(`[runner-server] failed to register runner:`, err);
+              ws.close(1011, "Internal error during registration");
+            });
           return;
         }
         ws.close(4001, "Expected register event");

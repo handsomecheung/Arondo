@@ -300,23 +300,35 @@ class RunnerManager {
 
   // ─── Connection lifecycle ─────────────────────────────────────────────
 
-  addRunner(ws: WebSocket, registerPayload: any, ip?: string): string {
+  async addRunner(ws: WebSocket, registerPayload: any, ip: string | undefined, runnerTokenId: string): Promise<string | null> {
     const name: string = registerPayload.name || "unknown";
     const hostname: string = registerPayload.hostname || "";
 
     const stableKey = `${name}@${hostname}`;
     let id = this.knownIds.get(stableKey);
+    const isNewId = !id;
+    if (!id) {
+      id = crypto.randomUUID();
+    }
 
-    if (id) {
+    // Locks this token to this runner identity on first use; rejects the
+    // connection if the token was already bound to a different runner
+    // (blocks a leaked token from being replayed to hijack another runner).
+    const { bindRunnerToken } = await import("./auth");
+    const bound = await bindRunnerToken(runnerTokenId, id);
+    if (!bound) {
+      return null;
+    }
+
+    if (isNewId) {
+      this.knownIds.set(stableKey, id);
+    } else {
       const existing = this.runners.get(id);
       if (existing) {
         if (existing.ws.readyState === 1 /* OPEN */ || existing.ws.readyState === 0 /* CONNECTING */) {
           existing.ws.close();
         }
       }
-    } else {
-      id = crypto.randomUUID();
-      this.knownIds.set(stableKey, id);
     }
 
     const info: RunnerInfo = {
@@ -352,6 +364,15 @@ class RunnerManager {
     }
 
     return id;
+  }
+
+  // Closes the live connection for a runner, e.g. when an admin revokes its
+  // token. The actual cleanup (removeRunner) runs via the ws "close" handler.
+  forceDisconnectRunner(runnerId: string): void {
+    const conn = this.runners.get(runnerId);
+    if (conn && conn.ws.readyState <= 1 /* CONNECTING or OPEN */) {
+      conn.ws.close(4004, "Runner token revoked");
+    }
   }
 
   removeRunner(runnerId: string): void {

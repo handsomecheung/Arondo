@@ -8,7 +8,7 @@ import { setupRunnerServer } from "./lib/runner-server";
 import { startQuotaAggregator } from "./lib/quota-aggregator";
 import { startScheduler } from "./lib/scheduler";
 
-import { initializeAuth, isValidRunnerToken } from "./lib/auth";
+import { initializeAuth, findRunnerTokenByToken } from "./lib/auth";
 
 const port = parseInt(process.env.PORT || (process.env.NODE_ENV === "production" ? "3250" : "3251"), 10);
 const dev = process.env.NODE_ENV !== "production";
@@ -35,17 +35,20 @@ initializeAuth().then(() => {
   const runnerWss = new WebSocketServer({ noServer: true });
   setupRunnerServer(runnerWss);
 
-  server.on("upgrade", (req, socket, head) => {
+  server.on("upgrade", async (req, socket, head) => {
     if (req.url?.startsWith("/runner")) {
-      const parsedUrl = new URL(req.url, "http://localhost");
-      const token = parsedUrl.searchParams.get("token") || (req.headers["x-runner-token"] as string);
+      // Header-only: a token in the URL query string would end up in proxy
+      // and access logs.
+      const token = (req.headers["x-runner-token"] as string) || null;
+      const tokenRecord = await findRunnerTokenByToken(token);
 
-      if (!isValidRunnerToken(token)) {
+      if (!tokenRecord) {
         socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
         socket.destroy();
         return;
       }
 
+      (req as any).runnerTokenId = tokenRecord.id;
       runnerWss.handleUpgrade(req, socket, head, (ws) => {
         runnerWss.emit("connection", ws, req);
       });

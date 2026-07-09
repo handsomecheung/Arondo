@@ -14,7 +14,7 @@ test.describe('Runner Git API integration tests', () => {
     runnerProcess = spawn(runnerBinary, [
       '--server', 'ws://localhost:3252/runner',
       '--name', 'git-test-runner',
-      '--token', 'test-runner-token-xyz'
+      '--token', 'test-runner-token-git'
     ], {
       stdio: 'pipe',
     });

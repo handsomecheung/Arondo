@@ -17,13 +17,24 @@ export interface TokenInfo {
   type: "admin" | "user";
 }
 
+export interface RunnerTokenInfo {
+  id: string;
+  token: string;
+  name: string;
+  createdAt: number;
+  lastUsedAt?: number;
+  // Locked to the first runner identity (name@hostname derived id) that
+  // successfully authenticates with this token, so a leaked token can't be
+  // replayed to impersonate a different, already-registered runner.
+  boundRunnerId?: string | null;
+}
+
 export interface TokensConfig {
   clients: TokenInfo[];
-  runner: string;
+  runners: RunnerTokenInfo[];
 }
 
 let cachedTokens: TokenInfo[] = [];
-let cachedRunnerToken: string = "";
 
 function generateUUID(): string {
   if (typeof crypto.randomUUID === "function") {
@@ -36,86 +47,33 @@ export function generateToken(): string {
   return crypto.randomBytes(16).toString("hex");
 }
 
-export function migrateConfig(rawConfig: any): TokenInfo[] {
-  if (Array.isArray(rawConfig)) {
-    return rawConfig.map((item: any) => ({
-      token: String(item.token || ""),
-      uuid: String(item.uuid || generateUUID()),
-      name: String(item.name || ""),
-      type: item.type === "admin" ? "admin" : "user",
-    }));
+// Constant-time string comparison so token checks don't leak timing
+// information about how many leading bytes matched. When lengths differ we
+// still run a same-length comparison to avoid a fast-path short-circuit.
+function timingSafeEqualStrings(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, "utf-8");
+  const bufB = Buffer.from(b, "utf-8");
+  if (bufA.length !== bufB.length) {
+    crypto.timingSafeEqual(bufA, bufA);
+    return false;
   }
-
-  const list: TokenInfo[] = [];
-  if (rawConfig && typeof rawConfig === "object") {
-    // Migrate admin
-    if (rawConfig.admin) {
-      if (Array.isArray(rawConfig.admin)) {
-        rawConfig.admin.forEach((t: string) => {
-          list.push({
-            token: t,
-            uuid: generateUUID(),
-            name: "Default Admin",
-            type: "admin",
-          });
-        });
-      } else if (typeof rawConfig.admin === "object") {
-        for (const [t, name] of Object.entries(rawConfig.admin)) {
-          list.push({
-            token: t,
-            uuid: generateUUID(),
-            name: String(name || "Default Admin"),
-            type: "admin",
-          });
-        }
-      }
-    }
-
-    // Migrate user
-    if (rawConfig.user) {
-      if (Array.isArray(rawConfig.user)) {
-        rawConfig.user.forEach((t: string) => {
-          list.push({
-            token: t,
-            uuid: generateUUID(),
-            name: "Default User",
-            type: "user",
-          });
-        });
-      } else if (typeof rawConfig.user === "object") {
-        for (const [t, name] of Object.entries(rawConfig.user)) {
-          list.push({
-            token: t,
-            uuid: generateUUID(),
-            name: String(name || "Default User"),
-            type: "user",
-          });
-        }
-      }
-    }
-  }
-
-  return list;
+  return crypto.timingSafeEqual(bufA, bufB);
 }
 
 export async function readTokensConfig(): Promise<TokensConfig> {
   let clients: TokenInfo[] = [];
-  let runner = "";
+  let runners: RunnerTokenInfo[] = [];
   try {
     if (fsSync.existsSync(TOKENS_FILE)) {
       const raw = await fs.readFile(TOKENS_FILE, "utf-8");
       const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object" && "clients" in parsed) {
-        clients = migrateConfig(parsed.clients);
-        runner = typeof parsed.runner === "string" ? parsed.runner : "";
-      } else {
-        clients = migrateConfig(parsed);
-      }
+      if (Array.isArray(parsed?.clients)) clients = parsed.clients;
+      if (Array.isArray(parsed?.runners)) runners = parsed.runners;
     }
   } catch (err) {
     console.error("[auth] Failed to read tokens config:", err);
   }
-  return { clients, runner };
+  return { clients, runners };
 }
 
 export async function writeTokensConfig(config: TokensConfig): Promise<void> {
@@ -125,81 +83,34 @@ export async function writeTokensConfig(config: TokensConfig): Promise<void> {
 
 export async function initializeAuth(): Promise<void> {
   try {
-    await fs.mkdir(CONFIG_DIR, { recursive: true });
-    let exists = false;
-    try {
-      await fs.access(TOKENS_FILE);
-      exists = true;
-    } catch {}
+    const config = await readTokensConfig();
 
-    let clients: TokenInfo[] = [];
-    let runnerToken = "";
-    if (exists) {
-      const raw = await fs.readFile(TOKENS_FILE, "utf-8");
-      try {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === "object" && "clients" in parsed) {
-          clients = migrateConfig(parsed.clients);
-          runnerToken = typeof parsed.runner === "string" ? parsed.runner : "";
-        } else {
-          clients = migrateConfig(parsed);
-        }
-      } catch {
-        // Fallback for corrupted json
-      }
-    }
-
-    const hasAdmin = clients.some(t => t.type === "admin");
+    const hasAdmin = config.clients.some((t) => t.type === "admin");
     if (!hasAdmin) {
       const generatedAdminToken = generateToken();
-      clients.push({
+      config.clients.push({
         token: generatedAdminToken,
         uuid: generateUUID(),
         name: "Default Admin",
-        type: "admin"
+        type: "admin",
       });
-      
+
       console.log("\n========================================================");
       console.log(`🔑 GENERATED ADMIN ACCESS TOKEN:\n\n   ${generatedAdminToken}\n`);
       console.log("   Please save this token. It has been written to tokens.json");
       console.log("========================================================\n");
     }
 
-    if (!runnerToken) {
-      runnerToken = generateToken();
-      
-      console.log("\n========================================================");
-      console.log(`🔑 GENERATED RUNNER ACCESS TOKEN:\n\n   ${runnerToken}\n`);
-      console.log("   Please save this token. It has been written to tokens.json");
-      console.log("========================================================\n");
-    }
-
-    const newConfig: TokensConfig = {
-      clients,
-      runner: runnerToken
-    };
-
-    await fs.writeFile(TOKENS_FILE, JSON.stringify(newConfig, null, 2), "utf-8");
-    cachedTokens = clients;
-    cachedRunnerToken = runnerToken;
+    await writeTokensConfig(config);
+    cachedTokens = config.clients;
   } catch (err) {
     console.error("[auth] Failed to initialize tokens.json:", err);
   }
 }
 
 export async function reloadTokens(): Promise<void> {
-  try {
-    if (fsSync.existsSync(TOKENS_FILE)) {
-      const raw = await fs.readFile(TOKENS_FILE, "utf-8");
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object" && "clients" in parsed) {
-        cachedTokens = migrateConfig(parsed.clients);
-        cachedRunnerToken = typeof parsed.runner === "string" ? parsed.runner : "";
-      } else {
-        cachedTokens = migrateConfig(parsed);
-      }
-    }
-  } catch {}
+  const config = await readTokensConfig();
+  cachedTokens = config.clients;
 }
 
 export function getArondoToken(req: NextRequest): string | null {
@@ -215,21 +126,15 @@ export function getRoleByToken(token: string | null): "admin" | "user" | null {
     if (fsSync.existsSync(TOKENS_FILE)) {
       const raw = fsSync.readFileSync(TOKENS_FILE, "utf-8");
       const parsed = JSON.parse(raw);
-      let config: TokenInfo[] = [];
-      if (parsed && typeof parsed === "object" && "clients" in parsed) {
-        config = migrateConfig(parsed.clients);
-      } else {
-        config = migrateConfig(parsed);
-      }
-      
-      const found = config.find(t => t.token === token);
+      const clients: TokenInfo[] = Array.isArray(parsed?.clients) ? parsed.clients : [];
+      const found = clients.find((t) => t.token === token);
       if (found) return found.type;
     }
   } catch (err) {
     console.error("[auth] Failed to read tokens.json dynamically:", err);
   }
 
-  const foundCached = cachedTokens.find(t => t.token === token);
+  const foundCached = cachedTokens.find((t) => t.token === token);
   if (foundCached) return foundCached.type;
   return null;
 }
@@ -241,43 +146,47 @@ export function getUuidByToken(token: string | null): string | null {
     if (fsSync.existsSync(TOKENS_FILE)) {
       const raw = fsSync.readFileSync(TOKENS_FILE, "utf-8");
       const parsed = JSON.parse(raw);
-      let config: TokenInfo[] = [];
-      if (parsed && typeof parsed === "object" && "clients" in parsed) {
-        config = migrateConfig(parsed.clients);
-      } else {
-        config = migrateConfig(parsed);
-      }
-      
-      const found = config.find(t => t.token === token);
+      const clients: TokenInfo[] = Array.isArray(parsed?.clients) ? parsed.clients : [];
+      const found = clients.find((t) => t.token === token);
       if (found) return found.uuid;
     }
   } catch (err) {
     console.error("[auth] Failed to read tokens.json dynamically for UUID:", err);
   }
 
-  const foundCached = cachedTokens.find(t => t.token === token);
+  const foundCached = cachedTokens.find((t) => t.token === token);
   if (foundCached) return foundCached.uuid;
   return null;
 }
 
-export function getRunnerTokenSync(): string {
-  try {
-    if (fsSync.existsSync(TOKENS_FILE)) {
-      const raw = fsSync.readFileSync(TOKENS_FILE, "utf-8");
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object" && typeof parsed.runner === "string") {
-        return parsed.runner;
-      }
+// Looks up a runner token by value using a constant-time comparison against
+// every configured runner token, so an attacker can't use response timing to
+// narrow down a valid token byte-by-byte.
+export async function findRunnerTokenByToken(token: string | null): Promise<RunnerTokenInfo | null> {
+  if (!token) return null;
+  const { runners } = await readTokensConfig();
+  let match: RunnerTokenInfo | null = null;
+  for (const r of runners) {
+    if (timingSafeEqualStrings(token, r.token)) {
+      match = r;
     }
-  } catch (err) {
-    console.error("[auth] Failed to read runner token from tokens.json dynamically:", err);
   }
-  return cachedRunnerToken;
+  return match;
 }
 
-export function isValidRunnerToken(token: string | null): boolean {
-  if (!token) return false;
-  return token === getRunnerTokenSync();
+// Locks a runner token to the runner identity it first registers as. Returns
+// false if the token is unknown/revoked, or if it's already bound to a
+// different runner (blocks token replay to hijack another runner's identity).
+export async function bindRunnerToken(tokenId: string, runnerId: string): Promise<boolean> {
+  const config = await readTokensConfig();
+  const record = config.runners.find((r) => r.id === tokenId);
+  if (!record) return false;
+  if (record.boundRunnerId && record.boundRunnerId !== runnerId) return false;
+
+  record.boundRunnerId = runnerId;
+  record.lastUsedAt = Date.now();
+  await writeTokensConfig(config);
+  return true;
 }
 
 export function isValidToken(token: string | null): boolean {
