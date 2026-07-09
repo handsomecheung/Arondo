@@ -114,8 +114,10 @@ app/
     fs/route.ts         # GET: browse directories on a runner
     fs/infos/route.ts   # POST: batch check path existence and git diff status on the runner (used for markdown file link verification and inline diff triggering)
     auth/
-      tokens/
-        route.ts        # GET/POST/DELETE: manage access tokens (admin role only)
+      client-tokens/
+        route.ts        # GET/POST/DELETE: manage client access tokens (admin role only)
+      runner-tokens/
+        route.ts        # GET/POST/DELETE: manage per-runner access tokens (admin role only)
       verify/
         route.ts        # POST: verify token validity
 components/
@@ -209,6 +211,8 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 | `fs.infos` | S→R request | Batch check path existence and git diff status |
 | `git.status` | S→R request | Run `git status --porcelain` |
 | `git.diff` | S→R request | Run `git diff HEAD` |
+| `rules.sync` | S→R request | Write global agent rules block into `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` |
+| `rules.remove` | S→R request | Strip the previously synced rules block from `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` |
 
 ## Runner Manager
 
@@ -221,6 +225,7 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 - **Runner discovery**: `getAllKnownRunners()` returns both connected runners and disconnected runners persisted on disk, used by the `/api/runners` route.
 - **Task restart**: `restartTask()` sends `exec.restart` to the runner, killing the current process and re-spawning it with a new command within the same task slot.
 - **Runner resolution**: `resolveRunnerId()` falls back to any connected runner when a session's stored runnerId is stale.
+- **Global rules sync toggle**: `updateRunnerSyncGlobalRules()` persists a per-runner `syncGlobalRules` flag (`RunnerInfo.syncGlobalRules`, cached in `cachedSyncGlobalRules`, default `true`). Enabling it re-syncs rules via `syncGlobalRulesToRunner()`; disabling it calls `removeGlobalRulesFromRunner()` (sends `rules.remove`) to strip the previously written block from the runner's `GEMINI.md`/`CLAUDE.md`. `syncGlobalRulesToRunner()` is a no-op when the flag is `false`.
 - **Stream/event handling**: Routes `exec.output` streams to the correct session's log file and event bus. Handles `exec.exit` to update session status and add completion messages.
 - **Disconnect cleanup**: Fails orphaned active tasks when a runner disconnects (skips already-completed tasks).
 
@@ -269,14 +274,25 @@ The application enforces token-based authentication on all API routes and WebSoc
         "type": "admin"
       }
     ],
-    "runner": "32-character-runner-access-token"
+    "runners": [
+      {
+        "id": "token-id",
+        "token": "32-character-hex-string",
+        "name": "Runner Token Name",
+        "createdAt": 1720000000000,
+        "lastUsedAt": 1720000100000,
+        "boundRunnerId": "runner-name@hostname"
+      }
+    ]
   }
   ```
-- **Automatic Initialization**: On server startup, `initializeAuth()` in `lib/auth.ts` verifies if at least one token of type `admin` exists in `clients`, and if a `runner` token exists. If not, it automatically generates a 32-character hexadecimal token, writes it to `tokens.json`, and outputs it to the server console.
-- **Runner Connection Authentication**:
-  - The Go runner client must authenticate when connecting to the server `/runner` WebSocket endpoint.
-  - The connection request is validated using the `runner` token from `tokens.json`.
-  - The runner passes the token via the `token` query parameter or `x-runner-token` header. The runner client can configure the token via the `--token` CLI flag or the `ARONDO_RUNNER_TOKEN` environment variable. Invalid or missing tokens result in a `401 Unauthorized` connection rejection.
+- **Automatic Initialization**: On server startup, `initializeAuth()` in `lib/auth.ts` verifies if at least one token of type `admin` exists in `clients`. If not, it automatically generates a 32-character hexadecimal token, writes it to `tokens.json`, and outputs it to the server console.
+- **Runner Connection Authentication (per-runner tokens)**:
+  - Each runner authenticates with its own individually generated token, created and managed by an admin in Settings (Runner Tokens section) via `/api/auth/runner-tokens`, stored alongside client tokens under `runners` in `tokens.json`.
+  - The token is sent only via the `x-runner-token` header (no longer accepted as a URL query param) and compared using a constant-time check (`timingSafeEqualStrings()` in `lib/auth.ts`).
+  - A runner token **locks to the first runner identity** (`name@hostname`) that successfully registers with it (`boundRunnerId`), so a leaked token can't be replayed to impersonate a different, already-registered runner. Revoking a token disconnects its bound runner immediately.
+  - The runner client can configure its token via the `--token` CLI flag or the `ARONDO_RUNNER_TOKEN` environment variable. Invalid or missing tokens result in a `401 Unauthorized` connection rejection.
+  - Registration is asynchronous; messages arriving before the registration ack (e.g. the `task.status` event sent immediately after registering) are queued on the runner client and replayed once registration completes, avoiding a race where they'd be rejected as out-of-order.
 - **Roles & Permissions**:
   - `admin`: Has unrestricted access to all runners, settings, custom agent commands, global rules, and user token management (generating, renaming, deleting user tokens).
   - `user`: Restricted role. Can only access sessions, projects, and runners that they are explicitly allowed to access.
@@ -304,7 +320,7 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **Agent Session Continuity (Session Resume)**: Retains conversation context for AI agents across different runs.
   - **Claude Code**: Supports `--session-id` (bound to the session) and `--resume` flags for native session continuity.
   - **Antigravity CLI (agy)**: On task exit, the Go runner scans its local logs via process ID (`detectAgyConvIdByPid`) to extract the generated conversation UUID. This UUID is passed back in the `exec.exit` event and saved by the server. Subsequent runs of `agy` within the same session will automatically pass `--conversation <uuid>` to resume the session.
-- **Global Agent Rules Sync**: Settings screen allows specifying global agent rules. These are stored in `~/.arondo/global-rules.md` and automatically synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on runners upon connection.
+- **Global Agent Rules Sync**: Settings screen allows specifying global agent rules. These are stored in `~/.arondo/global-rules.md` and automatically synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on runners upon connection. Each runner has a per-runner sync toggle (checked by default for new runners) in Settings; unchecking it stops future syncs to that runner and removes the previously synced block via a `rules.remove` runner method (`runner/handler_rules.go`).
 - **AI Agent Quota Monitoring**: Runners collect agent quota usage from Claude and Antigravity via tmux pane capture, which is saved locally under `~/.arondo/agents/` on the server and displayed with progress bars in the Runners dashboard.
 - **Secure Prompt Passing**: Instead of command line arguments, prompts are passed to agents using temporary files on the runner. The file path is stored in the `ARONDO_PROMPT_FILE` environment variable (and resolved using shell redirection `$(< "$ARONDO_PROMPT_FILE")`), which mitigates command length constraints and process command argument exposure. The UI "Show Prompt" panel displays the real resolved prompt instead of the original raw inputs.
 - **AI Agent Auto-Selection (Auto Mode)**: Automatically selects the best agent and model based on hourly and weekly quota availability retrieved from the runner. New chat sessions default to using the Auto agent mode.
@@ -320,7 +336,7 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **Inline Runner Details**: The Runners dashboard displays the runner details panel inline directly below the selected runner card for better usability.
 - **Disconnected Runner Deletion**: Allows deleting registered but disconnected runners from the Runners dashboard, which purges their corresponding metadata and directories.
 - **Automated Data Lifecycle**: Automatically purges orphan sessions or projects on load if their parent references (e.g. project or runner) no longer exist.
-- **@ Path Selector Modal**: Typing `@` in the chat textarea opens a file and directory selector modal to easily select a path and insert its relative path into the input field.
+- **@ Path Selector Modal**: Typing `@` in the chat textarea opens a file and directory selector modal to easily select a path and insert its relative path into the input field. Navigation ("Go Up") is allowed past the project root, with an "(outside project)" label shown once the current path leaves the project directory.
 - **File Browser with Syntax Highlighting**: A Remote File Browser can be opened from the session's three-dot menu, featuring file previews (up to 512KB) with code syntax highlighting and a word wrap toggle option.
 - **Scheduled Tasks, Auto-Queue Follow-ups & Quota Retry**: Users can schedule project-scoped scripts to run at a future fixed time. If the agent is currently running when a user sends a follow-up, the message is automatically queued as a scheduled task (`afterSession` trigger) and executed sequentially once the active task finishes. If the agent terminates due to quota limits, a `quotaAvailable` task is scheduled to automatically retry using the last user prompt once the quota becomes available.
 - **Diff View File Collapse/Expand**: The visual HTML diff viewer supports collapsing and expanding individual changed files dynamically, enhancing diff readability.
