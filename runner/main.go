@@ -10,17 +10,8 @@ import (
 
 func main() {
 	serverURL := flag.String("server", "ws://localhost:3251/runner", "Server WebSocket URL")
-	name := flag.String("name", "", "Runner name (defaults to hostname)")
 	token := flag.String("token", "", "Runner access token (optional, can also set ARONDO_RUNNER_TOKEN)")
 	flag.Parse()
-
-	if *name == "" {
-		hostname, err := os.Hostname()
-		if err != nil {
-			hostname = "unknown"
-		}
-		*name = hostname
-	}
 
 	runnerToken := *token
 	if runnerToken == "" {
@@ -30,9 +21,9 @@ func main() {
 	log.SetFlags(log.Ltime | log.Lmsgprefix)
 	log.SetPrefix("[runner] ")
 
-	log.Printf("starting runner %q, connecting to %s", *name, *serverURL)
+	log.Printf("starting runner, connecting to %s", *serverURL)
 
-	client := NewClient(*serverURL, *name, runnerToken)
+	client := NewClient(*serverURL, runnerToken)
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)

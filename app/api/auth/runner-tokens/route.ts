@@ -95,6 +95,12 @@ export async function PUT(request: NextRequest) {
     record.name = name.trim();
     await writeTokensConfig(config);
 
+    // Push the new name to the bound runner immediately, rather than
+    // waiting for it to reconnect and re-register.
+    if (record.boundRunnerId) {
+      await runnerManager.updateRunnerName(record.boundRunnerId, record.name);
+    }
+
     return NextResponse.json({ success: true });
   } catch (err) {
     return NextResponse.json({ error: "Failed to update runner token name" }, { status: 500 });

@@ -13,7 +13,6 @@ test.describe('Runner Git API integration tests', () => {
     console.log('[git-test] Spawning Go runner process...');
     runnerProcess = spawn(runnerBinary, [
       '--server', 'ws://localhost:3252/runner',
-      '--name', 'git-test-runner',
       '--token', 'test-runner-token-git'
     ], {
       stdio: 'pipe',
@@ -26,7 +25,7 @@ test.describe('Runner Git API integration tests', () => {
       });
       if (response.ok()) {
         const list = await response.json();
-        const found = list.find((r: any) => r.name === 'git-test-runner');
+        const found = list.find((r: any) => r.name === 'Test Git Runner');
         if (found) {
           runnerId = found.id;
           break;

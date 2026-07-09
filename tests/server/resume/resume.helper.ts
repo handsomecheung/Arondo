@@ -23,7 +23,8 @@ export async function setupRunner(request: any, name: string, mockBinDir: string
   const runnerBinary = path.resolve(__dirname, '../../../runner/arondo-runner');
 
   // A runner token binds to the first runner identity that registers with
-  // it, so each differently-named test runner needs its own dedicated token
+  // it, and the token's own `name` becomes the runner's display name, so
+  // each differently-named test runner needs its own dedicated token
   // (mirrors how an admin would generate one token per real machine).
   const tokenRes = await request.post('/api/auth/runner-tokens', {
     headers: { 'x-arondo-token': 'test-token-123456', 'Content-Type': 'application/json' },
@@ -37,7 +38,6 @@ export async function setupRunner(request: any, name: string, mockBinDir: string
   console.log(`[resume-test] Spawning Go runner process for ${name}...`);
   const runnerProcess = spawn(runnerBinary, [
     '--server', 'ws://localhost:3252/runner',
-    '--name', name,
     '--token', runnerToken
   ], {
     stdio: 'pipe',

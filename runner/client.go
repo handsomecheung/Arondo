@@ -29,7 +29,6 @@ const (
 
 type Client struct {
 	serverURL string
-	name      string
 	token     string
 	conn      *websocket.Conn
 	handler   *Handler
@@ -37,10 +36,9 @@ type Client struct {
 	done      chan struct{}
 }
 
-func NewClient(serverURL, name, token string) *Client {
+func NewClient(serverURL, token string) *Client {
 	c := &Client{
 		serverURL: serverURL,
-		name:      name,
 		token:     token,
 		done:      make(chan struct{}),
 	}
@@ -139,7 +137,6 @@ func (c *Client) sendRegister() error {
 	hostname, _ := os.Hostname()
 
 	payload := map[string]any{
-		"name":     c.name,
 		"version":  "0.2.5",
 		"hostname": hostname,
 		"os":       runtime.GOOS,

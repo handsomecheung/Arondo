@@ -29,6 +29,7 @@ const TASK_RETENTION_MS = 3 * 24 * 60 * 60 * 1000;
 export interface RunnerInfo {
   id: string;
   name: string;
+  runnerTokenId: string;
   hostname: string;
   ip: string;
   os: string;
@@ -84,7 +85,6 @@ interface MessageEnvelope {
 
 class RunnerManager {
   private runners = new Map<string, RunnerConnection>();
-  private knownIds = new Map<string, string>();
   private tasks = new Map<string, TaskContext>();
   private ptyKeyToTaskId = new Map<string, string>();
   private pending = new Map<string, PendingRequest>();
@@ -109,6 +109,7 @@ class RunnerManager {
   }
 
   async restoreRunners(): Promise<void> {
+    let restoredCount = 0;
     try {
       await fs.mkdir(RUNNERS_DIR, { recursive: true });
       const entries = await fs.readdir(RUNNERS_DIR, { withFileTypes: true });
@@ -127,17 +128,16 @@ class RunnerManager {
             await fs.writeFile(filePath, JSON.stringify(info, null, 2), "utf-8");
           }
 
-          const stableKey = `${info.name}@${info.hostname}`;
-          this.knownIds.set(stableKey, info.id);
           this.cachedAllowedUserTokenUuids.set(info.id, info.allowedUserTokenUuids || []);
           this.cachedSyncGlobalRules.set(info.id, info.syncGlobalRules !== false);
+          restoredCount++;
         } catch {
           // Ignore corrupt runner files
         }
       }
-      if (this.knownIds.size > 0) {
+      if (restoredCount > 0) {
         console.log(
-          `[runner-manager] restored ${this.knownIds.size} known runner(s) from disk`,
+          `[runner-manager] restored ${restoredCount} known runner(s) from disk`,
         );
       }
     } catch {
@@ -304,28 +304,30 @@ class RunnerManager {
   // ─── Connection lifecycle ─────────────────────────────────────────────
 
   async addRunner(ws: WebSocket, registerPayload: any, ip: string | undefined, runnerTokenId: string): Promise<string | null> {
-    const name: string = registerPayload.name || "unknown";
     const hostname: string = registerPayload.hostname || "";
 
-    const stableKey = `${name}@${hostname}`;
-    let id = this.knownIds.get(stableKey);
-    const isNewId = !id;
-    if (!id) {
-      id = crypto.randomUUID();
+    // A runner token is already 1:1 with a runner identity (bound on first
+    // use), so it doubles as the stable key across reconnects/restarts —
+    // reuse its bound id if present, otherwise mint a new one.
+    const { readTokensConfig, bindRunnerToken } = await import("./auth");
+    const { runners: tokenRecords } = await readTokensConfig();
+    const tokenRecord = tokenRecords.find((r) => r.id === runnerTokenId);
+    if (!tokenRecord) {
+      return null;
     }
+    const id = tokenRecord.boundRunnerId || crypto.randomUUID();
+    const isNewId = !tokenRecord.boundRunnerId;
 
     // Locks this token to this runner identity on first use; rejects the
     // connection if the token was already bound to a different runner
     // (blocks a leaked token from being replayed to hijack another runner).
-    const { bindRunnerToken } = await import("./auth");
     const bound = await bindRunnerToken(runnerTokenId, id);
     if (!bound) {
       return null;
     }
+    const name = bound.name || "unknown";
 
-    if (isNewId) {
-      this.knownIds.set(stableKey, id);
-    } else {
+    if (!isNewId) {
       const existing = this.runners.get(id);
       if (existing) {
         if (existing.ws.readyState === 1 /* OPEN */ || existing.ws.readyState === 0 /* CONNECTING */) {
@@ -337,6 +339,7 @@ class RunnerManager {
     const info: RunnerInfo = {
       id,
       name,
+      runnerTokenId,
       hostname,
       ip: ip || "",
       os: registerPayload.os || "",
@@ -419,16 +422,16 @@ class RunnerManager {
       throw new Error("Cannot delete a connected runner");
     }
 
-    let stableKeyToDelete: string | undefined;
-    for (const [key, val] of this.knownIds.entries()) {
-      if (val === id) {
-        stableKeyToDelete = key;
-        break;
-      }
+    // Unbind the runner token so a future reconnect with the same token is
+    // treated as a fresh runner identity instead of reusing the deleted one.
+    const { readTokensConfig, writeTokensConfig } = await import("./auth");
+    const tokensConfig = await readTokensConfig();
+    const boundRecord = tokensConfig.runners.find((r) => r.boundRunnerId === id);
+    if (boundRecord) {
+      boundRecord.boundRunnerId = null;
+      await writeTokensConfig(tokensConfig);
     }
-    if (stableKeyToDelete) {
-      this.knownIds.delete(stableKeyToDelete);
-    }
+
     this.cachedAllowedUserTokenUuids.delete(id);
     this.cachedSyncGlobalRules.delete(id);
 
@@ -514,6 +517,27 @@ class RunnerManager {
 
   getRunners(): RunnerInfo[] {
     return Array.from(this.runners.values()).map((c) => ({ ...c.info }));
+  }
+
+  // Called when an admin renames a runner's bound token in Settings, so the
+  // displayed name updates immediately instead of waiting for the runner to
+  // reconnect and re-register.
+  async updateRunnerName(runnerId: string, name: string): Promise<boolean> {
+    const conn = this.runners.get(runnerId);
+    if (conn) {
+      conn.info.name = name;
+      await this.persistRunner(conn.info);
+      return true;
+    }
+
+    const runners = await this.getAllKnownRunners();
+    const info = runners.find((r) => r.id === runnerId);
+    if (info) {
+      info.name = name;
+      await this.persistRunner(info);
+      return true;
+    }
+    return false;
   }
 
   async updateRunnerSyncGlobalRules(runnerId: string, syncGlobalRules: boolean): Promise<boolean> {

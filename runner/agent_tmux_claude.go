@@ -10,7 +10,7 @@ import (
 )
 
 func fetchClaudeQuota(client *Client) {
-	session := tmuxSessionName("claude", client)
+	session := tmuxSessionName("claude")
 	run("tmux", "kill-session", "-t", session) //nolint
 
 	cwd, err := os.Getwd()

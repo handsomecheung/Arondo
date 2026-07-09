@@ -12,7 +12,6 @@ test.describe('Runner integration test', () => {
     console.log('Spawning Go runner process...');
     runnerProcess = spawn(runnerBinary, [
       '--server', 'ws://localhost:3252/runner',
-      '--name', 'playwright-test-runner',
       '--token', 'test-runner-token-xyz'
     ], {
       stdio: 'pipe',
@@ -50,7 +49,7 @@ test.describe('Runner integration test', () => {
       
       if (response.ok()) {
         const list = await response.json();
-        const found = list.find((r: any) => r.name === 'playwright-test-runner');
+        const found = list.find((r: any) => r.name === 'Test Runner');
         if (found) {
           registered = true;
           break;

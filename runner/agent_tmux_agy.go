@@ -10,7 +10,7 @@ import (
 )
 
 func fetchAgyQuota(client *Client) {
-	session := tmuxSessionName("agy", client)
+	session := tmuxSessionName("agy")
 	run("tmux", "kill-session", "-t", session) //nolint
 
 	cwd, err := os.Getwd()

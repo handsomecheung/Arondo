@@ -25,9 +25,9 @@ async function globalSetup() {
         type: 'user'
       }
     ],
-    // Each test spec spawns its own Go runner process under a distinct
-    // --name, and a runner token locks to the first runner identity that
-    // registers with it — so every spec needs its own dedicated token.
+    // Each test spec spawns its own Go runner process, and a runner token
+    // locks to the first runner identity that registers with it and lends
+    // it this display name — so every spec needs its own dedicated token.
     runners: [
       {
         id: 'test-runner-token-id-1',

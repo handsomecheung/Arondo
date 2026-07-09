@@ -46,7 +46,7 @@ All execution goes through a Runner — there is no local fallback on the server
 ```
 server.ts               # Custom HTTP server wrapping Next.js with WebSocket upgrade at /ws and /runner
 runner/                  # Go runner binary
-  main.go               # Entry point: --server and --name flags, signal handling
+  main.go               # Entry point: --server and --token flags, signal handling
   client.go             # WebSocket client: connect, reconnect (exponential backoff), heartbeat
   protocol.go           # Message envelope struct (id, type, method, payload), constructors
   handler.go            # Request dispatcher by method string, response helpers
@@ -281,7 +281,7 @@ The application enforces token-based authentication on all API routes and WebSoc
         "name": "Runner Token Name",
         "createdAt": 1720000000000,
         "lastUsedAt": 1720000100000,
-        "boundRunnerId": "runner-name@hostname"
+        "boundRunnerId": "server-generated-runner-id"
       }
     ]
   }
@@ -290,7 +290,8 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **Runner Connection Authentication (per-runner tokens)**:
   - Each runner authenticates with its own individually generated token, created and managed by an admin in Settings (Runner Tokens section) via `/api/auth/runner-tokens`, stored alongside client tokens under `runners` in `tokens.json`.
   - The token is sent only via the `x-runner-token` header (no longer accepted as a URL query param) and compared using a constant-time check (`timingSafeEqualStrings()` in `lib/auth.ts`).
-  - A runner token **locks to the first runner identity** (`name@hostname`) that successfully registers with it (`boundRunnerId`), so a leaked token can't be replayed to impersonate a different, already-registered runner. Revoking a token disconnects its bound runner immediately.
+  - A runner token **locks to the first runner identity** that successfully registers with it (`boundRunnerId`), so a leaked token can't be replayed to impersonate a different, already-registered runner. Revoking a token disconnects its bound runner immediately. Deleting a disconnected runner clears `boundRunnerId` on its token so a future reconnect starts as a fresh identity.
+  - The runner binary has no `--name` flag; it has no notion of its own display name. The bound runner token's own `name` (configured by an admin in Settings) is the runner's display name everywhere in the system (`RunnerInfo.name`, session/project lists, Runners dashboard).
   - The runner client can configure its token via the `--token` CLI flag or the `ARONDO_RUNNER_TOKEN` environment variable. Invalid or missing tokens result in a `401 Unauthorized` connection rejection.
   - Registration is asynchronous; messages arriving before the registration ack (e.g. the `task.status` event sent immediately after registering) are queued on the runner client and replayed once registration completes, avoiding a race where they'd be rejected as out-of-order.
 - **Roles & Permissions**:

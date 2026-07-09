@@ -12,7 +12,6 @@ test.describe('Sessions API integration tests', () => {
     console.log('[sessions-test] Spawning Go runner process...');
     runnerProcess = spawn(runnerBinary, [
       '--server', 'ws://localhost:3252/runner',
-      '--name', 'sessions-test-runner',
       '--token', 'test-runner-token-sessions'
     ], {
       stdio: 'pipe',
@@ -32,7 +31,7 @@ test.describe('Sessions API integration tests', () => {
       });
       if (response.ok()) {
         const list = await response.json();
-        const found = list.find((r: any) => r.name === 'sessions-test-runner');
+        const found = list.find((r: any) => r.name === 'Test Sessions Runner');
         if (found) {
           runnerId = found.id;
           break;

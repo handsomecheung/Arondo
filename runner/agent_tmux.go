@@ -31,11 +31,11 @@ func (h *Handler) handleInfoFetch(msg *Message) {
 }
 
 // tmuxSessionName builds a unique tmux session name for the given agent and
-// client, safe for multiple runners on the same host. Format:
-// arondo-{agent}-{name}_{hostname} with special characters replaced by "_".
-func tmuxSessionName(agent string, client *Client) string {
+// client process, safe for multiple runners on the same host. Format:
+// arondo-{agent}-{pid}_{hostname} with special characters replaced by "_".
+func tmuxSessionName(agent string) string {
 	hostname, _ := os.Hostname()
-	raw := fmt.Sprintf("arondo-%s-%s_%s", agent, client.name, hostname)
+	raw := fmt.Sprintf("arondo-%s-%d_%s", agent, os.Getpid(), hostname)
 	return strings.NewReplacer("@", "_", ".", "_", "/", "_", ":", "_").Replace(raw)
 }
 

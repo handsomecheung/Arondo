@@ -60,7 +60,7 @@ func TestAgentQuotas(t *testing.T) {
 	wsURL := strings.Replace(server.URL, "http://", "ws://", 1)
 
 	// Initialize runner client
-	client := NewClient(wsURL, "test-runner")
+	client := NewClient(wsURL, "test-token")
 	err = client.connect()
 	if err != nil {
 		t.Fatalf("failed to connect client: %v", err)

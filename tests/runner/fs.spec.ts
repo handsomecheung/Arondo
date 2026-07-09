@@ -12,7 +12,6 @@ test.describe('Runner File System API integration tests', () => {
     console.log('[fs-test] Spawning Go runner process...');
     runnerProcess = spawn(runnerBinary, [
       '--server', 'ws://localhost:3252/runner',
-      '--name', 'fs-test-runner',
       '--token', 'test-runner-token-fs'
     ], {
       stdio: 'pipe',
@@ -25,7 +24,7 @@ test.describe('Runner File System API integration tests', () => {
       });
       if (response.ok()) {
         const list = await response.json();
-        const found = list.find((r: any) => r.name === 'fs-test-runner');
+        const found = list.find((r: any) => r.name === 'Test FS Runner');
         if (found) {
           runnerId = found.id;
           break;

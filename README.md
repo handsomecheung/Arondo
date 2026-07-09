@@ -64,10 +64,10 @@ npm run dev
 cd runner
 go build -o arondo-runner .
 # Pass the runner token printed in the server console on startup
-./arondo-runner --server ws://localhost:3251/runner --name my-dev-machine --token <runner_access_token>
+./arondo-runner --server ws://localhost:3251/runner --token <runner_access_token>
 
 # Alternatively, pass it via environment variable:
-# ARONDO_RUNNER_TOKEN=<runner_access_token> ./arondo-runner --server ws://localhost:3251/runner --name my-dev-machine
+# ARONDO_RUNNER_TOKEN=<runner_access_token> ./arondo-runner --server ws://localhost:3251/runner
 ```
 
 Or use the convenience script:
@@ -112,11 +112,10 @@ arondo-runner [flags]
 
 Flags:
   --server string   Server WebSocket URL (default "ws://localhost:3251/runner")
-  --name string     Runner display name (default: hostname)
   --token string    Runner access token (optional, can also set ARONDO_RUNNER_TOKEN)
 ```
 
-The runner auto-reconnects with exponential backoff if the server connection drops.
+The runner auto-reconnects with exponential backoff if the server connection drops. It has no display name of its own — the name shown across the UI comes from the runner token's `name`, set by an admin when generating the token in Settings.
 
 ## Testing
 

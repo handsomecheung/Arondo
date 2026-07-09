@@ -23,9 +23,10 @@ export interface RunnerTokenInfo {
   name: string;
   createdAt: number;
   lastUsedAt?: number;
-  // Locked to the first runner identity (name@hostname derived id) that
+  // Locked to the first runner identity (server-generated id) that
   // successfully authenticates with this token, so a leaked token can't be
-  // replayed to impersonate a different, already-registered runner.
+  // replayed to impersonate a different, already-registered runner. This
+  // token's `name` is also the runner's display name across the system.
   boundRunnerId?: string | null;
 }
 
@@ -175,18 +176,20 @@ export async function findRunnerTokenByToken(token: string | null): Promise<Runn
 }
 
 // Locks a runner token to the runner identity it first registers as. Returns
-// false if the token is unknown/revoked, or if it's already bound to a
-// different runner (blocks token replay to hijack another runner's identity).
-export async function bindRunnerToken(tokenId: string, runnerId: string): Promise<boolean> {
+// the token record (whose `name` becomes the runner's display name) on
+// success, or null if the token is unknown/revoked, or if it's already bound
+// to a different runner (blocks token replay to hijack another runner's
+// identity).
+export async function bindRunnerToken(tokenId: string, runnerId: string): Promise<RunnerTokenInfo | null> {
   const config = await readTokensConfig();
   const record = config.runners.find((r) => r.id === tokenId);
-  if (!record) return false;
-  if (record.boundRunnerId && record.boundRunnerId !== runnerId) return false;
+  if (!record) return null;
+  if (record.boundRunnerId && record.boundRunnerId !== runnerId) return null;
 
   record.boundRunnerId = runnerId;
   record.lastUsedAt = Date.now();
   await writeTokensConfig(config);
-  return true;
+  return record;
 }
 
 export function isValidToken(token: string | null): boolean {
