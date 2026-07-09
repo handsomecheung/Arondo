@@ -84,3 +84,44 @@ func (h *Handler) handleRulesSync(msg *Message) {
 
 	h.sendResponse(msg.ID, rulesSyncResponse{OK: true})
 }
+
+func (h *Handler) handleRulesRemove(msg *Message) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		h.sendError(msg.ID, "INTERNAL", "failed to get user home dir: "+err.Error())
+		return
+	}
+
+	targets := []string{
+		filepath.Join(home, ".gemini", "GEMINI.md"),
+		filepath.Join(home, ".claude", "CLAUDE.md"),
+	}
+
+	for _, target := range targets {
+		data, err := os.ReadFile(target)
+		if err != nil {
+			continue
+		}
+		existing := string(data)
+
+		startIdx := strings.Index(existing, "<!-- arondo:start -->")
+		endIdx := strings.Index(existing, "<!-- arondo:end -->")
+		if startIdx == -1 || endIdx == -1 || startIdx >= endIdx {
+			continue
+		}
+		endPos := endIdx + len("<!-- arondo:end -->")
+		existing = existing[:startIdx] + existing[endPos:]
+
+		newContent := strings.TrimRight(existing, " \t\r\n")
+		if newContent != "" {
+			newContent += "\n"
+		}
+
+		if err := os.WriteFile(target, []byte(newContent), 0644); err != nil {
+			h.sendError(msg.ID, "INTERNAL", "failed to write file: "+err.Error())
+			return
+		}
+	}
+
+	h.sendResponse(msg.ID, rulesSyncResponse{OK: true})
+}

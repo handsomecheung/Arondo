@@ -39,6 +39,7 @@ export interface RunnerInfo {
   connected: boolean;
   lastSeenAt?: number;
   allowedUserTokenUuids?: string[];
+  syncGlobalRules?: boolean;
 }
 
 interface RunnerConnection {
@@ -88,6 +89,7 @@ class RunnerManager {
   private ptyKeyToTaskId = new Map<string, string>();
   private pending = new Map<string, PendingRequest>();
   private cachedAllowedUserTokenUuids = new Map<string, string[]>();
+  private cachedSyncGlobalRules = new Map<string, boolean>();
   private idCounter = 0;
 
   private nextId(): string {
@@ -128,6 +130,7 @@ class RunnerManager {
           const stableKey = `${info.name}@${info.hostname}`;
           this.knownIds.set(stableKey, info.id);
           this.cachedAllowedUserTokenUuids.set(info.id, info.allowedUserTokenUuids || []);
+          this.cachedSyncGlobalRules.set(info.id, info.syncGlobalRules !== false);
         } catch {
           // Ignore corrupt runner files
         }
@@ -344,7 +347,9 @@ class RunnerManager {
       connected: true,
       lastSeenAt: Date.now(),
       allowedUserTokenUuids: this.cachedAllowedUserTokenUuids.get(id) || [],
+      syncGlobalRules: this.cachedSyncGlobalRules.get(id) ?? true,
     };
+    this.cachedSyncGlobalRules.set(id, info.syncGlobalRules!);
     this.runners.set(id, { id, ws, info });
     this.persistRunner(info).catch(() => {});
     console.log(`[runner-manager] runner registered: ${info.name} (${id})`);
@@ -425,6 +430,7 @@ class RunnerManager {
       this.knownIds.delete(stableKeyToDelete);
     }
     this.cachedAllowedUserTokenUuids.delete(id);
+    this.cachedSyncGlobalRules.delete(id);
 
     const runnerDir = path.join(RUNNERS_DIR, id);
     try {
@@ -510,7 +516,37 @@ class RunnerManager {
     return Array.from(this.runners.values()).map((c) => ({ ...c.info }));
   }
 
+  async updateRunnerSyncGlobalRules(runnerId: string, syncGlobalRules: boolean): Promise<boolean> {
+    this.cachedSyncGlobalRules.set(runnerId, syncGlobalRules);
+
+    const conn = this.runners.get(runnerId);
+    if (conn) {
+      conn.info.syncGlobalRules = syncGlobalRules;
+      await this.persistRunner(conn.info);
+    } else {
+      const runners = await this.getAllKnownRunners();
+      const info = runners.find((r) => r.id === runnerId);
+      if (!info) return false;
+      info.syncGlobalRules = syncGlobalRules;
+      await this.persistRunner(info);
+    }
+
+    if (syncGlobalRules) {
+      this.syncGlobalRulesToRunner(runnerId).catch((err) => {
+        console.error(`[runner-manager] Failed to sync global rules to runner ${runnerId} after enabling:`, err);
+      });
+    } else {
+      this.removeGlobalRulesFromRunner(runnerId).catch((err) => {
+        console.error(`[runner-manager] Failed to remove global rules from runner ${runnerId} after disabling:`, err);
+      });
+    }
+    return true;
+  }
+
   async syncGlobalRulesToRunner(runnerId: string): Promise<void> {
+    if (this.cachedSyncGlobalRules.get(runnerId) === false) {
+      return;
+    }
     const globalRulesPath = path.join(CONFIG_DIR, "global-rules.md");
     try {
       const content = await fs.readFile(globalRulesPath, "utf-8");
@@ -522,6 +558,15 @@ class RunnerManager {
       if (err.code !== "ENOENT") {
         console.error(`[runner-manager] Failed to sync global rules to runner ${runnerId}:`, err);
       }
+    }
+  }
+
+  async removeGlobalRulesFromRunner(runnerId: string): Promise<void> {
+    try {
+      console.log(`[runner-manager] Removing synced global rules from runner ${runnerId}...`);
+      await this.sendRequest(runnerId, "rules.remove", {});
+    } catch (err) {
+      console.error(`[runner-manager] Failed to remove global rules from runner ${runnerId}:`, err);
     }
   }
 

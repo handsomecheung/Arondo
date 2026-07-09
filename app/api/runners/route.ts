@@ -28,8 +28,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, allowedUserTokenUuids } = body;
-    if (!id || !Array.isArray(allowedUserTokenUuids)) {
+    const { id, allowedUserTokenUuids, syncGlobalRules } = body;
+    if (!id || (allowedUserTokenUuids === undefined && syncGlobalRules === undefined)) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
@@ -38,7 +38,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const success = await runnerManager.updateRunnerAllowedUserTokenUuids(id, allowedUserTokenUuids);
+    let success = true;
+    if (Array.isArray(allowedUserTokenUuids)) {
+      success = (await runnerManager.updateRunnerAllowedUserTokenUuids(id, allowedUserTokenUuids)) && success;
+    }
+    if (typeof syncGlobalRules === "boolean") {
+      success = (await runnerManager.updateRunnerSyncGlobalRules(id, syncGlobalRules)) && success;
+    }
     return NextResponse.json({ success });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });

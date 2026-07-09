@@ -58,6 +58,8 @@ func (h *Handler) handleRequest(msg *Message) {
 		h.handleGitDiff(msg)
 	case "rules.sync":
 		h.handleRulesSync(msg)
+	case "rules.remove":
+		h.handleRulesRemove(msg)
 	case "info.fetch":
 		h.handleInfoFetch(msg)
 	default:

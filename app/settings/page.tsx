@@ -18,6 +18,7 @@ interface Runner {
   agents?: string[];
   lastSeenAt?: number;
   allowedUserTokenUuids?: string[];
+  syncGlobalRules?: boolean;
 }
 
 interface Project {
@@ -439,6 +440,23 @@ export default function SettingsPage() {
     const updatedTokenUuids = currentTokenUuids.filter((t) => t !== tokenToRemove);
     await saveRunnerUserTokenUuids(runnerId, updatedTokenUuids);
   }, [runners, saveRunnerUserTokenUuids]);
+
+  const handleToggleSyncGlobalRules = useCallback(async (runnerId: string, syncGlobalRules: boolean) => {
+    try {
+      const res = await fetch("/api/runners", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: runnerId, syncGlobalRules }),
+      });
+      if (res.ok) {
+        setRunners((prev) => prev.map((r) => (r.id === runnerId ? { ...r, syncGlobalRules } : r)));
+      } else {
+        alert("Failed to update global rules sync setting");
+      }
+    } catch (err) {
+      console.error("Failed to save runner global rules sync setting:", err);
+    }
+  }, []);
 
   useEffect(() => {
     if (userRole === "admin") {
@@ -1247,6 +1265,58 @@ export default function SettingsPage() {
               Define global rules that automatically apply to all AI Agents.
               These will be synced to <code>~/.gemini/GEMINI.md</code> (agy) and <code>~/.claude/CLAUDE.md</code> (claude) on the runners.
             </p>
+
+            {runners.length > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                  marginBottom: 12,
+                  padding: 12,
+                  background: "var(--bg-elevated)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-sm)",
+                }}
+              >
+                <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600 }}>
+                  Sync to runners
+                </span>
+                {runners.map((r) => {
+                  const enabled = r.syncGlobalRules !== false;
+                  return (
+                    <label
+                      key={r.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        fontSize: 12,
+                        color: "var(--text-primary)",
+                        cursor: userRole === "admin" ? "pointer" : "default",
+                        padding: "2px 0",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={enabled}
+                        disabled={userRole !== "admin"}
+                        onChange={(e) => handleToggleSyncGlobalRules(r.id, e.target.checked)}
+                        style={{ cursor: userRole === "admin" ? "pointer" : "default" }}
+                      />
+                      <span style={{ fontWeight: 500 }}>{r.name}</span>
+                      <span style={{ fontSize: 10, color: "var(--text-muted)" }}>
+                        ({r.hostname})
+                      </span>
+                      <span className={`task-status-badge ${r.connected ? "running" : "idle"}`}>
+                        {r.connected ? "connected" : "disconnected"}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+
             <textarea
               value={globalRules}
               onChange={(e) => setGlobalRules(e.target.value)}
