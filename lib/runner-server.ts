@@ -69,7 +69,7 @@ export function setupRunnerServer(wss: WebSocketServer): void {
                 method: "connected",
                 payload: {
                   runnerId,
-                  serverVersion: "0.2.5",
+                  serverVersion: "0.2.6",
                   // Inform the runner which binaries to detect on its PATH.
                   // The runner responds with an agent.status event.
                   queryAgents: getAgentBinaryNames(),
