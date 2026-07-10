@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, getScheduledTasks } from "@/lib/store";
-import { getArondoToken, verifySessionPermission } from "@/lib/auth";
+import { getArondoToken, verifySessionPermission, getUuidByToken } from "@/lib/auth";
 import { executeAction } from "@/lib/scheduler";
+import { dispatchFollowupMessage } from "@/lib/session-actions";
 
-// Manually dispatches a draft session right now, bypassing its codebaseReady trigger.
+// Manually dispatches a draft session right now, bypassing its codebaseReady trigger
+// (or, for a manual-only draft with no scheduled task, sending it directly).
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -24,11 +26,17 @@ export async function POST(
 
   const tasks = await getScheduledTasks();
   const task = tasks.find((t) => t.status === "pending" && t.action.sessionId === id);
-  if (!task) {
-    return NextResponse.json({ error: "No pending draft trigger found for this session" }, { status: 400 });
+  if (task) {
+    await executeAction(task);
+  } else {
+    const result = await dispatchFollowupMessage(id, session.prompt, {
+      tokenUuid: getUuidByToken(token) || undefined,
+    });
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
+    }
   }
 
-  await executeAction(task);
   const updated = await getSession(id);
   return NextResponse.json(updated);
 }

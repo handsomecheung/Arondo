@@ -86,6 +86,8 @@ export default function HomePage() {
   const [runners, setRunners] = useState<Runner[]>([]);
   const [isNewSession, setIsNewSession] = useState(false);
   const [isNewDraft, setIsNewDraft] = useState(false);
+  const [draftTrigger, setDraftTrigger] = useState<"manual" | "codebaseReady">("codebaseReady");
+  const [autoDraftSessionIds, setAutoDraftSessionIds] = useState<Set<string>>(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Custom dropdown states & refs
@@ -573,6 +575,7 @@ export default function HomePage() {
     runnerId,
     isNewSession,
     isNewDraft,
+    draftTrigger,
     showCommandMenu,
     selectedSession,
     selectedSessionId,
@@ -621,6 +624,7 @@ export default function HomePage() {
     setSelectedProjectId(null);
     setIsNewDraft(true);
     setIsNewSession(false);
+    setDraftTrigger("codebaseReady");
     setMessages([]);
     setSidebarOpen(false);
     setSessionLog("");
@@ -643,6 +647,44 @@ export default function HomePage() {
     } catch (err: any) {
       console.error(err);
       setApiError({ title: "Send Draft Error", message: err.message || "Failed to send draft" });
+    }
+  };
+
+  // Draft sessions with a pending codebaseReady scheduled task will send
+  // automatically ("Pending"); the rest are manual-only ("Draft").
+  const loadAutoDraftSessionIds = useCallback(() => {
+    fetch("/api/scheduled-tasks")
+      .then((r) => r.json())
+      .then((tasks: any[]) => {
+        const ids = new Set<string>(
+          tasks
+            .filter((t) => t.status === "pending" && t.trigger?.kind === "codebaseReady")
+            .map((t) => t.action.sessionId as string),
+        );
+        setAutoDraftSessionIds(ids);
+      })
+      .catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    loadAutoDraftSessionIds();
+    const interval = setInterval(loadAutoDraftSessionIds, 15000);
+    return () => clearInterval(interval);
+  }, [loadAutoDraftSessionIds, sessions.length]);
+
+  const handleToggleDraftTrigger = async () => {
+    if (!selectedSessionId) return;
+    try {
+      const res = await fetch(`/api/sessions/${selectedSessionId}/draft-trigger`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json();
+        setApiError({ title: "Toggle Draft Send Error", message: data.error || "Failed to switch send mode" });
+        return;
+      }
+      loadAutoDraftSessionIds();
+    } catch (err: any) {
+      console.error(err);
+      setApiError({ title: "Toggle Draft Send Error", message: err.message || "Failed to switch send mode" });
     }
   };
 
@@ -906,6 +948,7 @@ export default function HomePage() {
         runners={runners}
         selectedSessionId={selectedSessionId}
         selectedProjectId={selectedProjectId}
+        autoDraftSessionIds={autoDraftSessionIds}
         onSelectSession={handleSelectSession}
         onSelectProject={handleSelectProject}
         onNewSession={handleNewSession}
@@ -993,6 +1036,8 @@ export default function HomePage() {
             isAgentRunning={isAgentRunning}
             isRunning={isRunning}
             isDraftSession={isDraftSession}
+            isDraftAutoSend={!!selectedSessionId && autoDraftSessionIds.has(selectedSessionId)}
+            draftTrigger={draftTrigger}
             canSubmit={canSubmit}
             menuOpen={menuOpen}
             scriptSubMenuOpen={scriptSubMenuOpen}
@@ -1017,6 +1062,7 @@ export default function HomePage() {
             onSetRunnerId={setRunnerId}
             onSetRepoPath={setRepoPath}
             onSetAgentType={setAgentType}
+            onSetDraftTrigger={setDraftTrigger}
             onSetRunnerDropdownOpen={setRunnerDropdownOpen}
             onSetAgentDropdownOpen={setAgentDropdownOpen}
             onSetFsCurrentPath={setFsCurrentPath}
@@ -1030,6 +1076,7 @@ export default function HomePage() {
             onRetryCard={handleRetryCard}
             onSubmit={handleSubmit}
             onSendDraftNow={handleSendDraftNow}
+            onToggleDraftTrigger={handleToggleDraftTrigger}
             onPromptChange={handlePromptChange}
             onKeyDown={handleKeyDown}
             onRunScript={handleRunScript}

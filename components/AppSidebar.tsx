@@ -14,6 +14,7 @@ interface Props {
   runners: Runner[];
   selectedSessionId: string | null;
   selectedProjectId: string | null;
+  autoDraftSessionIds: Set<string>;
   onSelectSession: (id: string) => void;
   onSelectProject: (id: string) => void;
   onNewSession: () => void;
@@ -30,6 +31,7 @@ export default function AppSidebar({
   runners,
   selectedSessionId,
   selectedProjectId,
+  autoDraftSessionIds,
   onSelectSession,
   onSelectProject,
   onNewSession,
@@ -105,7 +107,11 @@ export default function AppSidebar({
                     <div className="task-item-header">
                       <span className={`task-status-badge ${session.status}`}>
                         {(session.status === "running" || session.status === "script-running") && "⟳ "}
-                        {session.status === "script-running" ? "running" : session.status}
+                        {session.status === "script-running"
+                          ? "running"
+                          : session.status === "draft"
+                            ? (autoDraftSessionIds.has(session.id) ? "pending" : "draft")
+                            : session.status}
                       </span>
                       {projectName && (
                         <span

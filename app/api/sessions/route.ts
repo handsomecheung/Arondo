@@ -52,13 +52,14 @@ export async function GET(request: NextRequest) {
 export async function POST(req: NextRequest) {
   const token = getArondoToken(req);
   const body = await req.json();
-  const { prompt, repoPath, agentType = "antigravity", runnerId, name, isDraft } = body as {
+  const { prompt, repoPath, agentType = "antigravity", runnerId, name, isDraft, draftTrigger = "codebaseReady" } = body as {
     prompt: string;
     repoPath: string;
     agentType?: string;
     runnerId: string;
     name?: string;
     isDraft?: boolean;
+    draftTrigger?: "manual" | "codebaseReady";
   };
 
   const isBlank = !prompt || !prompt.trim();
@@ -103,11 +104,13 @@ export async function POST(req: NextRequest) {
       repoPath,
       runnerId,
     });
-    await addScheduledTask({
-      trigger: { kind: "codebaseReady", runnerId, repoPath },
-      action: { kind: "sendMessage", sessionId: session.id, message: trimmedPrompt },
-      tokenUuid: getUuidByToken(token) || undefined,
-    });
+    if (draftTrigger !== "manual") {
+      await addScheduledTask({
+        trigger: { kind: "codebaseReady", runnerId, repoPath },
+        action: { kind: "sendMessage", sessionId: session.id, message: trimmedPrompt },
+        tokenUuid: getUuidByToken(token) || undefined,
+      });
+    }
     eventBus.publish({ type: "session_updated", payload: session });
     return NextResponse.json(session, { status: 201 });
   }

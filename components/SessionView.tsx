@@ -12,7 +12,7 @@ import {
   IconBolt, IconPlus, IconSend, IconCheck,
   IconGitPullRequest, IconPlay, IconTerminal, IconEdit, IconTrash,
   IconMoreVertical, IconFolder, IconChevronDown, IconFileSearch,
-  IconClaude, IconAntigravity, IconCodex, IconFileText,
+  IconClaude, IconAntigravity, IconCodex, IconFileText, IconClock,
 } from "@/components/Icons";
 import { getTriggerWord, resolveAgentCommand } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
@@ -34,6 +34,8 @@ interface SessionViewProps {
   isAgentRunning: boolean;
   isRunning: boolean;
   isDraftSession: boolean;
+  isDraftAutoSend: boolean;
+  draftTrigger: "manual" | "codebaseReady";
   canSubmit: boolean;
   menuOpen: boolean;
   scriptSubMenuOpen: boolean;
@@ -58,6 +60,7 @@ interface SessionViewProps {
   onSetRunnerId: (id: string) => void;
   onSetRepoPath: (path: string) => void;
   onSetAgentType: (type: string) => void;
+  onSetDraftTrigger: (v: "manual" | "codebaseReady") => void;
   onSetRunnerDropdownOpen: (v: boolean) => void;
   onSetAgentDropdownOpen: (v: boolean) => void;
   onSetFsCurrentPath: (path: string) => void;
@@ -71,6 +74,7 @@ interface SessionViewProps {
   onRetryCard: (cardInfo: ExecCardInfo) => void;
   onSubmit: () => void;
   onSendDraftNow: () => void;
+  onToggleDraftTrigger: () => void;
   onPromptChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onRunScript: (name: string) => void;
@@ -107,6 +111,8 @@ export default function SessionView({
   isAgentRunning,
   isRunning,
   isDraftSession,
+  isDraftAutoSend,
+  draftTrigger,
   canSubmit,
   menuOpen,
   scriptSubMenuOpen,
@@ -131,6 +137,7 @@ export default function SessionView({
   onSetRunnerId,
   onSetRepoPath,
   onSetAgentType,
+  onSetDraftTrigger,
   onSetRunnerDropdownOpen,
   onSetAgentDropdownOpen,
   onSetFsCurrentPath,
@@ -144,6 +151,7 @@ export default function SessionView({
   onRetryCard,
   onSubmit,
   onSendDraftNow,
+  onToggleDraftTrigger,
   onPromptChange,
   onKeyDown,
   onRunScript,
@@ -243,7 +251,7 @@ export default function SessionView({
                 })()}
               </span>
             ) : (
-              selectedSession.status
+              selectedSession.status === "draft" && isDraftAutoSend ? "pending" : selectedSession.status
             )}
           </span>
           <div
@@ -505,6 +513,20 @@ export default function SessionView({
                     id="menu-go-to-project"
                   >
                     <IconFolder /> Go to Project
+                  </button>
+                )}
+
+                {isDraftSession && (
+                  <button
+                    className="menu-item"
+                    onClick={() => {
+                      onToggleDraftTrigger();
+                      onSetMenuOpen(false);
+                    }}
+                    id="menu-toggle-draft-trigger"
+                  >
+                    <IconClock size={14} strokeWidth={2} />
+                    {isDraftAutoSend ? "Switch to Manual Send" : "Switch to Auto Send"}
                   </button>
                 )}
 
@@ -791,6 +813,31 @@ export default function SessionView({
                 </div>
               )}
             </div>
+
+            {isNewDraft && (
+              <div className="sidebar-mode-toggle" role="tablist" aria-label="Send mode" style={{ width: "auto", flex: "1 1 100%" }}>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={draftTrigger === "codebaseReady"}
+                  className={`sidebar-mode-tab${draftTrigger === "codebaseReady" ? " active" : ""}`}
+                  onClick={() => onSetDraftTrigger("codebaseReady")}
+                  id="draft-trigger-auto"
+                >
+                  Auto — when idle &amp; clean
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={draftTrigger === "manual"}
+                  className={`sidebar-mode-tab${draftTrigger === "manual" ? " active" : ""}`}
+                  onClick={() => onSetDraftTrigger("manual")}
+                  id="draft-trigger-manual"
+                >
+                  Manual only
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -895,7 +942,7 @@ export default function SessionView({
               isRunnerOffline
                 ? "Runner is offline. Chat is disabled."
                 : isDraftSession
-                  ? "Draft — will send once no agent is running and the codebase is clean"
+                  ? "Draft — send it now, or it may send automatically once no agent is running and the codebase is clean"
                   : isNewDraft
                     ? "Describe what you want to do — unlike a Session, a Draft won't run right away. It's held and sent once no agent is running and the codebase is clean, or whenever you send it manually."
                     : isAgentRunning

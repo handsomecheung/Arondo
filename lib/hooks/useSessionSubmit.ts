@@ -12,6 +12,7 @@ interface UseSessionSubmitParams {
   runnerId: string;
   isNewSession: boolean;
   isNewDraft: boolean;
+  draftTrigger: "manual" | "codebaseReady";
   showCommandMenu: boolean;
   selectedSession: Session | null;
   selectedSessionId: string | null;
@@ -44,6 +45,7 @@ export function useSessionSubmit({
   runnerId,
   isNewSession,
   isNewDraft,
+  draftTrigger,
   showCommandMenu,
   selectedSession,
   selectedSessionId,
@@ -285,7 +287,7 @@ export function useSessionSubmit({
             repoPath: repoPath.trim(),
             agentType,
             runnerId,
-            ...(isNewDraft ? { isDraft: true } : {}),
+            ...(isNewDraft ? { isDraft: true, draftTrigger } : {}),
           }),
         });
         const newSession: Session = await res.json();
@@ -330,7 +332,7 @@ export function useSessionSubmit({
     } catch (err) {
       console.error(err);
     }
-  }, [prompt, repoPath, agentType, runnerId, isNewSession, isNewDraft, selectedSessionId, selectedSession, loadProjects, setTaskQueue, handleNewSessionCommand, sendAgentMessage, sessionScripts, handleScriptCommand, agentCommands, queueFollowupMessage]);
+  }, [prompt, repoPath, agentType, runnerId, isNewSession, isNewDraft, draftTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, handleNewSessionCommand, sendAgentMessage, sessionScripts, handleScriptCommand, agentCommands, queueFollowupMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return;
