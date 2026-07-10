@@ -5,6 +5,7 @@ import { AGENT_COMMANDS, mergeAgentCommands } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
 import { getConfigDir } from "@/lib/config";
 import { getArondoToken, getRoleByToken, isValidToken } from "@/lib/auth";
+import { withFileLock, writeJsonAtomic } from "@/lib/fileLock";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +24,21 @@ async function readCustomCommands(): Promise<AgentCommand[]> {
 }
 
 async function writeCustomCommands(commands: AgentCommand[]): Promise<void> {
-  await fs.mkdir(CONFIG_DIR, { recursive: true });
-  await fs.writeFile(COMMANDS_FILE, JSON.stringify(commands, null, 2));
+  await writeJsonAtomic(COMMANDS_FILE, commands);
+}
+
+// Serializes the read-modify-write cycle below against itself so concurrent
+// POST/DELETE requests can't race into a lost update or a corrupt file.
+// `mutator` returns the full command list to persist (in place or a new array).
+function updateCustomCommands(
+  mutator: (commands: AgentCommand[]) => AgentCommand[]
+): Promise<AgentCommand[]> {
+  return withFileLock(COMMANDS_FILE, async () => {
+    const commands = await readCustomCommands();
+    const result = mutator(commands);
+    await writeCustomCommands(result);
+    return result;
+  });
 }
 
 export async function GET(req: NextRequest) {
@@ -50,14 +64,15 @@ export async function POST(req: NextRequest) {
   if (!body.command || !body.send) {
     return NextResponse.json({ error: "command and send are required" }, { status: 400 });
   }
-  const custom = await readCustomCommands();
-  const idx = custom.findIndex((c) => c.command === body.command);
-  if (idx >= 0) {
-    custom[idx] = body;
-  } else {
-    custom.push(body);
-  }
-  await writeCustomCommands(custom);
+  const custom = await updateCustomCommands((commands) => {
+    const idx = commands.findIndex((c) => c.command === body.command);
+    if (idx >= 0) {
+      commands[idx] = body;
+    } else {
+      commands.push(body);
+    }
+    return commands;
+  });
   return NextResponse.json(custom);
 }
 
@@ -72,8 +87,8 @@ export async function DELETE(req: NextRequest) {
   if (!command) {
     return NextResponse.json({ error: "command query param is required" }, { status: 400 });
   }
-  const custom = await readCustomCommands();
-  const filtered = custom.filter((c) => c.command !== command);
-  await writeCustomCommands(filtered);
+  const filtered = await updateCustomCommands((commands) =>
+    commands.filter((c) => c.command !== command)
+  );
   return NextResponse.json(filtered);
 }

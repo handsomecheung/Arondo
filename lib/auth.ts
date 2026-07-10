@@ -6,6 +6,7 @@ import fsSync from "fs";
 import path from "path";
 import crypto from "crypto";
 import { getConfigDir } from "./config";
+import { withFileLock, writeJsonAtomic } from "./fileLock";
 
 const CONFIG_DIR = getConfigDir();
 const TOKENS_FILE = path.join(CONFIG_DIR, "tokens.json");
@@ -78,31 +79,46 @@ export async function readTokensConfig(): Promise<TokensConfig> {
 }
 
 export async function writeTokensConfig(config: TokensConfig): Promise<void> {
-  await fs.mkdir(CONFIG_DIR, { recursive: true });
-  await fs.writeFile(TOKENS_FILE, JSON.stringify(config, null, 2), "utf-8");
+  await writeJsonAtomic(TOKENS_FILE, config);
+}
+
+// Runs `mutator` under a per-file lock against tokens.json, serialized
+// against every other reader/writer of this helper (including
+// bindRunnerToken and the runner/client token API routes) so concurrent
+// runner reconnects or admin edits can't race into a lost update or
+// corrupt the file that gates all authentication.
+export async function updateTokensConfig<T>(
+  mutator: (config: TokensConfig) => T | Promise<T>
+): Promise<T> {
+  return withFileLock(TOKENS_FILE, async () => {
+    const config = await readTokensConfig();
+    const result = await mutator(config);
+    await writeTokensConfig(config);
+    return result;
+  });
 }
 
 export async function initializeAuth(): Promise<void> {
   try {
+    await updateTokensConfig((config) => {
+      const hasAdmin = config.clients.some((t) => t.type === "admin");
+      if (!hasAdmin) {
+        const generatedAdminToken = generateToken();
+        config.clients.push({
+          token: generatedAdminToken,
+          uuid: generateUUID(),
+          name: "Default Admin",
+          type: "admin",
+        });
+
+        console.log("\n========================================================");
+        console.log(`🔑 GENERATED ADMIN ACCESS TOKEN:\n\n   ${generatedAdminToken}\n`);
+        console.log("   Please save this token. It has been written to tokens.json");
+        console.log("========================================================\n");
+      }
+    });
+
     const config = await readTokensConfig();
-
-    const hasAdmin = config.clients.some((t) => t.type === "admin");
-    if (!hasAdmin) {
-      const generatedAdminToken = generateToken();
-      config.clients.push({
-        token: generatedAdminToken,
-        uuid: generateUUID(),
-        name: "Default Admin",
-        type: "admin",
-      });
-
-      console.log("\n========================================================");
-      console.log(`🔑 GENERATED ADMIN ACCESS TOKEN:\n\n   ${generatedAdminToken}\n`);
-      console.log("   Please save this token. It has been written to tokens.json");
-      console.log("========================================================\n");
-    }
-
-    await writeTokensConfig(config);
     cachedTokens = config.clients;
   } catch (err) {
     console.error("[auth] Failed to initialize tokens.json:", err);
@@ -181,15 +197,15 @@ export async function findRunnerTokenByToken(token: string | null): Promise<Runn
 // to a different runner (blocks token replay to hijack another runner's
 // identity).
 export async function bindRunnerToken(tokenId: string, runnerId: string): Promise<RunnerTokenInfo | null> {
-  const config = await readTokensConfig();
-  const record = config.runners.find((r) => r.id === tokenId);
-  if (!record) return null;
-  if (record.boundRunnerId && record.boundRunnerId !== runnerId) return null;
+  return updateTokensConfig((config) => {
+    const record = config.runners.find((r) => r.id === tokenId);
+    if (!record) return null;
+    if (record.boundRunnerId && record.boundRunnerId !== runnerId) return null;
 
-  record.boundRunnerId = runnerId;
-  record.lastUsedAt = Date.now();
-  await writeTokensConfig(config);
-  return record;
+    record.boundRunnerId = runnerId;
+    record.lastUsedAt = Date.now();
+    return record;
+  });
 }
 
 export function isValidToken(token: string | null): boolean {

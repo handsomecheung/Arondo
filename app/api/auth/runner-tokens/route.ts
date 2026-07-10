@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getArondoToken, getRoleByToken, readTokensConfig, writeTokensConfig, generateToken } from "@/lib/auth";
+import { getArondoToken, getRoleByToken, readTokensConfig, updateTokensConfig, generateToken } from "@/lib/auth";
 import { runnerManager } from "@/lib/runner-manager";
 import crypto from "crypto";
 
@@ -49,18 +49,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
-    const config = await readTokensConfig();
-
     const generatedRunnerToken = generateToken();
-    config.runners.push({
-      id: generateUUID(),
-      token: generatedRunnerToken,
-      name: name.trim(),
-      createdAt: Date.now(),
-      boundRunnerId: null,
+    await updateTokensConfig((config) => {
+      config.runners.push({
+        id: generateUUID(),
+        token: generatedRunnerToken,
+        name: name.trim(),
+        createdAt: Date.now(),
+        boundRunnerId: null,
+      });
     });
-
-    await writeTokensConfig(config);
 
     return NextResponse.json({
       success: true,
@@ -85,20 +83,21 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "id and name are required" }, { status: 400 });
     }
 
-    const config = await readTokensConfig();
+    const boundRunnerId = await updateTokensConfig((config) => {
+      const record = config.runners.find((r) => r.id === id);
+      if (!record) return undefined;
+      record.name = name.trim();
+      return record.boundRunnerId;
+    });
 
-    const record = config.runners.find((r) => r.id === id);
-    if (!record) {
+    if (boundRunnerId === undefined) {
       return NextResponse.json({ error: "Runner token not found" }, { status: 404 });
     }
 
-    record.name = name.trim();
-    await writeTokensConfig(config);
-
     // Push the new name to the bound runner immediately, rather than
     // waiting for it to reconnect and re-register.
-    if (record.boundRunnerId) {
-      await runnerManager.updateRunnerName(record.boundRunnerId, record.name);
+    if (boundRunnerId) {
+      await runnerManager.updateRunnerName(boundRunnerId, name.trim());
     }
 
     return NextResponse.json({ success: true });
@@ -122,21 +121,22 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Missing runner token id" }, { status: 400 });
     }
 
-    const config = await readTokensConfig();
+    const revokedBoundRunnerId = await updateTokensConfig((config) => {
+      const tokenIndex = config.runners.findIndex((r) => r.id === id);
+      if (tokenIndex === -1) return undefined;
+      const revoked = config.runners[tokenIndex];
+      config.runners.splice(tokenIndex, 1);
+      return revoked.boundRunnerId ?? null;
+    });
 
-    const tokenIndex = config.runners.findIndex((r) => r.id === id);
-    if (tokenIndex === -1) {
+    if (revokedBoundRunnerId === undefined) {
       return NextResponse.json({ error: "Runner token not found" }, { status: 404 });
     }
 
-    const revoked = config.runners[tokenIndex];
-    config.runners.splice(tokenIndex, 1);
-    await writeTokensConfig(config);
-
     // Kick the currently connected runner off immediately so a revoked token
     // can't keep authorizing an already-established connection.
-    if (revoked.boundRunnerId) {
-      runnerManager.forceDisconnectRunner(revoked.boundRunnerId);
+    if (revokedBoundRunnerId) {
+      runnerManager.forceDisconnectRunner(revokedBoundRunnerId);
     }
 
     return NextResponse.json({ success: true });

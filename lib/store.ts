@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import { getConfigDir } from "./config";
+import { withFileLock, writeJsonAtomic } from "./fileLock";
 
 const CONFIG_DIR = getConfigDir();
 const SESSIONS_DIR = path.join(CONFIG_DIR, "sessions");
@@ -110,7 +111,7 @@ async function readJson<T>(filePath: string, defaultValue: T): Promise<T> {
 
 async function writeJson<T>(filePath: string, data: T): Promise<void> {
   await ensureDir(path.dirname(filePath));
-  await fs.writeFile(filePath, JSON.stringify(data, null, 2), "utf-8");
+  await writeJsonAtomic(filePath, data);
 }
 
 // ─── Sessions ─────────────────────────────────────────────────────────────────
@@ -238,32 +239,35 @@ export async function addProjectScript(
 ): Promise<ProjectScript[]> {
   const settingsDir = getProjectSettingsDir(projectId);
   await ensureDir(settingsDir);
-  let scripts = await getProjectScripts(projectId);
-  
-  if (oldName && oldName !== script.name) {
-    scripts = scripts.filter((s) => s.name !== oldName);
-  }
-  
-  const index = scripts.findIndex((s) => s.name === script.name);
-  if (index >= 0) {
-    scripts[index] = script;
-  } else {
-    scripts.push(script);
-  }
-  
   const filePath = path.join(settingsDir, "scripts.json");
-  await writeJson(filePath, scripts);
-  return scripts;
+  return withFileLock(filePath, async () => {
+    let scripts = await readJson<ProjectScript[]>(filePath, []);
+
+    if (oldName && oldName !== script.name) {
+      scripts = scripts.filter((s) => s.name !== oldName);
+    }
+
+    const index = scripts.findIndex((s) => s.name === script.name);
+    if (index >= 0) {
+      scripts[index] = script;
+    } else {
+      scripts.push(script);
+    }
+
+    await writeJson(filePath, scripts);
+    return scripts;
+  });
 }
 
 export async function deleteProjectScript(projectId: string, scriptName: string): Promise<ProjectScript[]> {
   const settingsDir = getProjectSettingsDir(projectId);
-  const scripts = await getProjectScripts(projectId);
-  const filtered = scripts.filter((s) => s.name !== scriptName);
-  
   const filePath = path.join(settingsDir, "scripts.json");
-  await writeJson(filePath, filtered);
-  return filtered;
+  return withFileLock(filePath, async () => {
+    const scripts = await readJson<ProjectScript[]>(filePath, []);
+    const filtered = scripts.filter((s) => s.name !== scriptName);
+    await writeJson(filePath, filtered);
+    return filtered;
+  });
 }
 
 export async function saveProjectScripts(
@@ -273,8 +277,10 @@ export async function saveProjectScripts(
   const settingsDir = getProjectSettingsDir(projectId);
   await ensureDir(settingsDir);
   const filePath = path.join(settingsDir, "scripts.json");
-  await writeJson(filePath, scripts);
-  return scripts;
+  return withFileLock(filePath, async () => {
+    await writeJson(filePath, scripts);
+    return scripts;
+  });
 }
 
 
@@ -299,17 +305,20 @@ export async function updateSession(
   id: string,
   patch: Partial<Omit<Session, "id" | "createdAt">>
 ): Promise<Session | undefined> {
-  const session = await getSession(id);
-  if (!session) return undefined;
-  
-  const updated: Session = {
-    ...session,
-    ...patch,
-    updatedAt: new Date().toISOString(),
-  };
-  
-  await writeJson(getSessionFilePath(id), updated);
-  return updated;
+  const filePath = getSessionFilePath(id);
+  return withFileLock(filePath, async () => {
+    const session = await readJson<Session | null>(filePath, null);
+    if (!session) return undefined;
+
+    const updated: Session = {
+      ...session,
+      ...patch,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await writeJson(filePath, updated);
+    return updated;
+  });
 }
 
 // ─── Messages ─────────────────────────────────────────────────────────────────
@@ -322,15 +331,18 @@ export async function addMessage(
   data: Omit<Message, "id" | "createdAt">
 ): Promise<Message> {
   const { sessionId, projectId } = data;
-  const all = await getMessages(sessionId, projectId);
-  const message: Message = {
-    ...data,
-    id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
-  };
-  all.push(message);
-  await writeJson(getMessagesFilePath(sessionId, projectId), all);
-  return message;
+  const filePath = getMessagesFilePath(sessionId, projectId);
+  return withFileLock(filePath, async () => {
+    const all = await readJson<Message[]>(filePath, []);
+    const message: Message = {
+      ...data,
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+    };
+    all.push(message);
+    await writeJson(filePath, all);
+    return message;
+  });
 }
 
 export async function updateMessage(
@@ -339,17 +351,20 @@ export async function updateMessage(
   patch: Partial<Omit<Message, "id" | "createdAt">>,
   projectId?: string
 ): Promise<Message | undefined> {
-  const all = await getMessages(sessionId, projectId);
-  const index = all.findIndex((m) => m.id === messageId);
-  if (index === -1) return undefined;
-  
-  const updated: Message = {
-    ...all[index],
-    ...patch,
-  };
-  all[index] = updated;
-  await writeJson(getMessagesFilePath(sessionId, projectId), all);
-  return updated;
+  const filePath = getMessagesFilePath(sessionId, projectId);
+  return withFileLock(filePath, async () => {
+    const all = await readJson<Message[]>(filePath, []);
+    const index = all.findIndex((m) => m.id === messageId);
+    if (index === -1) return undefined;
+
+    const updated: Message = {
+      ...all[index],
+      ...patch,
+    };
+    all[index] = updated;
+    await writeJson(filePath, all);
+    return updated;
+  });
 }
 
 // ─── Logs ─────────────────────────────────────────────────────────────────────
@@ -479,42 +494,48 @@ export async function getScheduledTask(id: string): Promise<ScheduledTask | unde
 export async function addScheduledTask(
   data: Omit<ScheduledTask, "id" | "createdAt" | "status">
 ): Promise<ScheduledTask> {
-  const tasks = await getScheduledTasksRaw();
-  const task: ScheduledTask = {
-    ...data,
-    id: crypto.randomUUID(),
-    createdAt: Date.now(),
-    status: "pending",
-  };
-  tasks.push(task);
-  await writeScheduledTasks(tasks);
-  return task;
+  return withFileLock(SCHEDULED_TASKS_FILE, async () => {
+    const tasks = await getScheduledTasksRaw();
+    const task: ScheduledTask = {
+      ...data,
+      id: crypto.randomUUID(),
+      createdAt: Date.now(),
+      status: "pending",
+    };
+    tasks.push(task);
+    await writeScheduledTasks(tasks);
+    return task;
+  });
 }
 
 export async function updateScheduledTask(
   id: string,
   patch: Partial<Omit<ScheduledTask, "id" | "createdAt">>
 ): Promise<ScheduledTask | undefined> {
-  const tasks = await getScheduledTasksRaw();
-  const index = tasks.findIndex((t) => t.id === id);
-  if (index === -1) return undefined;
-  const updated: ScheduledTask = { ...tasks[index], ...patch };
-  tasks[index] = updated;
-  await writeScheduledTasks(tasks);
-  return updated;
+  return withFileLock(SCHEDULED_TASKS_FILE, async () => {
+    const tasks = await getScheduledTasksRaw();
+    const index = tasks.findIndex((t) => t.id === id);
+    if (index === -1) return undefined;
+    const updated: ScheduledTask = { ...tasks[index], ...patch };
+    tasks[index] = updated;
+    await writeScheduledTasks(tasks);
+    return updated;
+  });
 }
 
 export async function removeScheduledTasksForSession(sessionId: string): Promise<void> {
-  const tasks = await getScheduledTasksRaw();
-  const filtered = tasks.filter((t) => {
-    if (t.trigger.kind === "afterSession" && t.trigger.sessionId === sessionId) return false;
-    if (t.action.kind === "sendMessage" && t.action.sessionId === sessionId) return false;
-    if (t.action.kind === "runScript" && t.action.sessionId === sessionId) return false;
-    return true;
+  return withFileLock(SCHEDULED_TASKS_FILE, async () => {
+    const tasks = await getScheduledTasksRaw();
+    const filtered = tasks.filter((t) => {
+      if (t.trigger.kind === "afterSession" && t.trigger.sessionId === sessionId) return false;
+      if (t.action.kind === "sendMessage" && t.action.sessionId === sessionId) return false;
+      if (t.action.kind === "runScript" && t.action.sessionId === sessionId) return false;
+      return true;
+    });
+    if (filtered.length !== tasks.length) {
+      await writeScheduledTasks(filtered);
+    }
   });
-  if (filtered.length !== tasks.length) {
-    await writeScheduledTasks(filtered);
-  }
 }
 
 export async function deleteSession(id: string): Promise<void> {

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import crypto from 'crypto';
 
 test.describe('Runners API tests', () => {
   test('should allow listing runners for both admin and regular user', async ({ request }) => {
@@ -69,5 +70,47 @@ test.describe('Runners API tests', () => {
     expect(response.status()).toBe(200);
     const json = await response.json();
     expect(json.success).toBeFalsy();
+  });
+
+  // Regression test: concurrent runner-token creation used to race on the
+  // same tokens.json read-modify-write, potentially dropping a token that
+  // another concurrent create had just written. Now serialized via
+  // updateTokensConfig()'s per-file lock in lib/auth.ts.
+  test('concurrent runner token creation does not corrupt tokens.json or drop tokens', async ({ request }) => {
+    const total = 15;
+    const names = Array.from({ length: total }, (_, i) => `Concurrent Runner Token ${crypto.randomUUID()}-${i}`);
+
+    const createResponses = await Promise.all(
+      names.map((name) =>
+        request.post('/api/auth/runner-tokens', {
+          headers: { 'x-arondo-token': 'test-token-123456' },
+          data: { name },
+        })
+      )
+    );
+
+    for (const res of createResponses) {
+      expect(res.status()).toBe(200);
+    }
+
+    const listRes = await request.get('/api/auth/runner-tokens', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+    });
+    expect(listRes.status()).toBe(200);
+    const tokens = await listRes.json();
+
+    for (const name of names) {
+      expect(tokens.some((t: any) => t.name === name)).toBeTruthy();
+    }
+
+    // Clean up the tokens created by this test.
+    const ids = tokens.filter((t: any) => names.includes(t.name)).map((t: any) => t.id);
+    await Promise.all(
+      ids.map((id: string) =>
+        request.delete(`/api/auth/runner-tokens?id=${id}`, {
+          headers: { 'x-arondo-token': 'test-token-123456' },
+        })
+      )
+    );
   });
 });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getArondoToken, getRoleByToken, TokenInfo, readTokensConfig, writeTokensConfig, generateToken } from "@/lib/auth";
+import { getArondoToken, getRoleByToken, TokenInfo, readTokensConfig, updateTokensConfig, generateToken } from "@/lib/auth";
 import crypto from "crypto";
 
 function generateUUID(): string {
@@ -39,18 +39,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
-    const config = await readTokensConfig();
-
     // Generate a secure user token
     const generatedUserToken = generateToken();
-    config.clients.push({
-      token: generatedUserToken,
-      uuid: generateUUID(),
-      name: name.trim(),
-      type: "user"
+    await updateTokensConfig((config) => {
+      config.clients.push({
+        token: generatedUserToken,
+        uuid: generateUUID(),
+        name: name.trim(),
+        type: "user"
+      });
     });
-
-    await writeTokensConfig(config);
 
     return NextResponse.json({
       success: true,
@@ -75,16 +73,16 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "role, token and name are required" }, { status: 400 });
     }
 
-    const config = await readTokensConfig();
+    const found = await updateTokensConfig((config) => {
+      const tokenIndex = config.clients.findIndex(t => t.token === targetToken && t.type === targetRole);
+      if (tokenIndex === -1) return false;
+      config.clients[tokenIndex].name = name.trim();
+      return true;
+    });
 
-    const tokenIndex = config.clients.findIndex(t => t.token === targetToken && t.type === targetRole);
-    if (tokenIndex === -1) {
+    if (!found) {
       return NextResponse.json({ error: "Token not found" }, { status: 404 });
     }
-
-    config.clients[tokenIndex].name = name.trim();
-
-    await writeTokensConfig(config);
 
     return NextResponse.json({ success: true });
   } catch (err) {
@@ -109,16 +107,16 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Missing role or token" }, { status: 400 });
     }
 
-    const config = await readTokensConfig();
+    const found = await updateTokensConfig((config) => {
+      const tokenIndex = config.clients.findIndex(t => t.token === targetToken && t.type === targetRole);
+      if (tokenIndex === -1) return false;
+      config.clients.splice(tokenIndex, 1);
+      return true;
+    });
 
-    const tokenIndex = config.clients.findIndex(t => t.token === targetToken && t.type === targetRole);
-    if (tokenIndex === -1) {
+    if (!found) {
       return NextResponse.json({ error: "Token not found" }, { status: 404 });
     }
-
-    config.clients.splice(tokenIndex, 1);
-
-    await writeTokensConfig(config);
 
     return NextResponse.json({ success: true });
   } catch (err) {

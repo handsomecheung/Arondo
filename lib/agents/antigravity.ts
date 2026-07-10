@@ -3,6 +3,7 @@ import fsSync from "fs";
 import path from "path";
 import { BaseAgent, AgentRunOptions, PROMPT_ENV_VAR } from "./base";
 import { getConfigDir } from "../config";
+import { withFileLock, writeJsonAtomic } from "../fileLock";
 
 const CONFIG_DIR = getConfigDir();
 const AGY_SESSION_MAP_FILE = path.join(CONFIG_DIR, "agy-sessions.json");
@@ -29,14 +30,15 @@ export async function getAgySessionId(sessionId: string): Promise<string | undef
 
 export async function saveAgySessionId(sessionId: string, agyId: string): Promise<void> {
   try {
-    await fs.mkdir(path.dirname(AGY_SESSION_MAP_FILE), { recursive: true });
-    let map: Record<string, string> = {};
-    try {
-      const raw = await fs.readFile(AGY_SESSION_MAP_FILE, "utf-8");
-      map = JSON.parse(raw);
-    } catch {}
-    map[sessionId] = agyId;
-    await fs.writeFile(AGY_SESSION_MAP_FILE, JSON.stringify(map, null, 2), "utf-8");
+    await withFileLock(AGY_SESSION_MAP_FILE, async () => {
+      let map: Record<string, string> = {};
+      try {
+        const raw = await fs.readFile(AGY_SESSION_MAP_FILE, "utf-8");
+        map = JSON.parse(raw);
+      } catch {}
+      map[sessionId] = agyId;
+      await writeJsonAtomic(AGY_SESSION_MAP_FILE, map);
+    });
   } catch (err) {
     console.error("Failed to save agy session mapping:", err);
   }
