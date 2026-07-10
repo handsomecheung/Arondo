@@ -13,6 +13,7 @@ import {
   IconGitPullRequest, IconPlay, IconTerminal, IconEdit, IconTrash,
   IconMoreVertical, IconFolder, IconChevronDown, IconFileSearch,
   IconClaude, IconAntigravity, IconCodex, IconFileText, IconClock,
+  IconArchive,
 } from "@/components/Icons";
 import { getTriggerWord, resolveAgentCommand } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
@@ -33,6 +34,8 @@ interface SessionViewProps {
   prompt: string;
   isAgentRunning: boolean;
   isRunning: boolean;
+  isArchived: boolean;
+  onUnarchiveSession: () => void;
   isDraftSession: boolean;
   isDraftAutoSend: boolean;
   draftTrigger: "manual" | "codebaseReady";
@@ -73,6 +76,7 @@ interface SessionViewProps {
   onRestartScriptCard: (msgId: string, scriptName: string) => void;
   onRetryCard: (cardInfo: ExecCardInfo) => void;
   onSubmit: () => void;
+  onArchiveSession: (id: string) => void;
   onSendDraftNow: () => void;
   onToggleDraftTrigger: () => void;
   onPromptChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
@@ -110,6 +114,8 @@ export default function SessionView({
   prompt,
   isAgentRunning,
   isRunning,
+  isArchived,
+  onUnarchiveSession,
   isDraftSession,
   isDraftAutoSend,
   draftTrigger,
@@ -150,6 +156,7 @@ export default function SessionView({
   onRestartScriptCard,
   onRetryCard,
   onSubmit,
+  onArchiveSession,
   onSendDraftNow,
   onToggleDraftTrigger,
   onPromptChange,
@@ -295,8 +302,8 @@ export default function SessionView({
               <div ref={agentSwitchRef} style={{ position: "relative", flexShrink: 0 }}>
                 <button
                   type="button"
-                  onClick={() => !isRunning && setAgentSwitchOpen(!agentSwitchOpen)}
-                  disabled={isRunning}
+                  onClick={() => !isRunning && !isArchived && setAgentSwitchOpen(!agentSwitchOpen)}
+                  disabled={isRunning || isArchived}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -390,7 +397,33 @@ export default function SessionView({
               <IconMoreVertical />
             </button>
 
-            {menuOpen && (
+            {menuOpen && isArchived && (
+              <div className="session-dropdown-menu">
+                <button
+                  className="menu-item"
+                  onClick={() => {
+                    onUnarchiveSession();
+                    onSetMenuOpen(false);
+                  }}
+                  id="menu-unarchive-session"
+                >
+                  <IconArchive /> Unarchive
+                </button>
+
+                <button
+                  className="menu-item delete"
+                  onClick={() => {
+                    onDeleteSession(selectedSessionId!);
+                    onSetMenuOpen(false);
+                  }}
+                  id="menu-delete-session"
+                >
+                  <IconTrash /> Delete
+                </button>
+              </div>
+            )}
+
+            {menuOpen && !isArchived && (
               <div className="session-dropdown-menu">
                 {!isGitRepo ? (
                   <button
@@ -538,7 +571,24 @@ export default function SessionView({
                   }}
                   id="menu-rename-session"
                 >
-                  <IconEdit /> Rename Session
+                  <IconEdit /> Rename
+                </button>
+
+                <button
+                  className="menu-item"
+                  onClick={() => {
+                    onArchiveSession(selectedSessionId!);
+                    onSetMenuOpen(false);
+                  }}
+                  disabled={isRunning}
+                  title={
+                    isRunning
+                      ? "Cannot archive a running session"
+                      : undefined
+                  }
+                  id="menu-archive-session"
+                >
+                  <IconArchive /> Archive
                 </button>
 
                 <button
@@ -555,7 +605,7 @@ export default function SessionView({
                   }
                   id="menu-delete-session"
                 >
-                  <IconTrash /> Delete Session
+                  <IconTrash /> Delete
                 </button>
               </div>
             )}
@@ -939,7 +989,9 @@ export default function SessionView({
             ref={textareaRef}
             className="chat-input"
             placeholder={
-              isRunnerOffline
+              isArchived
+                ? "This session is archived. Unarchive it to send messages."
+                : isRunnerOffline
                 ? "Runner is offline. Chat is disabled."
                 : isDraftSession
                   ? "Draft — send it now, or it may send automatically once no agent is running and the codebase is clean"
@@ -954,8 +1006,8 @@ export default function SessionView({
             value={isDraftSession ? selectedSession?.prompt ?? "" : prompt}
             onChange={onPromptChange}
             onKeyDown={onKeyDown}
-            disabled={isRunnerOffline || isDraftSession}
-            readOnly={isDraftSession}
+            disabled={isRunnerOffline || isDraftSession || isArchived}
+            readOnly={isDraftSession || isArchived}
             rows={1}
             id="chat-input"
           />

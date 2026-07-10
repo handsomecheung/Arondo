@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { IconPlus, IconInbox, IconSettings, IconServer } from "@/components/Icons";
+import { IconPlus, IconInbox, IconSettings, IconServer, IconMoreVertical, IconArchive, IconArrowLeft } from "@/components/Icons";
 import { formatRelative } from "@/lib/homeUtils";
 import type { Session, Project, Runner } from "@/types/home";
 
@@ -19,6 +19,11 @@ interface Props {
   onSelectProject: (id: string) => void;
   onNewSession: () => void;
   onNewDraft: () => void;
+  archivedView: boolean;
+  archivedSessions: Session[];
+  onOpenArchivedSessions: () => void;
+  onCloseArchivedSessions: () => void;
+  onSelectArchivedSession: (id: string) => void;
 }
 
 export default function AppSidebar({
@@ -36,8 +41,15 @@ export default function AppSidebar({
   onSelectProject,
   onNewSession,
   onNewDraft,
+  archivedView,
+  archivedSessions,
+  onOpenArchivedSessions,
+  onCloseArchivedSessions,
+  onSelectArchivedSession,
 }: Props) {
   const [userRole, setUserRole] = useState<"admin" | "user" | null>(null);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/auth/verify")
@@ -46,6 +58,16 @@ export default function AppSidebar({
         if (data.valid) setUserRole(data.role);
       })
       .catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
+        setMoreMenuOpen(false);
+      }
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
   return (
@@ -57,35 +79,138 @@ export default function AppSidebar({
       />
       <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="sidebar-header" style={{ flexDirection: "column", gap: 12, alignItems: "stretch" }}>
-          <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8 }}>
-            <button className="new-task-btn" onClick={onNewSession} id="new-session-btn">
-              <IconPlus /> New Session
-            </button>
-            <button className="new-task-btn" onClick={onNewDraft} id="new-draft-btn">
-              <IconPlus /> New Draft
-            </button>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+            <div ref={moreMenuRef} style={{ position: "relative" }}>
+              <button
+                className="menu-trigger-btn"
+                onClick={() => setMoreMenuOpen(!moreMenuOpen)}
+                id="sidebar-more-menu-btn"
+                title="More"
+              >
+                <IconMoreVertical />
+              </button>
+
+              {moreMenuOpen && (
+                <div className="session-dropdown-menu" style={{ left: 0, right: "auto" }}>
+                  <Link
+                    href="/runners"
+                    className="menu-item"
+                    onClick={() => {
+                      setMoreMenuOpen(false);
+                      onCloseSidebar();
+                    }}
+                    id="menu-runners"
+                  >
+                    <IconServer /> Runners
+                  </Link>
+                  {userRole === "admin" && (
+                    <Link
+                      href="/settings"
+                      className="menu-item"
+                      onClick={() => {
+                        setMoreMenuOpen(false);
+                        onCloseSidebar();
+                      }}
+                      id="menu-settings"
+                    >
+                      <IconSettings /> Settings
+                    </Link>
+                  )}
+                  <button
+                    className="menu-item"
+                    onClick={() => {
+                      setMoreMenuOpen(false);
+                      onOpenArchivedSessions();
+                    }}
+                    id="menu-archived-sessions"
+                  >
+                    <IconArchive /> Archived Sessions
+                  </button>
+                </div>
+              )}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button className="new-task-btn" onClick={onNewSession} id="new-session-btn">
+                <IconPlus /> Session
+              </button>
+              <button className="new-task-btn" onClick={onNewDraft} id="new-draft-btn">
+                <IconPlus /> Draft
+              </button>
+            </div>
           </div>
-          <div className="sidebar-mode-toggle" role="tablist" aria-label="View mode">
+          {archivedView ? (
             <button
-              role="tab"
-              aria-selected={sidebarMode === "sessions"}
-              className={`sidebar-mode-tab${sidebarMode === "sessions" ? " active" : ""}`}
-              onClick={() => onSetSidebarMode("sessions")}
+              className="sidebar-settings-link"
+              onClick={onCloseArchivedSessions}
+              id="close-archived-sessions-btn"
+              style={{ width: "100%", color: "var(--text-muted)" }}
             >
-              Sessions
+              <IconArrowLeft />
+              <span>Archived Sessions</span>
             </button>
-            <button
-              role="tab"
-              aria-selected={sidebarMode === "projects"}
-              className={`sidebar-mode-tab${sidebarMode === "projects" ? " active" : ""}`}
-              onClick={() => onSetSidebarMode("projects")}
-            >
-              Projects
-            </button>
-          </div>
+          ) : (
+            <div className="sidebar-mode-toggle" role="tablist" aria-label="View mode">
+              <button
+                role="tab"
+                aria-selected={sidebarMode === "sessions"}
+                className={`sidebar-mode-tab${sidebarMode === "sessions" ? " active" : ""}`}
+                onClick={() => onSetSidebarMode("sessions")}
+              >
+                Sessions
+              </button>
+              <button
+                role="tab"
+                aria-selected={sidebarMode === "projects"}
+                className={`sidebar-mode-tab${sidebarMode === "projects" ? " active" : ""}`}
+                onClick={() => onSetSidebarMode("projects")}
+              >
+                Projects
+              </button>
+            </div>
+          )}
         </div>
         <div className="task-list">
-          {sidebarMode === "sessions" ? (
+          {archivedView ? (
+            archivedSessions.length === 0 ? (
+              <div className="empty-state">
+                <IconArchive size={32} />
+                <p>No archived sessions.</p>
+              </div>
+            ) : (
+              archivedSessions.map((session) => {
+                const project = projects.find((p) => p.id === session.projectId);
+                const projectName = project ? project.repoPath.split("/").pop() || project.repoPath : "";
+                return (
+                  <div
+                    key={`archived-session-${session.id}`}
+                    className={`task-item ${selectedSessionId === session.id ? "active" : ""}`}
+                    onClick={() => onSelectArchivedSession(session.id)}
+                    id={`archived-session-item-${session.id}`}
+                  >
+                    <div className="task-item-header">
+                      <span className={`task-status-badge ${session.status}`}>{session.status}</span>
+                      {projectName && (
+                        <span
+                          className="task-item-project-badge"
+                          title={project?.repoPath}
+                          style={{
+                            fontSize: 10, fontWeight: 500, color: "var(--text-secondary)",
+                            backgroundColor: "rgba(255, 255, 255, 0.06)", border: "1px solid var(--border)",
+                            padding: "1px 6px", borderRadius: "4px", maxWidth: "120px",
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          }}
+                        >
+                          {projectName}
+                        </span>
+                      )}
+                    </div>
+                    <div className="task-item-prompt">{session.name || session.prompt}</div>
+                    <div className="task-item-time">{formatRelative(session.updatedAt)}</div>
+                  </div>
+                );
+              })
+            )
+          ) : sidebarMode === "sessions" ? (
             sortedSessions.length === 0 ? (
               <div className="empty-state">
                 <IconInbox />
@@ -210,18 +335,6 @@ export default function AppSidebar({
                 );
               })
             )
-          )}
-        </div>
-        <div className="sidebar-footer" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <Link href="/runners" className="sidebar-settings-link" onClick={onCloseSidebar}>
-            <IconServer />
-            <span>Runners</span>
-          </Link>
-          {userRole === "admin" && (
-            <Link href="/settings" className="sidebar-settings-link" onClick={onCloseSidebar}>
-              <IconSettings />
-              <span>Settings</span>
-            </Link>
           )}
         </div>
       </aside>

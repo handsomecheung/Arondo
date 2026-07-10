@@ -1,6 +1,6 @@
 import path from "path";
 import { NextRequest, NextResponse } from "next/server";
-import { getSessions, getProjects, deleteSession, createSession, addScheduledTask } from "@/lib/store";
+import { getSessions, getProjects, deleteSession, archiveSession, createSession, addScheduledTask, SESSION_ARCHIVE_AGE_MS } from "@/lib/store";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken, getUuidByToken } from "@/lib/auth";
@@ -43,6 +43,16 @@ export async function GET(request: NextRequest) {
       eventBus.publish({ type: "session_deleted", payload: { id: session.id } });
       continue;
     }
+
+    const isActive = session.status === "running" || session.status === "script-running";
+    const isStale = Date.now() - new Date(session.updatedAt).getTime() > SESSION_ARCHIVE_AGE_MS;
+    if (!isActive && isStale && session.archivedManually !== false) {
+      console.log(`[sessions] session ${session.id} last updated over ${SESSION_ARCHIVE_AGE_MS / (24 * 60 * 60 * 1000)} days ago, archiving`);
+      await archiveSession(session.id);
+      eventBus.publish({ type: "session_deleted", payload: { id: session.id } });
+      continue;
+    }
+
     valid.push(session);
   }
 

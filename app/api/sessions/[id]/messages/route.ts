@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dispatchFollowupMessage } from "@/lib/session-actions";
+import { isSessionArchived } from "@/lib/store";
 import { getArondoToken, verifySessionPermission, getUuidByToken } from "@/lib/auth";
 
 export async function POST(
@@ -10,6 +11,10 @@ export async function POST(
   const token = getArondoToken(req);
   if (!(await verifySessionPermission(id, token))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (isSessionArchived(id)) {
+    return NextResponse.json({ error: "Session is archived. Unarchive it to send messages." }, { status: 403 });
   }
 
   const { message, type, prompt } = await req.json();

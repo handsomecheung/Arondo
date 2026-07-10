@@ -89,6 +89,8 @@ export default function HomePage() {
   const [draftTrigger, setDraftTrigger] = useState<"manual" | "codebaseReady">("codebaseReady");
   const [autoDraftSessionIds, setAutoDraftSessionIds] = useState<Set<string>>(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [archivedView, setArchivedView] = useState(false);
+  const [archivedSessions, setArchivedSessions] = useState<Session[]>([]);
 
   // Custom dropdown states & refs
   const [runnerDropdownOpen, setRunnerDropdownOpen] = useState(false);
@@ -187,7 +189,11 @@ export default function HomePage() {
   });
 
   const selectedSession =
-    sessions.find((s) => s.id === selectedSessionId) ?? null;
+    sessions.find((s) => s.id === selectedSessionId) ??
+    archivedSessions.find((s) => s.id === selectedSessionId) ??
+    null;
+  const isArchivedSession = !sessions.some((s) => s.id === selectedSessionId)
+    && archivedSessions.some((s) => s.id === selectedSessionId);
   const isRunning =
     selectedSession?.status === "running" ||
     selectedSession?.status === "script-running";
@@ -426,6 +432,77 @@ export default function HomePage() {
       .catch(console.error);
   }, []);
 
+  const loadArchivedSessions = useCallback(() => {
+    fetch("/api/sessions/archived")
+      .then((r) => r.json())
+      .then((data: Session[]) => {
+        if (Array.isArray(data)) setArchivedSessions(data);
+      })
+      .catch(console.error);
+  }, []);
+
+  const handleOpenArchivedSessions = () => {
+    setArchivedView(true);
+    setSelectedProjectId(null);
+    loadArchivedSessions();
+  };
+
+  const handleCloseArchivedSessions = () => {
+    setArchivedView(false);
+  };
+
+  const handleSelectArchivedSession = (id: string) => {
+    setSelectedSessionId(id);
+    setSelectedProjectId(null);
+    setIsNewSession(false);
+    setIsNewDraft(false);
+    setSidebarOpen(false);
+    setActiveLogMsgId(null);
+    setLogModalOpen(false);
+    setMenuOpen(false);
+  };
+
+  const handleArchiveSession = async (id: string) => {
+    try {
+      const res = await fetch(`/api/sessions/${id}/archive`, { method: "POST" });
+      if (res.ok) {
+        setSessions((prev) => prev.filter((s) => s.id !== id));
+        if (selectedSessionId === id) {
+          setSelectedSessionId(null);
+          setMessages([]);
+          setSessionLog("");
+          setActiveLogMsgId(null);
+          setLogModalOpen(false);
+        }
+      } else {
+        const data = await res.json();
+        setApiError({ title: "Archive Session Error", message: data.error || "Failed to archive session" });
+      }
+    } catch (err: any) {
+      console.error(err);
+      setApiError({ title: "Archive Session Error", message: err.message || "Failed to archive session" });
+    }
+  };
+
+  const handleUnarchiveSession = async (id: string) => {
+    try {
+      const res = await fetch(`/api/sessions/${id}/unarchive`, { method: "POST" });
+      if (res.ok) {
+        const updated: Session = await res.json();
+        setArchivedSessions((prev) => prev.filter((s) => s.id !== id));
+        setSessions((prev) => [...prev.filter((s) => s.id !== id), updated]);
+        setArchivedView(false);
+        setSidebarMode("sessions");
+      } else {
+        const data = await res.json();
+        setApiError({ title: "Unarchive Session Error", message: data.error || "Failed to unarchive session" });
+      }
+    } catch (err: any) {
+      console.error(err);
+      setApiError({ title: "Unarchive Session Error", message: err.message || "Failed to unarchive session" });
+    }
+  };
+
   useEffect(() => {
     if (toast) {
       const timer = setTimeout(() => {
@@ -495,6 +572,7 @@ export default function HomePage() {
           });
           if (res.ok) {
             setSessions((prev) => prev.filter((s) => s.id !== id));
+            setArchivedSessions((prev) => prev.filter((s) => s.id !== id));
             if (selectedSessionId === id) {
               setSelectedSessionId(null);
               setMessages([]);
@@ -829,6 +907,7 @@ export default function HomePage() {
 
   const canSubmit =
     selectedRunnerConnected &&
+    !isArchivedSession &&
     (isNewDraft
       ? repoPath.trim().length > 0 && !!runnerId && prompt.trim().length > 0
       : isNewSession
@@ -840,6 +919,9 @@ export default function HomePage() {
   const getSendTooltip = () => {
     if (!selectedRunnerConnected) {
       return "Runner is offline";
+    }
+    if (isArchivedSession) {
+      return "Session is archived. Unarchive it to send messages.";
     }
     if (isNewDraft) {
       if (!runnerId) {
@@ -953,6 +1035,11 @@ export default function HomePage() {
         onSelectProject={handleSelectProject}
         onNewSession={handleNewSession}
         onNewDraft={handleNewDraft}
+        archivedView={archivedView}
+        archivedSessions={archivedSessions}
+        onOpenArchivedSessions={handleOpenArchivedSessions}
+        onCloseArchivedSessions={handleCloseArchivedSessions}
+        onSelectArchivedSession={handleSelectArchivedSession}
       />
 
       {/* Main */}
@@ -1035,6 +1122,8 @@ export default function HomePage() {
             prompt={prompt}
             isAgentRunning={isAgentRunning}
             isRunning={isRunning}
+            isArchived={isArchivedSession}
+            onUnarchiveSession={() => selectedSessionId && handleUnarchiveSession(selectedSessionId)}
             isDraftSession={isDraftSession}
             isDraftAutoSend={!!selectedSessionId && autoDraftSessionIds.has(selectedSessionId)}
             draftTrigger={draftTrigger}
@@ -1075,6 +1164,7 @@ export default function HomePage() {
             onRestartScriptCard={handleRestartScriptCard}
             onRetryCard={handleRetryCard}
             onSubmit={handleSubmit}
+            onArchiveSession={handleArchiveSession}
             onSendDraftNow={handleSendDraftNow}
             onToggleDraftTrigger={handleToggleDraftTrigger}
             onPromptChange={handlePromptChange}

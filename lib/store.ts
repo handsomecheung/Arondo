@@ -1,12 +1,18 @@
 import fs from "fs/promises";
+import fsSync from "fs";
 import path from "path";
 import { getConfigDir } from "./config";
 import { withFileLock, writeJsonAtomic } from "./fileLock";
 
 const CONFIG_DIR = getConfigDir();
 const SESSIONS_DIR = path.join(CONFIG_DIR, "sessions");
+const ARCHIVED_SESSIONS_DIR = path.join(CONFIG_DIR, "archived", "sessions");
 const PROJECTS_DIR = path.join(CONFIG_DIR, "projects");
 const SCHEDULED_TASKS_FILE = path.join(CONFIG_DIR, "scheduled-tasks.json");
+
+const DEFAULT_SESSION_ARCHIVE_DAYS = 7;
+const SESSION_ARCHIVE_DAYS = Number(process.env.ARONDO_SESSION_ARCHIVE_DAYS) || DEFAULT_SESSION_ARCHIVE_DAYS;
+export const SESSION_ARCHIVE_AGE_MS = SESSION_ARCHIVE_DAYS * 24 * 60 * 60 * 1000;
 
 export type SessionStatus = "draft" | "idle" | "running" | "script-running" | "done" | "error";
 
@@ -32,6 +38,9 @@ export interface Session {
   createdAt: string;
   updatedAt: string;
   runningScripts?: string[];
+  // Set to true on manual archive, false on manual unarchive. Undefined
+  // means never manually touched — the only state auto-archive may act on.
+  archivedManually?: boolean;
 }
 
 export type MessageType =
@@ -67,7 +76,15 @@ export interface Message {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getSessionDir(id: string): string {
-  return path.join(SESSIONS_DIR, id);
+  const activeDir = path.join(SESSIONS_DIR, id);
+  if (!fsSync.existsSync(activeDir) && fsSync.existsSync(path.join(ARCHIVED_SESSIONS_DIR, id))) {
+    return path.join(ARCHIVED_SESSIONS_DIR, id);
+  }
+  return activeDir;
+}
+
+export function isSessionArchived(id: string): boolean {
+  return fsSync.existsSync(path.join(ARCHIVED_SESSIONS_DIR, id));
 }
 
 function getSessionFilePath(id: string): string {
@@ -146,6 +163,32 @@ export async function getSession(id: string): Promise<Session | undefined> {
   const filePath = getSessionFilePath(id);
   const session = await readJson<Session | null>(filePath, null);
   return session || undefined;
+}
+
+export async function getArchivedSessions(): Promise<Session[]> {
+  try {
+    await ensureDir(ARCHIVED_SESSIONS_DIR);
+    const entries = await fs.readdir(ARCHIVED_SESSIONS_DIR, { withFileTypes: true });
+    const sessions: Session[] = [];
+
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const filePath = path.join(ARCHIVED_SESSIONS_DIR, entry.name, "session.json");
+        try {
+          const session = await readJson<Session | null>(filePath, null);
+          if (session) {
+            sessions.push(session);
+          }
+        } catch {
+          // Ignore corrupt metadata
+        }
+      }
+    }
+
+    return sessions.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  } catch {
+    return [];
+  }
 }
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
@@ -540,6 +583,21 @@ export async function removeScheduledTasksForSession(sessionId: string): Promise
 export async function deleteSession(id: string): Promise<void> {
   const sessionDir = getSessionDir(id);
   await fs.rm(sessionDir, { recursive: true, force: true });
+}
+
+export async function archiveSession(id: string, manual = false): Promise<void> {
+  const sessionDir = getSessionDir(id);
+  await ensureDir(ARCHIVED_SESSIONS_DIR);
+  await fs.rename(sessionDir, path.join(ARCHIVED_SESSIONS_DIR, id));
+  if (manual) {
+    await updateSession(id, { archivedManually: true });
+  }
+}
+
+export async function unarchiveSession(id: string): Promise<void> {
+  await ensureDir(SESSIONS_DIR);
+  await fs.rename(path.join(ARCHIVED_SESSIONS_DIR, id), path.join(SESSIONS_DIR, id));
+  await updateSession(id, { archivedManually: false });
 }
 
 export async function deleteProject(id: string): Promise<void> {
