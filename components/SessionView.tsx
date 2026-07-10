@@ -5,6 +5,7 @@ import ScriptExecCard from "@/components/ScriptExecCard";
 import AgentExecCard from "@/components/AgentExecCard";
 import ExecCard, { ExecCardItem } from "@/components/ExecCard";
 import UserAgentCommandCard from "@/components/UserAgentCommandCard";
+import UserMessageCard from "@/components/UserMessageCard";
 import type { Session, ProjectScript, Runner, Message } from "@/types/home";
 import type { ExecCardInfo } from "@/lib/homeUtils";
 import { formatTime, execCardInfoToItem } from "@/lib/homeUtils";
@@ -701,13 +702,22 @@ export default function SessionView({
             );
           }
 
+          if (msg.role === "user") {
+            return (
+              <UserMessageCard
+                key={msg.id}
+                content={msg.content}
+                timestamp={formatTime(msg.createdAt)}
+                renderContent={renderMessageContent}
+              />
+            );
+          }
+
           return (
             <div key={msg.id} className={`message ${msg.role}`}>
-              {msg.role !== "user" && (
-                <div className="message-avatar">
-                  {msg.role === "agent" ? "AI" : "⚙"}
-                </div>
-              )}
+              <div className="message-avatar">
+                {msg.role === "agent" ? "AI" : "⚙"}
+              </div>
               <div>
                 <div className="message-bubble">
                   {renderMessageContent(msg.content)}

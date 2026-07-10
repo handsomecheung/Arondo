@@ -1266,9 +1266,18 @@ body {
   margin: 2px 0;
 }
 
-.exec-card.user-agent-command-card {
+.exec-card.user-agent-command-card,
+.exec-card.user-message-card {
   background: rgba(79, 70, 229, 0.1);
   border-color: rgba(79, 70, 229, 0.3);
+}
+
+.user-message-card-content {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-primary);
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 
 /* Match background color of UserAgentCommandCard */
