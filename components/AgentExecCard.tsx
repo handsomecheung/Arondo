@@ -7,7 +7,7 @@ import rehypeHighlight from "rehype-highlight";
 import remarkFileLinks, { extractCandidatePaths, candidateToPath } from "@/lib/remarkFileLinks";
 import { resolveRepoFilePath } from "@/lib/homeUtils";
 import ExecCard, { ExecCardProps } from "@/components/ExecCard";
-import { IconTerminal, IconFileText, IconCode } from "@/components/Icons";
+import { IconTerminal, IconFileText, IconCopy } from "@/components/Icons";
 import DiffModal from "@/components/modals/DiffModal";
 
 // Terminal mode-control sequences (cursor visibility, mouse tracking, bracketed paste, etc.)
@@ -37,7 +37,6 @@ interface AgentExecCardProps extends ExecCardProps {
 export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runnerId, onShowPrompt, onViewLog, onOpenFilePath, ...props }: AgentExecCardProps) {
   const isLive = props.item.status === "running";
   const [log, setLog] = useState("");
-  const [showRaw, setShowRaw] = useState(false);
   const [pathInfos, setPathInfos] = useState<Record<string, { exists: boolean; diff?: string }>>({});
   const [diffsToSave, setDiffsToSave] = useState<Record<string, string>>({});
   const [hasVerified, setHasVerified] = useState(false);
@@ -182,7 +181,7 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
 
   // Save HTML cache once verification is completed and DOM is rendered
   useEffect(() => {
-    if (isLive || !hasVerified || cachedHtml || showRaw || !outputRef.current) return;
+    if (isLive || !hasVerified || cachedHtml || !outputRef.current) return;
 
     const timer = setTimeout(() => {
       if (!outputRef.current) return;
@@ -208,7 +207,7 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [isLive, hasVerified, cachedHtml, showRaw, sessionId, props.item.messageId, projectId, diffsToSave]);
+  }, [isLive, hasVerified, cachedHtml, sessionId, props.item.messageId, projectId, diffsToSave]);
 
   const handleOutputClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
@@ -239,8 +238,15 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
   );
 
   const hasLog = !!props.item.messageId;
-  const canToggleRaw = !onViewLog && hasLog && !!log;
-  const extraMenuItems = (onShowPrompt || (hasLog && onViewLog) || canToggleRaw)
+  const canCopy = !onViewLog && hasLog && !!log;
+
+  const copyRaw = () => navigator.clipboard.writeText(log).catch(() => {});
+  const copyRendered = () => {
+    const text = outputRef.current?.innerText ?? log;
+    navigator.clipboard.writeText(text).catch(() => {});
+  };
+
+  const extraMenuItems = (onShowPrompt || (hasLog && onViewLog) || canCopy)
     ? (closeMenu: () => void) => (
         <>
           {hasLog && onViewLog && (
@@ -252,13 +258,22 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
               <span>Show Log</span>
             </button>
           )}
-          {canToggleRaw && (
+          {canCopy && (
             <button
               className="task-menu-item"
-              onClick={() => { closeMenu(); setShowRaw((v) => !v); }}
+              onClick={() => { closeMenu(); copyRendered(); }}
             >
-              <IconCode />
-              <span>{showRaw ? "Show HTML" : "Show Raw Output"}</span>
+              <IconCopy />
+              <span>Copy Output</span>
+            </button>
+          )}
+          {canCopy && (
+            <button
+              className="task-menu-item"
+              onClick={() => { closeMenu(); copyRaw(); }}
+            >
+              <IconCopy />
+              <span>Copy Raw Output</span>
             </button>
           )}
           {onShowPrompt && (
@@ -280,12 +295,7 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
         {...props}
         extraMenuItems={extraMenuItems}
       >
-        {!onViewLog && props.item.messageId && log && showRaw && (
-          <div ref={outputRef} className="agent-exec-output agent-exec-output-raw">
-            <pre>{log}</pre>
-          </div>
-        )}
-        {!onViewLog && props.item.messageId && cachedHtml && !showRaw && (
+        {!onViewLog && props.item.messageId && cachedHtml && (
           <div 
             ref={outputRef} 
             className="agent-exec-output"
@@ -293,7 +303,7 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
             dangerouslySetInnerHTML={{ __html: cachedHtml }}
           />
         )}
-        {!onViewLog && props.item.messageId && !cachedHtml && log && !showRaw && (
+        {!onViewLog && props.item.messageId && !cachedHtml && log && (
           <div 
             ref={outputRef} 
             className="agent-exec-output"
