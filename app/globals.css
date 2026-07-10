@@ -2028,9 +2028,10 @@ body {
 
 .script-submenu {
   position: absolute;
-  top: 100%;
-  right: 0;
+  top: 0;
+  right: 100%;
   left: auto;
+  margin-right: 4px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);

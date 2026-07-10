@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import ScriptExecCard from "@/components/ScriptExecCard";
 import AgentExecCard from "@/components/AgentExecCard";
 import ExecCard, { ExecCardItem } from "@/components/ExecCard";
@@ -184,6 +184,18 @@ export default function SessionView({
 
   const [agentSwitchOpen, setAgentSwitchOpen] = useState(false);
   const agentSwitchRef = useRef<HTMLDivElement>(null);
+  const scriptSubMenuRef = useRef<HTMLDivElement>(null);
+  const [scriptSubMenuShift, setScriptSubMenuShift] = useState(0);
+
+  useLayoutEffect(() => {
+    if (!scriptSubMenuOpen || !scriptSubMenuRef.current) {
+      setScriptSubMenuShift(0);
+      return;
+    }
+    const rect = scriptSubMenuRef.current.getBoundingClientRect();
+    const overflow = 8 - rect.left;
+    setScriptSubMenuShift(overflow > 0 ? overflow : 0);
+  }, [scriptSubMenuOpen]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -477,7 +489,11 @@ export default function SessionView({
                       <span className="menu-item-arrow">›</span>
                     </button>
                     {scriptSubMenuOpen && (
-                      <div className="script-submenu">
+                      <div
+                        className="script-submenu"
+                        ref={scriptSubMenuRef}
+                        style={scriptSubMenuShift > 0 ? { transform: `translateX(${scriptSubMenuShift}px)` } : undefined}
+                      >
                         {sessionScripts.map((s) => (
                           <button
                             key={s.name}

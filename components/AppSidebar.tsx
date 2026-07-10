@@ -92,6 +92,16 @@ export default function AppSidebar({
 
               {moreMenuOpen && (
                 <div className="session-dropdown-menu" style={{ left: 0, right: "auto" }}>
+                  <button
+                    className="menu-item"
+                    onClick={() => {
+                      setMoreMenuOpen(false);
+                      onOpenArchivedSessions();
+                    }}
+                    id="menu-archived-sessions"
+                  >
+                    <IconArchive /> Archived Sessions
+                  </button>
                   <Link
                     href="/runners"
                     className="menu-item"
@@ -116,16 +126,6 @@ export default function AppSidebar({
                       <IconSettings /> Settings
                     </Link>
                   )}
-                  <button
-                    className="menu-item"
-                    onClick={() => {
-                      setMoreMenuOpen(false);
-                      onOpenArchivedSessions();
-                    }}
-                    id="menu-archived-sessions"
-                  >
-                    <IconArchive /> Archived Sessions
-                  </button>
                 </div>
               )}
             </div>
