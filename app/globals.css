@@ -452,6 +452,10 @@ body {
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-muted);
 }
+.task-status-badge.draft {
+  background: rgba(224, 180, 0, 0.15);
+  color: #e0b400;
+}
 
 @keyframes badge-pulse {
   0%,

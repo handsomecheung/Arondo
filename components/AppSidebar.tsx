@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { IconPlus, IconX, IconInbox, IconSettings, IconServer } from "@/components/Icons";
+import { IconPlus, IconInbox, IconSettings, IconServer } from "@/components/Icons";
 import { formatRelative } from "@/lib/homeUtils";
 import type { Session, Project, Runner } from "@/types/home";
 
@@ -17,6 +17,7 @@ interface Props {
   onSelectSession: (id: string) => void;
   onSelectProject: (id: string) => void;
   onNewSession: () => void;
+  onNewDraft: () => void;
 }
 
 export default function AppSidebar({
@@ -32,6 +33,7 @@ export default function AppSidebar({
   onSelectSession,
   onSelectProject,
   onNewSession,
+  onNewDraft,
 }: Props) {
   const [userRole, setUserRole] = useState<"admin" | "user" | null>(null);
 
@@ -53,16 +55,13 @@ export default function AppSidebar({
       />
       <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="sidebar-header" style={{ flexDirection: "column", gap: 12, alignItems: "stretch" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span className="sidebar-title">Menu</span>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <button className="new-task-btn" onClick={onNewSession} id="new-session-btn">
-                <IconPlus /> New Session
-              </button>
-              <button className="sidebar-close-btn" onClick={onCloseSidebar} aria-label="Close session list">
-                <IconX />
-              </button>
-            </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8 }}>
+            <button className="new-task-btn" onClick={onNewSession} id="new-session-btn">
+              <IconPlus /> New Session
+            </button>
+            <button className="new-task-btn" onClick={onNewDraft} id="new-draft-btn">
+              <IconPlus /> New Draft
+            </button>
           </div>
           <div className="sidebar-mode-toggle" role="tablist" aria-label="View mode">
             <button

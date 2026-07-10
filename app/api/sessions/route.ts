@@ -1,10 +1,10 @@
 import path from "path";
 import { NextRequest, NextResponse } from "next/server";
-import { getSessions, getProjects, deleteSession, createSession, updateSession, addMessage, clearSessionLog } from "@/lib/store";
-import { getAgent, AgentType, resolveAgentType, PROMPT_ENV_VAR } from "@/lib/agents";
+import { getSessions, getProjects, deleteSession, createSession, addScheduledTask } from "@/lib/store";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken, getUuidByToken } from "@/lib/auth";
+import { dispatchCreateSession } from "@/lib/session-actions";
 
 const MAX_SESSION_NAME_LENGTH = 80;
 
@@ -52,12 +52,13 @@ export async function GET(request: NextRequest) {
 export async function POST(req: NextRequest) {
   const token = getArondoToken(req);
   const body = await req.json();
-  const { prompt, repoPath, agentType = "antigravity", runnerId, name } = body as {
+  const { prompt, repoPath, agentType = "antigravity", runnerId, name, isDraft } = body as {
     prompt: string;
     repoPath: string;
     agentType?: string;
     runnerId: string;
     name?: string;
+    isDraft?: boolean;
   };
 
   const isBlank = !prompt || !prompt.trim();
@@ -92,83 +93,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(session, { status: 201 });
   }
 
-  const session = await createSession({
-    status: "running",
-    prompt,
-    name: name?.trim() || deriveSessionName(prompt, repoPath),
-    agentType,
-    repoPath,
-    runnerId,
-  });
+  if (isDraft) {
+    const trimmedPrompt = prompt.trim();
+    const session = await createSession({
+      status: "draft",
+      prompt: trimmedPrompt,
+      name: name?.trim() || deriveSessionName(trimmedPrompt, repoPath),
+      agentType,
+      repoPath,
+      runnerId,
+    });
+    await addScheduledTask({
+      trigger: { kind: "codebaseReady", runnerId, repoPath },
+      action: { kind: "sendMessage", sessionId: session.id, message: trimmedPrompt },
+      tokenUuid: getUuidByToken(token) || undefined,
+    });
+    eventBus.publish({ type: "session_updated", payload: session });
+    return NextResponse.json(session, { status: 201 });
+  }
 
-  const resolved = await resolveAgentType(agentType, run.info.agents);
-  const resolvedType = resolved.agentType;
-  const agent = getAgent(resolvedType);
-  const fullPrompt = agent.buildPrompt(prompt);
-  const command = agent.getCommand({ prompt, repoPath, sessionId: session.id, isResume: false, model: resolved.model });
-
-  await updateSession(session.id, { command });
-  session.command = command;
-
-  const userMessage = await addMessage({
-    sessionId: session.id,
-    role: "user",
-    content: prompt,
-    type: "chat-user",
+  const result = await dispatchCreateSession(runnerId, repoPath, agentType, prompt, {
+    name,
     tokenUuid: getUuidByToken(token) || undefined,
   });
-  eventBus.publish({ type: "message_added", payload: userMessage });
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: result.status });
+  }
 
-  const systemMsg = await addMessage({
-    sessionId: session.id,
-    role: "system",
-    content: `⚙️ Executing command:\n\`\`\`bash\n${command}\n\`\`\``,
-    type: "agent-run",
-    resolvedAgentType: resolvedType,
-    prompt: fullPrompt,
-  });
-  eventBus.publish({ type: "message_added", payload: systemMsg });
-  eventBus.publish({ type: "session_updated", payload: session });
-
-  const taskId = `task_${crypto.randomUUID().slice(0, 8)}`;
-  await runnerManager.registerTask({
-    taskId,
-    runnerId,
-    sessionId: session.id,
-    messageId: systemMsg.id,
-    type: "agent",
-    createdAt: Date.now(),
-    agentType: resolvedType,
-  });
-
-  await clearSessionLog(session.id, systemMsg.id);
-
-  runnerManager
-    .sendRequest(runnerId, "exec.agent", {
-      taskId,
-      command,
-      workDir: repoPath,
-      prompt: fullPrompt,
-      promptEnvVar: PROMPT_ENV_VAR,
-    }, 10_000)
-    .then((res: any) => {
-      if (res?.pid) runnerManager.updateTaskPid(taskId, res.pid);
-    })
-    .catch(async (err) => {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      const updated = await updateSession(session.id, { status: "error", errorMessage });
-      const errMsg = await addMessage({
-        sessionId: session.id,
-        role: "system",
-        content: `❌ Failed to start agent: ${errorMessage}`,
-        type: "agent-return",
-        parentId: systemMsg.id,
-      });
-      eventBus.publish({ type: "message_added", payload: errMsg });
-      eventBus.publish({ type: "session_updated", payload: updated });
-    });
-
-  return NextResponse.json(session, { status: 201 });
+  return NextResponse.json(result.session, { status: 201 });
 }
 
 export const dynamic = "force-dynamic";

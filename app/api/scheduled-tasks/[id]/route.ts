@@ -1,21 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getScheduledTask, updateScheduledTask, type ScheduledTask } from "@/lib/store";
-import { getArondoToken, verifySessionPermission, verifyProjectPermission } from "@/lib/auth";
-
-function scopeOf(task: Pick<ScheduledTask, "trigger" | "action">): { sessionId?: string; projectId?: string } {
-  if (task.trigger.kind === "afterSession") return { sessionId: task.trigger.sessionId };
-  if (task.action.kind === "sendMessage") return { sessionId: task.action.sessionId };
-  return { sessionId: task.action.sessionId, projectId: task.action.projectId };
-}
-
-async function hasScopePermission(
-  scope: { sessionId?: string; projectId?: string },
-  token: string | null,
-): Promise<boolean> {
-  if (scope.sessionId) return verifySessionPermission(scope.sessionId, token);
-  if (scope.projectId) return verifyProjectPermission(scope.projectId, token);
-  return false;
-}
+import { getScheduledTask, updateScheduledTask } from "@/lib/store";
+import { getArondoToken } from "@/lib/auth";
+import { scopeOf, hasScopePermission } from "@/lib/scheduled-task-scope";
 
 export async function DELETE(
   request: NextRequest,

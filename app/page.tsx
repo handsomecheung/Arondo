@@ -85,6 +85,7 @@ export default function HomePage() {
   const [runnerId, setRunnerId] = useState("");
   const [runners, setRunners] = useState<Runner[]>([]);
   const [isNewSession, setIsNewSession] = useState(false);
+  const [isNewDraft, setIsNewDraft] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Custom dropdown states & refs
@@ -571,6 +572,7 @@ export default function HomePage() {
     agentType,
     runnerId,
     isNewSession,
+    isNewDraft,
     showCommandMenu,
     selectedSession,
     selectedSessionId,
@@ -580,6 +582,7 @@ export default function HomePage() {
     setSessions,
     setSelectedSessionId,
     setIsNewSession,
+    setIsNewDraft,
     setMessages,
     setSessionLog,
     setActiveLogMsgId,
@@ -604,12 +607,43 @@ export default function HomePage() {
     setSelectedSessionId(null);
     setSelectedProjectId(null);
     setIsNewSession(true);
+    setIsNewDraft(false);
     setMessages([]);
     setSidebarOpen(false);
     setSessionLog("");
     setActiveLogMsgId(null);
     setLogModalOpen(false);
     setMenuOpen(false);
+  };
+
+  const handleNewDraft = () => {
+    setSelectedSessionId(null);
+    setSelectedProjectId(null);
+    setIsNewDraft(true);
+    setIsNewSession(false);
+    setMessages([]);
+    setSidebarOpen(false);
+    setSessionLog("");
+    setActiveLogMsgId(null);
+    setLogModalOpen(false);
+    setMenuOpen(false);
+  };
+
+  const handleSendDraftNow = async () => {
+    if (!selectedSessionId) return;
+    try {
+      const res = await fetch(`/api/sessions/${selectedSessionId}/send-draft-now`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json();
+        setApiError({ title: "Send Draft Error", message: data.error || "Failed to send draft" });
+        return;
+      }
+      const updated: Session = await res.json();
+      setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+    } catch (err: any) {
+      console.error(err);
+      setApiError({ title: "Send Draft Error", message: err.message || "Failed to send draft" });
+    }
   };
 
   const handleStopExecCard = async (msgId: string) => {
@@ -695,6 +729,7 @@ export default function HomePage() {
     setSelectedProjectId(projectId);
     setSelectedSessionId(null);
     setIsNewSession(false);
+    setIsNewDraft(false);
     setSidebarOpen(false);
     setActiveLogMsgId(null);
     setLogModalOpen(false);
@@ -705,6 +740,7 @@ export default function HomePage() {
     setSelectedSessionId(id);
     setSelectedProjectId(null);
     setIsNewSession(false);
+    setIsNewDraft(false);
     setSidebarOpen(false);
     setActiveLogMsgId(null);
     setLogModalOpen(false);
@@ -747,15 +783,33 @@ export default function HomePage() {
     return r ? r.connected : false;
   }, [runners, runnerId, selectedSession]);
 
+  const isDraftSession = selectedSession?.status === "draft";
+
   const canSubmit =
     selectedRunnerConnected &&
-    (isNewSession
-      ? repoPath.trim().length > 0 && !!runnerId
-      : prompt.trim().length > 0 && !!selectedSessionId);
+    (isNewDraft
+      ? repoPath.trim().length > 0 && !!runnerId && prompt.trim().length > 0
+      : isNewSession
+        ? repoPath.trim().length > 0 && !!runnerId
+        : isDraftSession
+          ? true
+          : prompt.trim().length > 0 && !!selectedSessionId);
 
   const getSendTooltip = () => {
     if (!selectedRunnerConnected) {
       return "Runner is offline";
+    }
+    if (isNewDraft) {
+      if (!runnerId) {
+        return "Please select a runner first";
+      }
+      if (repoPath.trim().length === 0) {
+        return "Please select a project path";
+      }
+      if (!prompt.trim()) {
+        return "Describe what you want to do";
+      }
+      return "Save Draft (Enter)";
     }
     if (isNewSession) {
       if (!runnerId) {
@@ -768,6 +822,8 @@ export default function HomePage() {
         return "Create Blank Session";
       }
       return "Send (Enter)";
+    } else if (isDraftSession) {
+      return "Send this draft now";
     } else {
       if (!selectedSessionId) {
         return "No active session selected";
@@ -853,6 +909,7 @@ export default function HomePage() {
         onSelectSession={handleSelectSession}
         onSelectProject={handleSelectProject}
         onNewSession={handleNewSession}
+        onNewDraft={handleNewDraft}
       />
 
       {/* Main */}
@@ -923,6 +980,7 @@ export default function HomePage() {
             selectedSession={selectedSession}
             selectedSessionId={selectedSessionId}
             isNewSession={isNewSession}
+            isNewDraft={isNewDraft}
             messages={messages}
             execCards={execCards}
             returnMsgIds={returnMsgIds}
@@ -934,6 +992,7 @@ export default function HomePage() {
             prompt={prompt}
             isAgentRunning={isAgentRunning}
             isRunning={isRunning}
+            isDraftSession={isDraftSession}
             canSubmit={canSubmit}
             menuOpen={menuOpen}
             scriptSubMenuOpen={scriptSubMenuOpen}
@@ -970,6 +1029,7 @@ export default function HomePage() {
             onRestartScriptCard={handleRestartScriptCard}
             onRetryCard={handleRetryCard}
             onSubmit={handleSubmit}
+            onSendDraftNow={handleSendDraftNow}
             onPromptChange={handlePromptChange}
             onKeyDown={handleKeyDown}
             onRunScript={handleRunScript}

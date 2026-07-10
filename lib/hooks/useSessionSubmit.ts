@@ -11,6 +11,7 @@ interface UseSessionSubmitParams {
   agentType: string;
   runnerId: string;
   isNewSession: boolean;
+  isNewDraft: boolean;
   showCommandMenu: boolean;
   selectedSession: Session | null;
   selectedSessionId: string | null;
@@ -20,6 +21,7 @@ interface UseSessionSubmitParams {
   setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
   setSelectedSessionId: React.Dispatch<React.SetStateAction<string | null>>;
   setIsNewSession: (v: boolean) => void;
+  setIsNewDraft: (v: boolean) => void;
   setMessages: React.Dispatch<React.SetStateAction<any[]>>;
   setSessionLog: (v: string) => void;
   setActiveLogMsgId: (v: string | null) => void;
@@ -41,6 +43,7 @@ export function useSessionSubmit({
   agentType,
   runnerId,
   isNewSession,
+  isNewDraft,
   showCommandMenu,
   selectedSession,
   selectedSessionId,
@@ -50,6 +53,7 @@ export function useSessionSubmit({
   setSessions,
   setSelectedSessionId,
   setIsNewSession,
+  setIsNewDraft,
   setMessages,
   setSessionLog,
   setActiveLogMsgId,
@@ -231,7 +235,7 @@ export function useSessionSubmit({
 
   const handleSubmit = useCallback(async () => {
     const trimmed = prompt.trim();
-    const isBlankSession = (isNewSession || !selectedSessionId) && !trimmed;
+    const isBlankSession = (isNewSession || (!selectedSessionId && !isNewDraft)) && !trimmed;
 
     if (trimmed.startsWith("/new") && !isNewSession && selectedSessionId) {
       const rest = trimmed.slice(4).trim();
@@ -270,15 +274,22 @@ export function useSessionSubmit({
     if (textareaRef.current) textareaRef.current.style.height = "auto";
 
     try {
-      if (isNewSession || !selectedSessionId) {
+      if (isNewSession || isNewDraft || !selectedSessionId) {
         if (!repoPath.trim() || !runnerId) return;
+        if (isNewDraft && !trimmed) return;
         const res = await fetch("/api/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: trimmed, repoPath: repoPath.trim(), agentType, runnerId }),
+          body: JSON.stringify({
+            prompt: trimmed,
+            repoPath: repoPath.trim(),
+            agentType,
+            runnerId,
+            ...(isNewDraft ? { isDraft: true } : {}),
+          }),
         });
         const newSession: Session = await res.json();
-        if (!isBlankSession) {
+        if (!isBlankSession && !isNewDraft) {
           setTaskQueue((prev) => [
             ...prev,
             { id: `agent-${newSession.id}-${Date.now()}`, type: "agent", name: `Agent: ${trimmed}`, sessionId: newSession.id, status: "running", createdAt: Date.now() },
@@ -287,6 +298,7 @@ export function useSessionSubmit({
         setSessions((prev) => [newSession, ...prev]);
         setSelectedSessionId(newSession.id);
         setIsNewSession(false);
+        setIsNewDraft(false);
         setSessionLog("");
         setActiveLogMsgId(null);
         setLogModalOpen(false);
@@ -318,7 +330,7 @@ export function useSessionSubmit({
     } catch (err) {
       console.error(err);
     }
-  }, [prompt, repoPath, agentType, runnerId, isNewSession, selectedSessionId, selectedSession, loadProjects, setTaskQueue, handleNewSessionCommand, sendAgentMessage, sessionScripts, handleScriptCommand, agentCommands, queueFollowupMessage]);
+  }, [prompt, repoPath, agentType, runnerId, isNewSession, isNewDraft, selectedSessionId, selectedSession, loadProjects, setTaskQueue, handleNewSessionCommand, sendAgentMessage, sessionScripts, handleScriptCommand, agentCommands, queueFollowupMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return;

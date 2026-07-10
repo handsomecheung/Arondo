@@ -21,6 +21,7 @@ interface SessionViewProps {
   selectedSession: Session | null;
   selectedSessionId: string | null;
   isNewSession: boolean;
+  isNewDraft: boolean;
   messages: Message[];
   execCards: Map<string, ExecCardInfo>;
   returnMsgIds: Set<string>;
@@ -32,6 +33,7 @@ interface SessionViewProps {
   prompt: string;
   isAgentRunning: boolean;
   isRunning: boolean;
+  isDraftSession: boolean;
   canSubmit: boolean;
   menuOpen: boolean;
   scriptSubMenuOpen: boolean;
@@ -68,6 +70,7 @@ interface SessionViewProps {
   onRestartScriptCard: (msgId: string, scriptName: string) => void;
   onRetryCard: (cardInfo: ExecCardInfo) => void;
   onSubmit: () => void;
+  onSendDraftNow: () => void;
   onPromptChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onRunScript: (name: string) => void;
@@ -91,6 +94,7 @@ export default function SessionView({
   selectedSession,
   selectedSessionId,
   isNewSession,
+  isNewDraft,
   messages,
   execCards,
   returnMsgIds,
@@ -102,6 +106,7 @@ export default function SessionView({
   prompt,
   isAgentRunning,
   isRunning,
+  isDraftSession,
   canSubmit,
   menuOpen,
   scriptSubMenuOpen,
@@ -138,6 +143,7 @@ export default function SessionView({
   onRestartScriptCard,
   onRetryCard,
   onSubmit,
+  onSendDraftNow,
   onPromptChange,
   onKeyDown,
   onRunScript,
@@ -536,7 +542,7 @@ export default function SessionView({
       )}
 
       <div className="chat-area" id="chat-area">
-        {!selectedSession && !isNewSession && (
+        {!selectedSession && !isNewSession && !isNewDraft && (
           <div className="welcome-screen">
             <div className="welcome-icon">
               <IconBolt />
@@ -557,14 +563,16 @@ export default function SessionView({
           </div>
         )}
 
-        {(selectedSession || isNewSession) &&
+        {(selectedSession || isNewSession || isNewDraft) &&
           messages.length === 0 &&
           !isRunning && (
             <div className="welcome-screen">
               <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
-                {isNewSession
-                  ? "Describe what you want the agent to do…"
-                  : "No messages yet."}
+                {isNewDraft
+                  ? "A Draft is saved now and sent later — once no agent is running and the codebase is clean, or whenever you send it manually."
+                  : isNewSession
+                    ? "Describe what you want the agent to do…"
+                    : "No messages yet."}
               </p>
             </div>
           )}
@@ -644,7 +652,7 @@ export default function SessionView({
       </div>
 
       <div className="input-area">
-        {isNewSession && (
+        {(isNewSession || isNewDraft) && (
           <div className="input-meta">
             <div
               className="custom-dropdown-container"
@@ -658,7 +666,7 @@ export default function SessionView({
                 }
                 disabled={isRunning}
                 style={{
-                  ...(isNewSession && !runnerId
+                  ...((isNewSession || isNewDraft) && !runnerId
                     ? { borderColor: "var(--error)" }
                     : {}),
                 }}
@@ -718,7 +726,7 @@ export default function SessionView({
               }
               id="browse-repo-btn"
               style={
-                isNewSession && !repoPath.trim()
+                (isNewSession || isNewDraft) && !repoPath.trim()
                   ? { borderColor: "var(--error)" }
                   : {}
               }
@@ -738,7 +746,7 @@ export default function SessionView({
                 }
                 disabled={isRunning}
                 style={{
-                  ...(isNewSession && !agentType
+                  ...((isNewSession || isNewDraft) && !agentType
                     ? { borderColor: "var(--error)" }
                     : {}),
                 }}
@@ -886,22 +894,27 @@ export default function SessionView({
             placeholder={
               isRunnerOffline
                 ? "Runner is offline. Chat is disabled."
-                : isAgentRunning
-                  ? "Agent is working… your message will be queued until it finishes"
-                  : isNewSession
-                    ? "Describe what you want the agent to build or fix in this project…"
-                    : "Send a message or follow-up feedback to the agent…"
+                : isDraftSession
+                  ? "Draft — will send once no agent is running and the codebase is clean"
+                  : isNewDraft
+                    ? "Describe what you want to do — unlike a Session, a Draft won't run right away. It's held and sent once no agent is running and the codebase is clean, or whenever you send it manually."
+                    : isAgentRunning
+                      ? "Agent is working… your message will be queued until it finishes"
+                      : isNewSession
+                        ? "Describe what you want the agent to build or fix in this project…"
+                        : "Send a message or follow-up feedback to the agent…"
             }
-            value={prompt}
+            value={isDraftSession ? selectedSession?.prompt ?? "" : prompt}
             onChange={onPromptChange}
             onKeyDown={onKeyDown}
-            disabled={isRunnerOffline}
+            disabled={isRunnerOffline || isDraftSession}
+            readOnly={isDraftSession}
             rows={1}
             id="chat-input"
           />
           <button
             className="send-btn"
-            onClick={onSubmit}
+            onClick={isDraftSession ? onSendDraftNow : onSubmit}
             disabled={!canSubmit}
             title={getSendTooltip()}
             id="send-btn"

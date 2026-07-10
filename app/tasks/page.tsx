@@ -5,9 +5,8 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import ScriptExecCard from "@/components/ScriptExecCard";
 import AgentExecCard from "@/components/AgentExecCard";
-import ScheduleTaskModal from "@/components/ScheduleTaskModal";
 import {
-  IconArrowLeft, IconBolt, IconX, IconInbox, IconTerminal, IconCode, IconChevronDown, IconClock, IconPlus,
+  IconArrowLeft, IconBolt, IconX, IconInbox, IconTerminal, IconCode, IconChevronDown, IconClock,
 } from "@/components/Icons";
 import { agentTypeLabel } from "@/lib/homeUtils";
 
@@ -94,10 +93,10 @@ interface SessionGroup {
 type ScheduledTaskTrigger =
   | { kind: "at"; timestamp: number }
   | { kind: "afterSession"; sessionId: string }
-  | { kind: "quotaAvailable"; agentType?: string };
+  | { kind: "quotaAvailable"; agentType?: string }
+  | { kind: "codebaseReady"; runnerId: string; repoPath: string };
 
 type ScheduledTaskAction =
-  | { kind: "runScript"; scriptName: string; sessionId?: string; projectId?: string }
   | { kind: "sendMessage"; sessionId: string; message: string; prompt?: string };
 
 interface ScheduledTask {
@@ -113,29 +112,18 @@ interface ScheduledTask {
 function describeScheduledTask(
   task: ScheduledTask,
   sessionMap: Map<string, Session>,
-  projectMap: Map<string, Project>,
 ): string {
-  const actionText =
-    task.action.kind === "sendMessage"
-      ? `Send: "${task.action.message.slice(0, 60)}${task.action.message.length > 60 ? "…" : ""}"`
-      : `Run script: ${task.action.scriptName}`;
-
-  let targetName = "";
-  if (task.action.kind === "sendMessage") {
-    targetName = sessionMap.get(task.action.sessionId)?.name || sessionMap.get(task.action.sessionId)?.prompt || task.action.sessionId;
-  } else if (task.action.projectId) {
-    const project = projectMap.get(task.action.projectId);
-    targetName = project ? project.repoPath.split("/").pop() || project.repoPath : task.action.projectId;
-  } else if (task.action.sessionId) {
-    targetName = sessionMap.get(task.action.sessionId)?.name || task.action.sessionId;
-  }
+  const actionText = `Send: "${task.action.message.slice(0, 60)}${task.action.message.length > 60 ? "…" : ""}"`;
+  const targetName = sessionMap.get(task.action.sessionId)?.name || sessionMap.get(task.action.sessionId)?.prompt || task.action.sessionId;
 
   const triggerText =
     task.trigger.kind === "at"
       ? `at ${new Date(task.trigger.timestamp).toLocaleString()}`
       : task.trigger.kind === "afterSession"
         ? "after the current run finishes"
-        : `when ${task.trigger.agentType ? agentTypeLabel(task.trigger.agentType) : "any agent"} quota is available`;
+        : task.trigger.kind === "codebaseReady"
+          ? "once no agent is running and the codebase is clean"
+          : `when ${task.trigger.agentType ? agentTypeLabel(task.trigger.agentType) : "any agent"} quota is available`;
   return `${actionText}${targetName ? ` → ${targetName}` : ""} — ${triggerText}`;
 }
 
@@ -163,7 +151,6 @@ export default function TasksPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [scheduledTasks, setScheduledTasks] = useState<ScheduledTask[]>([]);
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [groupBy, setGroupBy] = useState<"session" | "status">("session");
   const [filterType, setFilterType] = useState<"both" | "agent" | "script">("both");
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
@@ -257,7 +244,8 @@ export default function TasksPage() {
     try {
       const res = await fetch("/api/scheduled-tasks");
       const tasks: ScheduledTask[] = await res.json();
-      setScheduledTasks(tasks.filter((t) => t.status === "pending"));
+      // Drafts (codebaseReady trigger) surface as sessions in the sidebar instead.
+      setScheduledTasks(tasks.filter((t) => t.status === "pending" && t.trigger.kind !== "codebaseReady"));
     } catch {
       // ignore
     }
@@ -719,7 +707,6 @@ export default function TasksPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {scheduledTasks.map((task) => {
                   const sessionMap = new Map(sessions.map((s) => [s.id, s]));
-                  const projectMap = new Map(projects.map((p) => [p.id, p]));
                   return (
                     <div
                       key={task.id}
@@ -734,7 +721,7 @@ export default function TasksPage() {
                       }}
                     >
                       <span style={{ flex: 1, fontSize: 12, color: "var(--text-secondary)" }}>
-                        {describeScheduledTask(task, sessionMap, projectMap)}
+                        {describeScheduledTask(task, sessionMap)}
                       </span>
                       <button
                         onClick={() => handleCancelScheduledTask(task.id)}
@@ -896,29 +883,6 @@ export default function TasksPage() {
                   </div>
                 )}
               </div>
-
-              <button
-                onClick={() => setShowScheduleModal(true)}
-                disabled={projects.length === 0}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "7px 12px",
-                  borderRadius: "var(--radius-md)",
-                  border: "1px solid var(--border)",
-                  background: "var(--bg-surface)",
-                  color: "var(--text-primary)",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: projects.length === 0 ? "default" : "pointer",
-                  opacity: projects.length === 0 ? 0.5 : 1,
-                  marginLeft: "auto",
-                }}
-              >
-                <IconPlus />
-                Schedule
-              </button>
             </div>
           )}
 
@@ -1368,16 +1332,6 @@ export default function TasksPage() {
         </div>
       )}
 
-      {showScheduleModal && (
-        <ScheduleTaskModal
-          projects={projects}
-          onClose={() => setShowScheduleModal(false)}
-          onCreated={() => {
-            setShowScheduleModal(false);
-            loadScheduledTasks();
-          }}
-        />
-      )}
     </div>
   );
 }

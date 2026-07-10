@@ -1,5 +1,7 @@
+import path from "path";
 import {
   getSession,
+  createSession,
   updateSession,
   addMessage,
   clearSessionLog,
@@ -145,6 +147,116 @@ export async function dispatchFollowupMessage(
     });
 
   return { ok: true, message: userMsg };
+}
+
+function deriveSessionName(prompt: string, repoPath: string): string {
+  if (prompt && prompt.trim()) {
+    const firstLine = prompt.trim().split("\n")[0];
+    return firstLine.length > MAX_SESSION_NAME_LENGTH
+      ? firstLine.slice(0, MAX_SESSION_NAME_LENGTH) + "…"
+      : firstLine;
+  }
+  return path.basename(repoPath) || "Untitled";
+}
+
+/**
+ * Creates a brand-new session and immediately starts the agent.
+ * Shared by the /sessions API route (POST, non-blank prompt) and the
+ * scheduler (draft's codebaseReady trigger).
+ */
+export async function dispatchCreateSession(
+  runnerId: string,
+  repoPath: string,
+  agentType: string,
+  prompt: string,
+  opts: { name?: string; tokenUuid?: string } = {},
+): Promise<ActionResult> {
+  const trimmedPrompt = prompt.trim();
+  if (!trimmedPrompt) {
+    return { ok: false, error: "prompt is required", status: 400 };
+  }
+
+  const run = runnerManager.getRunner(runnerId);
+  if (!run) {
+    return { ok: false, error: "Runner not found or disconnected", status: 503 };
+  }
+
+  const session = await createSession({
+    status: "running",
+    prompt: trimmedPrompt,
+    name: opts.name?.trim() || deriveSessionName(trimmedPrompt, repoPath),
+    agentType,
+    repoPath,
+    runnerId,
+  });
+
+  const resolved = await resolveAgentType(agentType, run.info.agents);
+  const resolvedType = resolved.agentType;
+  const agent = getAgent(resolvedType);
+  const fullPrompt = agent.buildPrompt(trimmedPrompt);
+  const command = agent.getCommand({ prompt: trimmedPrompt, repoPath, sessionId: session.id, isResume: false, model: resolved.model });
+
+  const updatedSession = await updateSession(session.id, { command });
+  eventBus.publish({ type: "session_updated", payload: updatedSession });
+
+  const userMessage = await addMessage({
+    sessionId: session.id,
+    role: "user",
+    content: trimmedPrompt,
+    type: "chat-user",
+    tokenUuid: opts.tokenUuid,
+  });
+  eventBus.publish({ type: "message_added", payload: userMessage });
+
+  const systemMsg = await addMessage({
+    sessionId: session.id,
+    role: "system",
+    content: `⚙️ Executing command:\n\`\`\`bash\n${command}\n\`\`\``,
+    type: "agent-run",
+    resolvedAgentType: resolvedType,
+    prompt: fullPrompt,
+  });
+  eventBus.publish({ type: "message_added", payload: systemMsg });
+
+  const taskId = `task_${crypto.randomUUID().slice(0, 8)}`;
+  await runnerManager.registerTask({
+    taskId,
+    runnerId,
+    sessionId: session.id,
+    messageId: systemMsg.id,
+    type: "agent",
+    createdAt: Date.now(),
+    agentType: resolvedType,
+  });
+
+  await clearSessionLog(session.id, systemMsg.id);
+
+  runnerManager
+    .sendRequest(runnerId, "exec.agent", {
+      taskId,
+      command,
+      workDir: repoPath,
+      prompt: fullPrompt,
+      promptEnvVar: PROMPT_ENV_VAR,
+    }, 10_000)
+    .then((res: any) => {
+      if (res?.pid) runnerManager.updateTaskPid(taskId, res.pid);
+    })
+    .catch(async (err) => {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      const updated = await updateSession(session.id, { status: "error", errorMessage });
+      const errMsg = await addMessage({
+        sessionId: session.id,
+        role: "system",
+        content: `❌ Failed to start agent: ${errorMessage}`,
+        type: "agent-return",
+        parentId: systemMsg.id,
+      });
+      eventBus.publish({ type: "message_added", payload: errMsg });
+      eventBus.publish({ type: "session_updated", payload: updated });
+    });
+
+  return { ok: true, session: updatedSession, messageId: systemMsg.id };
 }
 
 /**

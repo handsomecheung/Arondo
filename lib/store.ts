@@ -8,7 +8,7 @@ const SESSIONS_DIR = path.join(CONFIG_DIR, "sessions");
 const PROJECTS_DIR = path.join(CONFIG_DIR, "projects");
 const SCHEDULED_TASKS_FILE = path.join(CONFIG_DIR, "scheduled-tasks.json");
 
-export type SessionStatus = "idle" | "running" | "script-running" | "done" | "error";
+export type SessionStatus = "draft" | "idle" | "running" | "script-running" | "done" | "error";
 
 export interface Project {
   id: string;
@@ -455,10 +455,10 @@ export type ScheduledTaskStatus = "pending" | "triggered" | "done" | "failed" | 
 export type ScheduledTaskTrigger =
   | { kind: "at"; timestamp: number }
   | { kind: "afterSession"; sessionId: string }
-  | { kind: "quotaAvailable"; agentType?: string };
+  | { kind: "quotaAvailable"; agentType?: string }
+  | { kind: "codebaseReady"; runnerId: string; repoPath: string };
 
 export type ScheduledTaskAction =
-  | { kind: "runScript"; scriptName: string; sessionId?: string; projectId?: string }
   | { kind: "sendMessage"; sessionId: string; message: string; prompt?: string };
 
 export interface ScheduledTask {
@@ -529,7 +529,6 @@ export async function removeScheduledTasksForSession(sessionId: string): Promise
     const filtered = tasks.filter((t) => {
       if (t.trigger.kind === "afterSession" && t.trigger.sessionId === sessionId) return false;
       if (t.action.kind === "sendMessage" && t.action.sessionId === sessionId) return false;
-      if (t.action.kind === "runScript" && t.action.sessionId === sessionId) return false;
       return true;
     });
     if (filtered.length !== tasks.length) {

@@ -4,11 +4,12 @@ import {
   getScheduledTask,
   updateScheduledTask,
   getSession,
+  getSessions,
   type ScheduledTask,
 } from "./store";
-import { dispatchFollowupMessage, dispatchSessionScript } from "./session-actions";
-import { dispatchProjectScript } from "./project-actions";
+import { dispatchFollowupMessage } from "./session-actions";
 import { isQuotaAvailable } from "./autoselect";
+import { runnerManager } from "./runner-manager";
 
 const TICK_MS = 30_000;
 
@@ -16,7 +17,7 @@ const TICK_MS = 30_000;
 // dispatch the same task twice (single-process, but both paths are async).
 const dispatching = new Set<string>();
 
-async function executeAction(task: ScheduledTask): Promise<void> {
+export async function executeAction(task: ScheduledTask): Promise<void> {
   if (dispatching.has(task.id)) return;
   dispatching.add(task.id);
   try {
@@ -25,23 +26,10 @@ async function executeAction(task: ScheduledTask): Promise<void> {
     if (!fresh || fresh.status !== "pending") return;
     await updateScheduledTask(task.id, { status: "triggered" });
 
-    let result: { ok: true; [k: string]: any } | { ok: false; error: string; status: number };
-    if (task.action.kind === "sendMessage") {
-      result = await dispatchFollowupMessage(task.action.sessionId, task.action.message, {
-        prompt: task.action.prompt,
-        tokenUuid: task.tokenUuid,
-      });
-    } else if (task.action.sessionId) {
-      result = await dispatchSessionScript(task.action.sessionId, task.action.scriptName, {
-        tokenUuid: task.tokenUuid,
-      });
-    } else if (task.action.projectId) {
-      result = await dispatchProjectScript(task.action.projectId, task.action.scriptName, {
-        tokenUuid: task.tokenUuid,
-      });
-    } else {
-      result = { ok: false, error: "Scheduled task action is missing a target session/project", status: 400 };
-    }
+    const result = await dispatchFollowupMessage(task.action.sessionId, task.action.message, {
+      prompt: task.action.prompt,
+      tokenUuid: task.tokenUuid,
+    });
 
     if (result.ok) {
       await updateScheduledTask(task.id, { status: "done", resultMessageId: (result as any).messageId });
@@ -59,6 +47,22 @@ async function executeAction(task: ScheduledTask): Promise<void> {
   }
 }
 
+// A draft's target codebase is "ready" once no session is actively running
+// against it and the working tree has no uncommitted changes.
+async function isCodebaseReady(runnerId: string, repoPath: string): Promise<boolean> {
+  const sessions = await getSessions();
+  const isBusy = sessions.some(
+    (s) => s.runnerId === runnerId && s.repoPath === repoPath && (s.status === "running" || s.status === "script-running"),
+  );
+  if (isBusy) return false;
+
+  const connectedRunnerId = runnerManager.resolveRunnerId(runnerId);
+  if (!connectedRunnerId) return false;
+
+  const result = await runnerManager.sendRequest(connectedRunnerId, "git.status", { workDir: repoPath });
+  return !result.hasChanges;
+}
+
 async function tick(): Promise<void> {
   let tasks: ScheduledTask[];
   try {
@@ -67,6 +71,10 @@ async function tick(): Promise<void> {
     console.error("[scheduler] failed to read scheduled tasks:", err);
     return;
   }
+
+  // Oldest first, so drafts targeting the same codebase dispatch in FIFO
+  // order instead of racing within the same tick.
+  tasks = [...tasks].sort((a, b) => a.createdAt - b.createdAt);
 
   const now = Date.now();
   for (const task of tasks) {
@@ -83,6 +91,8 @@ async function tick(): Promise<void> {
         }
       } else if (task.trigger.kind === "quotaAvailable") {
         if (await isQuotaAvailable(task.trigger.agentType as any)) await executeAction(task);
+      } else if (task.trigger.kind === "codebaseReady") {
+        if (await isCodebaseReady(task.trigger.runnerId, task.trigger.repoPath)) await executeAction(task);
       }
     } catch (err) {
       console.error(`[scheduler] error evaluating task ${task.id}:`, err);
@@ -91,15 +101,33 @@ async function tick(): Promise<void> {
 }
 
 // Fast-path: react immediately when a session's agent stops running, instead
-// of waiting up to TICK_MS for an "afterSession" follow-up to fire.
-function onSessionUpdated(session: { id: string; status: string }): void {
-  if (session.status === "running") return;
+// of waiting up to TICK_MS for an "afterSession" follow-up or a draft's
+// "codebaseReady" trigger to fire.
+function onSessionUpdated(session: { id: string; status: string; runnerId?: string; repoPath?: string }): void {
+  if (session.status === "running" || session.status === "script-running") return;
   getScheduledTasks()
-    .then((tasks) => {
-      const match = tasks.find(
+    .then(async (tasks) => {
+      const followup = tasks.find(
         (t) => t.status === "pending" && t.trigger.kind === "afterSession" && t.trigger.sessionId === session.id,
       );
-      if (match) executeAction(match).catch((err) => console.error("[scheduler] fast-path dispatch failed:", err));
+      if (followup) {
+        await executeAction(followup).catch((err) => console.error("[scheduler] fast-path dispatch failed:", err));
+      }
+
+      if (session.runnerId && session.repoPath) {
+        const drafts = tasks.filter(
+          (t) =>
+            t.status === "pending" &&
+            t.trigger.kind === "codebaseReady" &&
+            t.trigger.runnerId === session.runnerId &&
+            t.trigger.repoPath === session.repoPath,
+        );
+        for (const draft of drafts) {
+          if (await isCodebaseReady(session.runnerId!, session.repoPath!)) {
+            await executeAction(draft).catch((err) => console.error("[scheduler] fast-path dispatch failed:", err));
+          }
+        }
+      }
     })
     .catch((err) => console.error("[scheduler] fast-path lookup failed:", err));
 }
