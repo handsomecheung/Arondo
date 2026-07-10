@@ -137,8 +137,9 @@ func parseDurationTimestamp(s string) *int64 {
 	return &ts
 }
 
-// parseResetsTimestamp converts strings like "3am (Asia/Tokyo)" or
-// "Jul 1, 5am (Asia/Tokyo)" to a Unix timestamp. Returns nil on failure.
+// parseResetsTimestamp converts strings like "3am (Asia/Tokyo)",
+// "Jul 1, 5am (Asia/Tokyo)", or "Jul 15 at 4:59am (Asia/Tokyo)" to a Unix
+// timestamp. Returns nil on failure.
 func parseResetsTimestamp(s string) *int64 {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -201,7 +202,7 @@ func ampmToHour(hour int, ampm string) int {
 var (
 	durationRe       = regexp.MustCompile(`^(?:(\d+)h)?\s*(?:(\d+)m)?$`)
 	resetsTimezoneRe = regexp.MustCompile(`\(([^)]+)\)`)
-	resetsDateRe     = regexp.MustCompile(`^(\w{3}) (\d{1,2}), (\d{1,2})(?::(\d{2}))?(am|pm)`)
+	resetsDateRe     = regexp.MustCompile(`^(\w{3}) (\d{1,2})(?:,| at) (\d{1,2})(?::(\d{2}))?(am|pm)`)
 	resetsTimeRe     = regexp.MustCompile(`^(\d{1,2})(?::(\d{2}))?(am|pm)`)
 	monthMap         = map[string]time.Month{
 		"Jan": time.January, "Feb": time.February, "Mar": time.March,

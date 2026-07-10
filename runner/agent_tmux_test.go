@@ -13,6 +13,35 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+func TestParseResetsTimestamp(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+	}{
+		{"same-day time", "1:09pm (Asia/Tokyo)"},
+		{"same-day time no minutes", "3am (Asia/Tokyo)"},
+		{"comma date", "Jul 1, 5am (Asia/Tokyo)"},
+		{"comma date with minutes", "Jul 1, 4:59am (Europe/London)"},
+		{"at date", "Jul 15 at 4:59am (Asia/Tokyo)"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ts := parseResetsTimestamp(c.input)
+			if ts == nil {
+				t.Fatalf("parseResetsTimestamp(%q) = nil, want a valid timestamp", c.input)
+			}
+		})
+	}
+
+	if ts := parseResetsTimestamp(""); ts != nil {
+		t.Fatalf("parseResetsTimestamp(\"\") = %v, want nil", *ts)
+	}
+	if ts := parseResetsTimestamp("not a valid reset string"); ts != nil {
+		t.Fatalf("parseResetsTimestamp(%q) = %v, want nil", "not a valid reset string", *ts)
+	}
+}
+
 func TestAgentQuotas(t *testing.T) {
 	// Set up mock bin directory in PATH
 	wd, err := os.Getwd()

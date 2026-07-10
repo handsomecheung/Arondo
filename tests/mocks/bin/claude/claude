@@ -99,7 +99,7 @@ if (sessionId !== null || prompt !== null) {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const monthStr = months[targetDate.getMonth()];
   const day = targetDate.getDate();
-  const dateStr = `${monthStr} ${day}, 4:59am (Europe/London)`;
+  const dateStr = `${monthStr} ${day} at 4:59am (Europe/London)`;
 
   statusContent = statusContent.replace(/__datetime__/g, dateStr);
   usageContent = usageContent.replace(/__datetime__/g, dateStr);

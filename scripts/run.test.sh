@@ -6,3 +6,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 ./runner/build.sh
 
 npm run test:integration
+
+cd "$(dirname "${BASH_SOURCE[0]}")/../runner"
+
+go test -v
