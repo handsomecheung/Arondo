@@ -8,7 +8,7 @@ import UserAgentCommandCard from "@/components/UserAgentCommandCard";
 import UserMessageCard from "@/components/UserMessageCard";
 import type { Session, ProjectScript, Runner, Message, Project } from "@/types/home";
 import type { ExecCardInfo } from "@/lib/homeUtils";
-import { formatTime, execCardInfoToItem } from "@/lib/homeUtils";
+import { formatTime, execCardInfoToItem, autoResizeTextarea } from "@/lib/homeUtils";
 import {
   IconBolt, IconPlus, IconSend, IconCheck,
   IconGitPullRequest, IconPlay, IconTerminal, IconEdit, IconTrash,
@@ -213,6 +213,29 @@ export default function SessionView({
     document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
+
+  const chatInputPlaceholder = isArchived
+    ? "This session is archived. Unarchive it to send messages."
+    : isRunnerOffline
+    ? "Runner is offline. Chat is disabled."
+    : isDraftSession
+      ? "Draft — send it now, or it may send automatically once no agent is running and the codebase is clean"
+      : isNewDraft
+        ? "Describe what you want to do — unlike a Session, a Draft won't run right away. It's held and sent once no agent is running and the codebase is clean, or whenever you send it manually."
+        : isAgentRunning
+          ? "Agent is working… your message will be queued until it finishes"
+          : isNewSession
+            ? "Describe what you want the agent to build or fix in this project…"
+            : "Send a message or follow-up feedback to the agent…";
+
+  const chatInputValue = isDraftSession ? selectedSession?.prompt ?? "" : prompt;
+
+  // Resize to fit the placeholder whenever it changes while the input is empty,
+  // so the box previews how much room a longer message will need.
+  useLayoutEffect(() => {
+    if (chatInputValue) return;
+    if (textareaRef.current) autoResizeTextarea(textareaRef.current);
+  }, [chatInputPlaceholder, chatInputValue, textareaRef]);
 
   function agentTypeLabel(type: string): string {
     if (type === "antigravity") return "Antigravity CLI";
@@ -1088,22 +1111,8 @@ export default function SessionView({
           <textarea
             ref={textareaRef}
             className="chat-input"
-            placeholder={
-              isArchived
-                ? "This session is archived. Unarchive it to send messages."
-                : isRunnerOffline
-                ? "Runner is offline. Chat is disabled."
-                : isDraftSession
-                  ? "Draft — send it now, or it may send automatically once no agent is running and the codebase is clean"
-                  : isNewDraft
-                    ? "Describe what you want to do — unlike a Session, a Draft won't run right away. It's held and sent once no agent is running and the codebase is clean, or whenever you send it manually."
-                    : isAgentRunning
-                      ? "Agent is working… your message will be queued until it finishes"
-                      : isNewSession
-                        ? "Describe what you want the agent to build or fix in this project…"
-                        : "Send a message or follow-up feedback to the agent…"
-            }
-            value={isDraftSession ? selectedSession?.prompt ?? "" : prompt}
+            placeholder={chatInputPlaceholder}
+            value={chatInputValue}
             onChange={onPromptChange}
             onKeyDown={onKeyDown}
             disabled={isRunnerOffline || isDraftSession || isArchived}

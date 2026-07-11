@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import type { Session, TaskItem, ProjectScript } from "@/types/home";
 import { resolveAgentCommand, getUniqueTriggers, getTriggerWord } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
+import { autoResizeTextarea } from "@/lib/homeUtils";
 
 interface UseSessionSubmitParams {
   prompt: string;
@@ -124,16 +125,14 @@ export function useSessionSubmit({
         !isNewSession &&
         !!selectedSessionId
     );
-    const el = e.target;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 260)}px`;
+    autoResizeTextarea(e.target);
   };
 
   const handleNewSessionCommand = useCallback(async (sessionName?: string) => {
     if (!selectedSession) return;
     setPrompt("");
     setShowCommandMenu(false);
-    if (textareaRef.current) textareaRef.current.style.height = "auto";
+    if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
     const { repoPath: sessionRepoPath, agentType: sessionAgentType, runnerId: sessionRunnerId } = selectedSession;
     const res = await fetch("/api/sessions", {
       method: "POST",
@@ -186,7 +185,7 @@ export function useSessionSubmit({
     if (!selectedSessionId) return;
     setPrompt("");
     setShowCommandMenu(false);
-    if (textareaRef.current) textareaRef.current.style.height = "auto";
+    if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
 
     if (selectedSession?.status === "running") {
       await queueFollowupMessage(originalMessage, agentMessage);
@@ -230,7 +229,7 @@ export function useSessionSubmit({
     if (!rest) return;
     setPrompt("");
     setShowCommandMenu(false);
-    if (textareaRef.current) textareaRef.current.style.height = "auto";
+    if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
     const match = sessionScripts.find((s) => s.name === rest);
     onRunScript(match ? match.name : rest, promptText);
   }, [sessionScripts, onRunScript]);
@@ -250,7 +249,7 @@ export function useSessionSubmit({
     if (trimmed === "/delete" && !isNewSession && selectedSessionId) {
       setPrompt("");
       setShowCommandMenu(false);
-      if (textareaRef.current) textareaRef.current.style.height = "auto";
+      if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
       onDeleteSession(selectedSessionId);
       return;
     }
@@ -273,7 +272,7 @@ export function useSessionSubmit({
 
     setPrompt("");
     setShowCommandMenu(false);
-    if (textareaRef.current) textareaRef.current.style.height = "auto";
+    if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
 
     try {
       if (isNewSession || isNewDraft || !selectedSessionId) {
@@ -353,8 +352,7 @@ export function useSessionSubmit({
       requestAnimationFrame(() => {
         const el = textareaRef.current;
         if (!el) return;
-        el.style.height = "auto";
-        el.style.height = `${Math.min(el.scrollHeight, 260)}px`;
+        autoResizeTextarea(el);
         el.selectionStart = el.selectionEnd = el.value.length;
       });
       return;
@@ -368,8 +366,7 @@ export function useSessionSubmit({
       setPrompt(newValue);
       requestAnimationFrame(() => {
         textarea.selectionStart = textarea.selectionEnd = start + 1;
-        textarea.style.height = "auto";
-        textarea.style.height = `${Math.min(textarea.scrollHeight, 260)}px`;
+        autoResizeTextarea(textarea);
       });
       return;
     }

@@ -6,6 +6,15 @@ export function resolveRepoFilePath(repoPath: string, path: string): string {
   return `${repoPath.replace(/\/$/, "")}/${path}`;
 }
 
+export function autoResizeTextarea(el: HTMLTextAreaElement, maxHeight = 260) {
+  const text = el.value || el.placeholder;
+  const original = el.value;
+  if (text !== original) el.value = text;
+  el.style.height = "auto";
+  el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
+  if (text !== original) el.value = original;
+}
+
 export function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], {
     hour: "2-digit",
