@@ -202,6 +202,10 @@ export default function SettingsPage() {
   const [savingRules, setSavingRules] = useState(false);
   const [saveRulesSuccess, setSaveRulesSuccess] = useState(false);
 
+  const [sessionArchiveDays, setSessionArchiveDays] = useState<number | "">("");
+  const [savingSessionArchiveDays, setSavingSessionArchiveDays] = useState(false);
+  const [saveSessionArchiveDaysSuccess, setSaveSessionArchiveDaysSuccess] = useState(false);
+
   const loadRunners = useCallback(() => {
     fetch("/api/runners")
       .then((r) => r.json())
@@ -222,6 +226,13 @@ export default function SettingsPage() {
     fetch("/api/global-rules")
       .then((r) => r.json())
       .then((data: { content: string }) => setGlobalRules(data.content || ""))
+      .catch(console.error);
+  }, []);
+
+  const loadSettings = useCallback(() => {
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data: { sessionArchiveDays: number }) => setSessionArchiveDays(data.sessionArchiveDays))
       .catch(console.error);
   }, []);
 
@@ -401,6 +412,29 @@ export default function SettingsPage() {
     }
   }, [globalRules]);
 
+  const handleSaveSessionArchiveDays = useCallback(async () => {
+    if (sessionArchiveDays === "" || sessionArchiveDays < 1) return;
+    setSavingSessionArchiveDays(true);
+    setSaveSessionArchiveDaysSuccess(false);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionArchiveDays }),
+      });
+      if (res.ok) {
+        setSaveSessionArchiveDaysSuccess(true);
+        setTimeout(() => setSaveSessionArchiveDaysSuccess(false), 3000);
+      } else {
+        alert("Failed to save session archive days");
+      }
+    } catch (err) {
+      console.error("Failed to save session archive days:", err);
+    } finally {
+      setSavingSessionArchiveDays(false);
+    }
+  }, [sessionArchiveDays]);
+
   const saveRunnerUserTokenUuids = useCallback(async (runnerId: string, allowedUserTokenUuids: string[]) => {
     try {
       const res = await fetch("/api/runners", {
@@ -483,6 +517,7 @@ export default function SettingsPage() {
     loadRunners();
     loadCustomCommands();
     loadGlobalRules();
+    loadSettings();
     fetch("/api/projects")
       .then((r) => r.json())
       .then((data: Project[]) => {
@@ -1232,6 +1267,79 @@ export default function SettingsPage() {
                     )}
                   </div>
                 ),
+              )}
+            </div>
+          </div>
+
+          {/* Session Management Section */}
+          <div
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-md)",
+              padding: 16,
+            }}
+          >
+            <h2
+              style={{
+                fontSize: 16,
+                fontWeight: 600,
+                color: "var(--text-primary)",
+                marginBottom: 4,
+              }}
+            >
+              Session Management
+            </h2>
+            <p
+              style={{
+                fontSize: 12,
+                color: "var(--text-muted)",
+                marginBottom: 12,
+              }}
+            >
+              Number of idle days before an active session is automatically archived.
+            </p>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <input
+                type="number"
+                min={1}
+                value={sessionArchiveDays}
+                onChange={(e) =>
+                  setSessionArchiveDays(e.target.value === "" ? "" : Number(e.target.value))
+                }
+                style={{
+                  width: 100,
+                  padding: "7px 10px",
+                  fontSize: 13,
+                  backgroundColor: "var(--bg-elevated)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-sm)",
+                  color: "var(--text-primary)",
+                  outline: "none",
+                }}
+              />
+              <button
+                onClick={handleSaveSessionArchiveDays}
+                disabled={savingSessionArchiveDays || sessionArchiveDays === "" || sessionArchiveDays < 1}
+                style={{
+                  padding: "7px 18px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#fff",
+                  background: "var(--accent)",
+                  border: "none",
+                  borderRadius: "var(--radius-sm)",
+                  cursor: "pointer",
+                  opacity:
+                    savingSessionArchiveDays || sessionArchiveDays === "" || sessionArchiveDays < 1 ? 0.5 : 1,
+                }}
+              >
+                {savingSessionArchiveDays ? "Saving…" : "Save"}
+              </button>
+              {saveSessionArchiveDaysSuccess && (
+                <span style={{ fontSize: 13, color: "var(--accent)", fontWeight: 500 }}>
+                  ✓ Saved successfully!
+                </span>
               )}
             </div>
           </div>

@@ -9,10 +9,15 @@ const SESSIONS_DIR = path.join(CONFIG_DIR, "sessions");
 const ARCHIVED_SESSIONS_DIR = path.join(CONFIG_DIR, "archived", "sessions");
 const PROJECTS_DIR = path.join(CONFIG_DIR, "projects");
 const SCHEDULED_TASKS_FILE = path.join(CONFIG_DIR, "scheduled-tasks.json");
+const SETTINGS_FILE = path.join(CONFIG_DIR, "settings.json");
 
 const DEFAULT_SESSION_ARCHIVE_DAYS = 7;
-const SESSION_ARCHIVE_DAYS = Number(process.env.ARONDO_SESSION_ARCHIVE_DAYS) || DEFAULT_SESSION_ARCHIVE_DAYS;
-export const SESSION_ARCHIVE_AGE_MS = SESSION_ARCHIVE_DAYS * 24 * 60 * 60 * 1000;
+const SESSION_ARCHIVE_DAYS_DEFAULT =
+  Number(process.env.ARONDO_SESSION_ARCHIVE_DAYS_DEFAULT) || DEFAULT_SESSION_ARCHIVE_DAYS;
+
+export interface AppSettings {
+  sessionArchiveDays?: number;
+}
 
 export type SessionStatus = "draft" | "idle" | "running" | "script-running" | "done" | "error";
 
@@ -603,6 +608,31 @@ export async function unarchiveSession(id: string): Promise<void> {
 export async function deleteProject(id: string): Promise<void> {
   const projectDir = getProjectDir(id);
   await fs.rm(projectDir, { recursive: true, force: true });
+}
+
+// ─── App Settings ─────────────────────────────────────────────────────────────
+
+export async function getAppSettings(): Promise<AppSettings> {
+  return readJson<AppSettings>(SETTINGS_FILE, {});
+}
+
+export async function updateAppSettings(patch: Partial<AppSettings>): Promise<AppSettings> {
+  return withFileLock(SETTINGS_FILE, async () => {
+    const current = await getAppSettings();
+    const updated = { ...current, ...patch };
+    await writeJson(SETTINGS_FILE, updated);
+    return updated;
+  });
+}
+
+export async function getSessionArchiveDays(): Promise<number> {
+  const settings = await getAppSettings();
+  return settings.sessionArchiveDays || SESSION_ARCHIVE_DAYS_DEFAULT;
+}
+
+export async function getSessionArchiveAgeMs(): Promise<number> {
+  const days = await getSessionArchiveDays();
+  return days * 24 * 60 * 60 * 1000;
 }
 
 
