@@ -1,6 +1,6 @@
 {
   "name": "arondo",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "private": true,
   "scripts": {
     "dev": "tsx watch --exclude \".arondo-test/**\" --exclude \"tests/**\" server.ts",
