@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { IconPlus, IconInbox, IconSettings, IconServer, IconMoreVertical, IconArchive, IconArrowLeft } from "@/components/Icons";
+import { IconPlus, IconInbox, IconSettings, IconServer, IconMoreVertical, IconArchive, IconArrowLeft, IconTrash } from "@/components/Icons";
 import { formatRelative } from "@/lib/homeUtils";
 import type { Session, Project, Runner } from "@/types/home";
+
+const SWIPE_THRESHOLD = 72;
 
 interface Props {
   sidebarOpen: boolean;
@@ -19,6 +21,7 @@ interface Props {
   onSelectProject: (id: string) => void;
   onNewSession: () => void;
   onNewDraft: () => void;
+  onDeleteSession: (id: string) => void;
   archivedView: boolean;
   archivedSessions: Session[];
   onOpenArchivedSessions: () => void;
@@ -41,6 +44,7 @@ export default function AppSidebar({
   onSelectProject,
   onNewSession,
   onNewDraft,
+  onDeleteSession,
   archivedView,
   archivedSessions,
   onOpenArchivedSessions,
@@ -50,6 +54,31 @@ export default function AppSidebar({
   const [userRole, setUserRole] = useState<"admin" | "user" | null>(null);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
+  const [swipe, setSwipe] = useState<{ id: string; startX: number; dx: number } | null>(null);
+  const lastDragDistanceRef = useRef(0);
+
+  const handleSwipeTouchStart = (id: string) => (e: React.TouchEvent) => {
+    setSwipe({ id, startX: e.touches[0].clientX, dx: 0 });
+  };
+  const handleSwipeTouchMove = (e: React.TouchEvent) => {
+    setSwipe((prev) => (prev ? { ...prev, dx: Math.max(0, e.touches[0].clientX - prev.startX) } : prev));
+  };
+  const handleSwipeTouchEnd = () => {
+    const prev = swipe;
+    setSwipe(null);
+    if (!prev) return;
+    lastDragDistanceRef.current = Math.abs(prev.dx);
+    if (prev.dx >= SWIPE_THRESHOLD) {
+      onDeleteSession(prev.id);
+    }
+  };
+  const handleSwipeClick = (onClick: () => void) => () => {
+    if (lastDragDistanceRef.current > 10) {
+      lastDragDistanceRef.current = 0;
+      return;
+    }
+    onClick();
+  };
 
   useEffect(() => {
     fetch("/api/auth/verify")
@@ -180,32 +209,50 @@ export default function AppSidebar({
               archivedSessions.map((session) => {
                 const project = projects.find((p) => p.id === session.projectId);
                 const projectName = project ? project.repoPath.split("/").pop() || project.repoPath : "";
+                const isSwiping = swipe?.id === session.id;
+                const swipeDx = isSwiping ? swipe!.dx : 0;
+                const clampedDx = Math.max(0, Math.min(120, swipeDx));
                 return (
                   <div
                     key={`archived-session-${session.id}`}
-                    className={`task-item ${selectedSessionId === session.id ? "active" : ""}`}
-                    onClick={() => onSelectArchivedSession(session.id)}
-                    id={`archived-session-item-${session.id}`}
+                    className="task-item-swipe-wrapper"
                   >
-                    <div className="task-item-header">
-                      <span className={`task-status-badge ${session.status}`}>{session.status}</span>
-                      {projectName && (
-                        <span
-                          className="task-item-project-badge"
-                          title={project?.repoPath}
-                          style={{
-                            fontSize: 10, fontWeight: 500, color: "var(--text-secondary)",
-                            backgroundColor: "rgba(255, 255, 255, 0.06)", border: "1px solid var(--border)",
-                            padding: "1px 6px", borderRadius: "4px", maxWidth: "120px",
-                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                          }}
-                        >
-                          {projectName}
-                        </span>
-                      )}
+                    <div className="task-item-swipe-action task-item-swipe-action-delete" style={{ opacity: clampedDx > 8 ? Math.min(1, clampedDx / SWIPE_THRESHOLD) : 0 }}>
+                      <IconTrash /> Delete
                     </div>
-                    <div className="task-item-prompt">{session.name || session.prompt}</div>
-                    <div className="task-item-time">{formatRelative(session.updatedAt)}</div>
+                    <div
+                      className={`task-item ${selectedSessionId === session.id ? "active" : ""}`}
+                      onClick={handleSwipeClick(() => onSelectArchivedSession(session.id))}
+                      onTouchStart={handleSwipeTouchStart(session.id)}
+                      onTouchMove={handleSwipeTouchMove}
+                      onTouchEnd={handleSwipeTouchEnd}
+                      onTouchCancel={handleSwipeTouchEnd}
+                      style={{
+                        transform: `translateX(${clampedDx}px)`,
+                        transition: isSwiping ? "none" : "transform 0.2s ease",
+                      }}
+                      id={`archived-session-item-${session.id}`}
+                    >
+                      <div className="task-item-header">
+                        <span className={`task-status-badge ${session.status}`}>{session.status}</span>
+                        {projectName && (
+                          <span
+                            className="task-item-project-badge"
+                            title={project?.repoPath}
+                            style={{
+                              fontSize: 10, fontWeight: 500, color: "var(--text-secondary)",
+                              backgroundColor: "rgba(255, 255, 255, 0.06)", border: "1px solid var(--border)",
+                              padding: "1px 6px", borderRadius: "4px", maxWidth: "120px",
+                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            }}
+                          >
+                            {projectName}
+                          </span>
+                        )}
+                      </div>
+                      <div className="task-item-prompt">{session.name || session.prompt}</div>
+                      <div className="task-item-time">{formatRelative(session.updatedAt)}</div>
+                    </div>
                   </div>
                 );
               })
@@ -222,13 +269,30 @@ export default function AppSidebar({
                 const projectName = project ? project.repoPath.split("/").pop() || project.repoPath : "";
                 const runner = runners.find((r) => r.id === session.runnerId);
                 const runnerName = runner ? runner.name : session.runnerId || "";
+                const isSwiping = swipe?.id === session.id;
+                const swipeDx = isSwiping ? swipe!.dx : 0;
+                const clampedDx = Math.max(0, Math.min(120, swipeDx));
                 return (
                   <div
                     key={session.id ? `session-${session.id}` : `session-idx-${index}`}
-                    className={`task-item ${selectedSessionId === session.id ? "active" : ""}`}
-                    onClick={() => onSelectSession(session.id)}
-                    id={`session-item-${session.id}`}
+                    className="task-item-swipe-wrapper"
                   >
+                    <div className="task-item-swipe-action task-item-swipe-action-delete" style={{ opacity: clampedDx > 8 ? Math.min(1, clampedDx / SWIPE_THRESHOLD) : 0 }}>
+                      <IconTrash /> Delete
+                    </div>
+                    <div
+                      className={`task-item ${selectedSessionId === session.id ? "active" : ""}`}
+                      onClick={handleSwipeClick(() => onSelectSession(session.id))}
+                      onTouchStart={handleSwipeTouchStart(session.id)}
+                      onTouchMove={handleSwipeTouchMove}
+                      onTouchEnd={handleSwipeTouchEnd}
+                      onTouchCancel={handleSwipeTouchEnd}
+                      style={{
+                        transform: `translateX(${clampedDx}px)`,
+                        transition: isSwiping ? "none" : "transform 0.2s ease",
+                      }}
+                      id={`session-item-${session.id}`}
+                    >
                     <div className="task-item-header">
                       <span className={`task-status-badge ${session.status}`}>
                         {(session.status === "running" || session.status === "script-running") && "⟳ "}
@@ -269,6 +333,7 @@ export default function AppSidebar({
                     </div>
                     <div className="task-item-prompt">{session.name || session.prompt}</div>
                     <div className="task-item-time">{formatRelative(session.createdAt)}</div>
+                    </div>
                   </div>
                 );
               })

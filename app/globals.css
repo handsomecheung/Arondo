@@ -412,6 +412,30 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+.task-item-swipe-wrapper {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  margin-bottom: 4px;
+}
+
+.task-item-swipe-action {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+.task-item-swipe-action-delete {
+  left: 0;
+  background: #ef4444;
+}
+
 .task-item {
   padding: 12px;
   border-radius: var(--radius-md);
@@ -421,6 +445,12 @@ body {
   margin-bottom: 4px;
   /* Minimum touch target */
   min-height: 60px;
+  background: var(--bg-surface);
+  position: relative;
+  touch-action: pan-y;
+}
+.task-item-swipe-wrapper .task-item {
+  margin-bottom: 0;
 }
 .task-item:hover {
   background: var(--bg-elevated);

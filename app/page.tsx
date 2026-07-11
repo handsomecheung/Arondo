@@ -1036,6 +1036,7 @@ export default function HomePage() {
         onSelectProject={handleSelectProject}
         onNewSession={handleNewSession}
         onNewDraft={handleNewDraft}
+        onDeleteSession={handleDeleteSession}
         archivedView={archivedView}
         archivedSessions={archivedSessions}
         onOpenArchivedSessions={handleOpenArchivedSessions}
