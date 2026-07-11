@@ -475,7 +475,7 @@ export default function SessionView({
                     id="menu-show-diff"
                     title="Not a git repository"
                   >
-                    🔍 Show Diff
+                    🔍 Show Changes
                   </button>
                 ) : isCheckingGitChanges || !hasGitChanges ? (
                   <button
@@ -488,7 +488,7 @@ export default function SessionView({
                         : "No changes detected in git repository"
                     }
                   >
-                    🔍 Show Diff
+                    🔍 Show Changes
                   </button>
                 ) : (
                   <button
@@ -499,7 +499,7 @@ export default function SessionView({
                     }}
                     id="menu-show-diff"
                   >
-                    🔍 Show Diff
+                    🔍 Show Changes
                   </button>
                 )}
 

@@ -163,7 +163,7 @@ export default function AppSidebar({
                 <IconPlus /> Session
               </button>
               <button className="new-task-btn" onClick={onNewDraft} id="new-draft-btn">
-                <IconPlus /> Draft
+                <IconPlus /> TODO
               </button>
             </div>
           </div>
