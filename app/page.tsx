@@ -1115,6 +1115,7 @@ export default function HomePage() {
             execCards={execCards}
             returnMsgIds={returnMsgIds}
             runners={runners}
+            projects={projects}
             runnerAgents={runnerAgents}
             runnerId={runnerId}
             agentType={agentType}

@@ -313,6 +313,22 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
+/* New Draft Send Mode Toggle */
+.draft-send-toggle {
+  height: 36px !important;
+  box-sizing: border-box !important;
+  align-items: stretch !important;
+}
+
+.draft-send-toggle .sidebar-mode-tab {
+  height: 100% !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 12px !important;
+  box-sizing: border-box !important;
+}
+
 /* Close button inside sidebar (mobile) */
 .sidebar-close-btn {
   display: flex;
@@ -772,10 +788,21 @@ body {
 
 .input-meta {
   display: flex;
+  flex-direction: column;
   gap: 8px;
   margin-bottom: 10px;
+  align-items: stretch;
+}
+
+.input-meta-row {
+  display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.input-meta-row-label {
+  flex-shrink: 0;
+  width: 52px;
 }
 
 .input-label {

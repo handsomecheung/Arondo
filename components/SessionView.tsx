@@ -6,7 +6,7 @@ import AgentExecCard from "@/components/AgentExecCard";
 import ExecCard, { ExecCardItem } from "@/components/ExecCard";
 import UserAgentCommandCard from "@/components/UserAgentCommandCard";
 import UserMessageCard from "@/components/UserMessageCard";
-import type { Session, ProjectScript, Runner, Message } from "@/types/home";
+import type { Session, ProjectScript, Runner, Message, Project } from "@/types/home";
 import type { ExecCardInfo } from "@/lib/homeUtils";
 import { formatTime, execCardInfoToItem } from "@/lib/homeUtils";
 import {
@@ -28,6 +28,7 @@ interface SessionViewProps {
   execCards: Map<string, ExecCardInfo>;
   returnMsgIds: Set<string>;
   runners: Runner[];
+  projects: Project[];
   runnerAgents: string[] | undefined;
   runnerId: string;
   agentType: string;
@@ -108,6 +109,7 @@ export default function SessionView({
   execCards,
   returnMsgIds,
   runners,
+  projects,
   runnerAgents,
   runnerId,
   agentType,
@@ -186,6 +188,8 @@ export default function SessionView({
   const agentSwitchRef = useRef<HTMLDivElement>(null);
   const scriptSubMenuRef = useRef<HTMLDivElement>(null);
   const [scriptSubMenuShift, setScriptSubMenuShift] = useState(0);
+  const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);
+  const projectSelectRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     if (!scriptSubMenuOpen || !scriptSubMenuRef.current) {
@@ -201,6 +205,9 @@ export default function SessionView({
     const handleClickOutside = (e: MouseEvent) => {
       if (agentSwitchRef.current && !agentSwitchRef.current.contains(e.target as Node)) {
         setAgentSwitchOpen(false);
+      }
+      if (projectSelectRef.current && !projectSelectRef.current.contains(e.target as Node)) {
+        setProjectDropdownOpen(false);
       }
     };
     document.addEventListener("click", handleClickOutside);
@@ -752,146 +759,213 @@ export default function SessionView({
       <div className="input-area">
         {(isNewSession || isNewDraft) && (
           <div className="input-meta">
-            <div
-              className="custom-dropdown-container"
-              ref={runnerSelectRef}
-            >
-              <button
-                type="button"
-                className="custom-dropdown-trigger"
-                onClick={() =>
-                  !isRunning && onSetRunnerDropdownOpen(!runnerDropdownOpen)
-                }
-                disabled={isRunning}
-                style={{
-                  ...((isNewSession || isNewDraft) && !runnerId
-                    ? { borderColor: "var(--error)" }
-                    : {}),
-                }}
-                id="runner-select-trigger"
+            <div className="input-meta-row">
+              <span className="input-label input-meta-row-label">Runner:</span>
+              <div
+                className="custom-dropdown-container"
+                ref={runnerSelectRef}
               >
-                <span>
-                  {runners.find((r) => r.id === runnerId)
-                    ? `${runners.find((r) => r.id === runnerId)?.name} (${runners.find((r) => r.id === runnerId)?.hostname})`
-                    : "Select Runner"}
-                </span>
-                <IconChevronDown
-                  className={`arrow-icon ${runnerDropdownOpen ? "open" : ""}`}
-                />
-              </button>
-              {runnerDropdownOpen && (
-                <div className="custom-dropdown-menu">
-                  {runners.filter((r) => r.connected).length === 0 ? (
-                    <div className="custom-dropdown-item disabled">
-                      No runners connected
-                    </div>
-                  ) : (
-                    runners
-                      .filter((r) => r.connected)
-                      .map((r) => (
-                        <button
-                          key={r.id}
-                          type="button"
-                          className={`custom-dropdown-item ${r.id === runnerId ? "active" : ""}`}
-                          onClick={() => {
-                            if (r.id !== runnerId) {
-                              onSetRunnerId(r.id);
-                              onSetRepoPath("");
-                            }
-                            onSetRunnerDropdownOpen(false);
-                          }}
-                        >
-                          {r.name} ({r.hostname})
-                        </button>
-                      ))
-                  )}
-                </div>
-              )}
+                <button
+                  type="button"
+                  className="custom-dropdown-trigger"
+                  onClick={() =>
+                    !isRunning && onSetRunnerDropdownOpen(!runnerDropdownOpen)
+                  }
+                  disabled={isRunning}
+                  style={{
+                    ...((isNewSession || isNewDraft) && !runnerId
+                      ? { borderColor: "var(--error)" }
+                      : {}),
+                  }}
+                  id="runner-select-trigger"
+                >
+                  <span>
+                    {runners.find((r) => r.id === runnerId)
+                      ? `${runners.find((r) => r.id === runnerId)?.name} (${runners.find((r) => r.id === runnerId)?.hostname})`
+                      : "Select Runner"}
+                  </span>
+                  <IconChevronDown
+                    className={`arrow-icon ${runnerDropdownOpen ? "open" : ""}`}
+                  />
+                </button>
+                {runnerDropdownOpen && (
+                  <div className="custom-dropdown-menu">
+                    {runners.filter((r) => r.connected).length === 0 ? (
+                      <div className="custom-dropdown-item disabled">
+                        No runners connected
+                      </div>
+                    ) : (
+                      runners
+                        .filter((r) => r.connected)
+                        .map((r) => (
+                          <button
+                            key={r.id}
+                            type="button"
+                            className={`custom-dropdown-item ${r.id === runnerId ? "active" : ""}`}
+                            onClick={() => {
+                              if (r.id !== runnerId) {
+                                onSetRunnerId(r.id);
+                                onSetRepoPath("");
+                              }
+                              onSetRunnerDropdownOpen(false);
+                            }}
+                          >
+                            {r.name} ({r.hostname})
+                          </button>
+                        ))
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
-            <button
-              type="button"
-              className="browse-btn"
-              onClick={() => {
-                if (!runnerId) return;
-                const startingPath = repoPath.trim() || "/";
-                onSetFsCurrentPath(startingPath);
-                onSetFsModalOpen(true);
-              }}
-              disabled={isRunning || !runnerId}
-              title={
-                repoPath ? `Selected: ${repoPath}` : "Browse Directory"
-              }
-              id="browse-repo-btn"
-              style={
-                (isNewSession || isNewDraft) && !repoPath.trim()
-                  ? { borderColor: "var(--error)" }
-                  : {}
-              }
-            >
-              <IconFolder />
-            </button>
+            <div className="input-meta-row">
+              <span className="input-label input-meta-row-label">Project:</span>
+              <div
+                className="custom-dropdown-container"
+                ref={projectSelectRef}
+              >
+                <button
+                  type="button"
+                  className="custom-dropdown-trigger"
+                  onClick={() =>
+                    !isRunning && runnerId && setProjectDropdownOpen(!projectDropdownOpen)
+                  }
+                  disabled={isRunning || !runnerId}
+                  style={
+                    (isNewSession || isNewDraft) && !repoPath.trim()
+                      ? { borderColor: "var(--error)" }
+                      : {}
+                  }
+                  id="project-select-trigger"
+                >
+                  <span>
+                    {(() => {
+                      const runnerProjects = projects.filter((p) => p.runnerId === runnerId);
+                      const matched = runnerProjects.find((p) => p.repoPath === repoPath);
+                      if (matched) return matched.repoPath.split("/").pop() || matched.repoPath;
+                      return runnerId ? "Select Project" : "Select runner first";
+                    })()}
+                  </span>
+                  <IconChevronDown
+                    className={`arrow-icon ${projectDropdownOpen ? "open" : ""}`}
+                  />
+                </button>
+                {projectDropdownOpen && (
+                  <div className="custom-dropdown-menu">
+                    {projects.filter((p) => p.runnerId === runnerId).length === 0 ? (
+                      <div className="custom-dropdown-item disabled">
+                        No projects on this runner
+                      </div>
+                    ) : (
+                      projects
+                        .filter((p) => p.runnerId === runnerId)
+                        .map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            className={`custom-dropdown-item ${p.repoPath === repoPath ? "active" : ""}`}
+                            onClick={() => {
+                              onSetRepoPath(p.repoPath);
+                              setProjectDropdownOpen(false);
+                            }}
+                            title={p.repoPath}
+                          >
+                            {p.repoPath.split("/").pop() || p.repoPath}
+                          </button>
+                        ))
+                    )}
+                  </div>
+                )}
+              </div>
 
-            <div
-              className="custom-dropdown-container"
-              ref={agentSelectRef}
-            >
               <button
                 type="button"
-                className="custom-dropdown-trigger"
-                onClick={() =>
-                  !isRunning && onSetAgentDropdownOpen(!agentDropdownOpen)
-                }
-                disabled={isRunning}
-                style={{
-                  ...((isNewSession || isNewDraft) && !agentType
-                    ? { borderColor: "var(--error)" }
-                    : {}),
+                className="browse-btn"
+                onClick={() => {
+                  if (!runnerId) return;
+                  const startingPath = repoPath.trim() || "/";
+                  onSetFsCurrentPath(startingPath);
+                  onSetFsModalOpen(true);
                 }}
-                id="agent-select-trigger"
+                disabled={isRunning || !runnerId}
+                title={
+                  repoPath ? `Selected: ${repoPath}` : "Browse Directory"
+                }
+                id="browse-repo-btn"
+                style={
+                  (isNewSession || isNewDraft) && !repoPath.trim()
+                    ? { borderColor: "var(--error)" }
+                    : {}
+                }
               >
-                <span>{agentTypeLabel(agentType)}</span>
-                <IconChevronDown
-                  className={`arrow-icon ${agentDropdownOpen ? "open" : ""}`}
-                />
+                <IconFolder />
               </button>
-              {agentDropdownOpen && (
-                <div className="custom-dropdown-menu">
-                  {(() => {
-                    const concreteAgents = (
-                      [
-                        { value: "antigravity", label: "Antigravity CLI", cmd: "agy", comingSoon: false },
-                        { value: "claude",       label: "Claude Code",     cmd: "claude", comingSoon: false },
-                        { value: "codex",        label: "Codex",           cmd: "codex",  comingSoon: true },
-                      ] as const
-                    ).filter(({ cmd, comingSoon }) => !comingSoon && isAgentAvailable(cmd));
+            </div>
 
-                    const showAuto = concreteAgents.length > 1;
-                    const items: { value: string; label: string }[] = [
-                      ...(showAuto ? [{ value: "auto", label: "Auto" }] : []),
-                      ...concreteAgents,
-                    ];
+            <div className="input-meta-row">
+              <span className="input-label input-meta-row-label">Agent:</span>
+              <div
+                className="custom-dropdown-container"
+                ref={agentSelectRef}
+              >
+                <button
+                  type="button"
+                  className="custom-dropdown-trigger"
+                  onClick={() =>
+                    !isRunning && onSetAgentDropdownOpen(!agentDropdownOpen)
+                  }
+                  disabled={isRunning}
+                  style={{
+                    ...((isNewSession || isNewDraft) && !agentType
+                      ? { borderColor: "var(--error)" }
+                      : {}),
+                  }}
+                  id="agent-select-trigger"
+                >
+                  <span>{agentTypeLabel(agentType)}</span>
+                  <IconChevronDown
+                    className={`arrow-icon ${agentDropdownOpen ? "open" : ""}`}
+                  />
+                </button>
+                {agentDropdownOpen && (
+                  <div className="custom-dropdown-menu">
+                    {(() => {
+                      const concreteAgents = (
+                        [
+                          { value: "antigravity", label: "Antigravity CLI", cmd: "agy", comingSoon: false },
+                          { value: "claude",       label: "Claude Code",     cmd: "claude", comingSoon: false },
+                          { value: "codex",        label: "Codex",           cmd: "codex",  comingSoon: true },
+                        ] as const
+                      ).filter(({ cmd, comingSoon }) => !comingSoon && isAgentAvailable(cmd));
 
-                    return items.map(({ value, label }) => (
-                      <button
-                        key={value}
-                        type="button"
-                        className={`custom-dropdown-item ${agentType === value ? "active" : ""}`}
-                        onClick={() => {
-                          onSetAgentType(value);
-                          onSetAgentDropdownOpen(false);
-                        }}
-                      >
-                        <span style={{ flex: 1, textAlign: "left" }}>{label}</span>
-                      </button>
-                    ));
-                  })()}
-                </div>
-              )}
+                      const showAuto = concreteAgents.length > 1;
+                      const items: { value: string; label: string }[] = [
+                        ...(showAuto ? [{ value: "auto", label: "Auto" }] : []),
+                        ...concreteAgents,
+                      ];
+
+                      return items.map(({ value, label }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          className={`custom-dropdown-item ${agentType === value ? "active" : ""}`}
+                          onClick={() => {
+                            onSetAgentType(value);
+                            onSetAgentDropdownOpen(false);
+                          }}
+                        >
+                          <span style={{ flex: 1, textAlign: "left" }}>{label}</span>
+                        </button>
+                      ));
+                    })()}
+                  </div>
+                )}
+              </div>
             </div>
 
             {isNewDraft && (
-              <div className="sidebar-mode-toggle" role="tablist" aria-label="Send mode" style={{ width: "auto", flex: "1 1 100%" }}>
+              <div className="sidebar-mode-toggle draft-send-toggle" role="tablist" aria-label="Send mode">
                 <button
                   type="button"
                   role="tab"
