@@ -4,12 +4,11 @@ import {
   getScheduledTask,
   updateScheduledTask,
   getSession,
-  getSessions,
   type ScheduledTask,
 } from "./store";
 import { dispatchFollowupMessage } from "./session-actions";
 import { isQuotaAvailable } from "./autoselect";
-import { runnerManager } from "./runner-manager";
+import { getProjectReadiness } from "./project-readiness";
 
 const TICK_MS = 30_000;
 
@@ -50,17 +49,8 @@ export async function executeAction(task: ScheduledTask): Promise<void> {
 // A draft's target codebase is "ready" once no session is actively running
 // against it and the working tree has no uncommitted changes.
 async function isCodebaseReady(runnerId: string, repoPath: string): Promise<boolean> {
-  const sessions = await getSessions();
-  const isBusy = sessions.some(
-    (s) => s.runnerId === runnerId && s.repoPath === repoPath && (s.status === "running" || s.status === "script-running"),
-  );
-  if (isBusy) return false;
-
-  const connectedRunnerId = runnerManager.resolveRunnerId(runnerId);
-  if (!connectedRunnerId) return false;
-
-  const result = await runnerManager.sendRequest(connectedRunnerId, "git.status", { workDir: repoPath });
-  return !result.hasChanges;
+  const { dirty, busy } = await getProjectReadiness(runnerId, repoPath);
+  return !dirty && !busy;
 }
 
 async function tick(): Promise<void> {

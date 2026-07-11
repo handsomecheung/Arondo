@@ -20,6 +20,7 @@ import CommandModal from "@/components/modals/CommandModal";
 import AddScriptModal from "@/components/modals/AddScriptModal";
 import ToastNotification from "@/components/modals/ToastNotification";
 import ApiErrorModal from "@/components/modals/ApiErrorModal";
+import ProjectNotReadyModal from "@/components/modals/ProjectNotReadyModal";
 import RenameSessionDialog from "@/components/modals/RenameSessionDialog";
 import ConfirmDialog from "@/components/modals/ConfirmDialog";
 import InfoDialog from "@/components/modals/InfoDialog";
@@ -646,7 +647,7 @@ export default function HomePage() {
     setChatFsModalOpen(false);
   };
 
-  const { handlePromptChange, handleNewSessionCommand, handleAgentCommand, handleScriptCommand, handleSubmit, handleKeyDown, commandMenuIndex } = useSessionSubmit({
+  const { handlePromptChange, handleNewSessionCommand, handleAgentCommand, handleScriptCommand, handleSubmit, handleKeyDown, commandMenuIndex, pendingConfirmation, resolvePendingConfirmation, cancelPendingConfirmation } = useSessionSubmit({
     prompt,
     repoPath,
     agentType,
@@ -1300,6 +1301,12 @@ export default function HomePage() {
       <ApiErrorModal
         apiError={apiError}
         onClose={() => setApiError(null)}
+      />
+
+      <ProjectNotReadyModal
+        pendingConfirmation={pendingConfirmation}
+        onResolve={resolvePendingConfirmation}
+        onCancel={cancelPendingConfirmation}
       />
 
       <RenameSessionDialog

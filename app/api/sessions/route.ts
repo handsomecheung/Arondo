@@ -5,6 +5,7 @@ import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken, getUuidByToken } from "@/lib/auth";
 import { dispatchCreateSession } from "@/lib/session-actions";
+import { getProjectReadiness } from "@/lib/project-readiness";
 
 const MAX_SESSION_NAME_LENGTH = 80;
 
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest) {
 export async function POST(req: NextRequest) {
   const token = getArondoToken(req);
   const body = await req.json();
-  const { prompt, repoPath, agentType = "antigravity", runnerId, name, isDraft, draftTrigger = "codebaseReady" } = body as {
+  const { prompt, repoPath, agentType = "antigravity", runnerId, name, isDraft, draftTrigger = "codebaseReady", force } = body as {
     prompt: string;
     repoPath: string;
     agentType?: string;
@@ -70,6 +71,7 @@ export async function POST(req: NextRequest) {
     name?: string;
     isDraft?: boolean;
     draftTrigger?: "manual" | "codebaseReady";
+    force?: boolean;
   };
 
   const isBlank = !prompt || !prompt.trim();
@@ -123,6 +125,13 @@ export async function POST(req: NextRequest) {
     }
     eventBus.publish({ type: "session_updated", payload: session });
     return NextResponse.json(session, { status: 201 });
+  }
+
+  if (!force) {
+    const { dirty, busy } = await getProjectReadiness(runnerId, repoPath);
+    if (dirty || busy) {
+      return NextResponse.json({ needsConfirmation: true, reason: { dirty, busy } }, { status: 409 });
+    }
   }
 
   const result = await dispatchCreateSession(runnerId, repoPath, agentType, prompt, {

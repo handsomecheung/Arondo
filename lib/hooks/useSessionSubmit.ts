@@ -72,6 +72,13 @@ export function useSessionSubmit({
   onTriggerFsModal,
 }: UseSessionSubmitParams) {
   const [commandMenuIndex, setCommandMenuIndex] = useState(-1);
+  const [pendingConfirmation, setPendingConfirmation] = useState<{
+    trimmedPrompt: string;
+    repoPath: string;
+    agentType: string;
+    runnerId: string;
+    reason: { dirty: boolean; busy: boolean };
+  } | null>(null);
 
   const getVisibleMenuItems = useCallback((): string[] => {
     const v = prompt.trim();
@@ -234,6 +241,61 @@ export function useSessionSubmit({
     onRunScript(match ? match.name : rest, promptText);
   }, [sessionScripts, onRunScript]);
 
+  // Shared post-creation bookkeeping for a freshly created session, whether
+  // it was sent immediately, forced past a confirmation, or created as a draft.
+  const finalizeNewSession = useCallback((newSession: Session, trimmedPrompt: string, immediate: boolean) => {
+    if (immediate) {
+      setTaskQueue((prev) => [
+        ...prev,
+        { id: `agent-${newSession.id}-${Date.now()}`, type: "agent", name: `Agent: ${trimmedPrompt}`, sessionId: newSession.id, status: "running", createdAt: Date.now() },
+      ]);
+    }
+    setSessions((prev) => [newSession, ...prev]);
+    setSelectedSessionId(newSession.id);
+    setIsNewSession(false);
+    setIsNewDraft(false);
+    setSessionLog("");
+    setActiveLogMsgId(null);
+    setLogModalOpen(false);
+    loadProjects();
+  }, [setTaskQueue, setSessions, setSelectedSessionId, setIsNewSession, setIsNewDraft, setSessionLog, setActiveLogMsgId, setLogModalOpen, loadProjects]);
+
+  // Resolves the "project not ready" confirmation dialog: send anyway, queue
+  // an auto-send draft, or create a manual draft — all reuse the same /api/sessions POST.
+  const resolvePendingConfirmation = useCallback(async (choice: "force" | "pendingAuto" | "draft") => {
+    if (!pendingConfirmation) return;
+    const { trimmedPrompt, repoPath: pendingRepoPath, agentType: pendingAgentType, runnerId: pendingRunnerId } = pendingConfirmation;
+    setPendingConfirmation(null);
+
+    const body: Record<string, unknown> = { prompt: trimmedPrompt, repoPath: pendingRepoPath, agentType: pendingAgentType, runnerId: pendingRunnerId };
+    if (choice === "force") body.force = true;
+    else if (choice === "pendingAuto") { body.isDraft = true; body.draftTrigger = "codebaseReady"; }
+    else { body.isDraft = true; body.draftTrigger = "manual"; }
+
+    try {
+      const res = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setApiError({ title: "Send Error", message: data.error || "Failed to create session" });
+        return;
+      }
+      const newSession: Session = await res.json();
+      finalizeNewSession(newSession, trimmedPrompt, choice === "force");
+    } catch (err: any) {
+      setApiError({ title: "Send Error", message: err.message || "Failed to create session" });
+    }
+  }, [pendingConfirmation, finalizeNewSession, setApiError]);
+
+  const cancelPendingConfirmation = useCallback(() => {
+    if (!pendingConfirmation) return;
+    setPrompt(pendingConfirmation.trimmedPrompt);
+    setPendingConfirmation(null);
+  }, [pendingConfirmation, setPrompt]);
+
   const handleSubmit = useCallback(async () => {
     const trimmed = prompt.trim();
     const isBlankSession = (isNewSession || (!selectedSessionId && !isNewDraft)) && !trimmed;
@@ -278,32 +340,25 @@ export function useSessionSubmit({
       if (isNewSession || isNewDraft || !selectedSessionId) {
         if (!repoPath.trim() || !runnerId) return;
         if (isNewDraft && !trimmed) return;
+        const trimmedRepoPath = repoPath.trim();
         const res = await fetch("/api/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             prompt: trimmed,
-            repoPath: repoPath.trim(),
+            repoPath: trimmedRepoPath,
             agentType,
             runnerId,
             ...(isNewDraft ? { isDraft: true, draftTrigger } : {}),
           }),
         });
-        const newSession: Session = await res.json();
-        if (!isBlankSession && !isNewDraft) {
-          setTaskQueue((prev) => [
-            ...prev,
-            { id: `agent-${newSession.id}-${Date.now()}`, type: "agent", name: `Agent: ${trimmed}`, sessionId: newSession.id, status: "running", createdAt: Date.now() },
-          ]);
+        if (res.status === 409) {
+          const data = await res.json();
+          setPendingConfirmation({ trimmedPrompt: trimmed, repoPath: trimmedRepoPath, agentType, runnerId, reason: data.reason });
+          return;
         }
-        setSessions((prev) => [newSession, ...prev]);
-        setSelectedSessionId(newSession.id);
-        setIsNewSession(false);
-        setIsNewDraft(false);
-        setSessionLog("");
-        setActiveLogMsgId(null);
-        setLogModalOpen(false);
-        loadProjects();
+        const newSession: Session = await res.json();
+        finalizeNewSession(newSession, trimmed, !isBlankSession && !isNewDraft);
       } else if (selectedSession?.status === "running") {
         await queueFollowupMessage(trimmed);
       } else {
@@ -331,7 +386,7 @@ export function useSessionSubmit({
     } catch (err) {
       console.error(err);
     }
-  }, [prompt, repoPath, agentType, runnerId, isNewSession, isNewDraft, draftTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, handleNewSessionCommand, sendAgentMessage, sessionScripts, handleScriptCommand, agentCommands, queueFollowupMessage]);
+  }, [prompt, repoPath, agentType, runnerId, isNewSession, isNewDraft, draftTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, handleNewSessionCommand, sendAgentMessage, sessionScripts, handleScriptCommand, agentCommands, queueFollowupMessage, finalizeNewSession]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return;
@@ -382,5 +437,16 @@ export function useSessionSubmit({
     }
   };
 
-  return { handlePromptChange, handleNewSessionCommand, handleAgentCommand, handleScriptCommand, handleSubmit, handleKeyDown, commandMenuIndex };
+  return {
+    handlePromptChange,
+    handleNewSessionCommand,
+    handleAgentCommand,
+    handleScriptCommand,
+    handleSubmit,
+    handleKeyDown,
+    commandMenuIndex,
+    pendingConfirmation,
+    resolvePendingConfirmation,
+    cancelPendingConfirmation,
+  };
 }
