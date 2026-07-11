@@ -69,9 +69,19 @@ app/
     runners/
       route.ts          # GET: list all known runners (connected + disconnected, with lastSeenAt)
     sessions/
-      route.ts          # POST: create session & run agent via runner; GET: list sessions
+      route.ts          # POST: create session & run agent via runner; GET: list active sessions
+      archived/
+        route.ts        # GET: list archived sessions
       [id]/
         route.ts        # DELETE: delete session (moves to ~/.arondo/deleted-sessions/)
+        archive/
+          route.ts      # POST: archive a session manually
+        unarchive/
+          route.ts      # POST: unarchive a session manually
+        send-draft-now/
+          route.ts      # POST: send draft message immediately
+        draft-trigger/
+          route.ts      # POST: update auto/manual trigger mode for draft session
         diff/
           route.ts      # GET: generate and serve visual HTML diff via runner + diff2html
         log/
@@ -107,7 +117,7 @@ app/
       kill/
         route.ts        # POST: kill a running task by sessionId + messageId
     scheduled-tasks/
-      route.ts          # GET: list scheduled tasks; POST: create fixed-time project script task
+      route.ts          # GET: list scheduled tasks; POST: create scheduled task (triggers: at, afterSession, quotaAvailable, codebaseReady)
       [id]/
         route.ts        # DELETE: cancel/delete a scheduled task
     messages/route.ts   # GET: list messages for a session
@@ -125,7 +135,9 @@ components/
   ShellTerminal.tsx     # Interactive shell terminal component (spawns server-side PTY via WebSocket)
   UserAgentCommandCard.tsx # Exec card representing a user-initiated agent slash command in the timeline
   ClientInit.tsx        # Performs client-side session token checking and login redirects
-  ScheduleTaskModal.tsx # Modal to schedule project-scoped scripts at a future fixed time
+  UserMessageCard.tsx   # Card component to render user chat messages with a Copy action
+  modals/
+    ProjectNotReadyModal.tsx # Modal shown when creating a session on a dirty codebase or running agent
 lib/
   auth.ts               # Core authentication library (token verification, UUID lookup, token generation/migration)
   config.ts             # Configuration helpers, resolves data directory (defaults to ~/.arondo)
@@ -136,7 +148,8 @@ lib/
   runner-manager.ts     # Manages runner connections, task routing, and task persistence
   runner-server.ts      # WebSocket handler for /runner endpoint (registration, heartbeat)
   ws-server.ts          # WebSocket handler for /ws endpoint: event bus broadcast + PTY I/O + shell PTY bridging
-  scheduler.ts          # Scheduler engine for managing at, afterSession, and quotaAvailable tasks
+  project-readiness.ts  # Utility to check project readiness (uncommitted changes, running agents)
+  scheduler.ts          # Scheduler engine for managing at, afterSession, quotaAvailable, and codebaseReady tasks
   project-actions.ts    # Extracted action helpers for executing project-scoped scripts
   session-actions.ts    # Extracted action helpers for processing session messages and running agents
   agents/
@@ -181,6 +194,9 @@ tests/                  # Playwright integration tests
       logs/
         [taskId].log    # Project-scoped execution output logs
   deleted-sessions/     # Soft-deleted sessions moved here upon deletion
+  archived/
+    sessions/
+      [sessionId]/      # Archived sessions are moved here (idle or manually archived)
 ```
 
 ## Runner Protocol

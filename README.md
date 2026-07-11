@@ -9,7 +9,7 @@ Browser (Next.js UI)  <--ws-->  Server (Next.js)  <--ws-->  Runner A (Go, machin
                                                   <--ws-->  Runner B (Go, machine-2)
 ```
 
-- **Runner** (`runner/`): A Go binary that connects to the Server via WebSocket. Executes commands, manages PTY sessions, runs git/filesystem operations. Minimal config — just a server URL and optional name.
+- **Runner** (`runner/`): A Go binary that connects to the Server via WebSocket. Executes commands, manages PTY sessions, runs git/filesystem operations. Minimal config — just a server URL and token.
 - **Server**: Routes operations to Runners. Manages all persistent state (sessions, projects, messages, logs). Serves the frontend.
 - **Frontend**: Single-page React UI with runner selection, file browsing, chat, terminal modals, and task queue.
 
@@ -18,6 +18,9 @@ All execution goes through a Runner — there is no local fallback on the server
 ## Features
 
 - **Multi-Machine Runners**: Install Go runners on any development machine. The UI lets you pick which runner runs each session. Supports deleting disconnected runners from the Runners dashboard.
+- **TODO Sessions**: Jot down tasks as "TODO" sessions while a project has uncommitted changes or active agents. Fully unified with the normal Session model, they support auto/manual send modes, holding the prompt until the codebase is clean and no agent is running.
+- **Session Archiving**: Automatically archive sessions idle for more than a configured period, or manually archive/unarchive them. Archived sessions are read-only to prevent sending new messages, while preserving history, logs, and diff views.
+- **Project Readiness Warnings**: Warns before sending a message to a session when the project has uncommitted changes or a running agent, offering options to send anyway, auto-send once ready, or save as a TODO session.
 - **Multi-User Token-Based Authentication**: Secure the application with token-based authentication supporting `admin` and `user` roles. Automatically generates an admin access token on first startup if not already configured. Admins can manage access tokens and configure runner-specific access control lists (restricting runners to specific user token UUIDs) from the Settings dashboard.
 - **Secure WebSocket Communication**: Browser-to-server WebSocket connections are secured by passing the authentication token via the `Sec-WebSocket-Protocol` header (`arondo-token`), preventing exposure of sensitive credentials in query parameters or server logs.
 - **Session-Based Workspaces**: Each task is encapsulated inside a self-contained session under the configuration directory (`~/.arondo/sessions/[sessionId]/` by default), tracking history, settings, and outputs.
@@ -25,7 +28,7 @@ All execution goes through a Runner — there is no local fallback on the server
 - **Multiple AI Agents Support**: Supports **Antigravity CLI (agy)** and **Claude Code** for code generation tasks.
 - **Interactive Terminal (PTY)**: Both agent and script execution run in a full pseudo-terminal via Go's `creack/pty`, rendered in the browser with `xterm.js`. Supports interactive stdin, ANSI colors, and cursor control. PTY ensures reliable process cleanup on runner exit (SIGHUP). Interactive shell terminals are spawned directly on the runner rather than the server.
 - **Mobile Terminal Keyboard Bar**: Includes a mobile-specific special-keys bar (ESC, TAB, CTRL, ALT, arrows, and an FN layer for F1-F12) for the terminal modal. It dynamically tracks visualViewport to pin itself above the virtual keyboard, preventing keyboard obstruction.
-- **Dedicated Execution Cards & Rich Markdown View**: Script execution uses `ScriptExecCard` (supporting inline log streaming for quick-run commands), while agent execution uses `AgentExecCard` which renders output as Markdown with syntax highlighting (`rehype-highlight`) and clickable file/URL links. Clicking a verified file path automatically opens the Remote File Browser. Users can toggle between Markdown rendering and raw output view from the card's menu.
+- **Dedicated Execution Cards & Rich Markdown View**: Script execution uses `ScriptExecCard` (supporting inline log streaming for quick-run commands), while agent execution uses `AgentExecCard` which renders output as Markdown with syntax highlighting (`rehype-highlight`) and clickable file/URL links. Clicking a verified file path automatically opens the Remote File Browser. Users can copy the formatted markdown output or raw text output directly from the card's menu. Users can also copy chat messages using the Copy action on user chat cards.
 - **Terminal Session Persistence & Reattaching**: Terminal sessions persist across browser refreshes or close events. Re-opening a terminal automatically reattaches to the active PTY session on the runner and replays the output buffer.
 - **Quota & Session Limit Detection**: Automatically detects AI agent API limits (such as Claude's session limit hit or `agy` quota exhaustion) and displays human-readable error messages.
 - **AI Agent Quota Monitoring**: Automatically collects quota usage data for Claude and Antigravity via tmux on the runners and displays remaining quota with progress bars in the Runners dashboard.
@@ -46,7 +49,7 @@ All execution goes through a Runner — there is no local fallback on the server
 - **Task Grouping, Filtering & Inline Logs**: In the Tasks dashboard, tasks can be filtered by type (Agent/Script), toggled to show only non-completed tasks by default, and grouped by Scope or Status. Script execution logs are now also viewable inline.
 - **Task Persistence**: Active task contexts are persisted by serializing execution metadata directly into the session and project `messages.json` files and dynamically restored on server restart. Runner IDs are stable across reconnections.
 - **Automated Data Lifecycle**: Automatically purges sessions or projects during listing queries if their parent references (e.g. project or runner) no longer exist.
-- **Mobile-Friendly UI**: Designed with collapsible panels, modal logs, responsive menus, and touch-friendly actions.
+- **Mobile-Friendly UI**: Designed with collapsible panels, modal logs, responsive menus, and touch-friendly actions. Supports a swipe-to-delete gesture for session items in the mobile sidebar.
 - **Project Management**: Scopes and tracks sessions within resolved repository paths. Supports custom project scripts and AI auto-script discovery (executed safely on the selected runner).
 
 ## Getting Started
@@ -84,6 +87,7 @@ Open [http://localhost:3251](http://localhost:3251) in your browser. Select the 
 
 - `ARONDO_CONFIG_DIR` – (Optional) Custom directory to store configuration and runtime data. Defaults to `~/.arondo` in both development and production.
 - `PORT` – (Optional) Server port. Defaults to `3251` in development, `3250` in production.
+- `ARONDO_SESSION_ARCHIVE_DAYS` – (Optional) Number of idle days before active sessions are auto-archived. Defaults to `7`.
 
 ### Configuration Files (in `ARONDO_CONFIG_DIR` or `~/.arondo/`)
 
