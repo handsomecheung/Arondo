@@ -1060,6 +1060,12 @@ export default function HomePage() {
         onNewSession={handleNewSession}
         onNewDraft={handleNewDraft}
         onDeleteSession={handleDeleteSession}
+        onArchiveSession={handleArchiveSession}
+        onTogglePinSession={handleTogglePinSession}
+        onOpenRenameModal={(id, currentName) => {
+          setRenameModal({ sessionId: id, currentName });
+          setRenameInput(currentName);
+        }}
         archivedView={archivedView}
         archivedSessions={archivedSessions}
         onOpenArchivedSessions={handleOpenArchivedSessions}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
-import { IconPlus, IconInbox, IconSettings, IconServer, IconMoreVertical, IconArchive, IconArrowLeft, IconTrash, IconPin } from "@/components/Icons";
+import { IconPlus, IconInbox, IconSettings, IconServer, IconMoreVertical, IconArchive, IconArrowLeft, IconTrash, IconPin, IconEdit } from "@/components/Icons";
 import { formatRelative } from "@/lib/homeUtils";
 import type { Session, Project, Runner } from "@/types/home";
 
@@ -22,6 +23,9 @@ interface Props {
   onNewSession: () => void;
   onNewDraft: () => void;
   onDeleteSession: (id: string) => void;
+  onArchiveSession: (id: string) => void;
+  onTogglePinSession: (id: string, pinned: boolean) => void;
+  onOpenRenameModal: (id: string, currentName: string) => void;
   archivedView: boolean;
   archivedSessions: Session[];
   onOpenArchivedSessions: () => void;
@@ -45,6 +49,9 @@ export default function AppSidebar({
   onNewSession,
   onNewDraft,
   onDeleteSession,
+  onArchiveSession,
+  onTogglePinSession,
+  onOpenRenameModal,
   archivedView,
   archivedSessions,
   onOpenArchivedSessions,
@@ -56,6 +63,10 @@ export default function AppSidebar({
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const [swipe, setSwipe] = useState<{ id: string; startX: number; dx: number } | null>(null);
   const lastDragDistanceRef = useRef(0);
+  const [openSessionMenuId, setOpenSessionMenuId] = useState<string | null>(null);
+  const [sessionMenuPos, setSessionMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const sessionMenuTriggerRef = useRef<HTMLDivElement>(null);
+  const sessionMenuPortalRef = useRef<HTMLDivElement>(null);
 
   const handleSwipeTouchStart = (id: string) => (e: React.TouchEvent) => {
     setSwipe({ id, startX: e.touches[0].clientX, dx: 0 });
@@ -98,6 +109,30 @@ export default function AppSidebar({
     document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const insideTrigger = sessionMenuTriggerRef.current?.contains(target);
+      const insidePortal = sessionMenuPortalRef.current?.contains(target);
+      if (!insideTrigger && !insidePortal) {
+        setOpenSessionMenuId(null);
+      }
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (!openSessionMenuId) return;
+    const close = () => setOpenSessionMenuId(null);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [openSessionMenuId]);
 
   return (
     <>
@@ -335,6 +370,85 @@ export default function AppSidebar({
                           {runnerName}
                         </span>
                       )}
+                      <div
+                        style={{ marginLeft: "auto" }}
+                        ref={openSessionMenuId === session.id ? sessionMenuTriggerRef : null}
+                      >
+                        <button
+                          className="menu-trigger-btn"
+                          style={{ width: 24, height: 24 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (openSessionMenuId === session.id) {
+                              setOpenSessionMenuId(null);
+                              return;
+                            }
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                            const MENU_WIDTH = 180;
+                            const MENU_HEIGHT_EST = 184;
+                            const openUpward = rect.bottom + MENU_HEIGHT_EST > window.innerHeight;
+                            setSessionMenuPos({
+                              left: Math.min(Math.max(8, rect.right - MENU_WIDTH), window.innerWidth - MENU_WIDTH - 8),
+                              top: openUpward ? rect.top - MENU_HEIGHT_EST - 4 : rect.bottom + 4,
+                            });
+                            setOpenSessionMenuId(session.id);
+                          }}
+                          id={`session-menu-btn-${session.id}`}
+                          title="Session actions"
+                        >
+                          <IconMoreVertical />
+                        </button>
+                        {openSessionMenuId === session.id && sessionMenuPos && createPortal(
+                          <div
+                            className="session-dropdown-menu"
+                            ref={sessionMenuPortalRef}
+                            style={{ position: "fixed", top: sessionMenuPos.top, left: sessionMenuPos.left, right: "auto" }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              className="menu-item"
+                              onClick={() => {
+                                onTogglePinSession(session.id, !session.pinnedAt);
+                                setOpenSessionMenuId(null);
+                              }}
+                              id={`session-menu-pin-${session.id}`}
+                            >
+                              <IconPin size={14} /> {session.pinnedAt ? "Unpin" : "Pin"}
+                            </button>
+                            <button
+                              className="menu-item"
+                              onClick={() => {
+                                onOpenRenameModal(session.id, session.name || session.prompt);
+                                setOpenSessionMenuId(null);
+                              }}
+                              id={`session-menu-rename-${session.id}`}
+                            >
+                              <IconEdit /> Rename
+                            </button>
+                            <button
+                              className="menu-item"
+                              onClick={() => {
+                                onArchiveSession(session.id);
+                                setOpenSessionMenuId(null);
+                              }}
+                              id={`session-menu-archive-${session.id}`}
+                            >
+                              <IconArchive /> Archive
+                            </button>
+                            <button
+                              className="menu-item delete"
+                              onClick={() => {
+                                onDeleteSession(session.id);
+                                setOpenSessionMenuId(null);
+                              }}
+                              id={`session-menu-delete-${session.id}`}
+                            >
+                              <IconTrash /> Delete
+                            </button>
+                          </div>,
+                          document.body
+                        )}
+                      </div>
                     </div>
                     <div className="task-item-prompt">{session.name || session.prompt}</div>
                     <div className="task-item-time">{formatRelative(session.createdAt)}</div>
