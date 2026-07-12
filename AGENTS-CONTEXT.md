@@ -61,6 +61,8 @@ app/
     page.tsx            # Login UI page
   runners/
     page.tsx            # Standalone page for monitoring and deleting runners, and viewing quota details
+  settings/
+    page.tsx            # Standalone page for monitoring and deleting runners, viewing quota details, and managing global settings
   tasks/
     page.tsx            # Tasks management page (session list, shell terminal, status monitoring)
   layout.tsx            # Root layout
@@ -68,6 +70,8 @@ app/
   api/
     runners/
       route.ts          # GET: list all known runners (connected + disconnected, with lastSeenAt)
+    settings/
+      route.ts          # GET/POST: retrieve and update global app settings (e.g., sessionArchiveDays)
     sessions/
       route.ts          # POST: create session & run agent via runner; GET: list active sessions
       archived/
@@ -177,6 +181,7 @@ tests/                  # Playwright integration tests
     runner.spec.ts      # Runner connection and handshake tests
 ~/.arondo/              # Runtime configuration & data directory (overridden by ARONDO_CONFIG_DIR)
   tokens.json           # Persisted multi-user access tokens (admin and user roles)
+  settings.json         # Persisted global application configuration settings (e.g., sessionArchiveDays)
   agent-commands.json   # Persisted custom agent slash commands
   global-rules.md       # Global agent rules written from Settings
   agy-sessions.json     # Map file matching Arondo sessionIds with agy conversation UUIDs
@@ -327,7 +332,7 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **User-stopped vs Failed distinction**: When a task is killed via the UI, `TaskContext.stoppedByUser` is set, producing a 🛑 "Stopped by user" completion message and `errorMessage` instead of an ❌ error. The terminal shows a “─── stopped by user ───” separator.
 - **Dedicated Execution Cards, Rich Markdown & Inline Logs**: Unified `ExecCard` is split into `ScriptExecCard` (using `xterm.js` for interactive output, and supporting inline log streaming for quick-run commands) and `AgentExecCard` (rendering outputs in Markdown with syntax highlighting and clickable file/URL links). Clicking verified file paths opens them in the Remote File Browser. If a file has git modifications, a diff button is displayed next to the path to trigger an inline visual diff viewer modal. Card rendering performance is optimized by caching generated HTML to the backend on the first render. Users can toggle between Markdown and raw text views.
 - **Restart/Retry actions**: `ScriptExecCard` shows a Restart button for script tasks (calls `restart-script` API → `exec.restart` on the runner) and `AgentExecCard` shows a Retry button for failed agent tasks (calls `rerun-agent` API). The terminal/view shows a “─── restarting ───” separator inline in the existing log.
-- **Slash commands & Quick Exec Triggers**: Slash commands are config-driven and customizable (stored in `~/.arondo/agent-commands.json`). Custom slash commands display as blue `UserAgentCommandCard` nodes in the session timeline and track both the raw command and resolved prompt separately. Additionally, users can use `!` in the chat input to execute project-scoped scripts or arbitrary shell commands inline, with execution logs streamed directly within the card.
+- **Slash commands & Quick Exec Triggers**: Slash commands are config-driven and customizable (stored in `~/.arondo/agent-commands.json`). Custom slash commands display as blue `UserAgentCommandCard` nodes in the session timeline and track both the raw command and resolved prompt separately. Built-in slash commands like `/new [name]`, `/delete` (to delete the current session), and `/rename <name>` (to rename the current session) are supported. Additionally, users can use `!` in the chat input to execute project-scoped scripts or arbitrary shell commands inline, with execution logs streamed directly within the card.
 - **Tab Completion & Keyboard UX**: Chat input supports Tab completion to cycle through slash commands. Send messages via `Enter`, and insert a newline via `Ctrl+Enter` / `Meta+Enter`.
 - **Session Navigation & Shell Terminal**: The three-dot dropdown in a session includes an "Open Terminal" option to open a `ShellTerminal` modal, and a "Go to Project" button to navigate back to the parent project interface.
 - **Real-time Streaming**: Both agent and script output stream via WebSocket `terminal:output` (base64-encoded PTY data), forwarded through the event bus. The frontend renders script logs via xterm.js and agent logs via the plain wrapped text view.
@@ -338,6 +343,8 @@ The application enforces token-based authentication on all API routes and WebSoc
   - **Claude Code**: Supports `--session-id` (bound to the session) and `--resume` flags for native session continuity.
   - **Antigravity CLI (agy)**: On task exit, the Go runner scans its local logs via process ID (`detectAgyConvIdByPid`) to extract the generated conversation UUID. This UUID is passed back in the `exec.exit` event and saved by the server. Subsequent runs of `agy` within the same session will automatically pass `--conversation <uuid>` to resume the session.
 - **Global Agent Rules Sync**: Settings screen allows specifying global agent rules. These are stored in `~/.arondo/global-rules.md` and automatically synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on runners upon connection. Each runner has a per-runner sync toggle (checked by default for new runners) in Settings; unchecking it stops future syncs to that runner and removes the previously synced block via a `rules.remove` runner method (`runner/handler_rules.go`).
+- **Session Pinning & Three-dot Menu**: Important sessions can be pinned to the top of the sidebar session list (ordered by pinned timestamp). A per-session three-dot menu in the sidebar and detailed session view provides quick access to Pin, Rename, Archive, and Delete actions.
+- **Session Archive Day Override**: The Settings screen allows users to customize the number of idle days before active sessions are auto-archived. This overrides the default value defined by the `ARONDO_SESSION_ARCHIVE_DAYS_DEFAULT` environment variable and is persisted in `~/.arondo/settings.json`.
 - **AI Agent Quota Monitoring**: Runners collect agent quota usage from Claude and Antigravity via tmux pane capture, which is saved locally under `~/.arondo/agents/` on the server and displayed with progress bars in the Runners dashboard.
 - **Secure Prompt Passing**: Instead of command line arguments, prompts are passed to agents using temporary files on the runner. The file path is stored in the `ARONDO_PROMPT_FILE` environment variable (and resolved using shell redirection `$(< "$ARONDO_PROMPT_FILE")`), which mitigates command length constraints and process command argument exposure. The UI "Show Prompt" panel displays the real resolved prompt instead of the original raw inputs.
 - **AI Agent Auto-Selection (Auto Mode)**: Automatically selects the best agent and model based on hourly and weekly quota availability retrieved from the runner. New chat sessions default to using the Auto agent mode.
