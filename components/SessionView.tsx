@@ -10,7 +10,7 @@ import type { Session, ProjectScript, Runner, Message, Project } from "@/types/h
 import type { ExecCardInfo } from "@/lib/homeUtils";
 import { formatTime, execCardInfoToItem, autoResizeTextarea } from "@/lib/homeUtils";
 import {
-  IconBolt, IconPlus, IconSend, IconCheck,
+  IconLogo, IconPlus, IconSend, IconCheck,
   IconGitPullRequest, IconPlay, IconTerminal, IconEdit, IconTrash,
   IconMoreVertical, IconFolder, IconChevronDown, IconFileSearch,
   IconClaude, IconAntigravity, IconCodex, IconFileText, IconClock,
@@ -677,7 +677,7 @@ export default function SessionView({
         {!selectedSession && !isNewSession && !isNewDraft && (
           <div className="welcome-screen">
             <div className="welcome-icon">
-              <IconBolt />
+              <IconLogo />
             </div>
             <h1 className="welcome-title">Welcome to Arondo</h1>
             <p className="welcome-desc">

@@ -6,7 +6,7 @@ import Link from "next/link";
 import type { Session, Project, Runner, ProjectScript, Message, TaskItem } from "@/types/home";
 import { AGENT_COMMANDS, mergeAgentCommands } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
-import { IconTaskQueue, IconBolt, IconMenu } from "@/components/Icons";
+import { IconTaskQueue, IconLogo, IconMenu } from "@/components/Icons";
 import AppSidebar from "@/components/AppSidebar";
 import ProjectPanel from "@/components/ProjectPanel";
 import SessionView from "@/components/SessionView";
@@ -1009,7 +1009,7 @@ export default function HomePage() {
         </button>
 
         <div className="header-logo">
-          <IconBolt />
+          <IconLogo />
           <span className="header-title">Arondo</span>
         </div>
         <span className="header-subtitle">AI-powered dev · anywhere</span>

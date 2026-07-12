@@ -6,7 +6,7 @@ import Link from "next/link";
 import ScriptExecCard from "@/components/ScriptExecCard";
 import AgentExecCard from "@/components/AgentExecCard";
 import {
-  IconArrowLeft, IconBolt, IconX, IconInbox, IconTerminal, IconCode, IconChevronDown, IconClock,
+  IconArrowLeft, IconLogo, IconX, IconInbox, IconTerminal, IconCode, IconChevronDown, IconClock,
 } from "@/components/Icons";
 import { agentTypeLabel } from "@/lib/homeUtils";
 
@@ -582,7 +582,7 @@ export default function TasksPage() {
         </Link>
 
         <div className="header-logo">
-          <IconBolt />
+          <IconLogo />
           <span className="header-title">Arondo</span>
         </div>
         <span

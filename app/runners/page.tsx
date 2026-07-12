@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import ConfirmDialog from "@/components/modals/ConfirmDialog";
-import { IconArrowLeft, IconBolt, IconInbox } from "@/components/Icons";
+import { IconArrowLeft, IconLogo, IconInbox } from "@/components/Icons";
 
 interface AgyQuota {
   Account: string;
@@ -313,7 +313,7 @@ export default function RunnersPage() {
         </Link>
 
         <div className="header-logo">
-          <IconBolt />
+          <IconLogo />
           <span className="header-title">Arondo</span>
         </div>
         <span

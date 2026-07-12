@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ConfirmDialog from "@/components/modals/ConfirmDialog";
+import { IconLogo } from "@/components/Icons";
 
 interface Runner {
   id: string;
@@ -125,23 +126,6 @@ function IconArrowLeft() {
     >
       <line x1="19" y1="12" x2="5" y2="12" />
       <polyline points="12 19 5 12 12 5" />
-    </svg>
-  );
-}
-
-function IconBolt() {
-  return (
-    <svg
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
     </svg>
   );
 }
@@ -635,7 +619,7 @@ export default function SettingsPage() {
         </Link>
 
         <div className="header-logo">
-          <IconBolt />
+          <IconLogo />
           <span className="header-title">Arondo</span>
         </div>
         <span
