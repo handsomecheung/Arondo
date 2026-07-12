@@ -105,13 +105,18 @@ function onSessionUpdated(session: { id: string; status: string; runnerId?: stri
       }
 
       if (session.runnerId && session.repoPath) {
-        const drafts = tasks.filter(
-          (t) =>
-            t.status === "pending" &&
-            t.trigger.kind === "codebaseReady" &&
-            t.trigger.runnerId === session.runnerId &&
-            t.trigger.repoPath === session.repoPath,
-        );
+        const drafts = tasks
+          .filter(
+            (t) =>
+              t.status === "pending" &&
+              t.trigger.kind === "codebaseReady" &&
+              t.trigger.runnerId === session.runnerId &&
+              t.trigger.repoPath === session.repoPath,
+          )
+          // Oldest pending draft first, so drafts targeting the same codebase
+          // dispatch in FIFO order instead of newest-first (tasks come back
+          // newest-first from getScheduledTasks()).
+          .sort((a, b) => a.createdAt - b.createdAt);
         for (const draft of drafts) {
           if (await isCodebaseReady(session.runnerId!, session.repoPath!)) {
             await executeAction(draft).catch((err) => console.error("[scheduler] fast-path dispatch failed:", err));
