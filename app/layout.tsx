@@ -3,7 +3,7 @@ import "./globals.css";
 import { ClientInit } from "@/components/ClientInit";
 
 export const metadata: Metadata = {
-  title: "Arondo – AI-Powered Dev from Anywhere",
+  title: "Arondo – Develop from Anywhere, Any Device",
   description:
     "Delegate software development tasks to AI agents, review PRs on your phone, and ship from anywhere.",
 };

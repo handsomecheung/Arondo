@@ -1012,7 +1012,7 @@ export default function HomePage() {
           <IconLogo />
           <span className="header-title">Arondo</span>
         </div>
-        <span className="header-subtitle">AI-powered dev · anywhere</span>
+        <span className="header-subtitle">Develop from anywhere, any device</span>
         <div
           style={{
             display: "flex",
