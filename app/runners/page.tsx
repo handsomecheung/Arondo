@@ -48,6 +48,7 @@ interface Runner {
   capabilities?: string[];
   agents?: string[];
   lastSeenAt?: number;
+  connectedAt?: number;
   allowedUserTokenUuids?: string[];
 }
 
@@ -506,9 +507,10 @@ export default function RunnersPage() {
                         >
                           <span>Host: {r.hostname}</span>
                           {r.ip && <span>IP: {r.ip}</span>}
-                          {!r.connected && r.lastSeenAt && (
+                          {(r.connectedAt || r.lastSeenAt) && (
                             <span style={{ color: "var(--text-muted)" }}>
-                              Last seen: {formatLastSeen(r.lastSeenAt)}
+                              {r.connected ? "Connected: " : "Last connected: "}
+                              {formatLastSeen(r.connectedAt || r.lastSeenAt!)}
                             </span>
                           )}
                         </div>

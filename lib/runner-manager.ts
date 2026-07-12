@@ -39,6 +39,7 @@ export interface RunnerInfo {
   agents: string[];
   connected: boolean;
   lastSeenAt?: number;
+  connectedAt?: number;
   allowedUserTokenUuids?: string[];
   syncGlobalRules?: boolean;
 }
@@ -349,6 +350,7 @@ class RunnerManager {
       agents: registerPayload.agents || [],
       connected: true,
       lastSeenAt: Date.now(),
+      connectedAt: Date.now(),
       allowedUserTokenUuids: this.cachedAllowedUserTokenUuids.get(id) || [],
       syncGlobalRules: this.cachedSyncGlobalRules.get(id) ?? true,
     };

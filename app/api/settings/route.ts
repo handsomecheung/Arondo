@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getArondoToken, getRoleByToken, isValidToken } from "@/lib/auth";
 import { getAppSettings, updateAppSettings, getSessionArchiveDays } from "@/lib/store";
+import fs from "fs/promises";
+import path from "path";
 
 export async function GET(request: NextRequest) {
   const token = getArondoToken(request);
@@ -9,7 +11,18 @@ export async function GET(request: NextRequest) {
   }
 
   const sessionArchiveDays = await getSessionArchiveDays();
-  return NextResponse.json({ sessionArchiveDays });
+
+  let version = "unknown";
+  try {
+    const packageJsonPath = path.join(process.cwd(), "package.json");
+    const packageJsonContent = await fs.readFile(packageJsonPath, "utf-8");
+    const packageJson = JSON.parse(packageJsonContent);
+    version = packageJson.version || "unknown";
+  } catch (err) {
+    console.error("Failed to read package.json version:", err);
+  }
+
+  return NextResponse.json({ sessionArchiveDays, version });
 }
 
 export async function POST(request: NextRequest) {

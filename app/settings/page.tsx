@@ -189,6 +189,7 @@ export default function SettingsPage() {
   const [sessionArchiveDays, setSessionArchiveDays] = useState<number | "">("");
   const [savingSessionArchiveDays, setSavingSessionArchiveDays] = useState(false);
   const [saveSessionArchiveDaysSuccess, setSaveSessionArchiveDaysSuccess] = useState(false);
+  const [serverVersion, setServerVersion] = useState<string>("");
 
   const loadRunners = useCallback(() => {
     fetch("/api/runners")
@@ -216,7 +217,12 @@ export default function SettingsPage() {
   const loadSettings = useCallback(() => {
     fetch("/api/settings")
       .then((r) => r.json())
-      .then((data: { sessionArchiveDays: number }) => setSessionArchiveDays(data.sessionArchiveDays))
+      .then((data: { sessionArchiveDays: number; version?: string }) => {
+        setSessionArchiveDays(data.sessionArchiveDays);
+        if (data.version) {
+          setServerVersion(data.version);
+        }
+      })
       .catch(console.error);
   }, []);
 
@@ -670,166 +676,40 @@ export default function SettingsPage() {
             gap: 24,
           }}
         >
-          <div>
-            <h1
-              style={{
-                fontSize: 22,
-                fontWeight: 700,
-                color: "var(--text-primary)",
-                letterSpacing: "-0.02em",
-                marginBottom: 4,
-              }}
-            >
-              Settings
-            </h1>
-            <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
-              Manage your Arondo configuration.
-            </p>
-          </div>
-
-          {/* Runner Access Control Section */}
-          <div>
-            <h2
-              style={{
-                fontSize: 16,
-                fontWeight: 600,
-                color: "var(--text-primary)",
-                marginBottom: 4,
-              }}
-            >
-              Runner Access Control
-            </h2>
-            <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>
-              Configure which users (by access tokens) are allowed to access each runner. If no users are selected, the runner allows public access.
-            </p>
-
-            {runners.length === 0 ? (
-              <div
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+            <div>
+              <h1
                 style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 12,
-                  minHeight: 160,
-                  background: "var(--bg-surface)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "var(--radius-md)",
-                  color: "var(--text-muted)",
-                  fontSize: 13,
+                  fontSize: 22,
+                  fontWeight: 700,
+                  color: "var(--text-primary)",
+                  letterSpacing: "-0.02em",
+                  marginBottom: 4,
                 }}
               >
-                <IconInbox />
-                <p>No runners found.</p>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {runners.map((r) => (
-                  <div
-                    key={r.id}
-                    style={{
-                      padding: 14,
-                      background: "var(--bg-elevated)",
-                      border: "1px solid var(--border)",
-                      borderRadius: "var(--radius-md)",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                      <span className={`task-status-badge ${r.connected ? "running" : "idle"}`}>
-                        {r.connected ? "connected" : "disconnected"}
-                      </span>
-                      <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
-                        {r.name}
-                      </span>
-                      <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                        ({r.hostname})
-                      </span>
-                    </div>
-                    <div>
-                      {userRole === "admin" ? (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
-                          {systemTokens.filter(t => t.type === "user").length === 0 ? (
-                            <span style={{ fontSize: 11, color: "var(--text-muted)", fontStyle: "italic" }}>
-                              No user tokens configured. Go to Token Manager below to create one.
-                            </span>
-                          ) : (
-                            systemTokens.filter(t => t.type === "user").map(({ token: tokenKey, uuid: tokenUuid, name, type }) => {
-                              const isAllowed = (r.allowedUserTokenUuids || []).includes(tokenUuid);
-                              const isUserToken = type === "user";
-                              const masked = tokenKey.substring(0, 3) + "...";
-                              return (
-                                <label
-                                  key={tokenUuid}
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 8,
-                                    fontSize: 12,
-                                    color: "var(--text-primary)",
-                                    cursor: "pointer",
-                                    padding: "2px 0",
-                                  }}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={isAllowed}
-                                    onChange={async (e) => {
-                                      const current = r.allowedUserTokenUuids || [];
-                                      let updated: string[];
-                                      if (e.target.checked) {
-                                        updated = [...current, tokenUuid];
-                                      } else {
-                                        updated = current.filter((t) => t !== tokenUuid);
-                                      }
-                                      await saveRunnerUserTokenUuids(r.id, updated);
-                                    }}
-                                    style={{ cursor: "pointer" }}
-                                  />
-                                  <span style={{ fontWeight: 500 }}>{name}</span>
-                                  <span style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "monospace" }}>
-                                    ({isUserToken ? "User" : "Admin"}: {masked})
-                                  </span>
-                                </label>
-                              );
-                            })
-                          )}
-                        </div>
-                      ) : (
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, minHeight: 24, alignItems: "center" }}>
-                          {!r.allowedUserTokenUuids || r.allowedUserTokenUuids.length === 0 ? (
-                            <span style={{ fontSize: 11, color: "var(--text-muted)", fontStyle: "italic" }}>
-                              Public access (No tokens configured)
-                            </span>
-                          ) : (
-                            r.allowedUserTokenUuids.map((tokenUuid) => {
-                              const name = systemTokens.find(t => t.uuid === tokenUuid)?.name || tokenUuid.substring(0, 9) + "...";
-                              return (
-                                <span
-                                  key={tokenUuid}
-                                  style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    fontSize: 11,
-                                    background: "var(--bg-elevated)",
-                                    border: "1px solid var(--border)",
-                                    padding: "2px 8px",
-                                    borderRadius: "4px",
-                                    color: "var(--text-primary)",
-                                  }}
-                                >
-                                  {name}
-                                </span>
-                              );
-                            })
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                Settings
+              </h1>
+              <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                Manage your Arondo configuration.
+              </p>
+            </div>
+            {serverVersion && (
+              <span
+                style={{
+                  fontSize: 12,
+                  color: "var(--text-muted)",
+                  background: "var(--bg-elevated)",
+                  border: "1px solid var(--border)",
+                  padding: "4px 8px",
+                  borderRadius: "var(--radius-sm)",
+                  fontFamily: "monospace",
+                }}
+              >
+                Server v{serverVersion}
+              </span>
             )}
           </div>
+
 
           {/* Agent Commands Section */}
           <div>
@@ -2030,6 +1910,150 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
+
+          {/* Runner Access Control Section */}
+          <div>
+            <h2
+              style={{
+                fontSize: 16,
+                fontWeight: 600,
+                color: "var(--text-primary)",
+                marginBottom: 4,
+              }}
+            >
+              Runner Access Control
+            </h2>
+            <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>
+              Configure which users (by access tokens) are allowed to access each runner. If no users are selected, the runner allows public access.
+            </p>
+
+            {runners.length === 0 ? (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 12,
+                  minHeight: 160,
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-md)",
+                  color: "var(--text-muted)",
+                  fontSize: 13,
+                }}
+              >
+                <IconInbox />
+                <p>No runners found.</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {runners.map((r) => (
+                  <div
+                    key={r.id}
+                    style={{
+                      padding: 14,
+                      background: "var(--bg-elevated)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-md)",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <span className={`task-status-badge ${r.connected ? "running" : "idle"}`}>
+                        {r.connected ? "connected" : "disconnected"}
+                      </span>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
+                        {r.name}
+                      </span>
+                      <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                        ({r.hostname})
+                      </span>
+                    </div>
+                    <div>
+                      {userRole === "admin" ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
+                          {systemTokens.filter(t => t.type === "user").length === 0 ? (
+                            <span style={{ fontSize: 11, color: "var(--text-muted)", fontStyle: "italic" }}>
+                              No user tokens configured. Go to Token Manager below to create one.
+                            </span>
+                          ) : (
+                            systemTokens.filter(t => t.type === "user").map(({ token: tokenKey, uuid: tokenUuid, name, type }) => {
+                              const isAllowed = (r.allowedUserTokenUuids || []).includes(tokenUuid);
+                              const isUserToken = type === "user";
+                              const masked = tokenKey.substring(0, 3) + "...";
+                              return (
+                                <label
+                                  key={tokenUuid}
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    fontSize: 12,
+                                    color: "var(--text-primary)",
+                                    cursor: "pointer",
+                                    padding: "2px 0",
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isAllowed}
+                                    onChange={async (e) => {
+                                      const current = r.allowedUserTokenUuids || [];
+                                      let updated: string[];
+                                      if (e.target.checked) {
+                                        updated = [...current, tokenUuid];
+                                      } else {
+                                        updated = current.filter((t) => t !== tokenUuid);
+                                      }
+                                      await saveRunnerUserTokenUuids(r.id, updated);
+                                    }}
+                                    style={{ cursor: "pointer" }}
+                                  />
+                                  <span style={{ fontWeight: 500 }}>{name}</span>
+                                  <span style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "monospace" }}>
+                                    ({isUserToken ? "User" : "Admin"}: {masked})
+                                  </span>
+                                </label>
+                              );
+                            })
+                          )}
+                        </div>
+                      ) : (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, minHeight: 24, alignItems: "center" }}>
+                          {!r.allowedUserTokenUuids || r.allowedUserTokenUuids.length === 0 ? (
+                            <span style={{ fontSize: 11, color: "var(--text-muted)", fontStyle: "italic" }}>
+                              Public access (No tokens configured)
+                            </span>
+                          ) : (
+                            r.allowedUserTokenUuids.map((tokenUuid) => {
+                              const name = systemTokens.find(t => t.uuid === tokenUuid)?.name || tokenUuid.substring(0, 9) + "...";
+                              return (
+                                <span
+                                  key={tokenUuid}
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    fontSize: 11,
+                                    background: "var(--bg-elevated)",
+                                    border: "1px solid var(--border)",
+                                    padding: "2px 8px",
+                                    borderRadius: "4px",
+                                    color: "var(--text-primary)",
+                                  }}
+                                >
+                                  {name}
+                                </span>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
         </div>
       </main>
