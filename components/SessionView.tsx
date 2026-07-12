@@ -14,7 +14,7 @@ import {
   IconGitPullRequest, IconPlay, IconTerminal, IconEdit, IconTrash,
   IconMoreVertical, IconFolder, IconChevronDown, IconFileSearch,
   IconClaude, IconAntigravity, IconCodex, IconFileText, IconClock,
-  IconArchive,
+  IconArchive, IconPin,
 } from "@/components/Icons";
 import { getTriggerWord, resolveAgentCommand } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
@@ -79,6 +79,7 @@ interface SessionViewProps {
   onRetryCard: (cardInfo: ExecCardInfo) => void;
   onSubmit: () => void;
   onArchiveSession: (id: string) => void;
+  onTogglePinSession: (id: string, pinned: boolean) => void;
   onSendDraftNow: () => void;
   onToggleDraftTrigger: () => void;
   onPromptChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
@@ -160,6 +161,7 @@ export default function SessionView({
   onRetryCard,
   onSubmit,
   onArchiveSession,
+  onTogglePinSession,
   onSendDraftNow,
   onToggleDraftTrigger,
   onPromptChange,
@@ -609,6 +611,17 @@ export default function SessionView({
                     {isDraftAutoSend ? "Switch to Manual Send" : "Switch to Auto Send"}
                   </button>
                 )}
+
+                <button
+                  className="menu-item"
+                  onClick={() => {
+                    onTogglePinSession(selectedSessionId!, !selectedSession.pinnedAt);
+                    onSetMenuOpen(false);
+                  }}
+                  id="menu-pin-session"
+                >
+                  <IconPin /> {selectedSession.pinnedAt ? "Unpin" : "Pin"}
+                </button>
 
                 <button
                   className="menu-item"

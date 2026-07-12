@@ -14,6 +14,7 @@ export interface Session {
   createdAt: string;
   updatedAt: string;
   runningScripts?: string[];
+  pinnedAt?: string;
 }
 
 export interface Project {

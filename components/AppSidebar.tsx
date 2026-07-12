@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { IconPlus, IconInbox, IconSettings, IconServer, IconMoreVertical, IconArchive, IconArrowLeft, IconTrash } from "@/components/Icons";
+import { IconPlus, IconInbox, IconSettings, IconServer, IconMoreVertical, IconArchive, IconArrowLeft, IconTrash, IconPin } from "@/components/Icons";
 import { formatRelative } from "@/lib/homeUtils";
 import type { Session, Project, Runner } from "@/types/home";
 
@@ -294,6 +294,11 @@ export default function AppSidebar({
                       id={`session-item-${session.id}`}
                     >
                     <div className="task-item-header">
+                      {session.pinnedAt && (
+                        <span className="task-item-pin-badge" title="Pinned" style={{ color: "var(--text-secondary)" }}>
+                          <IconPin size={11} />
+                        </span>
+                      )}
                       <span className={`task-status-badge ${session.status}`}>
                         {(session.status === "running" || session.status === "script-running") && "⟳ "}
                         {session.status === "script-running"

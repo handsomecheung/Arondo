@@ -69,6 +69,9 @@ export default function HomePage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const sortedSessions = useMemo(() => {
     return [...sessions].sort((a, b) => {
+      const aPinned = a.pinnedAt ? new Date(a.pinnedAt).getTime() : 0;
+      const bPinned = b.pinnedAt ? new Date(b.pinnedAt).getTime() : 0;
+      if (aPinned !== bPinned) return bPinned - aPinned;
       const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
       const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
       return bTime - aTime;
@@ -482,6 +485,26 @@ export default function HomePage() {
     } catch (err: any) {
       console.error(err);
       setApiError({ title: "Archive Session Error", message: err.message || "Failed to archive session" });
+    }
+  };
+
+  const handleTogglePinSession = async (id: string, pinned: boolean) => {
+    try {
+      const res = await fetch(`/api/sessions/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pinned }),
+      });
+      if (res.ok) {
+        const updated: Session = await res.json();
+        setSessions((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      } else {
+        const data = await res.json();
+        setApiError({ title: "Pin Session Error", message: data.error || "Failed to update pin state" });
+      }
+    } catch (err: any) {
+      console.error(err);
+      setApiError({ title: "Pin Session Error", message: err.message || "Failed to update pin state" });
     }
   };
 
@@ -1168,6 +1191,7 @@ export default function HomePage() {
             onRetryCard={handleRetryCard}
             onSubmit={handleSubmit}
             onArchiveSession={handleArchiveSession}
+            onTogglePinSession={handleTogglePinSession}
             onSendDraftNow={handleSendDraftNow}
             onToggleDraftTrigger={handleToggleDraftTrigger}
             onPromptChange={handlePromptChange}

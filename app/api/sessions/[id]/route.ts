@@ -44,7 +44,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const body = await req.json();
-  const { name, agentType } = body as { name?: string; agentType?: string };
+  const { name, agentType, pinned } = body as { name?: string; agentType?: string; pinned?: boolean };
 
   const session = await getSession(id);
   if (!session) {
@@ -55,6 +55,7 @@ export async function PATCH(
     const patch: Record<string, any> = {};
     if (name !== undefined) patch.name = name;
     if (agentType !== undefined) patch.agentType = agentType;
+    if (pinned !== undefined) patch.pinnedAt = pinned ? new Date().toISOString() : undefined;
     const updated = await updateSession(id, patch);
     eventBus.publish({ type: "session_updated", payload: updated });
     return NextResponse.json(updated);
