@@ -36,6 +36,7 @@ interface UseSessionSubmitParams {
   sessionScripts: ProjectScript[];
   onRunScript: (name: string, promptText?: string) => void;
   onDeleteSession: (id: string) => void;
+  onRenameSession: (id: string, newName: string) => void;
   onTriggerFsModal?: () => void;
 }
 
@@ -69,6 +70,7 @@ export function useSessionSubmit({
   sessionScripts,
   onRunScript,
   onDeleteSession,
+  onRenameSession,
   onTriggerFsModal,
 }: UseSessionSubmitParams) {
   const [commandMenuIndex, setCommandMenuIndex] = useState(-1);
@@ -92,6 +94,7 @@ export function useSessionSubmit({
     }
     if (("/new").startsWith(v) || v.startsWith("/new")) items.push("/new");
     if (("/delete").startsWith(v) || v.startsWith("/delete")) items.push("/delete");
+    if (("/rename").startsWith(v) || v.startsWith("/rename")) items.push("/rename");
     for (const cmd of agentCommands) {
       const trigger = getTriggerWord(cmd);
       const slashTrigger = "/" + trigger;
@@ -125,7 +128,7 @@ export function useSessionSubmit({
     const v = value.trim();
     const agentTriggers = getUniqueTriggers(agentCommands);
     const matchesAgentCmd = agentTriggers.some((t) => v.startsWith("/" + t) || ("/" + t).startsWith(v));
-    const matchesCommand = v.startsWith("/new") || "/new".startsWith(v) || v.startsWith("/delete") || "/delete".startsWith(v) || matchesAgentCmd;
+    const matchesCommand = v.startsWith("/new") || "/new".startsWith(v) || v.startsWith("/delete") || "/delete".startsWith(v) || v.startsWith("/rename") || "/rename".startsWith(v) || matchesAgentCmd;
     const matchesScript = sessionScripts.some((s) => v.startsWith("!" + s.name) || ("!" + s.name).startsWith(v));
     setShowCommandMenu(
       ((v.startsWith("/") && matchesCommand) || (value.startsWith("!") && matchesScript)) &&
@@ -228,6 +231,16 @@ export function useSessionSubmit({
     await sendAgentMessage(promptText, agentMessage);
   }, [sendAgentMessage, agentCommands]);
 
+  // Called from SessionView with the name typed after "/rename". Requires a
+  // non-empty name — unlike "/new", renaming to a blank name is not allowed.
+  const handleRenameSessionCommand = useCallback((newName: string) => {
+    if (!selectedSessionId || !newName.trim()) return;
+    setPrompt("");
+    setShowCommandMenu(false);
+    if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
+    onRenameSession(selectedSessionId, newName.trim());
+  }, [selectedSessionId, onRenameSession]);
+
   // Called from SessionView with the raw prompt text (e.g. "!build" or "!ls").
   // If the text after "!" matches a predefined script, that script runs; otherwise
   // it's executed as a raw shell command.
@@ -308,6 +321,12 @@ export function useSessionSubmit({
       }
     }
 
+    if (trimmed.startsWith("/rename") && !isNewSession && selectedSessionId) {
+      const rest = trimmed.slice("/rename".length).trim();
+      if (rest) handleRenameSessionCommand(rest);
+      return;
+    }
+
     if (trimmed === "/delete" && !isNewSession && selectedSessionId) {
       setPrompt("");
       setShowCommandMenu(false);
@@ -386,7 +405,7 @@ export function useSessionSubmit({
     } catch (err) {
       console.error(err);
     }
-  }, [prompt, repoPath, agentType, runnerId, isNewSession, isNewDraft, draftTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, handleNewSessionCommand, sendAgentMessage, sessionScripts, handleScriptCommand, agentCommands, queueFollowupMessage, finalizeNewSession]);
+  }, [prompt, repoPath, agentType, runnerId, isNewSession, isNewDraft, draftTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, handleNewSessionCommand, handleRenameSessionCommand, sendAgentMessage, sessionScripts, handleScriptCommand, agentCommands, queueFollowupMessage, finalizeNewSession]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return;
@@ -440,6 +459,7 @@ export function useSessionSubmit({
   return {
     handlePromptChange,
     handleNewSessionCommand,
+    handleRenameSessionCommand,
     handleAgentCommand,
     handleScriptCommand,
     handleSubmit,

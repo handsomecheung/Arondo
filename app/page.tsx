@@ -670,7 +670,7 @@ export default function HomePage() {
     setChatFsModalOpen(false);
   };
 
-  const { handlePromptChange, handleNewSessionCommand, handleAgentCommand, handleScriptCommand, handleSubmit, handleKeyDown, commandMenuIndex, pendingConfirmation, resolvePendingConfirmation, cancelPendingConfirmation } = useSessionSubmit({
+  const { handlePromptChange, handleNewSessionCommand, handleRenameSessionCommand, handleAgentCommand, handleScriptCommand, handleSubmit, handleKeyDown, commandMenuIndex, pendingConfirmation, resolvePendingConfirmation, cancelPendingConfirmation } = useSessionSubmit({
     prompt,
     repoPath,
     agentType,
@@ -700,6 +700,7 @@ export default function HomePage() {
     sessionScripts,
     onRunScript: handleRunScript,
     onDeleteSession: handleDeleteSession,
+    onRenameSession: (id, newName) => handleRenameSession(id, newName),
     onTriggerFsModal: () => {
       if (selectedSession?.repoPath) {
         setChatFsCurrentPath(selectedSession.repoPath);
@@ -1232,6 +1233,7 @@ export default function HomePage() {
             agentCommands={agentCommands}
             onNewSession={handleNewSession}
             onNewSessionCommand={handleNewSessionCommand}
+            onRenameSessionCommand={handleRenameSessionCommand}
             onExecuteAgentCommand={handleAgentCommand}
             onExecuteScriptCommand={handleScriptCommand}
             onSwitchAgent={handleSwitchAgent}

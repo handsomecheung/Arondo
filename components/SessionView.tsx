@@ -96,6 +96,7 @@ interface SessionViewProps {
   onNewSession: () => void;
   agentCommands: AgentCommand[];
   onNewSessionCommand: (name?: string) => void;
+  onRenameSessionCommand: (name: string) => void;
   onExecuteAgentCommand: (promptText: string) => void;
   onExecuteScriptCommand: (promptText: string) => void;
   onSwitchAgent: (agentType: string) => void;
@@ -178,6 +179,7 @@ export default function SessionView({
   agentCommands,
   onNewSession,
   onNewSessionCommand,
+  onRenameSessionCommand,
   onExecuteAgentCommand,
   onExecuteScriptCommand,
   onSwitchAgent,
@@ -1062,6 +1064,9 @@ export default function SessionView({
           const newItemIndex = newVisible ? menuItemIndex++ : -1;
           const deleteVisible = ("/delete").startsWith(prompt.trim()) || prompt.trim().startsWith("/delete");
           const deleteItemIndex = deleteVisible ? menuItemIndex++ : -1;
+          const renameVisible = ("/rename").startsWith(prompt.trim()) || prompt.trim().startsWith("/rename");
+          const renameItemIndex = renameVisible ? menuItemIndex++ : -1;
+          const renameName = prompt.trim().slice("/rename".length).trim();
           return (
             <div className="command-menu">
               {newVisible ? (
@@ -1087,6 +1092,19 @@ export default function SessionView({
                 >
                   <span className="command-menu-name">/delete</span>
                   <span className="command-menu-desc">Delete the current session</span>
+                </button>
+              ) : null}
+              {renameVisible ? (
+                <button
+                  className={`command-menu-item${commandMenuIndex === renameItemIndex ? " highlighted" : ""}${prompt.trim().startsWith("/rename") ? " active" : ""}`}
+                  disabled={!renameName}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    if (renameName) onRenameSessionCommand(renameName);
+                  }}
+                >
+                  <span className="command-menu-name">/rename &lt;name&gt;</span>
+                  <span className="command-menu-desc">Rename the current session</span>
                 </button>
               ) : null}
               {agentCommands.map((cmd, idx) => {
