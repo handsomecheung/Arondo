@@ -882,6 +882,7 @@ export default function SessionView({
                       const runnerProjects = projects.filter((p) => p.runnerId === runnerId);
                       const matched = runnerProjects.find((p) => p.repoPath === repoPath);
                       if (matched) return matched.repoPath.split("/").pop() || matched.repoPath;
+                      if (repoPath.trim()) return repoPath.split("/").pop() || repoPath;
                       return runnerId ? "Select Project" : "Select runner first";
                     })()}
                   </span>
