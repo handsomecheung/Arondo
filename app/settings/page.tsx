@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ConfirmDialog from "@/components/modals/ConfirmDialog";
-import { IconLogo } from "@/components/Icons";
+import { IconLogo, IconRefresh } from "@/components/Icons";
 
 interface Runner {
   id: string;
@@ -638,6 +638,28 @@ export default function SettingsPage() {
           Settings
         </span>
         <button
+          onClick={() => window.location.reload()}
+          style={{
+            background: "transparent",
+            border: "none",
+            color: "var(--text-secondary)",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 4,
+            borderRadius: "var(--radius-sm)",
+            transition: "all 0.2s ease",
+            marginLeft: "auto",
+          }}
+          title="Refresh App"
+          aria-label="Refresh application data"
+          onMouseEnter={(e) => e.currentTarget.style.color = "var(--text-primary)"}
+          onMouseLeave={(e) => e.currentTarget.style.color = "var(--text-secondary)"}
+        >
+          <IconRefresh />
+        </button>
+        <button
           onClick={() => {
             if (confirm("Are you sure you want to reset your access token?")) {
               localStorage.removeItem("arondo_token");
@@ -645,7 +667,7 @@ export default function SettingsPage() {
             }
           }}
           style={{
-            marginLeft: "auto",
+            marginLeft: 12,
             padding: "6px 12px",
             fontSize: 12,
             fontWeight: 500,

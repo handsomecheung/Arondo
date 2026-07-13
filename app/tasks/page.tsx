@@ -6,7 +6,7 @@ import Link from "next/link";
 import ScriptExecCard from "@/components/ScriptExecCard";
 import AgentExecCard from "@/components/AgentExecCard";
 import {
-  IconArrowLeft, IconLogo, IconX, IconInbox, IconTerminal, IconCode, IconChevronDown, IconClock,
+  IconArrowLeft, IconLogo, IconX, IconInbox, IconTerminal, IconCode, IconChevronDown, IconClock, IconRefresh,
 } from "@/components/Icons";
 import { agentTypeLabel } from "@/lib/homeUtils";
 
@@ -595,9 +595,32 @@ export default function TasksPage() {
           Task Queue
         </span>
 
+        <button
+          onClick={() => window.location.reload()}
+          style={{
+            background: "transparent",
+            border: "none",
+            color: "var(--text-secondary)",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 4,
+            borderRadius: "var(--radius-sm)",
+            transition: "all 0.2s ease",
+            marginLeft: "auto",
+          }}
+          title="Refresh App"
+          aria-label="Refresh application data"
+          onMouseEnter={(e) => e.currentTarget.style.color = "var(--text-primary)"}
+          onMouseLeave={(e) => e.currentTarget.style.color = "var(--text-secondary)"}
+        >
+          <IconRefresh />
+        </button>
+
         <div
           className={`status-dot ${connected ? "connected" : ""}`}
-          style={{ marginLeft: "auto" }}
+          style={{ marginLeft: 12 }}
           suppressHydrationWarning
           title={connected ? "Connected" : "Disconnected"}
         />

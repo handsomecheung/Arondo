@@ -61,6 +61,22 @@ export function ClientInit() {
     };
 
     checkToken();
+
+    // 3. Global keyboard reload shortcut for PWA/Standalone app
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.key === "F5" ||
+        ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "r")
+      ) {
+        e.preventDefault();
+        window.location.reload();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, [pathname, router]);
 
   return null;

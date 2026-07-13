@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import ConfirmDialog from "@/components/modals/ConfirmDialog";
-import { IconArrowLeft, IconLogo, IconInbox } from "@/components/Icons";
+import { IconArrowLeft, IconLogo, IconInbox, IconRefresh } from "@/components/Icons";
 
 interface AgyQuota {
   Account: string;
@@ -326,6 +326,28 @@ export default function RunnersPage() {
         >
           Runners
         </span>
+        <button
+          onClick={() => window.location.reload()}
+          style={{
+            background: "transparent",
+            border: "none",
+            color: "var(--text-secondary)",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 4,
+            borderRadius: "var(--radius-sm)",
+            transition: "all 0.2s ease",
+            marginLeft: "auto",
+          }}
+          title="Refresh App"
+          aria-label="Refresh application data"
+          onMouseEnter={(e) => e.currentTarget.style.color = "var(--text-primary)"}
+          onMouseLeave={(e) => e.currentTarget.style.color = "var(--text-secondary)"}
+        >
+          <IconRefresh />
+        </button>
       </header>
 
       <main

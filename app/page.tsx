@@ -6,7 +6,7 @@ import Link from "next/link";
 import type { Session, Project, Runner, ProjectScript, Message, TaskItem } from "@/types/home";
 import { AGENT_COMMANDS, mergeAgentCommands } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
-import { IconTaskQueue, IconLogo, IconMenu } from "@/components/Icons";
+import { IconTaskQueue, IconLogo, IconMenu, IconRefresh } from "@/components/Icons";
 import AppSidebar from "@/components/AppSidebar";
 import ProjectPanel from "@/components/ProjectPanel";
 import SessionView from "@/components/SessionView";
@@ -1036,6 +1036,28 @@ export default function HomePage() {
               )}
             </Link>
           </div>
+
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "var(--text-secondary)",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 4,
+              borderRadius: "var(--radius-sm)",
+              transition: "all 0.2s ease",
+            }}
+            title="Refresh App"
+            aria-label="Refresh application data"
+            onMouseEnter={(e) => e.currentTarget.style.color = "var(--text-primary)"}
+            onMouseLeave={(e) => e.currentTarget.style.color = "var(--text-secondary)"}
+          >
+            <IconRefresh />
+          </button>
 
           <div
             className={`status-dot ${connected ? "connected" : ""}`}

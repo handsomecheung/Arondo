@@ -28,6 +28,11 @@ export function useWebSocket({
   const [wsInstance, setWsInstance] = useState<WebSocket | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
+  const selectedSessionIdRef = useRef(selectedSessionId);
+  useEffect(() => {
+    selectedSessionIdRef.current = selectedSessionId;
+  }, [selectedSessionId]);
+
   useEffect(() => {
     let ws: WebSocket;
     let reconnectTimer: ReturnType<typeof setTimeout>;
@@ -63,6 +68,7 @@ export function useWebSocket({
       ws.onmessage = (e) => {
         try {
           const event = JSON.parse(e.data) as { type: string; payload: any };
+          const currentSelectedSessionId = selectedSessionIdRef.current;
 
           if (event.type === "session:updated") {
             const updated = event.payload as Session;
@@ -95,7 +101,7 @@ export function useWebSocket({
           if (event.type === "session:deleted") {
             const { id } = event.payload as { id: string };
             setSessions((prev) => prev.filter((s) => s.id !== id));
-            if (selectedSessionId === id) {
+            if (currentSelectedSessionId === id) {
               setSelectedSessionId(null);
               setMessages([]);
               setSessionLog("");
@@ -113,7 +119,7 @@ export function useWebSocket({
               );
             }
 
-            if (msg.sessionId === selectedSessionId) {
+            if (msg.sessionId === currentSelectedSessionId) {
               setMessages((prev) => {
                 if (prev.find((m) => m.id === msg.id)) return prev;
                 const filtered = prev.filter(
@@ -188,7 +194,8 @@ export function useWebSocket({
       wsRef.current = null;
       setWsInstance(null);
     };
-  }, [selectedSessionId, setSessions, setMessages, setTaskQueue, setSelectedSessionId, setSessionLog, setActiveLogMsgId, setLogModalOpen]);
+  }, [setSessions, setMessages, setTaskQueue, setSelectedSessionId, setSessionLog, setActiveLogMsgId, setLogModalOpen]);
+
 
   return { connected, wsInstance };
 }
