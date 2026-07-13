@@ -571,9 +571,52 @@ export default function HomePage() {
       .catch(console.error);
   }, [selectedSessionId, activeLogMsgId]);
 
+  const lastScrolledSessionIdRef = useRef<string | null>(null);
   useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isRunning]);
+    const isNewEntry = lastScrolledSessionIdRef.current !== selectedSessionId;
+    chatBottomRef.current?.scrollIntoView({ behavior: isNewEntry ? "auto" : "smooth" });
+    if (messages.length > 0) lastScrolledSessionIdRef.current = selectedSessionId;
+  }, [messages, isRunning, selectedSessionId]);
+
+  // Exec cards fetch their rendered content (cached HTML, verified links) asynchronously,
+  // growing individual card heights after the initial scroll above. #chat-area itself has a
+  // fixed CSS height (it's the overflow-y:auto container), so watching it directly never
+  // fires — observe its message-card children instead, which do resize as content streams in.
+  useEffect(() => {
+    if (!mounted || !selectedSessionId) return;
+    const container = document.getElementById("chat-area");
+    if (!container) return;
+
+    let stick = true;
+    const scrollToEnd = () => {
+      if (stick) chatBottomRef.current?.scrollIntoView({ behavior: "auto" });
+    };
+
+    const resizeObserver = new ResizeObserver(scrollToEnd);
+    const observeChildren = () => {
+      Array.from(container.children).forEach((child) => resizeObserver.observe(child));
+    };
+    observeChildren();
+
+    const mutationObserver = new MutationObserver(() => {
+      observeChildren();
+      scrollToEnd();
+    });
+    mutationObserver.observe(container, { childList: true });
+
+    const timer = setTimeout(() => {
+      stick = false;
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+    }, 2000);
+
+    return () => {
+      stick = false;
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+      clearTimeout(timer);
+    };
+  }, [selectedSessionId, mounted]);
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 768px)");
