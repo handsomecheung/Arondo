@@ -114,6 +114,17 @@ export default function HomePage() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     initUrl.project,
   );
+  const sortedProjectsByRecentSession = useMemo(() => {
+    const latestSessionCreatedAt = (projectId: string): number => {
+      const times = sessions
+        .filter((s) => s.projectId === projectId)
+        .map((s) => new Date(s.createdAt).getTime());
+      return times.length > 0 ? Math.max(...times) : 0;
+    };
+    return [...projects].sort(
+      (a, b) => latestSessionCreatedAt(b.id) - latestSessionCreatedAt(a.id),
+    );
+  }, [projects, sessions]);
 
   const [toast, setToast] = useState<{
     message: string;
@@ -1212,7 +1223,7 @@ export default function HomePage() {
             execCards={execCards}
             returnMsgIds={returnMsgIds}
             runners={runners}
-            projects={projects}
+            projects={sortedProjectsByRecentSession}
             runnerAgents={runnerAgents}
             runnerId={runnerId}
             agentType={agentType}
