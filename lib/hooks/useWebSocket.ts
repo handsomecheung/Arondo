@@ -115,7 +115,12 @@ export function useWebSocket({
 
             if (msg.type === "script-return" || msg.type === "agent-return") {
               setTaskQueue((prev) =>
-                prev.filter((t) => t.messageId !== msg.parentId && t.id !== msg.parentId)
+                prev.filter(
+                  (t) =>
+                    t.messageId !== msg.parentId &&
+                    t.id !== msg.parentId &&
+                    !(msg.type === "agent-return" && t.sessionId === msg.sessionId && t.type === "agent")
+                )
               );
             }
 

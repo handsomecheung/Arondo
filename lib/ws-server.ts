@@ -67,9 +67,10 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
 
     const resolveAndBroadcast = async () => {
       if (!runnerId) {
-        if (event.payload.sessionId) {
+        const sid = event.payload.sessionId || event.payload.id;
+        if (sid) {
           const { getSession } = require("./store");
-          const session = await getSession(event.payload.sessionId);
+          const session = await getSession(sid);
           if (session) runnerId = session.runnerId;
         } else if (event.payload.projectId) {
           const { getProject } = require("./store");
