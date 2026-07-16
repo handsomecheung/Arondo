@@ -82,6 +82,8 @@ app/
           route.ts      # POST: archive a session manually
         unarchive/
           route.ts      # POST: unarchive a session manually
+        view/
+          route.ts      # POST: mark session as viewed (updates lastViewedAt)
         send-draft-now/
           route.ts      # POST: send draft message immediately
         draft-trigger/
@@ -228,7 +230,8 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 | `pty.input` | S→R request | Write stdin data to PTY |
 | `pty.resize` | S→R request | Resize PTY terminal |
 | `fs.list` | S→R request | List directories at a path |
-| `fs.read` | S→R request | Read file content |
+| `fs.read` | S→R request | Read file content (supports offset/length chunked reads) |
+| `fs.upload` | S→R request | Upload base64 file to a temporary directory on the runner |
 | `fs.infos` | S→R request | Batch check path existence and git diff status |
 | `git.status` | S→R request | Run `git status --porcelain` |
 | `git.diff` | S→R request | Run `git diff HEAD` |
@@ -334,7 +337,7 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **Dedicated Execution Cards, Rich Markdown & Inline Logs**: Unified `ExecCard` is split into `ScriptExecCard` (using `xterm.js` for interactive output, and supporting inline log streaming for quick-run commands) and `AgentExecCard` (rendering outputs in Markdown with syntax highlighting and clickable file/URL links). Clicking verified file paths opens them in the Remote File Browser. If a file has git modifications, a diff button is displayed next to the path to trigger an inline visual diff viewer modal. Card rendering performance is optimized by caching generated HTML to the backend on the first render. Users can toggle between Markdown and raw text views. On entering a session, the chat area automatically scrolls to the latest message instantly, while normal updates use smooth scrolling. Because execution cards load content asynchronously and grow, a ResizeObserver and MutationObserver monitor the card elements for 2 seconds after session entry to keep the viewport pinned to the bottom.
 - **Restart/Retry actions**: `ScriptExecCard` shows a Restart button for script tasks (calls `restart-script` API → `exec.restart` on the runner) and `AgentExecCard` shows a Retry button for failed agent tasks (calls `rerun-agent` API). The terminal/view shows a “─── restarting ───” separator inline in the existing log.
 - **Slash commands & Quick Exec Triggers**: Slash commands are config-driven and customizable (stored in `~/.arondo/agent-commands.json`). Custom slash commands display as blue `UserAgentCommandCard` nodes in the session timeline and track both the raw command and resolved prompt separately. Built-in slash commands like `/new [name]`, `/delete` (to delete the current session), and `/rename <name>` to rename the current session are supported. Additionally, users can use `!` in the chat input to execute project-scoped scripts or arbitrary shell commands inline, with execution logs streamed directly within the card.
-- **Tab Completion & Keyboard UX**: Chat input supports Tab completion to cycle through slash commands. Send messages via `Enter`, and insert a newline via `Ctrl+Enter` / `Meta+Enter`. Additionally, a global keyboard reload shortcut (`F5` or `Ctrl+R` / `Cmd+R`) is registered for PWA/standalone app wrappers to reload the client. Manual "Refresh App" buttons are also provided in the app header, Settings, and Tasks pages.
+- **Tab Completion, Keyboard UX & Drafts**: Chat input supports Tab completion to cycle through slash commands. Send messages via `Enter`, and insert a newline via `Ctrl+Enter` / `Meta+Enter`. Chat drafts are persisted in `localStorage` per session to survive navigation and reloads. Additionally, a global keyboard reload shortcut (`F5` or `Ctrl+R` / `Cmd+R`) is registered for PWA/standalone app wrappers to reload the client. Manual "Refresh App" buttons are also provided in the app header, Settings, and Tasks pages.
 - **Session Navigation & Shell Terminal**: The three-dot dropdown in a session includes an "Open Terminal" option to open a `ShellTerminal` modal, and a "Go to Project" button to navigate back to the parent project interface.
 - **Real-time Streaming**: Both agent and script output stream via WebSocket `terminal:output` (base64-encoded PTY data), forwarded through the event bus. The frontend renders script logs via xterm.js and agent logs via the plain wrapped text view.
 - **Concurrency**: Multiple background scripts can run concurrently in a single session. The chat prompt stays active during execution.
@@ -361,10 +364,11 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **Inline Runner Details**: The Runners dashboard displays the runner details panel inline directly below the selected runner card for better usability.
 - **Disconnected Runner Deletion**: Allows deleting registered but disconnected runners from the Runners dashboard, which purges their corresponding metadata and directories.
 - **Automated Data Lifecycle**: Automatically purges orphan sessions or projects on load if their parent references (e.g. project or runner) no longer exist.
-- **@ Path Selector Modal**: Typing `@` in the chat textarea opens a file and directory selector modal to easily select a path and insert its relative path into the input field. Navigation ("Go Up") is allowed past the project root, with an "(outside project)" label shown once the current path leaves the project directory.
-- **File Browser with Syntax Highlighting**: A Remote File Browser can be opened from the session's three-dot menu, featuring file previews (up to 512KB) with code syntax highlighting and a word wrap toggle option.
+- **@ Path Selector Modal & File Upload**: Typing `@` in the chat textarea opens a file and directory selector modal to easily select a path and insert its relative path into the input field. The chat input also supports direct file uploads; uploaded files are sent to the runner's temporary directory via WebSocket `fs.upload`, and the resolved path is appended to the agent prompt automatically. Navigation ("Go Up") is allowed past the project root, with an "(outside project)" label shown once the current path leaves the project directory.
+- **File Browser with Syntax Highlighting**: A Remote File Browser can be opened from the session's three-dot menu, featuring file previews with code syntax highlighting (loaded in 64KB chunks on scroll to support files of any size) and a word wrap toggle option.
 - **Scheduled Tasks, Auto-Queue Follow-ups & Quota Retry**: Users can schedule project-scoped scripts to run at a future fixed time. If the agent is currently running when a user sends a follow-up, the message is automatically queued as a scheduled task (`afterSession` trigger) and executed sequentially once the active task finishes. If the agent terminates due to quota limits, a `quotaAvailable` task is scheduled to automatically retry using the last user prompt once the quota becomes available.
 - **Diff View File Collapse/Expand**: The visual HTML diff viewer supports collapsing and expanding individual changed files dynamically, enhancing diff readability.
+- **Unread Session Completion Indicator**: Automatically tracks when background running sessions complete (`done` or `error`). It compares the session's `completedAt` timestamp with the user's `lastViewedAt` timestamp (updated via the `/api/sessions/[id]/view` endpoint). If a session has unviewed completions, the UI displays a colored dot in the sidebar (green for success, red for error) and an unread count badge on the mobile navigation menu.
 
 ## Project & Custom Scripts Management
 - **Project Scoping**: Sessions are mapped to projects by repository path + runnerId. Projects store metadata at `~/.arondo/projects/[projectId]/project.json`.
