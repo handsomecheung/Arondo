@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { IconX, IconCornerLeftUp, IconFolder, IconFile, IconCode, IconChevronDown } from "@/components/Icons";
+
+const CHUNK_SIZE = 64 * 1024; // 64KB per chunk
 
 interface FsEntry {
   name: string;
@@ -19,6 +21,26 @@ interface Props {
 
 type View = "list" | "file";
 
+const LANG_MAP: Record<string, string> = {
+  ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
+  py: "python", go: "go", rs: "rust", java: "java", rb: "ruby",
+  sh: "bash", bash: "bash", zsh: "bash", fish: "bash",
+  md: "markdown", json: "json", yaml: "yaml", yml: "yaml",
+  toml: "toml", css: "css", scss: "css", html: "xml", xml: "xml",
+  sql: "sql", c: "c", cpp: "cpp", h: "cpp", hpp: "cpp",
+  kt: "kotlin", swift: "swift", cs: "csharp", php: "php",
+  dockerfile: "dockerfile", tf: "hcl",
+};
+
+async function highlightChunk(content: string, ext: string): Promise<string> {
+  const hljs = (await import("highlight.js")).default;
+  const lang = LANG_MAP[ext];
+  const result = lang && hljs.getLanguage(lang)
+    ? hljs.highlight(content, { language: lang })
+    : hljs.highlightAuto(content);
+  return result.value;
+}
+
 export default function FileBrowserModal({ open, onClose, runnerId, initialPath = "/", initialFilePath }: Props) {
   const [currentPath, setCurrentPath] = useState(initialPath);
   const [parentPath, setParentPath] = useState<string | null>(null);
@@ -26,15 +48,19 @@ export default function FileBrowserModal({ open, onClose, runnerId, initialPath 
   const [dirLoading, setDirLoading] = useState(false);
 
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [fileContent, setFileContent] = useState<string | null>(null);
-  const [fileLoading, setFileLoading] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
-  const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
+  const [fileLoading, setFileLoading] = useState(false);
+  const [highlightedChunks, setHighlightedChunks] = useState<string[]>([]);
+  const [totalSize, setTotalSize] = useState(0);
+  const [loadedOffset, setLoadedOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  // Mobile: "list" or "file" view
   const [mobileView, setMobileView] = useState<View>("list");
   const [wordWrap, setWordWrap] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
+
+  const filePanelRef = useRef<HTMLDivElement>(null);
 
   const loadDir = useCallback((path: string) => {
     if (!runnerId) return;
@@ -56,6 +82,68 @@ export default function FileBrowserModal({ open, onClose, runnerId, initialPath 
       .finally(() => setDirLoading(false));
   }, [runnerId]);
 
+  const fetchChunk = useCallback(async (path: string, offset: number): Promise<void> => {
+    const ext = path.split(".").pop()?.toLowerCase() ?? "";
+    const r = await fetch(
+      `/api/fs/file?runner=${encodeURIComponent(runnerId)}&path=${encodeURIComponent(path)}&offset=${offset}&length=${CHUNK_SIZE}`
+    );
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}));
+      throw new Error(body.error || `HTTP ${r.status}`);
+    }
+    const data = await r.json();
+    const highlighted = await highlightChunk(data.content as string, ext);
+    setHighlightedChunks((prev) => [...prev, highlighted]);
+    setTotalSize(data.totalSize);
+    setLoadedOffset(data.offset + data.size);
+    setHasMore(data.hasMore);
+  }, [runnerId]);
+
+  const openFile = useCallback(async (path: string) => {
+    setSelectedFile(path);
+    setHighlightedChunks([]);
+    setFileError(null);
+    setFileLoading(true);
+    setMobileView("file");
+    setTotalSize(0);
+    setLoadedOffset(0);
+    setHasMore(false);
+
+    try {
+      await fetchChunk(path, 0);
+    } catch (err: any) {
+      setFileError(err.message || "Failed to load file");
+    } finally {
+      setFileLoading(false);
+    }
+  }, [fetchChunk]);
+
+  const loadMoreChunk = useCallback(async () => {
+    if (!selectedFile || loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      await fetchChunk(selectedFile, loadedOffset);
+    } catch {
+      // silently ignore transient chunk errors
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [selectedFile, loadedOffset, hasMore, loadingMore, fetchChunk]);
+
+  useEffect(() => {
+    const el = filePanelRef.current;
+    if (!el || !hasMore) return;
+
+    const handleScroll = () => {
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 300) {
+        loadMoreChunk();
+      }
+    };
+
+    el.addEventListener("scroll", handleScroll);
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, [hasMore, loadMoreChunk]);
+
   useEffect(() => {
     if (!open || !runnerId) return;
     if (initialFilePath) {
@@ -73,61 +161,21 @@ export default function FileBrowserModal({ open, onClose, runnerId, initialPath 
     loadDir(path);
   };
 
-  const openFile = async (path: string) => {
-    setSelectedFile(path);
-    setFileContent(null);
-    setHighlightedHtml(null);
-    setFileError(null);
-    setFileLoading(true);
-    setMobileView("file");
-
-    try {
-      const r = await fetch(`/api/fs/file?runner=${encodeURIComponent(runnerId)}&path=${encodeURIComponent(path)}`);
-      if (!r.ok) {
-        const body = await r.json().catch(() => ({}));
-        throw new Error(body.error || `HTTP ${r.status}`);
-      }
-      const data = await r.json();
-      const content: string = data.content;
-      setFileContent(content);
-
-      const hljs = (await import("highlight.js")).default;
-      const ext = path.split(".").pop()?.toLowerCase() ?? "";
-      const langMap: Record<string, string> = {
-        ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
-        py: "python", go: "go", rs: "rust", java: "java", rb: "ruby",
-        sh: "bash", bash: "bash", zsh: "bash", fish: "bash",
-        md: "markdown", json: "json", yaml: "yaml", yml: "yaml",
-        toml: "toml", css: "css", scss: "css", html: "xml", xml: "xml",
-        sql: "sql", c: "c", cpp: "cpp", h: "cpp", hpp: "cpp",
-        kt: "kotlin", swift: "swift", cs: "csharp", php: "php",
-        dockerfile: "dockerfile", tf: "hcl",
-      };
-      const lang = langMap[ext];
-      const result = lang && hljs.getLanguage(lang)
-        ? hljs.highlight(content, { language: lang })
-        : hljs.highlightAuto(content);
-      setHighlightedHtml(result.value);
-    } catch (err: any) {
-      setFileError(err.message || "Failed to load file");
-    } finally {
-      setFileLoading(false);
-    }
-  };
-
   const handleClose = () => {
     setMobileView("list");
     setSelectedFile(null);
-    setFileContent(null);
-    setHighlightedHtml(null);
+    setHighlightedChunks([]);
     setFileError(null);
     onClose();
   };
 
   if (!open) return null;
 
+  const loadedKB = Math.ceil(loadedOffset / 1024);
+  const totalKB = Math.ceil(totalSize / 1024);
+
   const filePanel = (
-    <div className="fb-file-panel">
+    <div className="fb-file-panel" ref={filePanelRef}>
       {!selectedFile ? (
         <div className="fb-file-empty">
           <IconCode />
@@ -139,10 +187,15 @@ export default function FileBrowserModal({ open, onClose, runnerId, initialPath 
         <div className="fb-file-error">{fileError}</div>
       ) : (
         <pre className={`fb-code-pre${wordWrap ? " fb-wrap" : ""}`}>
-          {highlightedHtml != null ? (
-            <code dangerouslySetInnerHTML={{ __html: highlightedHtml }} />
-          ) : (
-            <code>{fileContent}</code>
+          {highlightedChunks.map((html, i) => (
+            <code key={i} dangerouslySetInnerHTML={{ __html: html }} />
+          ))}
+          {(hasMore || loadingMore) && (
+            <div className="fb-chunk-status">
+              {loadingMore
+                ? `Loading… ${loadedKB} / ${totalKB} KB`
+                : `${loadedKB} / ${totalKB} KB — scroll to load more`}
+            </div>
           )}
         </pre>
       )}

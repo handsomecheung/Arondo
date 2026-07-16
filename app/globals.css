@@ -1950,6 +1950,15 @@ body {
   font-size: inherit;
 }
 
+.fb-chunk-status {
+  display: block;
+  padding: 8px 0 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: inherit;
+  opacity: 0.7;
+}
+
 /* highlight.js theme — mapped to project design tokens */
 .hljs-keyword,
 .hljs-selector-tag,

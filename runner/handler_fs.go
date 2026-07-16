@@ -4,24 +4,30 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 )
 
-const maxFileReadSize = 512 * 1024 // 512KB
+const defaultChunkSize int64 = 64 * 1024  // 64KB per chunk
 const maxFileUploadSize = 50 * 1024 * 1024 // 50MB
 
 type fsReadRequest struct {
-	Path string `json:"path"`
+	Path   string `json:"path"`
+	Offset int64  `json:"offset,omitempty"`
+	Length int64  `json:"length,omitempty"`
 }
 
 type fsReadResponse struct {
-	OK      bool   `json:"ok"`
-	Path    string `json:"path"`
-	Content string `json:"content"`
-	Size    int64  `json:"size"`
+	OK        bool   `json:"ok"`
+	Path      string `json:"path"`
+	Content   string `json:"content"`
+	Size      int64  `json:"size"`
+	TotalSize int64  `json:"totalSize"`
+	Offset    int64  `json:"offset"`
+	HasMore   bool   `json:"hasMore"`
 }
 
 func (h *Handler) handleFsRead(msg *Message) {
@@ -46,22 +52,42 @@ func (h *Handler) handleFsRead(msg *Message) {
 		h.sendError(msg.ID, "BAD_REQUEST", "path is a directory")
 		return
 	}
-	if info.Size() > maxFileReadSize {
-		h.sendError(msg.ID, "TOO_LARGE", fmt.Sprintf("file too large: %d bytes (max %d)", info.Size(), maxFileReadSize))
-		return
+
+	length := req.Length
+	if length <= 0 {
+		length = defaultChunkSize
 	}
 
-	content, err := os.ReadFile(absPath)
+	file, err := os.Open(absPath)
 	if err != nil {
+		h.sendError(msg.ID, "INTERNAL", "failed to open file: "+err.Error())
+		return
+	}
+	defer file.Close()
+
+	if req.Offset > 0 {
+		if _, err := file.Seek(req.Offset, io.SeekStart); err != nil {
+			h.sendError(msg.ID, "INTERNAL", "failed to seek: "+err.Error())
+			return
+		}
+	}
+
+	buf := make([]byte, length)
+	n, err := io.ReadFull(file, buf)
+	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
 		h.sendError(msg.ID, "INTERNAL", "failed to read file: "+err.Error())
 		return
 	}
+	buf = buf[:n]
 
 	h.sendResponse(msg.ID, fsReadResponse{
-		OK:      true,
-		Path:    absPath,
-		Content: string(content),
-		Size:    info.Size(),
+		OK:        true,
+		Path:      absPath,
+		Content:   string(buf),
+		Size:      int64(n),
+		TotalSize: info.Size(),
+		Offset:    req.Offset,
+		HasMore:   req.Offset+int64(n) < info.Size(),
 	})
 }
 
