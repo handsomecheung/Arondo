@@ -116,8 +116,10 @@ export function useSessionSubmit({
     const lastChar = selectionStart > 0 ? value.substring(selectionStart - 1, selectionStart) : "";
     if (lastChar === "@" && onTriggerFsModal) {
       const isStart = selectionStart === 1;
-      const isAfterSpace = selectionStart > 1 && value.substring(selectionStart - 2, selectionStart - 1) === " ";
-      if (isStart || isAfterSpace) {
+      const charBeforeAt = selectionStart > 1 ? value.substring(selectionStart - 2, selectionStart - 1) : "";
+      const isAfterSpace = charBeforeAt === " ";
+      const isAfterNewline = charBeforeAt === "\n";
+      if (isStart || isAfterSpace || isAfterNewline) {
         if (textareaRef.current) {
           textareaRef.current.blur();
         }
