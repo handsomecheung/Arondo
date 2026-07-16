@@ -460,6 +460,19 @@ body {
   background: var(--accent-glow);
   border-color: var(--border-accent);
 }
+.task-item.unread-completion {
+  border-left: 3px solid var(--unread-color, var(--success));
+}
+
+.task-item-unread-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--unread-color, var(--success));
+  box-shadow: 0 0 6px var(--unread-color, var(--success));
+  flex-shrink: 0;
+  animation: pulse 1.6s infinite;
+}
 
 .task-item-header {
   display: flex;

@@ -26,7 +26,7 @@ import ConfirmDialog from "@/components/modals/ConfirmDialog";
 import InfoDialog from "@/components/modals/InfoDialog";
 import {
   formatTime, formatRelative, formatDuration, readUrlState,
-  parseExecCommand, execCardInfoToItem, resolveRepoFilePath,
+  parseExecCommand, execCardInfoToItem, resolveRepoFilePath, isUnviewedCompletion,
 } from "@/lib/homeUtils";
 import type { ExecCardInfo } from "@/lib/homeUtils";
 import { useFileSystem } from "@/lib/hooks/useFileSystem";
@@ -79,6 +79,10 @@ export default function HomePage() {
       return bTime - aTime;
     });
   }, [sessions]);
+  const unviewedCompletionCount = useMemo(
+    () => sessions.filter(isUnviewedCompletion).length,
+    [sessions],
+  );
   const initUrl = useMemo(readUrlState, []);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     initUrl.session,
@@ -983,6 +987,15 @@ export default function HomePage() {
     setMenuOpen(false);
   };
 
+  const markSessionViewed = useCallback((id: string) => {
+    fetch(`/api/sessions/${id}/view`, { method: "POST" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((updated) => {
+        if (updated) setSessions((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      })
+      .catch(console.error);
+  }, []);
+
   const handleSelectSession = (id: string) => {
     setSelectedSessionId(id);
     setSelectedProjectId(null);
@@ -992,7 +1005,21 @@ export default function HomePage() {
     setActiveLogMsgId(null);
     setLogModalOpen(false);
     setMenuOpen(false);
+
+    markSessionViewed(id);
   };
+
+  // If the session currently open finishes (running -> done/error) while the
+  // user is looking at it, clear its unread flag immediately instead of
+  // waiting for them to leave and re-enter — it shouldn't count as "unread"
+  // when they're already staring at the result.
+  useEffect(() => {
+    if (!selectedSessionId) return;
+    const session = sessions.find((s) => s.id === selectedSessionId);
+    if (session && isUnviewedCompletion(session)) {
+      markSessionViewed(selectedSessionId);
+    }
+  }, [selectedSessionId, sessions, markSessionViewed]);
 
   const handleRenameSession = async (id: string, newName: string) => {
     if (!newName.trim()) return;
@@ -1107,8 +1134,12 @@ export default function HomePage() {
           onClick={() => setSidebarOpen(true)}
           id="menu-btn"
           aria-label="Open session list"
+          style={{ position: "relative" }}
         >
           <IconMenu />
+          {unviewedCompletionCount > 0 && (
+            <span className="task-queue-badge">{unviewedCompletionCount}</span>
+          )}
         </button>
 
         <div className="header-logo">

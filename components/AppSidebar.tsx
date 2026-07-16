@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { IconPlus, IconInbox, IconSettings, IconServer, IconMoreVertical, IconArchive, IconArrowLeft, IconTrash, IconPin, IconEdit } from "@/components/Icons";
-import { formatRelative } from "@/lib/homeUtils";
+import { formatRelative, isUnviewedCompletion } from "@/lib/homeUtils";
 import type { Session, Project, Runner } from "@/types/home";
 
 const SWIPE_THRESHOLD = 72;
@@ -307,6 +307,8 @@ export default function AppSidebar({
                 const isSwiping = swipe?.id === session.id;
                 const swipeDx = isSwiping ? swipe!.dx : 0;
                 const clampedDx = Math.max(0, Math.min(120, swipeDx));
+                const unread = isUnviewedCompletion(session);
+                const unreadColor = session.status === "error" ? "var(--error)" : "var(--success)";
                 return (
                   <div
                     key={session.id ? `session-${session.id}` : `session-idx-${index}`}
@@ -316,7 +318,7 @@ export default function AppSidebar({
                       <IconTrash /> Delete
                     </div>
                     <div
-                      className={`task-item ${selectedSessionId === session.id ? "active" : ""}`}
+                      className={`task-item ${selectedSessionId === session.id ? "active" : ""} ${unread ? "unread-completion" : ""}`}
                       onClick={handleSwipeClick(() => onSelectSession(session.id))}
                       onTouchStart={handleSwipeTouchStart(session.id)}
                       onTouchMove={handleSwipeTouchMove}
@@ -325,10 +327,17 @@ export default function AppSidebar({
                       style={{
                         transform: `translateX(${clampedDx}px)`,
                         transition: isSwiping ? "none" : "transform 0.2s ease",
+                        ...(unread ? ({ "--unread-color": unreadColor } as React.CSSProperties) : {}),
                       }}
                       id={`session-item-${session.id}`}
                     >
                     <div className="task-item-header">
+                      {unread && (
+                        <span
+                          className="task-item-unread-dot"
+                          title={session.status === "error" ? "Finished with an error" : "Finished"}
+                        />
+                      )}
                       {session.pinnedAt && (
                         <span className="task-item-pin-badge" title="Pinned" style={{ color: "var(--text-secondary)" }}>
                           <IconPin size={11} />

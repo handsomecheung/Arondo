@@ -1,5 +1,13 @@
 import type { ExecCardItem } from "@/components/ExecCard";
-import type { Message } from "@/types/home";
+import type { Message, Session } from "@/types/home";
+
+// A session finished (done/error) since it was last opened, and the user
+// hasn't seen the outcome yet.
+export function isUnviewedCompletion(session: Session): boolean {
+  if (!session.completedAt) return false;
+  if (!session.lastViewedAt) return true;
+  return new Date(session.completedAt).getTime() > new Date(session.lastViewedAt).getTime();
+}
 
 export function resolveRepoFilePath(repoPath: string, path: string): string {
   if (path.startsWith("/")) return path;

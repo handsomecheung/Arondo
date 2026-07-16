@@ -49,6 +49,13 @@ export interface Session {
   // ISO timestamp of when the session was pinned. Pinned sessions sort first,
   // ordered by this value; undefined/absent means not pinned.
   pinnedAt?: string;
+  // ISO timestamp of the last time the user opened this session in the UI.
+  // Compared against completedAt to decide whether to show the "unread
+  // completion" indicator in the sidebar.
+  lastViewedAt?: string;
+  // ISO timestamp of the most recent transition to status "done"/"error".
+  // Set automatically by updateSession(), never bumped by unrelated patches.
+  completedAt?: string;
 }
 
 export type MessageType =
@@ -366,7 +373,25 @@ export async function updateSession(
       ...patch,
       updatedAt: new Date().toISOString(),
     };
+    if (patch.status === "done" || patch.status === "error") {
+      updated.completedAt = updated.updatedAt;
+    }
 
+    await writeJson(filePath, updated);
+    return updated;
+  });
+}
+
+// Records that the user opened this session in the UI. Deliberately bypasses
+// updateSession() so it never bumps updatedAt (which would reorder the
+// sidebar's most-recently-active sort merely from viewing a session).
+export async function touchSessionViewed(id: string): Promise<Session | undefined> {
+  const filePath = getSessionFilePath(id);
+  return withFileLock(filePath, async () => {
+    const session = await readJson<Session | null>(filePath, null);
+    if (!session) return undefined;
+
+    const updated: Session = { ...session, lastViewedAt: new Date().toISOString() };
     await writeJson(filePath, updated);
     return updated;
   });
