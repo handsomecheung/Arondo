@@ -60,6 +60,8 @@ function renderMessageContent(content: string) {
   return content;
 }
 
+const DRAFT_STORAGE_PREFIX = "arondo:chat-draft:";
+
 export default function HomePage() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -570,6 +572,27 @@ export default function HomePage() {
         setMessages([]);
       });
   }, [selectedSessionId]);
+
+  const draftKeyRef = useRef<string>(selectedSessionId ?? "__new__");
+  useEffect(() => {
+    const key = selectedSessionId ?? "__new__";
+    draftKeyRef.current = key;
+    try {
+      setPrompt(localStorage.getItem(DRAFT_STORAGE_PREFIX + key) ?? "");
+    } catch {
+      setPrompt("");
+    }
+  }, [selectedSessionId]);
+
+  useEffect(() => {
+    try {
+      const key = DRAFT_STORAGE_PREFIX + draftKeyRef.current;
+      if (prompt) localStorage.setItem(key, prompt);
+      else localStorage.removeItem(key);
+    } catch {
+      // localStorage unavailable (private mode / quota) — draft persistence best-effort only
+    }
+  }, [prompt]);
 
   useEffect(() => {
     if (!selectedSessionId || !activeLogMsgId) {
