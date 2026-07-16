@@ -905,10 +905,56 @@ body {
   color: var(--text-muted);
 }
 
+.pending-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  padding: 4px 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  max-width: 100%;
+}
+.pending-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+.pending-file-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+}
+.pending-file-remove:hover {
+  color: var(--text-primary);
+}
+
 .input-row {
   display: flex;
   gap: 8px;
-  align-items: flex-end;
+  align-items: stretch;
+}
+
+.input-actions-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 48px;
+  flex-shrink: 0;
+}
+@media (min-width: 768px) {
+  .input-actions-col {
+    width: 44px;
+  }
 }
 
 .chat-input {
@@ -948,9 +994,31 @@ body {
   cursor: not-allowed;
 }
 
+.upload-btn {
+  flex: 1;
+  min-height: 0;
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.upload-btn:hover:not(:disabled) {
+  border-color: var(--border-accent);
+  color: var(--text-primary);
+}
+.upload-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .send-btn {
-  width: 48px;
-  height: 48px;
+  flex: 1;
+  min-height: 0;
   border-radius: var(--radius-md);
   background: var(--accent);
   border: none;
@@ -960,13 +1028,6 @@ body {
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-@media (min-width: 768px) {
-  .send-btn {
-    width: 44px;
-    height: 44px;
-  }
 }
 .send-btn:hover:not(:disabled) {
   background: var(--accent-hover);

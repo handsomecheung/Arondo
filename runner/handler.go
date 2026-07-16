@@ -36,6 +36,8 @@ func (h *Handler) handleRequest(msg *Message) {
 		h.handleFsRead(msg)
 	case "fs.infos":
 		h.handleFsInfos(msg)
+	case "fs.upload":
+		h.handleFsUpload(msg)
 	case "exec.agent":
 		h.handleExecAgent(msg)
 	case "exec.script":

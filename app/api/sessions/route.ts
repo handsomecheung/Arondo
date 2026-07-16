@@ -64,8 +64,9 @@ export async function GET(request: NextRequest) {
 export async function POST(req: NextRequest) {
   const token = getArondoToken(req);
   const body = await req.json();
-  const { prompt, repoPath, agentType = "antigravity", runnerId, name, isDraft, draftTrigger = "codebaseReady", force } = body as {
+  const { prompt, message, repoPath, agentType = "antigravity", runnerId, name, isDraft, draftTrigger = "codebaseReady", force } = body as {
     prompt: string;
+    message?: string;
     repoPath: string;
     agentType?: string;
     runnerId: string;
@@ -109,10 +110,11 @@ export async function POST(req: NextRequest) {
 
   if (isDraft) {
     const trimmedPrompt = prompt.trim();
+    const trimmedMessage = message?.trim() || trimmedPrompt;
     const session = await createSession({
       status: "draft",
-      prompt: trimmedPrompt,
-      name: name?.trim() || deriveSessionName(trimmedPrompt, repoPath),
+      prompt: trimmedMessage,
+      name: name?.trim() || deriveSessionName(trimmedMessage, repoPath),
       agentType,
       repoPath,
       runnerId,
@@ -120,7 +122,7 @@ export async function POST(req: NextRequest) {
     if (draftTrigger !== "manual") {
       await addScheduledTask({
         trigger: { kind: "codebaseReady", runnerId, repoPath },
-        action: { kind: "sendMessage", sessionId: session.id, message: trimmedPrompt },
+        action: { kind: "sendMessage", sessionId: session.id, message: trimmedMessage, prompt: trimmedPrompt },
         tokenUuid: getUuidByToken(token) || undefined,
       });
     }
@@ -138,6 +140,7 @@ export async function POST(req: NextRequest) {
   const result = await dispatchCreateSession(runnerId, repoPath, agentType, prompt, {
     name,
     tokenUuid: getUuidByToken(token) || undefined,
+    displayMessage: message,
   });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });

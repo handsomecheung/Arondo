@@ -13,6 +13,9 @@ interface UseSessionSubmitParams {
   runnerId: string;
   isNewSession: boolean;
   isNewDraft: boolean;
+  pendingFile: File | null;
+  setPendingFile: (v: File | null) => void;
+  uploadPendingFile: (file: File, runnerId: string) => Promise<string>;
   draftTrigger: "manual" | "codebaseReady";
   showCommandMenu: boolean;
   selectedSession: Session | null;
@@ -47,6 +50,9 @@ export function useSessionSubmit({
   runnerId,
   isNewSession,
   isNewDraft,
+  pendingFile,
+  setPendingFile,
+  uploadPendingFile,
   draftTrigger,
   showCommandMenu,
   selectedSession,
@@ -75,7 +81,9 @@ export function useSessionSubmit({
 }: UseSessionSubmitParams) {
   const [commandMenuIndex, setCommandMenuIndex] = useState(-1);
   const [pendingConfirmation, setPendingConfirmation] = useState<{
-    trimmedPrompt: string;
+    rawText: string;
+    displayMessage: string;
+    agentPrompt: string;
     repoPath: string;
     agentType: string;
     runnerId: string;
@@ -279,10 +287,10 @@ export function useSessionSubmit({
   // an auto-send draft, or create a manual draft — all reuse the same /api/sessions POST.
   const resolvePendingConfirmation = useCallback(async (choice: "force" | "pendingAuto" | "draft") => {
     if (!pendingConfirmation) return;
-    const { trimmedPrompt, repoPath: pendingRepoPath, agentType: pendingAgentType, runnerId: pendingRunnerId } = pendingConfirmation;
+    const { displayMessage, agentPrompt, repoPath: pendingRepoPath, agentType: pendingAgentType, runnerId: pendingRunnerId } = pendingConfirmation;
     setPendingConfirmation(null);
 
-    const body: Record<string, unknown> = { prompt: trimmedPrompt, repoPath: pendingRepoPath, agentType: pendingAgentType, runnerId: pendingRunnerId };
+    const body: Record<string, unknown> = { prompt: agentPrompt, message: displayMessage, repoPath: pendingRepoPath, agentType: pendingAgentType, runnerId: pendingRunnerId };
     if (choice === "force") body.force = true;
     else if (choice === "pendingAuto") { body.isDraft = true; body.draftTrigger = "codebaseReady"; }
     else { body.isDraft = true; body.draftTrigger = "manual"; }
@@ -299,7 +307,7 @@ export function useSessionSubmit({
         return;
       }
       const newSession: Session = await res.json();
-      finalizeNewSession(newSession, trimmedPrompt, choice === "force");
+      finalizeNewSession(newSession, displayMessage, choice === "force");
     } catch (err: any) {
       setApiError({ title: "Send Error", message: err.message || "Failed to create session" });
     }
@@ -307,13 +315,13 @@ export function useSessionSubmit({
 
   const cancelPendingConfirmation = useCallback(() => {
     if (!pendingConfirmation) return;
-    setPrompt(pendingConfirmation.trimmedPrompt);
+    setPrompt(pendingConfirmation.rawText);
     setPendingConfirmation(null);
   }, [pendingConfirmation, setPrompt]);
 
   const handleSubmit = useCallback(async () => {
     const trimmed = prompt.trim();
-    const isBlankSession = (isNewSession || (!selectedSessionId && !isNewDraft)) && !trimmed;
+    const isBlankSession = (isNewSession || (!selectedSessionId && !isNewDraft)) && !trimmed && !pendingFile;
 
     if (trimmed.startsWith("/new") && !isNewSession && selectedSessionId) {
       const rest = trimmed.slice(4).trim();
@@ -353,6 +361,26 @@ export function useSessionSubmit({
 
     if (!trimmed && !isBlankSession) return;
 
+    const targetRunnerId = (isNewSession || isNewDraft || !selectedSessionId) ? runnerId : (selectedSession?.runnerId ?? runnerId);
+
+    // displayMessage is what's shown in the chat timeline (never reveals the
+    // runner-local upload path); agentPrompt is the real instruction sent to
+    // the agent, which does include the path so it can read the file.
+    let displayMessage = trimmed;
+    let agentPrompt = trimmed;
+    if (pendingFile) {
+      try {
+        const path = await uploadPendingFile(pendingFile, targetRunnerId);
+        const attachmentNote = `📎 Uploaded a file: ${pendingFile.name}`;
+        displayMessage = trimmed ? `${trimmed}\n${attachmentNote}` : attachmentNote;
+        agentPrompt = trimmed ? `${trimmed}\n\nUploaded file path: ${path}` : `Uploaded file path: ${path}`;
+        setPendingFile(null);
+      } catch (err: any) {
+        setApiError({ title: "Upload Error", message: err.message || "Failed to upload file" });
+        return;
+      }
+    }
+
     setPrompt("");
     setShowCommandMenu(false);
     if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
@@ -360,13 +388,14 @@ export function useSessionSubmit({
     try {
       if (isNewSession || isNewDraft || !selectedSessionId) {
         if (!repoPath.trim() || !runnerId) return;
-        if (isNewDraft && !trimmed) return;
+        if (isNewDraft && !displayMessage) return;
         const trimmedRepoPath = repoPath.trim();
         const res = await fetch("/api/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            prompt: trimmed,
+            prompt: agentPrompt,
+            message: displayMessage,
             repoPath: trimmedRepoPath,
             agentType,
             runnerId,
@@ -375,24 +404,24 @@ export function useSessionSubmit({
         });
         if (res.status === 409) {
           const data = await res.json();
-          setPendingConfirmation({ trimmedPrompt: trimmed, repoPath: trimmedRepoPath, agentType, runnerId, reason: data.reason });
+          setPendingConfirmation({ rawText: trimmed, displayMessage, agentPrompt, repoPath: trimmedRepoPath, agentType, runnerId, reason: data.reason });
           return;
         }
         const newSession: Session = await res.json();
-        finalizeNewSession(newSession, trimmed, !isBlankSession && !isNewDraft);
+        finalizeNewSession(newSession, displayMessage, !isBlankSession && !isNewDraft);
       } else if (selectedSession?.status === "running") {
-        await queueFollowupMessage(trimmed);
+        await queueFollowupMessage(displayMessage, agentPrompt);
       } else {
         const tempTaskId = `agent-${selectedSessionId}-${Date.now()}`;
         setTaskQueue((prev) => [
           ...prev,
-          { id: tempTaskId, type: "agent", name: `Agent: ${trimmed}`, sessionId: selectedSessionId, status: "running", createdAt: Date.now() },
+          { id: tempTaskId, type: "agent", name: `Agent: ${displayMessage}`, sessionId: selectedSessionId, status: "running", createdAt: Date.now() },
         ]);
         try {
           const res = await fetch(`/api/sessions/${selectedSessionId}/messages`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: trimmed, type: "chat-user" }),
+            body: JSON.stringify({ message: displayMessage, prompt: agentPrompt, type: "chat-user" }),
           });
           if (!res.ok) {
             const data = await res.json();
@@ -407,7 +436,7 @@ export function useSessionSubmit({
     } catch (err) {
       console.error(err);
     }
-  }, [prompt, repoPath, agentType, runnerId, isNewSession, isNewDraft, draftTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, handleNewSessionCommand, handleRenameSessionCommand, sendAgentMessage, sessionScripts, handleScriptCommand, agentCommands, queueFollowupMessage, finalizeNewSession]);
+  }, [prompt, repoPath, agentType, runnerId, isNewSession, isNewDraft, pendingFile, setPendingFile, uploadPendingFile, draftTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, setApiError, handleNewSessionCommand, handleRenameSessionCommand, sendAgentMessage, sessionScripts, handleScriptCommand, agentCommands, queueFollowupMessage, finalizeNewSession]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return;

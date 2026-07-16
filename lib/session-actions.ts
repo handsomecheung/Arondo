@@ -169,12 +169,13 @@ export async function dispatchCreateSession(
   repoPath: string,
   agentType: string,
   prompt: string,
-  opts: { name?: string; tokenUuid?: string } = {},
+  opts: { name?: string; tokenUuid?: string; displayMessage?: string } = {},
 ): Promise<ActionResult> {
   const trimmedPrompt = prompt.trim();
   if (!trimmedPrompt) {
     return { ok: false, error: "prompt is required", status: 400 };
   }
+  const displayMessage = opts.displayMessage?.trim() || trimmedPrompt;
 
   const run = runnerManager.getRunner(runnerId);
   if (!run) {
@@ -183,8 +184,8 @@ export async function dispatchCreateSession(
 
   const session = await createSession({
     status: "running",
-    prompt: trimmedPrompt,
-    name: opts.name?.trim() || deriveSessionName(trimmedPrompt, repoPath),
+    prompt: displayMessage,
+    name: opts.name?.trim() || deriveSessionName(displayMessage, repoPath),
     agentType,
     repoPath,
     runnerId,
@@ -202,7 +203,7 @@ export async function dispatchCreateSession(
   const userMessage = await addMessage({
     sessionId: session.id,
     role: "user",
-    content: trimmedPrompt,
+    content: displayMessage,
     type: "chat-user",
     tokenUuid: opts.tokenUuid,
   });

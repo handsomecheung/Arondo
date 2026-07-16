@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 )
 
 const maxFileReadSize = 512 * 1024 // 512KB
+const maxFileUploadSize = 50 * 1024 * 1024 // 50MB
 
 type fsReadRequest struct {
 	Path string `json:"path"`
@@ -248,4 +250,56 @@ func (h *Handler) handleFsList(msg *Message) {
 	}
 
 	h.sendResponse(msg.ID, resp)
+}
+
+type fsUploadRequest struct {
+	Filename string `json:"filename"`
+	Content  string `json:"content"` // base64-encoded
+}
+
+type fsUploadResponse struct {
+	OK   bool   `json:"ok"`
+	Path string `json:"path"`
+	Dir  string `json:"dir"`
+}
+
+func (h *Handler) handleFsUpload(msg *Message) {
+	req, err := parsePayload[fsUploadRequest](msg)
+	if err != nil {
+		h.sendError(msg.ID, "INTERNAL", "invalid payload: "+err.Error())
+		return
+	}
+
+	if req.Filename == "" {
+		h.sendError(msg.ID, "BAD_REQUEST", "filename is required")
+		return
+	}
+
+	data, err := base64.StdEncoding.DecodeString(req.Content)
+	if err != nil {
+		h.sendError(msg.ID, "BAD_REQUEST", "invalid base64 content: "+err.Error())
+		return
+	}
+	if len(data) > maxFileUploadSize {
+		h.sendError(msg.ID, "TOO_LARGE", fmt.Sprintf("file too large: %d bytes (max %d)", len(data), maxFileUploadSize))
+		return
+	}
+
+	dir, err := os.MkdirTemp("", "arondo-upload-*")
+	if err != nil {
+		h.sendError(msg.ID, "INTERNAL", "failed to create temp dir: "+err.Error())
+		return
+	}
+
+	destPath := filepath.Join(dir, filepath.Base(req.Filename))
+	if err := os.WriteFile(destPath, data, 0o644); err != nil {
+		h.sendError(msg.ID, "INTERNAL", "failed to write file: "+err.Error())
+		return
+	}
+
+	h.sendResponse(msg.ID, fsUploadResponse{
+		OK:   true,
+		Path: destPath,
+		Dir:  dir,
+	})
 }

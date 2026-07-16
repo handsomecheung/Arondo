@@ -174,6 +174,7 @@ export default function HomePage() {
 
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const [viewportStyles, setViewportStyles] = useState<React.CSSProperties>({});
 
@@ -747,6 +748,27 @@ export default function HomePage() {
     setChatFsModalOpen(false);
   };
 
+  // File selection only stages the file; it's uploaded together with the
+  // message text once the user actually hits Send (see useSessionSubmit).
+  const handleSelectFile = (file: File) => setPendingFile(file);
+  const handleRemovePendingFile = () => setPendingFile(null);
+
+  const uploadPendingFile = async (file: File, targetRunnerId: string): Promise<string> => {
+    if (!targetRunnerId) {
+      throw new Error("Select a runner before uploading a file");
+    }
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("runner", targetRunnerId);
+
+    const res = await fetch("/api/upload", { method: "POST", body: formData });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || "Failed to upload file");
+    }
+    return data.path;
+  };
+
   const { handlePromptChange, handleNewSessionCommand, handleRenameSessionCommand, handleAgentCommand, handleScriptCommand, handleSubmit, handleKeyDown, commandMenuIndex, pendingConfirmation, resolvePendingConfirmation, cancelPendingConfirmation } = useSessionSubmit({
     prompt,
     repoPath,
@@ -754,6 +776,9 @@ export default function HomePage() {
     runnerId,
     isNewSession,
     isNewDraft,
+    pendingFile,
+    setPendingFile,
+    uploadPendingFile,
     draftTrigger,
     showCommandMenu,
     selectedSession,
@@ -1336,6 +1361,9 @@ export default function HomePage() {
             onExecuteAgentCommand={handleAgentCommand}
             onExecuteScriptCommand={handleScriptCommand}
             onSwitchAgent={handleSwitchAgent}
+            pendingFile={pendingFile}
+            onSelectFile={handleSelectFile}
+            onRemovePendingFile={handleRemovePendingFile}
           />
         )}
       </main>

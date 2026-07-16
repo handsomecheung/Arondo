@@ -14,7 +14,7 @@ import {
   IconGitPullRequest, IconPlay, IconTerminal, IconEdit, IconTrash,
   IconMoreVertical, IconFolder, IconChevronDown, IconFileSearch,
   IconClaude, IconAntigravity, IconCodex, IconFileText, IconClock,
-  IconArchive, IconPin,
+  IconArchive, IconPin, IconPaperclip, IconX,
 } from "@/components/Icons";
 import { getTriggerWord, resolveAgentCommand } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
@@ -100,6 +100,9 @@ interface SessionViewProps {
   onExecuteAgentCommand: (promptText: string) => void;
   onExecuteScriptCommand: (promptText: string) => void;
   onSwitchAgent: (agentType: string) => void;
+  pendingFile: File | null;
+  onSelectFile: (file: File) => void;
+  onRemovePendingFile: () => void;
 }
 
 export default function SessionView({
@@ -183,10 +186,20 @@ export default function SessionView({
   onExecuteAgentCommand,
   onExecuteScriptCommand,
   onSwitchAgent,
+  pendingFile,
+  onSelectFile,
+  onRemovePendingFile,
 }: SessionViewProps) {
   const activeRunnerId = selectedSession ? selectedSession.runnerId : runnerId;
   const activeRunner = runners.find((r) => r.id === activeRunnerId) ?? null;
   const isRunnerOffline = !activeRunner || !activeRunner.connected;
+
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+  const handleUploadChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) onSelectFile(file);
+    e.target.value = "";
+  };
 
   const [agentSwitchOpen, setAgentSwitchOpen] = useState(false);
   const agentSwitchRef = useRef<HTMLDivElement>(null);
@@ -1139,7 +1152,28 @@ export default function SessionView({
           );
         })()}
 
+        {pendingFile && (
+          <div className="pending-file-chip">
+            <IconPaperclip size={13} />
+            <span className="pending-file-name" title={pendingFile.name}>{pendingFile.name}</span>
+            <button
+              className="pending-file-remove"
+              onClick={onRemovePendingFile}
+              title="Remove attachment"
+              type="button"
+            >
+              <IconX />
+            </button>
+          </div>
+        )}
+
         <div className="input-row">
+          <input
+            ref={uploadInputRef}
+            type="file"
+            style={{ display: "none" }}
+            onChange={handleUploadChange}
+          />
           <textarea
             ref={textareaRef}
             className="chat-input"
@@ -1152,20 +1186,31 @@ export default function SessionView({
             rows={1}
             id="chat-input"
           />
-          <button
-            className="send-btn"
-            onClick={isDraftSession ? onSendDraftNow : onSubmit}
-            disabled={!canSubmit}
-            title={getSendTooltip()}
-            id="send-btn"
-            suppressHydrationWarning
-          >
-            {isNewSession && !prompt.trim() ? (
-              <IconCheck />
-            ) : (
-              <IconSend />
-            )}
-          </button>
+          <div className="input-actions-col">
+            <button
+              className="upload-btn"
+              onClick={() => uploadInputRef.current?.click()}
+              disabled={isRunnerOffline || isDraftSession || isArchived}
+              title="Upload a file"
+              type="button"
+            >
+              <IconPaperclip />
+            </button>
+            <button
+              className="send-btn"
+              onClick={isDraftSession ? onSendDraftNow : onSubmit}
+              disabled={!canSubmit}
+              title={getSendTooltip()}
+              id="send-btn"
+              suppressHydrationWarning
+            >
+              {isNewSession && !prompt.trim() ? (
+                <IconCheck />
+              ) : (
+                <IconSend />
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </>
