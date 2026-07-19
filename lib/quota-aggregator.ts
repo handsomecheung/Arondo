@@ -119,7 +119,11 @@ function requestStaleRefreshes(merged: Record<string, QuotaEntry>): void {
   }
 }
 
+let lastAggregateAt = 0;
+const MIN_ACCESS_INTERVAL_MS = 5 * 60 * 1000;
+
 export async function aggregateQuota(): Promise<void> {
+  lastAggregateAt = Date.now();
   let runnerIds: string[];
   try {
     const entries = await fs.readdir(AGENTS_DIR, { withFileTypes: true });
@@ -156,6 +160,15 @@ export async function aggregateQuota(): Promise<void> {
   requestStaleRefreshes(merged);
 }
 
+// Called on every incoming HTTP request. If aggregateQuota hasn't run in the
+// last MIN_ACCESS_INTERVAL_MS, triggers it in the background.
+export function notifyQuotaAggregatorAccess(): void {
+  if (Date.now() - lastAggregateAt <= MIN_ACCESS_INTERVAL_MS) return;
+  aggregateQuota().catch((err) =>
+    console.error("[quota-aggregator] access-triggered run failed:", err)
+  );
+}
+
 export function startQuotaAggregator(): void {
   aggregateQuota().catch((err) =>
     console.error("[quota-aggregator] initial run failed:", err)
@@ -164,5 +177,5 @@ export function startQuotaAggregator(): void {
     aggregateQuota().catch((err) =>
       console.error("[quota-aggregator] periodic run failed:", err)
     );
-  }, 5 * 60 * 1000);
+  }, 6 * 60 * 60 * 1000);
 }

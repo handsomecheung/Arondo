@@ -5,7 +5,7 @@ import next from "next";
 import { WebSocketServer } from "ws";
 import { setupWebSocketServer } from "./lib/ws-server";
 import { setupRunnerServer } from "./lib/runner-server";
-import { startQuotaAggregator } from "./lib/quota-aggregator";
+import { startQuotaAggregator, notifyQuotaAggregatorAccess } from "./lib/quota-aggregator";
 import { startScheduler } from "./lib/scheduler";
 
 import { initializeAuth, findRunnerTokenByToken } from "./lib/auth";
@@ -18,6 +18,7 @@ const handle = app.getRequestHandler();
 initializeAuth().then(() => {
   app.prepare().then(() => {
     const server = createServer((req, res) => {
+    notifyQuotaAggregatorAccess();
     handle(req, res);
   });
 
