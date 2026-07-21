@@ -273,9 +273,6 @@ export async function dispatchSessionScript(
   if (!session) {
     return { ok: false, error: "Session not found", status: 404 };
   }
-  if (session.status === "running") {
-    return { ok: false, error: "Agent is already running for this session", status: 400 };
-  }
 
   const runningScripts = session.runningScripts || [];
 
@@ -293,7 +290,7 @@ export async function dispatchSessionScript(
   eventBus.publish({ type: "message_added", payload: systemMsg });
 
   const updatedSession = await updateSession(sessionId, {
-    status: "script-running",
+    status: session.status === "running" ? "running" : "script-running",
     runningScripts: [...runningScripts, scriptName],
   });
   eventBus.publish({ type: "session_updated", payload: updatedSession });
@@ -333,7 +330,10 @@ export async function dispatchSessionScript(
       const nextRunning = removeIdx >= 0
         ? [...runningScripts.slice(0, removeIdx), ...runningScripts.slice(removeIdx + 1)]
         : [...runningScripts];
-      const nextStatus = nextRunning.length > 0 ? "script-running" : "error";
+      const hasAgentTask = runnerManager.getAllTasks().some(
+        (t) => t.sessionId === sessionId && t.type === "agent" && !t.completedAt,
+      );
+      const nextStatus = hasAgentTask ? "running" : nextRunning.length > 0 ? "script-running" : "error";
       const updated = await updateSession(sessionId, {
         status: nextStatus as any,
         runningScripts: nextRunning,

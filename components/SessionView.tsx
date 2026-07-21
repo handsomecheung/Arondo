@@ -528,8 +528,6 @@ export default function SessionView({
                   >
                     <button
                       className="menu-item"
-                      disabled={isAgentRunning}
-                      title={isAgentRunning ? "Agent is running" : undefined}
                       id="menu-run-script"
                     >
                       <IconPlay /> Run Script
