@@ -58,6 +58,13 @@ export default function Terminal({ sessionId, projectId, messageId, ws, mode, ta
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(containerRef.current);
+    const textarea = term.textarea || containerRef.current.querySelector("textarea");
+    if (textarea) {
+      textarea.setAttribute("autocorrect", "off");
+      textarea.setAttribute("autocapitalize", "none");
+      textarea.setAttribute("spellcheck", "false");
+      textarea.setAttribute("autocomplete", "off");
+    }
 
     requestAnimationFrame(() => {
       fit.fit();

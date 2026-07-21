@@ -87,6 +87,13 @@ export default function ShellTerminal({ ws, cwd, runnerId, sessionId, open, onCl
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(containerRef.current);
+    const textarea = term.textarea || containerRef.current.querySelector("textarea");
+    if (textarea) {
+      textarea.setAttribute("autocorrect", "off");
+      textarea.setAttribute("autocapitalize", "none");
+      textarea.setAttribute("spellcheck", "false");
+      textarea.setAttribute("autocomplete", "off");
+    }
     requestAnimationFrame(() => {
       fit.fit();
       term.focus();
