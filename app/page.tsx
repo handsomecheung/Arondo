@@ -1165,7 +1165,7 @@ export default function HomePage() {
             >
               <IconTaskQueue />
               {taskQueue.length > 0 && (
-                <span className="task-queue-badge">{taskQueue.length}</span>
+                <span className="task-queue-live-dot" />
               )}
             </Link>
           </div>

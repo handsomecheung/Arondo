@@ -2389,6 +2389,18 @@ body {
   box-shadow: 0 0 6px var(--accent);
 }
 
+.task-queue-live-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  animation: pulse 2s infinite;
+}
+
 
 .task-spinner {
   width: 10px;
