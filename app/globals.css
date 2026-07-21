@@ -1411,6 +1411,10 @@ body {
   white-space: pre-wrap;
 }
 
+.user-message-card .exec-card-header {
+  align-items: flex-start;
+}
+
 /* Match background color of UserAgentCommandCard */
 .exec-card.script-exec-card {
   background: rgba(79, 70, 229, 0.1);
