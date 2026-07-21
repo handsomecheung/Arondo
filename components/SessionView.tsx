@@ -505,7 +505,7 @@ export default function SessionView({
                         : "No changes detected in git repository"
                     }
                   >
-                    🔍 Show Changes
+                    🔍 {isCheckingGitChanges ? "Show Changes" : "No Changes"}
                   </button>
                 ) : (
                   <button
