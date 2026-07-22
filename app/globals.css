@@ -2202,12 +2202,6 @@ body {
   border-top: 1px solid var(--border);
 }
 
-.script-submenu-divider {
-  height: 1px;
-  background: var(--border);
-  margin: 4px 0;
-}
-
 .script-submenu-manage {
   color: var(--text-muted);
   font-size: 12px;

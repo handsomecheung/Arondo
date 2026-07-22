@@ -551,7 +551,6 @@ export default function SessionView({
                             {s.name}
                           </button>
                         ))}
-                        {sessionScripts.length > 0 && <div className="script-submenu-divider" />}
                         <button
                           className="menu-item script-submenu-manage"
                           id="menu-manage-scripts"
