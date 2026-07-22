@@ -1253,10 +1253,26 @@ export default function HomePage() {
                   handleNewSession();
                   setSidebarMode("sessions");
                 }}
-                onDeleteProject={() => {
+                onDeleteProject={async () => {
                   const folderName = project.repoPath.split("/").pop() || project.repoPath;
+                  let associatedArchivedCount = 0;
+                  try {
+                    const res = await fetch("/api/sessions/archived");
+                    const data: Session[] = await res.json();
+                    if (Array.isArray(data)) {
+                      associatedArchivedCount = data.filter(
+                        (s) => s.projectId === project.id,
+                      ).length;
+                    }
+                  } catch (err) {
+                    console.error(err);
+                  }
+                  const archivedWarning =
+                    associatedArchivedCount > 0
+                      ? ` This project has ${associatedArchivedCount} archived session${associatedArchivedCount !== 1 ? "s" : ""}; ${associatedArchivedCount !== 1 ? "they" : "it"} will no longer be usable after deletion.`
+                      : "";
                   setConfirmDialog({
-                    message: `Are you sure you want to delete project "${folderName}"?`,
+                    message: `Are you sure you want to delete project "${folderName}"?${archivedWarning}`,
                     onConfirm: async () => {
                       setConfirmDialog(null);
                       try {

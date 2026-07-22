@@ -193,6 +193,9 @@ export default function SessionView({
   const activeRunnerId = selectedSession ? selectedSession.runnerId : runnerId;
   const activeRunner = runners.find((r) => r.id === activeRunnerId) ?? null;
   const isRunnerOffline = !activeRunner || !activeRunner.connected;
+  const sessionProjectExists = selectedSession?.projectId
+    ? projects.some((p) => p.id === selectedSession.projectId)
+    : true;
 
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const handleUploadChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -461,11 +464,18 @@ export default function SessionView({
               <div className="session-dropdown-menu">
                 <button
                   className="menu-item"
+                  disabled={!sessionProjectExists}
                   onClick={() => {
+                    if (!sessionProjectExists) return;
                     onUnarchiveSession();
                     onSetMenuOpen(false);
                   }}
                   id="menu-unarchive-session"
+                  title={
+                    sessionProjectExists
+                      ? undefined
+                      : "The project this session belongs to no longer exists"
+                  }
                 >
                   <IconArchive /> Unarchive
                 </button>
