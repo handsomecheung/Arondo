@@ -67,6 +67,7 @@ export default function AppSidebar({
   const [sessionMenuPos, setSessionMenuPos] = useState<{ top: number; left: number } | null>(null);
   const sessionMenuTriggerRef = useRef<HTMLDivElement>(null);
   const sessionMenuPortalRef = useRef<HTMLDivElement>(null);
+  const [selectedProjectFilter, setSelectedProjectFilter] = useState<string | null>(null);
 
   const handleSwipeTouchStart = (id: string) => (e: React.TouchEvent) => {
     setSwipe({ id, startX: e.touches[0].clientX, dx: 0 });
@@ -205,7 +206,10 @@ export default function AppSidebar({
           {archivedView ? (
             <button
               className="sidebar-settings-link"
-              onClick={onCloseArchivedSessions}
+              onClick={() => {
+                setSelectedProjectFilter(null);
+                onCloseArchivedSessions();
+              }}
               id="close-archived-sessions-btn"
               style={{ width: "100%", color: "var(--text-muted)" }}
             >
@@ -218,7 +222,10 @@ export default function AppSidebar({
                 role="tab"
                 aria-selected={sidebarMode === "sessions"}
                 className={`sidebar-mode-tab${sidebarMode === "sessions" ? " active" : ""}`}
-                onClick={() => onSetSidebarMode("sessions")}
+                onClick={() => {
+                  setSelectedProjectFilter(null);
+                  onSetSidebarMode("sessions");
+                }}
               >
                 Sessions
               </button>
@@ -232,6 +239,72 @@ export default function AppSidebar({
               </button>
             </div>
           )}
+          {(archivedView || sidebarMode === "sessions") && (() => {
+            const targetSessions = archivedView ? archivedSessions : sortedSessions;
+            const sessionProjectIds = new Set(targetSessions.map((s) => s.projectId).filter(Boolean));
+            const visibleProjects = projects.filter((p) => sessionProjectIds.has(p.id));
+            if (visibleProjects.length < 2) return null;
+            return (
+              <div
+                style={{
+                  display: "flex",
+                  gap: 6,
+                  overflowX: "auto",
+                  scrollbarWidth: "none",
+                  WebkitOverflowScrolling: "touch",
+                  paddingBottom: 2,
+                } as React.CSSProperties}
+              >
+                <button
+                  onClick={() => setSelectedProjectFilter(null)}
+                  style={{
+                    flexShrink: 0,
+                    padding: "3px 10px",
+                    borderRadius: 20,
+                    border: `1px solid ${selectedProjectFilter === null ? "var(--accent)" : "var(--border)"}`,
+                    background: selectedProjectFilter === null ? "var(--accent-muted, rgba(99,102,241,0.15))" : "transparent",
+                    color: selectedProjectFilter === null ? "var(--accent)" : "var(--text-muted)",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  All
+                </button>
+                {visibleProjects.map((p) => {
+                  const name = p.repoPath.split("/").pop() || p.repoPath;
+                  const active = selectedProjectFilter === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => setSelectedProjectFilter(active ? null : p.id)}
+                      title={p.repoPath}
+                      style={{
+                        flexShrink: 0,
+                        maxWidth: 100,
+                        padding: "3px 10px",
+                        borderRadius: 20,
+                        border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+                        background: active ? "var(--accent-muted, rgba(99,102,241,0.15))" : "transparent",
+                        color: active ? "var(--accent)" : "var(--text-muted)",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      {name}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
         <div className="task-list">
           {archivedView ? (
@@ -241,7 +314,9 @@ export default function AppSidebar({
                 <p>No archived sessions.</p>
               </div>
             ) : (
-              archivedSessions.map((session) => {
+              archivedSessions
+              .filter((s) => !selectedProjectFilter || s.projectId === selectedProjectFilter)
+              .map((session) => {
                 const project = projects.find((p) => p.id === session.projectId);
                 const projectName = project ? project.repoPath.split("/").pop() || project.repoPath : "";
                 const isSwiping = swipe?.id === session.id;
@@ -299,7 +374,9 @@ export default function AppSidebar({
                 <p>No sessions yet.<br />Start by creating a new session.</p>
               </div>
             ) : (
-              sortedSessions.map((session, index) => {
+              sortedSessions
+              .filter((s) => !selectedProjectFilter || s.projectId === selectedProjectFilter)
+              .map((session, index) => {
                 const project = projects.find((p) => p.id === session.projectId);
                 const projectName = project ? project.repoPath.split("/").pop() || project.repoPath : "";
                 const runner = runners.find((r) => r.id === session.runnerId);
