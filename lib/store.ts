@@ -622,9 +622,7 @@ export async function archiveSession(id: string, manual = false): Promise<void> 
   const sessionDir = getSessionDir(id);
   await ensureDir(ARCHIVED_SESSIONS_DIR);
   await fs.rename(sessionDir, path.join(ARCHIVED_SESSIONS_DIR, id));
-  if (manual) {
-    await updateSession(id, { archivedManually: true });
-  }
+  await updateSession(id, { pinnedAt: undefined, ...(manual ? { archivedManually: true } : {}) });
 }
 
 export async function unarchiveSession(id: string): Promise<void> {
