@@ -1,19 +1,26 @@
 import { useState, useEffect } from "react";
 
-export function useFileSystem(runnerId: string) {
+export function useFileSystem(defaultRunnerId: string) {
   const [fsModalOpen, setFsModalOpen] = useState(false);
+  const [fsRunnerId, setFsRunnerId] = useState(defaultRunnerId);
   const [fsCurrentPath, setFsCurrentPath] = useState("/");
   const [fsDirectories, setFsDirectories] = useState<{ name: string; path: string }[]>([]);
   const [fsEntries, setFsEntries] = useState<{ name: string; path: string; isDir: boolean }[]>([]);
   const [fsParentPath, setFsParentPath] = useState<string | null>(null);
   const [fsLoading, setFsLoading] = useState(false);
 
+  const openModal = (runnerId: string, path: string) => {
+    setFsRunnerId(runnerId);
+    setFsCurrentPath(path);
+    setFsModalOpen(true);
+  };
+
   useEffect(() => {
-    if (!fsModalOpen || !runnerId) return;
+    if (!fsModalOpen || !fsRunnerId) return;
 
     setFsLoading(true);
     fetch(
-      `/api/fs?runner=${encodeURIComponent(runnerId)}&path=${encodeURIComponent(fsCurrentPath)}`,
+      `/api/fs?runner=${encodeURIComponent(fsRunnerId)}&path=${encodeURIComponent(fsCurrentPath)}`,
     )
       .then((r) => {
         if (!r.ok) throw new Error("Failed to load directory items");
@@ -36,10 +43,10 @@ export function useFileSystem(runnerId: string) {
       .finally(() => {
         setFsLoading(false);
       });
-  }, [fsCurrentPath, fsModalOpen, runnerId]);
+  }, [fsCurrentPath, fsModalOpen, fsRunnerId]);
 
   return {
-    fsModalOpen, setFsModalOpen,
+    fsModalOpen, setFsModalOpen, openModal,
     fsCurrentPath, setFsCurrentPath,
     fsDirectories,
     fsEntries, setFsEntries,

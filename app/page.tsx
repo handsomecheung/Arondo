@@ -190,6 +190,7 @@ export default function HomePage() {
 
   const {
     fsModalOpen: chatFsModalOpen, setFsModalOpen: setChatFsModalOpen,
+    openModal: openChatFsModal,
     fsCurrentPath: chatFsCurrentPath, setFsCurrentPath: setChatFsCurrentPath,
     fsEntries: chatFsEntries, fsParentPath: chatFsParentPath, fsLoading: chatFsLoading,
   } = useFileSystem(runnerId);
@@ -808,10 +809,9 @@ export default function HomePage() {
     onDeleteSession: handleDeleteSession,
     onRenameSession: (id, newName) => handleRenameSession(id, newName),
     onTriggerFsModal: () => {
-      if (selectedSession?.repoPath) {
-        setChatFsCurrentPath(selectedSession.repoPath);
-      }
-      setChatFsModalOpen(true);
+      const sessionRunnerId = selectedSession?.runnerId || runnerId;
+      const path = selectedSession?.repoPath || "/";
+      openChatFsModal(sessionRunnerId, path);
     },
   });
 
