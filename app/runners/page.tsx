@@ -794,9 +794,9 @@ export default function RunnersPage() {
                                       }}
                                     >
                                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                                        <div>
+                                        <div style={{ minWidth: 0 }}>
                                           <h4 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{folderName}</h4>
-                                          <code style={{ fontSize: 11, color: "var(--text-muted)" }}>{project.repoPath}</code>
+                                          <code style={{ fontSize: 11, color: "var(--text-muted)", wordBreak: "break-all" }}>{project.repoPath}</code>
                                         </div>
                                       </div>
                                       <div style={{ display: "flex", gap: 16 }}>
