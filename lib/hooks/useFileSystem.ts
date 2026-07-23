@@ -47,6 +47,7 @@ export function useFileSystem(defaultRunnerId: string) {
 
   return {
     fsModalOpen, setFsModalOpen, openModal,
+    fsRunnerId, setFsRunnerId,
     fsCurrentPath, setFsCurrentPath,
     fsDirectories,
     fsEntries, setFsEntries,

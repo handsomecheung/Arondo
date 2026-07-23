@@ -71,6 +71,7 @@ interface SessionViewProps {
   onSetAgentDropdownOpen: (v: boolean) => void;
   onSetFsCurrentPath: (path: string) => void;
   onSetFsModalOpen: (v: boolean) => void;
+  onSetFsRunnerId: (id: string) => void;
   ws: WebSocket | null;
   onViewLog: (msgId: string) => void;
   onShowCommand: (cmd: string) => void;
@@ -160,6 +161,7 @@ export default function SessionView({
   onSetAgentDropdownOpen,
   onSetFsCurrentPath,
   onSetFsModalOpen,
+  onSetFsRunnerId,
   ws,
   onViewLog,
   onShowCommand,
@@ -973,6 +975,7 @@ export default function SessionView({
                 onClick={() => {
                   if (!runnerId) return;
                   const startingPath = repoPath.trim() || "/";
+                  onSetFsRunnerId(runnerId);
                   onSetFsCurrentPath(startingPath);
                   onSetFsModalOpen(true);
                 }}

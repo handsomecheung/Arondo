@@ -183,6 +183,7 @@ export default function HomePage() {
 
   const {
     fsModalOpen, setFsModalOpen,
+    setFsRunnerId,
     fsCurrentPath, setFsCurrentPath,
     fsDirectories, fsParentPath, fsLoading,
   } = useFileSystem(runnerId);
@@ -1354,6 +1355,7 @@ export default function HomePage() {
             onSetAgentDropdownOpen={setAgentDropdownOpen}
             onSetFsCurrentPath={setFsCurrentPath}
             onSetFsModalOpen={setFsModalOpen}
+            onSetFsRunnerId={setFsRunnerId}
             ws={wsInstance}
             onViewLog={(msgId) => { setActiveLogMsgId(msgId); setLogModalOpen(true); }}
             onShowCommand={(cmd) => setCommandModalText(cmd)}
