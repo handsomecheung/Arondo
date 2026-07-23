@@ -34,7 +34,14 @@ export function ClientInit() {
       };
     }
 
-    // 2. Perform authentication check
+    // 2. Register service worker (required by Chrome on Android for full PWA installability)
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch((err) => {
+        console.error("Service worker registration failed:", err);
+      });
+    }
+
+    // 3. Perform authentication check
     if (pathname === "/login") {
       return; // Do not check auth on the login page itself
     }
@@ -62,7 +69,7 @@ export function ClientInit() {
 
     checkToken();
 
-    // 3. Global keyboard reload shortcut for PWA/Standalone app
+    // 4. Global keyboard reload shortcut for PWA/Standalone app
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
         e.key === "F5" ||
