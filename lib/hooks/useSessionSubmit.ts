@@ -182,12 +182,13 @@ export function useSessionSubmit({
   const queueFollowupMessage = useCallback(async (originalMessage: string, agentMessage?: string) => {
     if (!selectedSessionId) return;
     try {
-      const res = await fetch("/api/scheduled-tasks", {
+      const res = await fetch(`/api/sessions/${selectedSessionId}/todo-messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          trigger: { kind: "afterSession", sessionId: selectedSessionId },
-          action: { kind: "sendMessage", sessionId: selectedSessionId, message: originalMessage, prompt: agentMessage },
+          message: originalMessage,
+          prompt: agentMessage,
+          trigger: { kind: "afterSession" },
         }),
       });
       if (!res.ok) {

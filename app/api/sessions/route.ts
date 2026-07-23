@@ -1,6 +1,6 @@
 import path from "path";
 import { NextRequest, NextResponse } from "next/server";
-import { getSessions, getProjects, deleteSession, archiveSession, createSession, addScheduledTask, getSessionArchiveAgeMs } from "@/lib/store";
+import { getSessions, getProjects, deleteSession, archiveSession, createSession, addTodoMessage, getSession, getSessionArchiveAgeMs } from "@/lib/store";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken, getUuidByToken } from "@/lib/auth";
@@ -112,22 +112,23 @@ export async function POST(req: NextRequest) {
     const trimmedPrompt = prompt.trim();
     const trimmedMessage = message?.trim() || trimmedPrompt;
     const session = await createSession({
-      status: "draft",
-      prompt: trimmedMessage,
+      status: "idle",
+      prompt: "",
       name: name?.trim() || deriveSessionName(trimmedMessage, repoPath),
       agentType,
       repoPath,
       runnerId,
     });
-    if (draftTrigger !== "manual") {
-      await addScheduledTask({
-        trigger: { kind: "codebaseReady", runnerId, repoPath },
-        action: { kind: "sendMessage", sessionId: session.id, message: trimmedMessage, prompt: trimmedPrompt },
-        tokenUuid: getUuidByToken(token) || undefined,
-      });
-    }
-    eventBus.publish({ type: "session_updated", payload: session });
-    return NextResponse.json(session, { status: 201 });
+    const todoMessage = await addTodoMessage(session.id, {
+      content: trimmedMessage,
+      prompt: trimmedPrompt,
+      trigger: { kind: draftTrigger === "manual" ? "manual" : "codebaseReady" },
+      tokenUuid: getUuidByToken(token) || undefined,
+    });
+    const updated = (await getSession(session.id)) || session;
+    eventBus.publish({ type: "message_added", payload: todoMessage });
+    eventBus.publish({ type: "session_updated", payload: updated });
+    return NextResponse.json(updated, { status: 201 });
   }
 
   if (!force) {

@@ -84,10 +84,10 @@ app/
           route.ts      # POST: unarchive a session manually
         view/
           route.ts      # POST: mark session as viewed (updates lastViewedAt)
-        send-draft-now/
-          route.ts      # POST: send draft message immediately
-        draft-trigger/
-          route.ts      # POST: update auto/manual trigger mode for draft session
+        todo-messages/
+          route.ts      # POST: queue a new todo message on an existing session (e.g. afterSession follow-up)
+          [messageId]/
+            route.ts    # PATCH: cancel / send-now / change-trigger actions on a pending todo message
         diff/
           route.ts      # GET: generate and serve visual HTML diff via runner + diff2html
         log/
@@ -122,10 +122,8 @@ app/
       route.ts        # GET: list all tasks (active + retained)
       kill/
         route.ts        # POST: kill a running task by sessionId + messageId
-    scheduled-tasks/
-      route.ts          # GET: list scheduled tasks; POST: create scheduled task (triggers: at, afterSession, quotaAvailable, codebaseReady)
-      [id]/
-        route.ts        # DELETE: cancel/delete a scheduled task
+    todo-messages/
+      route.ts          # GET: flat list of every session's pending todo messages (read-time join, backs the Tasks dashboard "Upcoming" section)
     messages/route.ts   # GET: list messages for a session
     fs/route.ts         # GET: browse directories on a runner
     fs/infos/route.ts   # POST: batch check path existence and git diff status on the runner (used for markdown file link verification and inline diff triggering)
@@ -155,7 +153,7 @@ lib/
   runner-server.ts      # WebSocket handler for /runner endpoint (registration, heartbeat)
   ws-server.ts          # WebSocket handler for /ws endpoint: event bus broadcast + PTY I/O + shell PTY bridging
   project-readiness.ts  # Utility to check project readiness (uncommitted changes, running agents)
-  scheduler.ts          # Scheduler engine for managing at, afterSession, quotaAvailable, and codebaseReady tasks
+  scheduler.ts          # Polls sessions' pending "user-todo" messages and dispatches them once their trigger (at, afterSession, quotaAvailable, codebaseReady) is satisfied
   project-actions.ts    # Extracted action helpers for executing project-scoped scripts
   session-actions.ts    # Extracted action helpers for processing session messages and running agents
   agents/
@@ -366,7 +364,7 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **Automated Data Lifecycle**: Automatically purges orphan sessions or projects on load if their parent references (e.g. project or runner) no longer exist.
 - **@ Path Selector Modal & File Upload**: Typing `@` in the chat textarea opens a file and directory selector modal to easily select a path and insert its relative path into the input field. The chat input also supports direct file uploads; uploaded files are sent to the runner's temporary directory via WebSocket `fs.upload`, and the resolved path is appended to the agent prompt automatically. Navigation ("Go Up") is allowed past the project root, with an "(outside project)" label shown once the current path leaves the project directory.
 - **File Browser with Syntax Highlighting**: A Remote File Browser can be opened from the session's three-dot menu, featuring file previews with code syntax highlighting (loaded in 64KB chunks on scroll to support files of any size) and a word wrap toggle option.
-- **Scheduled Tasks, Auto-Queue Follow-ups & Quota Retry**: Users can schedule project-scoped scripts to run at a future fixed time. If the agent is currently running when a user sends a follow-up, the message is automatically queued as a scheduled task (`afterSession` trigger) and executed sequentially once the active task finishes. If the agent terminates due to quota limits, a `quotaAvailable` task is scheduled to automatically retry using the last user prompt once the quota becomes available.
+- **Todo Messages (Draft / Pending / Auto-Queue Follow-ups / Quota Retry)**: "Send this message later" is modeled as a single concept — a `user-todo` chat message (`Message.type === "user-todo"`) carrying a `todoStatus` and `todoTrigger` (`manual`, `codebaseReady`, `afterSession`, `quotaAvailable`, or `at`), rendered in the timeline as `UserTodoMessageCard` with a three-dot menu (Cancel / Send Now / Change Trigger). `Session.pendingTodoMessageIds`/`pendingTodoTrigger` are a denormalized cache (source of truth is the message) letting the sidebar/composer label a session "draft"/"pending" without reading `messages.json`. `lib/scheduler.ts` polls sessions with pending todos every 30s (plus an immediate event-bus fast path on `session_updated`) and evaluates each todo's trigger: `manual` never auto-fires; `codebaseReady` fires once no agent is running and the working tree is clean for that runner+repoPath; `afterSession` fires once the owning session leaves `running`/`script-running`; `quotaAvailable` fires once agent quota frees up; `at` fires at a fixed timestamp. A "Draft" session (manual send) and a "Pending" session (auto-send once ready) are both created via `POST /api/sessions` with `isDraft`/`draftTrigger`, which creates an idle session plus one `user-todo` message — there's no separate `"draft"` session status. Quota-exhausted runs and follow-ups queued behind a running agent add a `user-todo` message directly onto the existing session (`POST /api/sessions/[id]/todo-messages`) instead of a global scheduled-tasks table.
 - **Diff View File Collapse/Expand**: The visual HTML diff viewer supports collapsing and expanding individual changed files dynamically, enhancing diff readability.
 - **Unread Session Completion Indicator**: Automatically tracks when background running sessions complete (`done` or `error`). It compares the session's `completedAt` timestamp with the user's `lastViewedAt` timestamp (updated via the `/api/sessions/[id]/view` endpoint). If a session has unviewed completions, the UI displays a colored dot in the sidebar (green for success, red for error) and an unread count badge on the mobile navigation menu.
 

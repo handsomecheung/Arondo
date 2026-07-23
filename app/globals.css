@@ -1508,6 +1508,11 @@ body {
   text-overflow: ellipsis;
 }
 
+.user-todo-message-card .exec-card-status {
+  padding: 0 12px 8px;
+  color: var(--text-secondary);
+}
+
 .exec-card-running .exec-card-status {
   color: var(--accent);
   animation: badge-pulse 1.5s infinite;

@@ -184,6 +184,13 @@ export function useWebSocket({
               }
             }
           }
+
+          if (event.type === "message:updated") {
+            const msg = event.payload as Message;
+            if (msg.sessionId === currentSelectedSessionId) {
+              setMessages((prev) => prev.map((m) => (m.id === msg.id ? msg : m)));
+            }
+          }
         } catch {
           /* ignore parse errors */
         }

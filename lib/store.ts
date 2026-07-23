@@ -8,7 +8,6 @@ const CONFIG_DIR = getConfigDir();
 const SESSIONS_DIR = path.join(CONFIG_DIR, "sessions");
 const ARCHIVED_SESSIONS_DIR = path.join(CONFIG_DIR, "archived", "sessions");
 const PROJECTS_DIR = path.join(CONFIG_DIR, "projects");
-const SCHEDULED_TASKS_FILE = path.join(CONFIG_DIR, "scheduled-tasks.json");
 const SETTINGS_FILE = path.join(CONFIG_DIR, "settings.json");
 
 const DEFAULT_SESSION_ARCHIVE_DAYS = 7;
@@ -19,7 +18,15 @@ export interface AppSettings {
   sessionArchiveDays?: number;
 }
 
-export type SessionStatus = "draft" | "idle" | "running" | "script-running" | "done" | "error";
+export type SessionStatus = "idle" | "running" | "script-running" | "done" | "error";
+
+export type TodoTriggerKind = "manual" | "codebaseReady" | "afterSession" | "quotaAvailable" | "at";
+
+export interface TodoTrigger {
+  kind: TodoTriggerKind;
+  timestamp?: number; // "at" only
+  agentType?: string; // "quotaAvailable" only
+}
 
 export interface Project {
   id: string;
@@ -56,6 +63,13 @@ export interface Session {
   // ISO timestamp of the most recent transition to status "done"/"error".
   // Set automatically by updateSession(), never bumped by unrelated patches.
   completedAt?: string;
+  // Ids of this session's messages currently todoStatus:"pending". Pure
+  // cache/index — the message itself is the source of truth. Maintained by
+  // addTodoMessage()/resolveTodoMessage()/changeTodoTrigger().
+  pendingTodoMessageIds?: string[];
+  // Denormalized kind of the (first) pending todo, so the sidebar/composer
+  // can label Draft/Pending without reading messages.json.
+  pendingTodoTrigger?: TodoTriggerKind;
 }
 
 export type MessageType =
@@ -66,7 +80,10 @@ export type MessageType =
   | "script-run"
   | "script-return"
   | "system-info"
-  | "system-error";
+  | "system-error"
+  | "user-todo";
+
+export type TodoStatus = "pending" | "triggered" | "done" | "failed" | "cancelled" | "expired";
 
 export interface Message {
   id: string;
@@ -86,6 +103,11 @@ export interface Message {
   resolvedAgentType?: string;
   prompt?: string;
   tokenUuid?: string;
+  // "user-todo" messages only:
+  todoStatus?: TodoStatus;
+  todoTrigger?: TodoTrigger;
+  todoResultMessageId?: string;
+  todoError?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -524,93 +546,69 @@ export async function getSessionDiffs(sessionId: string, messageId: string, proj
   }
 }
 
-// ─── Scheduled Tasks ────────────────────────────────────────────────────────
+// ─── Todo Messages ──────────────────────────────────────────────────────────
+//
+// A "todo" message is a chat message that hasn't been dispatched yet — it
+// carries a trigger describing when it should fire. This replaces the old
+// global scheduled-tasks.json: draft/pending sessions, quota-exhausted
+// auto-retry, and follow-ups queued behind a running agent are all just
+// "user-todo" messages with a different `todoTrigger.kind`.
+//
+// `Session.pendingTodoMessageIds`/`pendingTodoTrigger` are a pure cache/index
+// over this — always kept in sync here so callers never touch them directly.
 
-export type ScheduledTaskStatus = "pending" | "triggered" | "done" | "failed" | "cancelled" | "expired";
-
-export type ScheduledTaskTrigger =
-  | { kind: "at"; timestamp: number }
-  | { kind: "afterSession"; sessionId: string }
-  | { kind: "quotaAvailable"; agentType?: string }
-  | { kind: "codebaseReady"; runnerId: string; repoPath: string };
-
-export type ScheduledTaskAction =
-  | { kind: "sendMessage"; sessionId: string; message: string; prompt?: string };
-
-export interface ScheduledTask {
-  id: string;
-  createdAt: number;
-  status: ScheduledTaskStatus;
-  trigger: ScheduledTaskTrigger;
-  action: ScheduledTaskAction;
-  label?: string;
-  tokenUuid?: string;
-  lastError?: string;
-  resultMessageId?: string;
-}
-
-async function getScheduledTasksRaw(): Promise<ScheduledTask[]> {
-  return readJson<ScheduledTask[]>(SCHEDULED_TASKS_FILE, []);
-}
-
-async function writeScheduledTasks(tasks: ScheduledTask[]): Promise<void> {
-  await writeJson(SCHEDULED_TASKS_FILE, tasks);
-}
-
-export async function getScheduledTasks(): Promise<ScheduledTask[]> {
-  const tasks = await getScheduledTasksRaw();
-  return tasks.sort((a, b) => b.createdAt - a.createdAt);
-}
-
-export async function getScheduledTask(id: string): Promise<ScheduledTask | undefined> {
-  const tasks = await getScheduledTasksRaw();
-  return tasks.find((t) => t.id === id);
-}
-
-export async function addScheduledTask(
-  data: Omit<ScheduledTask, "id" | "createdAt" | "status">
-): Promise<ScheduledTask> {
-  return withFileLock(SCHEDULED_TASKS_FILE, async () => {
-    const tasks = await getScheduledTasksRaw();
-    const task: ScheduledTask = {
-      ...data,
-      id: crypto.randomUUID(),
-      createdAt: Date.now(),
-      status: "pending",
-    };
-    tasks.push(task);
-    await writeScheduledTasks(tasks);
-    return task;
+async function syncPendingTodoPointer(sessionId: string): Promise<void> {
+  const session = await getSession(sessionId);
+  if (!session) return;
+  const messages = await getMessages(sessionId);
+  const pending = messages.filter((m) => m.type === "user-todo" && m.todoStatus === "pending");
+  await updateSession(sessionId, {
+    pendingTodoMessageIds: pending.map((m) => m.id),
+    pendingTodoTrigger: pending[0]?.todoTrigger?.kind,
   });
 }
 
-export async function updateScheduledTask(
-  id: string,
-  patch: Partial<Omit<ScheduledTask, "id" | "createdAt">>
-): Promise<ScheduledTask | undefined> {
-  return withFileLock(SCHEDULED_TASKS_FILE, async () => {
-    const tasks = await getScheduledTasksRaw();
-    const index = tasks.findIndex((t) => t.id === id);
-    if (index === -1) return undefined;
-    const updated: ScheduledTask = { ...tasks[index], ...patch };
-    tasks[index] = updated;
-    await writeScheduledTasks(tasks);
-    return updated;
+export async function addTodoMessage(
+  sessionId: string,
+  data: { content: string; prompt?: string; trigger: TodoTrigger; tokenUuid?: string }
+): Promise<Message> {
+  const message = await addMessage({
+    sessionId,
+    role: "user",
+    content: data.content,
+    prompt: data.prompt,
+    type: "user-todo",
+    todoStatus: "pending",
+    todoTrigger: data.trigger,
+    tokenUuid: data.tokenUuid,
   });
+  await syncPendingTodoPointer(sessionId);
+  return message;
 }
 
-export async function removeScheduledTasksForSession(sessionId: string): Promise<void> {
-  return withFileLock(SCHEDULED_TASKS_FILE, async () => {
-    const tasks = await getScheduledTasksRaw();
-    const filtered = tasks.filter((t) => {
-      if (t.trigger.kind === "afterSession" && t.trigger.sessionId === sessionId) return false;
-      if (t.action.kind === "sendMessage" && t.action.sessionId === sessionId) return false;
-      return true;
-    });
-    if (filtered.length !== tasks.length) {
-      await writeScheduledTasks(filtered);
-    }
-  });
+export async function resolveTodoMessage(
+  sessionId: string,
+  messageId: string,
+  patch: { todoStatus: TodoStatus; todoResultMessageId?: string; todoError?: string }
+): Promise<Message | undefined> {
+  const updated = await updateMessage(sessionId, messageId, patch);
+  if (updated) await syncPendingTodoPointer(sessionId);
+  return updated;
+}
+
+export async function changeTodoTrigger(
+  sessionId: string,
+  messageId: string,
+  trigger: TodoTrigger
+): Promise<Message | undefined> {
+  const updated = await updateMessage(sessionId, messageId, { todoTrigger: trigger });
+  if (updated) await syncPendingTodoPointer(sessionId);
+  return updated;
+}
+
+export async function getPendingTodoMessages(sessionId: string): Promise<Message[]> {
+  const messages = await getMessages(sessionId);
+  return messages.filter((m) => m.type === "user-todo" && m.todoStatus === "pending");
 }
 
 export async function deleteSession(id: string): Promise<void> {

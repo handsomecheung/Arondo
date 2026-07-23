@@ -1,4 +1,12 @@
-export type SessionStatus = "draft" | "idle" | "running" | "script-running" | "done" | "error";
+export type SessionStatus = "idle" | "running" | "script-running" | "done" | "error";
+
+export type TodoTriggerKind = "manual" | "codebaseReady" | "afterSession" | "quotaAvailable" | "at";
+
+export interface TodoTrigger {
+  kind: TodoTriggerKind;
+  timestamp?: number;
+  agentType?: string;
+}
 
 export interface Session {
   id: string;
@@ -17,6 +25,8 @@ export interface Session {
   pinnedAt?: string;
   lastViewedAt?: string;
   completedAt?: string;
+  pendingTodoMessageIds?: string[];
+  pendingTodoTrigger?: TodoTriggerKind;
 }
 
 export interface Project {
@@ -55,6 +65,10 @@ export interface Message {
   resolvedAgentType?: string;
   prompt?: string;
   createdAt: string;
+  todoStatus?: "pending" | "triggered" | "done" | "failed" | "cancelled" | "expired";
+  todoTrigger?: TodoTrigger;
+  todoResultMessageId?: string;
+  todoError?: string;
 }
 
 export interface TaskItem {

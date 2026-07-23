@@ -97,7 +97,6 @@ export default function HomePage() {
   const [isNewSession, setIsNewSession] = useState(false);
   const [isNewDraft, setIsNewDraft] = useState(false);
   const [draftTrigger, setDraftTrigger] = useState<"manual" | "codebaseReady">("codebaseReady");
-  const [autoDraftSessionIds, setAutoDraftSessionIds] = useState<Set<string>>(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [archivedView, setArchivedView] = useState(false);
   const [archivedSessions, setArchivedSessions] = useState<Session[]>([]);
@@ -842,60 +841,55 @@ export default function HomePage() {
     setMenuOpen(false);
   };
 
-  const handleSendDraftNow = async () => {
-    if (!selectedSessionId) return;
-    try {
-      const res = await fetch(`/api/sessions/${selectedSessionId}/send-draft-now`, { method: "POST" });
-      if (!res.ok) {
-        const data = await res.json();
-        setApiError({ title: "Send Draft Error", message: data.error || "Failed to send draft" });
-        return;
+  // The pending todo message backing the current draft/pending session (if any).
+  const pendingDraftTodoId = useMemo(
+    () =>
+      messages.find(
+        (m) =>
+          m.type === "user-todo" &&
+          m.todoStatus === "pending" &&
+          (m.todoTrigger?.kind === "manual" || m.todoTrigger?.kind === "codebaseReady"),
+      )?.id,
+    [messages],
+  );
+
+  const handleTodoAction = useCallback(
+    async (messageId: string, body: { action: "cancel" | "sendNow" | "changeTrigger"; trigger?: { kind: string } }) => {
+      if (!selectedSessionId) return;
+      try {
+        const res = await fetch(`/api/sessions/${selectedSessionId}/todo-messages/${messageId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          setApiError({ title: "Todo Message Error", message: data.error || "Failed to update todo message" });
+        }
+      } catch (err: any) {
+        console.error(err);
+        setApiError({ title: "Todo Message Error", message: err.message || "Failed to update todo message" });
       }
-      const updated: Session = await res.json();
-      setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-    } catch (err: any) {
-      console.error(err);
-      setApiError({ title: "Send Draft Error", message: err.message || "Failed to send draft" });
-    }
-  };
+    },
+    [selectedSessionId, setApiError],
+  );
 
-  // Draft sessions with a pending codebaseReady scheduled task will send
-  // automatically ("Pending"); the rest are manual-only ("Draft").
-  const loadAutoDraftSessionIds = useCallback(() => {
-    fetch("/api/scheduled-tasks")
-      .then((r) => r.json())
-      .then((tasks: any[]) => {
-        const ids = new Set<string>(
-          tasks
-            .filter((t) => t.status === "pending" && t.trigger?.kind === "codebaseReady")
-            .map((t) => t.action.sessionId as string),
-        );
-        setAutoDraftSessionIds(ids);
-      })
-      .catch(console.error);
-  }, []);
+  const handleCancelTodo = useCallback((messageId: string) => handleTodoAction(messageId, { action: "cancel" }), [handleTodoAction]);
+  const handleSendTodoNow = useCallback((messageId: string) => handleTodoAction(messageId, { action: "sendNow" }), [handleTodoAction]);
+  const handleChangeTodoTrigger = useCallback(
+    (messageId: string, trigger: { kind: string }) => handleTodoAction(messageId, { action: "changeTrigger", trigger }),
+    [handleTodoAction],
+  );
 
-  useEffect(() => {
-    loadAutoDraftSessionIds();
-    const interval = setInterval(loadAutoDraftSessionIds, 15000);
-    return () => clearInterval(interval);
-  }, [loadAutoDraftSessionIds, sessions.length]);
+  const handleSendDraftNow = useCallback(() => {
+    if (pendingDraftTodoId) handleSendTodoNow(pendingDraftTodoId);
+  }, [pendingDraftTodoId, handleSendTodoNow]);
 
-  const handleToggleDraftTrigger = async () => {
-    if (!selectedSessionId) return;
-    try {
-      const res = await fetch(`/api/sessions/${selectedSessionId}/draft-trigger`, { method: "POST" });
-      if (!res.ok) {
-        const data = await res.json();
-        setApiError({ title: "Toggle Draft Send Error", message: data.error || "Failed to switch send mode" });
-        return;
-      }
-      loadAutoDraftSessionIds();
-    } catch (err: any) {
-      console.error(err);
-      setApiError({ title: "Toggle Draft Send Error", message: err.message || "Failed to switch send mode" });
-    }
-  };
+  const handleToggleDraftTrigger = useCallback(() => {
+    if (!pendingDraftTodoId) return;
+    const current = messages.find((m) => m.id === pendingDraftTodoId)?.todoTrigger?.kind;
+    handleChangeTodoTrigger(pendingDraftTodoId, { kind: current === "codebaseReady" ? "manual" : "codebaseReady" });
+  }, [pendingDraftTodoId, messages, handleChangeTodoTrigger]);
 
   const handleStopExecCard = async (msgId: string) => {
     if (!selectedSessionId) return;
@@ -1057,7 +1051,8 @@ export default function HomePage() {
     return r ? r.connected : false;
   }, [runners, runnerId, selectedSession]);
 
-  const isDraftSession = selectedSession?.status === "draft";
+  const isDraftSession = !!pendingDraftTodoId;
+  const isDraftAutoSend = messages.find((m) => m.id === pendingDraftTodoId)?.todoTrigger?.kind === "codebaseReady";
 
   const canSubmit =
     selectedRunnerConnected &&
@@ -1210,7 +1205,6 @@ export default function HomePage() {
         runners={runners}
         selectedSessionId={selectedSessionId}
         selectedProjectId={selectedProjectId}
-        autoDraftSessionIds={autoDraftSessionIds}
         onSelectSession={handleSelectSession}
         onSelectProject={handleSelectProject}
         onNewSession={handleNewSession}
@@ -1329,7 +1323,7 @@ export default function HomePage() {
             isArchived={isArchivedSession}
             onUnarchiveSession={() => selectedSessionId && handleUnarchiveSession(selectedSessionId)}
             isDraftSession={isDraftSession}
-            isDraftAutoSend={!!selectedSessionId && autoDraftSessionIds.has(selectedSessionId)}
+            isDraftAutoSend={isDraftAutoSend}
             draftTrigger={draftTrigger}
             canSubmit={canSubmit}
             menuOpen={menuOpen}
@@ -1372,6 +1366,9 @@ export default function HomePage() {
             onTogglePinSession={handleTogglePinSession}
             onSendDraftNow={handleSendDraftNow}
             onToggleDraftTrigger={handleToggleDraftTrigger}
+            onCancelTodo={handleCancelTodo}
+            onSendTodoNow={handleSendTodoNow}
+            onChangeTodoTrigger={handleChangeTodoTrigger}
             onPromptChange={handlePromptChange}
             onKeyDown={handleKeyDown}
             onRunScript={handleRunScript}

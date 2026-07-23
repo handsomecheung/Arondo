@@ -9,6 +9,7 @@ export interface SseEvent {
   type:
     | "session_updated"
     | "message_added"
+    | "message_updated"
     | "session_deleted"
     | "terminal_output"
     | "terminal_exit"

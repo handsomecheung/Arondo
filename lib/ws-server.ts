@@ -11,6 +11,7 @@ const pendingSpawns = new Map<string, Promise<any>>();
 const EVENT_TYPE_MAP: Record<string, string> = {
   session_updated: "session:updated",
   message_added: "message:added",
+  message_updated: "message:updated",
   session_deleted: "session:deleted",
   terminal_output: "terminal:output",
   terminal_exit: "terminal:exit",

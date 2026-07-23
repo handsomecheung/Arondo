@@ -1,10 +1,12 @@
 import { eventBus } from "./event-bus";
 import {
-  getScheduledTasks,
-  getScheduledTask,
-  updateScheduledTask,
+  getSessions,
   getSession,
-  type ScheduledTask,
+  getPendingTodoMessages,
+  resolveTodoMessage,
+  type Message,
+  type Session,
+  type TodoStatus,
 } from "./store";
 import { dispatchFollowupMessage } from "./session-actions";
 import { isQuotaAvailable } from "./autoselect";
@@ -13,36 +15,47 @@ import { getProjectReadiness } from "./project-readiness";
 const TICK_MS = 30_000;
 
 // Guards against the event-bus fast-path and the periodic tick racing to
-// dispatch the same task twice (single-process, but both paths are async).
+// dispatch the same todo message twice (single-process, but both paths are async).
 const dispatching = new Set<string>();
 
-export async function executeAction(task: ScheduledTask): Promise<void> {
-  if (dispatching.has(task.id)) return;
-  dispatching.add(task.id);
-  try {
-    // Re-read: another path may have already claimed/cancelled this task.
-    const fresh = await getScheduledTask(task.id);
-    if (!fresh || fresh.status !== "pending") return;
-    await updateScheduledTask(task.id, { status: "triggered" });
+async function resolveAndBroadcast(
+  sessionId: string,
+  messageId: string,
+  patch: { todoStatus: TodoStatus; todoResultMessageId?: string; todoError?: string },
+): Promise<void> {
+  const updated = await resolveTodoMessage(sessionId, messageId, patch);
+  if (updated) eventBus.publish({ type: "message_updated", payload: updated });
+  const session = await getSession(sessionId);
+  if (session) eventBus.publish({ type: "session_updated", payload: session });
+}
 
-    const result = await dispatchFollowupMessage(task.action.sessionId, task.action.message, {
-      prompt: task.action.prompt,
-      tokenUuid: task.tokenUuid,
+export async function executeAction(session: Session, todo: Message): Promise<void> {
+  if (dispatching.has(todo.id)) return;
+  dispatching.add(todo.id);
+  try {
+    // Re-read: another path may have already claimed/cancelled this todo.
+    const fresh = (await getPendingTodoMessages(session.id)).find((m) => m.id === todo.id);
+    if (!fresh) return;
+    await resolveAndBroadcast(session.id, todo.id, { todoStatus: "triggered" });
+
+    const result = await dispatchFollowupMessage(session.id, todo.content, {
+      prompt: todo.prompt,
+      tokenUuid: todo.tokenUuid,
     });
 
     if (result.ok) {
-      await updateScheduledTask(task.id, { status: "done", resultMessageId: (result as any).messageId });
+      await resolveAndBroadcast(session.id, todo.id, { todoStatus: "done", todoResultMessageId: (result as any).message?.id });
     } else if (result.status === 400 || result.status === 503) {
       // Transient (e.g. agent already running, runner briefly offline) — retry next tick.
-      await updateScheduledTask(task.id, { status: "pending", lastError: result.error });
+      await resolveAndBroadcast(session.id, todo.id, { todoStatus: "pending", todoError: result.error });
     } else {
-      await updateScheduledTask(task.id, { status: "failed", lastError: result.error });
+      await resolveAndBroadcast(session.id, todo.id, { todoStatus: "failed", todoError: result.error });
     }
   } catch (err: any) {
-    console.error(`[scheduler] task ${task.id} failed:`, err);
-    await updateScheduledTask(task.id, { status: "failed", lastError: err?.message || String(err) });
+    console.error(`[scheduler] todo ${todo.id} failed:`, err);
+    await resolveAndBroadcast(session.id, todo.id, { todoStatus: "failed", todoError: err?.message || String(err) });
   } finally {
-    dispatching.delete(task.id);
+    dispatching.delete(todo.id);
   }
 }
 
@@ -53,78 +66,93 @@ async function isCodebaseReady(runnerId: string, repoPath: string): Promise<bool
   return !dirty && !busy;
 }
 
+async function evaluateTodo(session: Session, todo: Message): Promise<void> {
+  const trigger = todo.todoTrigger;
+  if (!trigger) return;
+  if (trigger.kind === "at") {
+    if (trigger.timestamp && trigger.timestamp <= Date.now()) await executeAction(session, todo);
+  } else if (trigger.kind === "afterSession") {
+    if (session.status !== "running" && session.status !== "script-running") await executeAction(session, todo);
+  } else if (trigger.kind === "quotaAvailable") {
+    if (await isQuotaAvailable(trigger.agentType as any)) await executeAction(session, todo);
+  } else if (trigger.kind === "codebaseReady") {
+    if (await isCodebaseReady(session.runnerId, session.repoPath)) await executeAction(session, todo);
+  }
+  // "manual" never auto-fires.
+}
+
 async function tick(): Promise<void> {
-  let tasks: ScheduledTask[];
+  let sessions: Session[];
   try {
-    tasks = await getScheduledTasks();
+    sessions = await getSessions();
   } catch (err) {
-    console.error("[scheduler] failed to read scheduled tasks:", err);
+    console.error("[scheduler] failed to read sessions:", err);
     return;
   }
 
-  // Oldest first, so drafts targeting the same codebase dispatch in FIFO
+  // Oldest first, so todos targeting the same codebase dispatch in FIFO
   // order instead of racing within the same tick.
-  tasks = [...tasks].sort((a, b) => a.createdAt - b.createdAt);
+  const candidates = sessions
+    .filter((s) => s.pendingTodoMessageIds && s.pendingTodoMessageIds.length > 0)
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
-  const now = Date.now();
-  for (const task of tasks) {
-    if (task.status !== "pending") continue;
+  for (const session of candidates) {
     try {
-      if (task.trigger.kind === "at") {
-        if (task.trigger.timestamp <= now) await executeAction(task);
-      } else if (task.trigger.kind === "afterSession") {
-        const session = await getSession(task.trigger.sessionId);
-        if (!session) {
-          await updateScheduledTask(task.id, { status: "expired", lastError: "Session no longer exists" });
-        } else if (session.status !== "running") {
-          await executeAction(task);
-        }
-      } else if (task.trigger.kind === "quotaAvailable") {
-        if (await isQuotaAvailable(task.trigger.agentType as any)) await executeAction(task);
-      } else if (task.trigger.kind === "codebaseReady") {
-        if (await isCodebaseReady(task.trigger.runnerId, task.trigger.repoPath)) await executeAction(task);
+      const todos = await getPendingTodoMessages(session.id);
+      for (const todo of todos) {
+        await evaluateTodo(session, todo);
       }
     } catch (err) {
-      console.error(`[scheduler] error evaluating task ${task.id}:`, err);
+      console.error(`[scheduler] error evaluating session ${session.id}:`, err);
     }
   }
 }
 
 // Fast-path: react immediately when a session's agent stops running, instead
-// of waiting up to TICK_MS for an "afterSession" follow-up or a draft's
-// "codebaseReady" trigger to fire.
-function onSessionUpdated(session: { id: string; status: string; runnerId?: string; repoPath?: string }): void {
+// of waiting up to TICK_MS for an "afterSession" follow-up or another
+// session's "codebaseReady" todo to fire.
+function onSessionUpdated(session: Session): void {
   if (session.status === "running" || session.status === "script-running") return;
-  getScheduledTasks()
-    .then(async (tasks) => {
-      const followup = tasks.find(
-        (t) => t.status === "pending" && t.trigger.kind === "afterSession" && t.trigger.sessionId === session.id,
-      );
-      if (followup) {
-        await executeAction(followup).catch((err) => console.error("[scheduler] fast-path dispatch failed:", err));
-      }
 
-      if (session.runnerId && session.repoPath) {
-        const drafts = tasks
-          .filter(
-            (t) =>
-              t.status === "pending" &&
-              t.trigger.kind === "codebaseReady" &&
-              t.trigger.runnerId === session.runnerId &&
-              t.trigger.repoPath === session.repoPath,
-          )
-          // Oldest pending draft first, so drafts targeting the same codebase
-          // dispatch in FIFO order instead of newest-first (tasks come back
-          // newest-first from getScheduledTasks()).
-          .sort((a, b) => a.createdAt - b.createdAt);
-        for (const draft of drafts) {
-          if (await isCodebaseReady(session.runnerId!, session.repoPath!)) {
-            await executeAction(draft).catch((err) => console.error("[scheduler] fast-path dispatch failed:", err));
-          }
+  getPendingTodoMessages(session.id)
+    .then(async (todos) => {
+      const followup = todos.find((t) => t.todoTrigger?.kind === "afterSession");
+      if (followup) {
+        await executeAction(session, followup).catch((err) =>
+          console.error("[scheduler] fast-path dispatch failed:", err),
+        );
+      }
+    })
+    .catch((err) => console.error("[scheduler] fast-path afterSession lookup failed:", err));
+
+  if (!session.runnerId || !session.repoPath) return;
+
+  getSessions()
+    .then(async (sessions) => {
+      const targets = sessions
+        .filter(
+          (s) =>
+            s.id !== session.id &&
+            s.runnerId === session.runnerId &&
+            s.repoPath === session.repoPath &&
+            s.pendingTodoMessageIds &&
+            s.pendingTodoMessageIds.length > 0,
+        )
+        // Oldest pending todo first, so todos targeting the same codebase
+        // dispatch in FIFO order instead of newest-first.
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+      for (const target of targets) {
+        const todos = await getPendingTodoMessages(target.id);
+        const draft = todos.find((t) => t.todoTrigger?.kind === "codebaseReady");
+        if (draft && (await isCodebaseReady(target.runnerId, target.repoPath))) {
+          await executeAction(target, draft).catch((err) =>
+            console.error("[scheduler] fast-path dispatch failed:", err),
+          );
         }
       }
     })
-    .catch((err) => console.error("[scheduler] fast-path lookup failed:", err));
+    .catch((err) => console.error("[scheduler] fast-path codebaseReady lookup failed:", err));
 }
 
 export function startScheduler(): void {
@@ -134,7 +162,7 @@ export function startScheduler(): void {
 
   eventBus.subscribe((event) => {
     if (event.type === "session_updated" && event.payload?.id) {
-      onSessionUpdated(event.payload);
+      onSessionUpdated(event.payload as Session);
     }
   });
   setInterval(() => {

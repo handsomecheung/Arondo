@@ -5,10 +5,12 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import ScriptExecCard from "@/components/ScriptExecCard";
 import AgentExecCard from "@/components/AgentExecCard";
+import UserTodoMessageCard from "@/components/UserTodoMessageCard";
 import {
-  IconArrowLeft, IconLogo, IconX, IconInbox, IconTerminal, IconCode, IconChevronDown, IconClock, IconRefresh,
+  IconArrowLeft, IconLogo, IconX, IconInbox, IconTerminal, IconCode, IconChevronDown, IconRefresh,
 } from "@/components/Icons";
 import { agentTypeLabel } from "@/lib/homeUtils";
+import type { TodoTrigger } from "@/types/home";
 
 const Terminal = dynamic(() => import("@/components/Terminal"), { ssr: false });
 
@@ -44,6 +46,9 @@ interface Message {
   type?: string;
   parentId?: string;
   createdAt: string;
+  todoStatus?: string;
+  todoTrigger?: TodoTrigger;
+  prompt?: string;
 }
 
 interface ServerTask {
@@ -70,7 +75,7 @@ interface TaskItem {
   name: string;
   sessionId: string;
   sessionName: string;
-  status: "running" | "done" | "error" | "stopped";
+  status: "running" | "done" | "error" | "stopped" | "todo";
   createdAt: number;
   completedAt?: number;
   messageId?: string;
@@ -79,6 +84,25 @@ interface TaskItem {
   projectId?: string;
   prompt?: string;
   agentType?: string;
+  content?: string;
+  trigger?: TodoTrigger;
+}
+
+function todoMessageToTaskItem(
+  t: { id: string; sessionId: string; content: string; trigger: TodoTrigger; createdAt: string | number },
+  sessionName?: string,
+): TaskItem {
+  return {
+    id: t.id,
+    type: "agent",
+    name: `Todo: ${t.content}`,
+    sessionId: t.sessionId,
+    sessionName: sessionName || "",
+    status: "todo",
+    createdAt: typeof t.createdAt === "string" ? new Date(t.createdAt).getTime() : t.createdAt,
+    content: t.content,
+    trigger: t.trigger,
+  };
 }
 
 interface SessionGroup {
@@ -89,44 +113,6 @@ interface SessionGroup {
   latestTime: number;
   tasks: TaskItem[];
 }
-
-type ScheduledTaskTrigger =
-  | { kind: "at"; timestamp: number }
-  | { kind: "afterSession"; sessionId: string }
-  | { kind: "quotaAvailable"; agentType?: string }
-  | { kind: "codebaseReady"; runnerId: string; repoPath: string };
-
-type ScheduledTaskAction =
-  | { kind: "sendMessage"; sessionId: string; message: string; prompt?: string };
-
-interface ScheduledTask {
-  id: string;
-  createdAt: number;
-  status: "pending" | "triggered" | "done" | "failed" | "cancelled" | "expired";
-  trigger: ScheduledTaskTrigger;
-  action: ScheduledTaskAction;
-  label?: string;
-  lastError?: string;
-}
-
-function describeScheduledTask(
-  task: ScheduledTask,
-  sessionMap: Map<string, Session>,
-): string {
-  const actionText = `Send: "${task.action.message.slice(0, 60)}${task.action.message.length > 60 ? "…" : ""}"`;
-  const targetName = sessionMap.get(task.action.sessionId)?.name || sessionMap.get(task.action.sessionId)?.prompt || task.action.sessionId;
-
-  const triggerText =
-    task.trigger.kind === "at"
-      ? `at ${new Date(task.trigger.timestamp).toLocaleString()}`
-      : task.trigger.kind === "afterSession"
-        ? "after the current run finishes"
-        : task.trigger.kind === "codebaseReady"
-          ? "once no agent is running and the codebase is clean"
-          : `when ${task.trigger.agentType ? agentTypeLabel(task.trigger.agentType) : "any agent"} quota is available`;
-  return `${actionText}${targetName ? ` → ${targetName}` : ""} — ${triggerText}`;
-}
-
 
 function formatDuration(ms: number): string {
   if (ms < 0) return "0s";
@@ -150,7 +136,7 @@ export default function TasksPage() {
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [scheduledTasks, setScheduledTasks] = useState<ScheduledTask[]>([]);
+  const sessionsRef = useRef<Session[]>([]);
   const [groupBy, setGroupBy] = useState<"session" | "status">("session");
   const [filterType, setFilterType] = useState<"both" | "agent" | "script">("both");
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
@@ -190,6 +176,16 @@ export default function TasksPage() {
         }),
       );
 
+      let todoItems: TaskItem[] = [];
+      try {
+        const todoRes = await fetch("/api/todo-messages");
+        const todos: { id: string; sessionId: string; sessionName?: string; content: string; trigger: TodoTrigger; createdAt: string }[] =
+          await todoRes.json();
+        todoItems = todos.map((t) => todoMessageToTaskItem(t, t.sessionName || sessionMap.get(t.sessionId)?.name));
+      } catch {
+        // ignore
+      }
+
       const initTasks: TaskItem[] = serverTasks.map((t) => {
         const session = sessionMap.get(t.sessionId);
         let name: string;
@@ -226,26 +222,36 @@ export default function TasksPage() {
         };
       });
 
-      initTasks.sort((a, b) => {
-        if (a.status === "running" && b.status !== "running") return -1;
-        if (a.status !== "running" && b.status === "running") return 1;
+      const statusPriority = (s: TaskItem["status"]) => (s === "running" ? 0 : s === "todo" ? 1 : 2);
+      const allTasks = [...initTasks, ...todoItems];
+      allTasks.sort((a, b) => {
+        const pa = statusPriority(a.status);
+        const pb = statusPriority(b.status);
+        if (pa !== pb) return pa - pb;
         const aTime = a.completedAt || a.createdAt;
         const bTime = b.completedAt || b.createdAt;
         return bTime - aTime;
       });
 
-      setTaskQueue(initTasks);
+      setTaskQueue(allTasks);
     } catch {
       // ignore
     }
   }, []);
 
-  const loadScheduledTasks = useCallback(async () => {
+  // Refreshes only the "todo" slice of the task queue (pending draft/pending/
+  // queued-followup/quota-retry messages) — a lightweight fallback poll in
+  // case a websocket event was missed.
+  const loadTodoMessages = useCallback(async () => {
     try {
-      const res = await fetch("/api/scheduled-tasks");
-      const tasks: ScheduledTask[] = await res.json();
-      // Drafts (codebaseReady trigger) surface as sessions in the sidebar instead.
-      setScheduledTasks(tasks.filter((t) => t.status === "pending" && t.trigger.kind !== "codebaseReady"));
+      const res = await fetch("/api/todo-messages");
+      const items: { id: string; sessionId: string; sessionName?: string; content: string; trigger: TodoTrigger; createdAt: string }[] =
+        await res.json();
+      setTaskQueue((prev) => {
+        const nonTodo = prev.filter((t) => t.status !== "todo");
+        const todoItems = items.map((t) => todoMessageToTaskItem(t, t.sessionName || sessionsRef.current.find((s) => s.id === t.sessionId)?.name));
+        return [...todoItems, ...nonTodo];
+      });
     } catch {
       // ignore
     }
@@ -253,23 +259,38 @@ export default function TasksPage() {
 
   useEffect(() => {
     loadInitialTasks();
-    loadScheduledTasks();
-  }, [loadInitialTasks, loadScheduledTasks]);
+  }, [loadInitialTasks]);
 
   useEffect(() => {
-    const interval = setInterval(loadScheduledTasks, 20000);
-    return () => clearInterval(interval);
-  }, [loadScheduledTasks]);
+    sessionsRef.current = sessions;
+  }, [sessions]);
 
-  const handleCancelScheduledTask = async (id: string) => {
-    setScheduledTasks((prev) => prev.filter((t) => t.id !== id));
-    try {
-      await fetch(`/api/scheduled-tasks/${id}`, { method: "DELETE" });
-    } catch (err) {
-      console.error("Failed to cancel scheduled task:", err);
-      loadScheduledTasks();
-    }
-  };
+  useEffect(() => {
+    const interval = setInterval(loadTodoMessages, 20000);
+    return () => clearInterval(interval);
+  }, [loadTodoMessages]);
+
+  const handleTodoTaskAction = useCallback(
+    async (task: TaskItem, body: { action: "cancel" | "sendNow" | "changeTrigger"; trigger?: TodoTrigger }) => {
+      if (body.action === "cancel") {
+        setTaskQueue((prev) => prev.filter((t) => t.id !== task.id));
+      }
+      try {
+        const res = await fetch(`/api/sessions/${task.sessionId}/todo-messages/${task.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          loadTodoMessages();
+        }
+      } catch (err) {
+        console.error("Failed to update todo message:", err);
+        loadTodoMessages();
+      }
+    },
+    [loadTodoMessages],
+  );
 
   useEffect(() => {
     let ws: WebSocket;
@@ -355,6 +376,17 @@ export default function TasksPage() {
 
           if (event.type === "message:added") {
             const msg = event.payload as Message;
+            if (msg.type === "user-todo" && msg.todoStatus === "pending" && msg.todoTrigger) {
+              const trigger = msg.todoTrigger;
+              setTaskQueue((prev) => {
+                if (prev.some((t) => t.id === msg.id)) return prev;
+                const sessionName = sessionsRef.current.find((s) => s.id === msg.sessionId)?.name;
+                return [
+                  todoMessageToTaskItem({ id: msg.id, sessionId: msg.sessionId, content: msg.content, trigger, createdAt: msg.createdAt }, sessionName),
+                  ...prev,
+                ];
+              });
+            }
             if (msg.role === "system") {
               if (msg.type === "agent-run") {
                 setTaskQueue((prev) => {
@@ -416,6 +448,18 @@ export default function TasksPage() {
                   return prev;
                 });
               }
+            }
+          }
+
+          if (event.type === "message:updated") {
+            const msg = event.payload as Message;
+            if (msg.type === "user-todo") {
+              setTaskQueue((prev) => {
+                if (msg.todoStatus !== "pending") {
+                  return prev.filter((t) => t.id !== msg.id);
+                }
+                return prev.map((t) => (t.id === msg.id ? { ...t, trigger: msg.todoTrigger, content: msg.content, name: `Todo: ${msg.content}` } : t));
+              });
             }
           }
         } catch {
@@ -708,65 +752,6 @@ export default function TasksPage() {
             </div>
           </div>
 
-          {scheduledTasks.length > 0 && (
-            <div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  marginBottom: 8,
-                  padding: "0 4px",
-                }}
-              >
-                <IconClock size={13} strokeWidth={2.5} />
-                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", flex: 1 }}>
-                  Upcoming
-                </span>
-                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                  {scheduledTasks.length} {scheduledTasks.length === 1 ? "task" : "tasks"}
-                </span>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                {scheduledTasks.map((task) => {
-                  const sessionMap = new Map(sessions.map((s) => [s.id, s]));
-                  return (
-                    <div
-                      key={task.id}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                        padding: "10px 12px",
-                        borderRadius: "var(--radius-md)",
-                        border: "1px solid var(--border)",
-                        background: "var(--bg-surface)",
-                      }}
-                    >
-                      <span style={{ flex: 1, fontSize: 12, color: "var(--text-secondary)" }}>
-                        {describeScheduledTask(task, sessionMap)}
-                      </span>
-                      <button
-                        onClick={() => handleCancelScheduledTask(task.id)}
-                        title="Cancel"
-                        style={{
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                          color: "var(--text-muted)",
-                          display: "flex",
-                          alignItems: "center",
-                        }}
-                      >
-                        <IconX />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
           {taskQueue.length > 0 && (
             <div
               style={{
@@ -1029,6 +1014,20 @@ export default function TasksPage() {
                         </div>
                         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                           {group.tasks.map((task) => {
+                            if (task.status === "todo") {
+                              return (
+                                <UserTodoMessageCard
+                                  key={task.id}
+                                  content={task.content || task.name.replace(/^Todo:\s*/, "")}
+                                  trigger={task.trigger}
+                                  status="pending"
+                                  onCancel={() => handleTodoTaskAction(task, { action: "cancel" })}
+                                  onSendNow={() => handleTodoTaskAction(task, { action: "sendNow" })}
+                                  onChangeTrigger={(trigger) => handleTodoTaskAction(task, { action: "changeTrigger", trigger })}
+                                />
+                              );
+                            }
+
                             const isRunning = task.status === "running";
 
                             let statusText: string;
@@ -1104,14 +1103,16 @@ export default function TasksPage() {
                     );
                   });
                 } else {
-                  const statusOrder: TaskItem["status"][] = ["running", "error", "done", "stopped"];
+                  const statusOrder: TaskItem["status"][] = ["todo", "running", "error", "done", "stopped"];
                   const statusLabels: Record<TaskItem["status"], string> = {
+                    todo: "Todo",
                     running: "Running",
                     error: "Failed",
                     done: "Completed",
                     stopped: "Stopped",
                   };
                   const statusColors: Record<TaskItem["status"], string> = {
+                    todo: "var(--warning)",
                     running: "var(--accent)",
                     error: "var(--error)",
                     done: "var(--success)",
@@ -1172,6 +1173,20 @@ export default function TasksPage() {
                         </div>
                         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                           {group.tasks.map((task) => {
+                            if (task.status === "todo") {
+                              return (
+                                <UserTodoMessageCard
+                                  key={task.id}
+                                  content={task.content || task.name.replace(/^Todo:\s*/, "")}
+                                  trigger={task.trigger}
+                                  status="pending"
+                                  onCancel={() => handleTodoTaskAction(task, { action: "cancel" })}
+                                  onSendNow={() => handleTodoTaskAction(task, { action: "sendNow" })}
+                                  onChangeTrigger={(trigger) => handleTodoTaskAction(task, { action: "changeTrigger", trigger })}
+                                />
+                              );
+                            }
+
                             const isRunning = task.status === "running";
 
                             let statusText: string;

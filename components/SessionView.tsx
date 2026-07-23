@@ -6,7 +6,8 @@ import AgentExecCard from "@/components/AgentExecCard";
 import ExecCard, { ExecCardItem } from "@/components/ExecCard";
 import UserAgentCommandCard from "@/components/UserAgentCommandCard";
 import UserMessageCard from "@/components/UserMessageCard";
-import type { Session, ProjectScript, Runner, Message, Project } from "@/types/home";
+import UserTodoMessageCard from "@/components/UserTodoMessageCard";
+import type { Session, ProjectScript, Runner, Message, Project, TodoTrigger } from "@/types/home";
 import type { ExecCardInfo } from "@/lib/homeUtils";
 import { formatTime, execCardInfoToItem, autoResizeTextarea } from "@/lib/homeUtils";
 import {
@@ -82,6 +83,9 @@ interface SessionViewProps {
   onTogglePinSession: (id: string, pinned: boolean) => void;
   onSendDraftNow: () => void;
   onToggleDraftTrigger: () => void;
+  onCancelTodo: (messageId: string) => void;
+  onSendTodoNow: (messageId: string) => void;
+  onChangeTodoTrigger: (messageId: string, trigger: TodoTrigger) => void;
   onPromptChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onRunScript: (name: string) => void;
@@ -168,6 +172,9 @@ export default function SessionView({
   onTogglePinSession,
   onSendDraftNow,
   onToggleDraftTrigger,
+  onCancelTodo,
+  onSendTodoNow,
+  onChangeTodoTrigger,
   onPromptChange,
   onKeyDown,
   onRunScript,
@@ -248,7 +255,13 @@ export default function SessionView({
             ? "Describe what you want the agent to build or fix in this project…"
             : "Send a message or follow-up feedback to the agent…";
 
-  const chatInputValue = isDraftSession ? selectedSession?.prompt ?? "" : prompt;
+  const pendingDraftTodo = messages.find(
+    (m) =>
+      m.type === "user-todo" &&
+      m.todoStatus === "pending" &&
+      (m.todoTrigger?.kind === "manual" || m.todoTrigger?.kind === "codebaseReady"),
+  );
+  const chatInputValue = isDraftSession ? pendingDraftTodo?.content ?? "" : prompt;
 
   // Resize to fit the placeholder whenever it changes while the input is empty,
   // so the box previews how much room a longer message will need.
@@ -321,7 +334,7 @@ export default function SessionView({
                 })()}
               </span>
             ) : (
-              selectedSession.status === "draft" && isDraftAutoSend ? "pending" : selectedSession.status
+              isDraftSession ? (isDraftAutoSend ? "pending" : "draft") : selectedSession.status
             )}
           </span>
           <div
@@ -767,6 +780,22 @@ export default function SessionView({
                 runnerId={selectedSession?.runnerId}
                 onShowPrompt={cardInfo.prompt ? () => onShowPrompt(cardInfo.prompt!) : undefined}
                 onOpenFilePath={onOpenFilePath}
+              />
+            );
+          }
+
+          if (msg.type === "user-todo") {
+            return (
+              <UserTodoMessageCard
+                key={msg.id}
+                content={msg.content}
+                timestamp={formatTime(msg.createdAt)}
+                trigger={msg.todoTrigger}
+                status={msg.todoStatus}
+                renderContent={renderMessageContent}
+                onCancel={() => onCancelTodo(msg.id)}
+                onSendNow={() => onSendTodoNow(msg.id)}
+                onChangeTrigger={(trigger) => onChangeTodoTrigger(msg.id, trigger)}
               />
             );
           }
