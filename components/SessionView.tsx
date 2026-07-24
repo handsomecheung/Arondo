@@ -248,7 +248,7 @@ export default function SessionView({
     : isRunnerOffline
     ? "Runner is offline. Chat is disabled."
     : isDraftSession
-      ? "Draft — send it now, or it may send automatically once no agent is running and the codebase is clean"
+      ? "This session has a pending Todo message — you can't type a new message until it's sent or cancelled."
       : isNewDraft
         ? "Describe what you want to do — unlike a Session, a Draft won't run right away. It's held and sent once no agent is running and the codebase is clean, or whenever you send it manually."
         : isAgentRunning
@@ -257,13 +257,7 @@ export default function SessionView({
             ? "Describe what you want the agent to build or fix in this project…"
             : "Send a message or follow-up feedback to the agent…";
 
-  const pendingDraftTodo = messages.find(
-    (m) =>
-      m.type === "user-todo" &&
-      m.todoStatus === "pending" &&
-      (m.todoTrigger?.kind === "manual" || m.todoTrigger?.kind === "codebaseReady"),
-  );
-  const chatInputValue = isDraftSession ? pendingDraftTodo?.content ?? "" : prompt;
+  const chatInputValue = isDraftSession ? "" : prompt;
 
   // Resize to fit the placeholder whenever it changes while the input is empty,
   // so the box previews how much room a longer message will need.
