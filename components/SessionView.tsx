@@ -248,7 +248,7 @@ export default function SessionView({
     : isRunnerOffline
     ? "Runner is offline. Chat is disabled."
     : isDraftSession
-      ? "This session has a pending Todo message — you can't type a new message until it's sent or cancelled."
+      ? "This session has a pending Todo message — type to queue another, or hit Send to dispatch it now."
       : isNewDraft
         ? "Describe what you want to do — unlike a Session, a Draft won't run right away. It's held and sent once no agent is running and the codebase is clean, or whenever you send it manually."
         : isAgentRunning
@@ -257,7 +257,7 @@ export default function SessionView({
             ? "Describe what you want the agent to build or fix in this project…"
             : "Send a message or follow-up feedback to the agent…";
 
-  const chatInputValue = isDraftSession ? "" : prompt;
+  const chatInputValue = prompt;
 
   // Resize to fit the placeholder whenever it changes while the input is empty,
   // so the box previews how much room a longer message will need.
@@ -788,6 +788,7 @@ export default function SessionView({
                 timestamp={formatTime(msg.createdAt)}
                 trigger={msg.todoTrigger}
                 status={msg.todoStatus}
+                isFollowup={messages.length > 0 && messages[0].id !== msg.id}
                 renderContent={renderMessageContent}
                 onCancel={() => onCancelTodo(msg.id)}
                 onSendNow={() => onSendTodoNow(msg.id)}
@@ -1214,8 +1215,8 @@ export default function SessionView({
             value={chatInputValue}
             onChange={onPromptChange}
             onKeyDown={onKeyDown}
-            disabled={isRunnerOffline || isDraftSession || isArchived}
-            readOnly={isDraftSession || isArchived}
+            disabled={isRunnerOffline || isArchived}
+            readOnly={isArchived}
             rows={1}
             id="chat-input"
           />
@@ -1223,7 +1224,7 @@ export default function SessionView({
             <button
               className="upload-btn"
               onClick={() => uploadInputRef.current?.click()}
-              disabled={isRunnerOffline || isDraftSession || isArchived}
+              disabled={isRunnerOffline || isArchived}
               title="Upload a file"
               type="button"
             >
@@ -1231,7 +1232,7 @@ export default function SessionView({
             </button>
             <button
               className="send-btn"
-              onClick={isDraftSession ? onSendDraftNow : onSubmit}
+              onClick={isDraftSession && !prompt.trim() ? onSendDraftNow : onSubmit}
               disabled={!canSubmit}
               title={getSendTooltip()}
               id="send-btn"

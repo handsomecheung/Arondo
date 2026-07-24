@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dispatchFollowupMessage } from "@/lib/session-actions";
-import { getSession, isSessionArchived } from "@/lib/store";
+import { getSession, getMessages, isSessionArchived } from "@/lib/store";
 import { getArondoToken, verifySessionPermission, getUuidByToken } from "@/lib/auth";
 import { getProjectReadiness } from "@/lib/project-readiness";
 
@@ -23,15 +23,31 @@ export async function POST(
     return NextResponse.json({ error: "message is required" }, { status: 400 });
   }
 
-  // The first message on a freshly created (empty) session hasn't gone through
-  // the codebase-readiness check new sessions get in POST /api/sessions — apply
-  // the same confirmation gate here so behavior is consistent either way.
   if (!force) {
     const session = await getSession(id);
-    if (session && !session.prompt) {
-      const { dirty, busy } = await getProjectReadiness(session.runnerId, session.repoPath);
-      if (dirty || busy) {
-        return NextResponse.json({ needsConfirmation: true, reason: { dirty, busy } }, { status: 409 });
+    if (session) {
+      // "First message" means nothing has ever been added to this session yet —
+      // not just "has an agent run", since a session can already carry queued
+      // (pending) todo messages before its first real dispatch.
+      const existingMessages = await getMessages(id);
+      const isFirstMessage = existingMessages.length === 0;
+      if (isFirstMessage) {
+        // The first message on a freshly created (empty) session hasn't gone through
+        // the codebase-readiness check new sessions get in POST /api/sessions — apply
+        // the same confirmation gate here so behavior is consistent either way.
+        const { dirty, busy } = await getProjectReadiness(session.runnerId, session.repoPath);
+        if (dirty || busy) {
+          return NextResponse.json({ needsConfirmation: true, reason: { dirty, busy, isFollowup: false } }, { status: 409 });
+        }
+      } else {
+        // Follow-up message: only this session's own running state matters —
+        // codebase cleanliness and other sessions on the same repo don't block it.
+        // A message can't jump ahead of todos already queued on this session either.
+        const busy = session.status === "running" || session.status === "script-running";
+        const queued = !!(session.pendingTodoMessageIds && session.pendingTodoMessageIds.length > 0);
+        if (busy || queued) {
+          return NextResponse.json({ needsConfirmation: true, reason: { dirty: false, busy, queued, isFollowup: true } }, { status: 409 });
+        }
       }
     }
   }

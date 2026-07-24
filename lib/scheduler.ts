@@ -72,7 +72,9 @@ async function evaluateTodo(session: Session, todo: Message): Promise<void> {
   if (trigger.kind === "at") {
     if (trigger.timestamp && trigger.timestamp <= Date.now()) await executeAction(session, todo);
   } else if (trigger.kind === "afterSession") {
-    if (session.status !== "running" && session.status !== "script-running") await executeAction(session, todo);
+    // Only fire once the current run finished successfully — an "error"
+    // status leaves the todo pending so the user can decide manually.
+    if (session.status === "done") await executeAction(session, todo);
   } else if (trigger.kind === "quotaAvailable") {
     if (await isQuotaAvailable(trigger.agentType as any)) await executeAction(session, todo);
   } else if (trigger.kind === "codebaseReady") {
@@ -116,7 +118,8 @@ function onSessionUpdated(session: Session): void {
 
   getPendingTodoMessages(session.id)
     .then(async (todos) => {
-      const followup = todos.find((t) => t.todoTrigger?.kind === "afterSession");
+      // Success-only: an "error" status leaves the afterSession todo pending.
+      const followup = session.status === "done" ? todos.find((t) => t.todoTrigger?.kind === "afterSession") : undefined;
       if (followup) {
         await executeAction(session, followup).catch((err) =>
           console.error("[scheduler] fast-path dispatch failed:", err),

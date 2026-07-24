@@ -9,16 +9,39 @@ export interface UserTodoMessageCardProps {
   timestamp?: string;
   trigger?: TodoTrigger;
   status?: string;
+  isFollowup?: boolean;
   renderContent?: (content: string) => React.ReactNode;
   onCancel: () => void;
   onSendNow: () => void;
   onChangeTrigger: (trigger: TodoTrigger) => void;
 }
 
-const TRIGGER_OPTIONS: { kind: TodoTriggerKind; label: string; title: string }[] = [
+const FIRST_MESSAGE_TRIGGER_OPTIONS: { kind: TodoTriggerKind; label: string; title: string }[] = [
   { kind: "manual", label: "Manually", title: "Send only when I choose" },
   { kind: "codebaseReady", label: "Automatically", title: "Send automatically once no agent is running and the codebase is clean" },
 ];
+
+const FOLLOWUP_TRIGGER_OPTIONS: { kind: TodoTriggerKind; label: string; title: string }[] = [
+  { kind: "manual", label: "Manually", title: "Send only when I choose" },
+  { kind: "afterSession", label: "Automatically", title: "Send automatically once the current run finishes successfully" },
+];
+
+function describeStatus(trigger: TodoTrigger | undefined, status: string | undefined): string {
+  switch (status) {
+    case "triggered":
+      return "⏳ Sending…";
+    case "done":
+      return "✅ Sent";
+    case "failed":
+      return "❌ Failed to send";
+    case "cancelled":
+      return "🚫 Cancelled";
+    case "expired":
+      return "⌛ Expired";
+    default:
+      return describeTrigger(trigger);
+  }
+}
 
 function describeTrigger(trigger?: TodoTrigger): string {
   if (!trigger) return "";
@@ -51,11 +74,13 @@ export default function UserTodoMessageCard({
   timestamp,
   trigger,
   status,
+  isFollowup,
   renderContent,
   onCancel,
   onSendNow,
   onChangeTrigger,
 }: UserTodoMessageCardProps) {
+  const triggerOptions = isFollowup ? FOLLOWUP_TRIGGER_OPTIONS : FIRST_MESSAGE_TRIGGER_OPTIONS;
   const [menuOpen, setMenuOpen] = useState(false);
   const [triggerPickerOpen, setTriggerPickerOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -124,7 +149,7 @@ export default function UserTodoMessageCard({
               )}
               {menuOpen && triggerPickerOpen && (
                 <div className="task-menu-dropdown">
-                  {TRIGGER_OPTIONS.map((opt) => (
+                  {triggerOptions.map((opt) => (
                     <button
                       key={opt.kind}
                       className="task-menu-item"
@@ -145,7 +170,7 @@ export default function UserTodoMessageCard({
           </div>
         )}
       </div>
-      <div className="exec-card-status">{describeTrigger(trigger)}</div>
+      <div className="exec-card-status">{describeStatus(trigger, status)}</div>
       {timestamp && <div className="exec-card-time">{timestamp}</div>}
     </div>
   );

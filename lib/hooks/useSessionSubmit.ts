@@ -87,8 +87,9 @@ export function useSessionSubmit({
     repoPath: string;
     agentType: string;
     runnerId: string;
-    reason: { dirty: boolean; busy: boolean };
+    reason: { dirty: boolean; busy: boolean; queued?: boolean };
     existingSessionId?: string;
+    isFollowup?: boolean;
   } | null>(null);
 
   const getVisibleMenuItems = useCallback((): string[] => {
@@ -177,42 +178,11 @@ export function useSessionSubmit({
     loadProjects();
   }, [selectedSession, loadProjects]);
 
-  // When the agent is already running, a follow-up chat message can't start
-  // immediately — queue it as a scheduled task that fires once the current
-  // run finishes, instead of blocking the input.
-  const queueFollowupMessage = useCallback(async (originalMessage: string, agentMessage?: string) => {
-    if (!selectedSessionId) return;
-    try {
-      const res = await fetch(`/api/sessions/${selectedSessionId}/todo-messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: originalMessage,
-          prompt: agentMessage,
-          trigger: { kind: "afterSession" },
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        setApiError({ title: "Schedule Error", message: data.error || "Failed to queue message" });
-        return;
-      }
-      setToast({ message: "Message queued — will send once the current run finishes.", type: "info" });
-    } catch (err: any) {
-      setApiError({ title: "Schedule Error", message: err.message || "Failed to queue message" });
-    }
-  }, [selectedSessionId, setApiError, setToast]);
-
   const sendAgentMessage = useCallback(async (originalMessage: string, agentMessage: string) => {
     if (!selectedSessionId) return;
     setPrompt("");
     setShowCommandMenu(false);
     if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
-
-    if (selectedSession?.status === "running") {
-      await queueFollowupMessage(originalMessage, agentMessage);
-      return;
-    }
 
     const tempTaskId = `agent-${selectedSessionId}-${Date.now()}`;
     setTaskQueue((prev) => [
@@ -225,6 +195,22 @@ export function useSessionSubmit({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: originalMessage, prompt: agentMessage, type: "chat-user" }),
       });
+      if (res.status === 409) {
+        setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
+        const data = await res.json();
+        setPendingConfirmation({
+          rawText: originalMessage,
+          displayMessage: originalMessage,
+          agentPrompt: agentMessage,
+          repoPath,
+          agentType,
+          runnerId,
+          reason: data.reason,
+          existingSessionId: selectedSessionId,
+          isFollowup: !!data.reason?.isFollowup,
+        });
+        return;
+      }
       if (!res.ok) {
         const data = await res.json();
         setApiError({ title: "Command Error", message: data.error || "Failed to send command" });
@@ -234,7 +220,7 @@ export function useSessionSubmit({
       console.error(err);
       setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
     }
-  }, [selectedSessionId, selectedSession, setTaskQueue, queueFollowupMessage]);
+  }, [selectedSessionId, repoPath, agentType, runnerId, setTaskQueue, setApiError]);
 
   // Called from SessionView with the raw prompt text (e.g. "/commit foo")
   const handleAgentCommand = useCallback(async (promptText: string) => {
@@ -289,7 +275,7 @@ export function useSessionSubmit({
   // an auto-send draft, or create a manual draft — all reuse the same /api/sessions POST.
   const resolvePendingConfirmation = useCallback(async (choice: "force" | "pendingAuto" | "draft") => {
     if (!pendingConfirmation) return;
-    const { displayMessage, agentPrompt, repoPath: pendingRepoPath, agentType: pendingAgentType, runnerId: pendingRunnerId, existingSessionId } = pendingConfirmation;
+    const { displayMessage, agentPrompt, repoPath: pendingRepoPath, agentType: pendingAgentType, runnerId: pendingRunnerId, existingSessionId, isFollowup } = pendingConfirmation;
     setPendingConfirmation(null);
 
     // First message on an already-created (empty) session: resolve against
@@ -313,13 +299,14 @@ export function useSessionSubmit({
             setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
           }
         } else {
+          const autoTriggerKind = isFollowup ? "afterSession" : "codebaseReady";
           const res = await fetch(`/api/sessions/${existingSessionId}/todo-messages`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               message: displayMessage,
               prompt: agentPrompt,
-              trigger: { kind: choice === "pendingAuto" ? "codebaseReady" : "manual" },
+              trigger: { kind: choice === "pendingAuto" ? autoTriggerKind : "manual" },
             }),
           });
           if (!res.ok) {
@@ -327,7 +314,10 @@ export function useSessionSubmit({
             setApiError({ title: "Send Error", message: data.error || "Failed to queue message" });
             return;
           }
-          setToast({ message: choice === "pendingAuto" ? "Will send automatically once the project is ready." : "Saved as draft — send it manually later.", type: "info" });
+          const autoToast = isFollowup
+            ? "Will send automatically once the current run finishes."
+            : "Will send automatically once the project is ready.";
+          setToast({ message: choice === "pendingAuto" ? autoToast : "Saved as draft — send it manually later.", type: "info" });
         }
       } catch (err: any) {
         setApiError({ title: "Send Error", message: err.message || "Failed to send message" });
@@ -454,8 +444,6 @@ export function useSessionSubmit({
         }
         const newSession: Session = await res.json();
         finalizeNewSession(newSession, displayMessage, !isBlankSession && !isNewDraft);
-      } else if (selectedSession?.status === "running") {
-        await queueFollowupMessage(displayMessage, agentPrompt);
       } else {
         const tempTaskId = `agent-${selectedSessionId}-${Date.now()}`;
         setTaskQueue((prev) => [
@@ -480,6 +468,7 @@ export function useSessionSubmit({
               runnerId,
               reason: data.reason,
               existingSessionId: selectedSessionId,
+              isFollowup: !!data.reason?.isFollowup,
             });
             return;
           }
@@ -496,7 +485,7 @@ export function useSessionSubmit({
     } catch (err) {
       console.error(err);
     }
-  }, [prompt, repoPath, agentType, runnerId, isNewSession, isNewDraft, pendingFile, setPendingFile, uploadPendingFile, draftTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, setApiError, handleNewSessionCommand, handleRenameSessionCommand, sendAgentMessage, sessionScripts, handleScriptCommand, agentCommands, queueFollowupMessage, finalizeNewSession]);
+  }, [prompt, repoPath, agentType, runnerId, isNewSession, isNewDraft, pendingFile, setPendingFile, uploadPendingFile, draftTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, setApiError, handleNewSessionCommand, handleRenameSessionCommand, sendAgentMessage, sessionScripts, handleScriptCommand, agentCommands, finalizeNewSession]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return;

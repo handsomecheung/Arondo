@@ -1,14 +1,17 @@
 import { IconX } from "@/components/Icons";
 
 interface Props {
-  pendingConfirmation: { reason: { dirty: boolean; busy: boolean } } | null;
+  pendingConfirmation: { reason: { dirty: boolean; busy: boolean; queued?: boolean }; isFollowup?: boolean } | null;
   onResolve: (choice: "force" | "pendingAuto" | "draft") => void;
   onCancel: () => void;
 }
 
 export default function ProjectNotReadyModal({ pendingConfirmation, onResolve, onCancel }: Props) {
   if (!pendingConfirmation) return null;
-  const { dirty, busy } = pendingConfirmation.reason;
+  const { dirty, busy, queued } = pendingConfirmation.reason;
+  const autoLabel = pendingConfirmation.isFollowup
+    ? "Send automatically once earlier messages are handled"
+    : "Send automatically once ready";
 
   return (
     <div className="modal-backdrop" onClick={onCancel}>
@@ -23,9 +26,13 @@ export default function ProjectNotReadyModal({ pendingConfirmation, onResolve, o
           <p style={{ fontSize: 14, color: "var(--text-primary)", marginBottom: 8 }}>
             {busy && dirty
               ? "This project has an agent already running and uncommitted changes in the working tree."
-              : busy
-                ? "This project has an agent already running."
-                : "This project's working tree has uncommitted changes."}
+              : busy && queued
+                ? "This session already has an agent running and a message queued ahead of this one."
+                : busy
+                  ? "This project has an agent already running."
+                  : queued
+                    ? "This session already has a message queued to send."
+                    : "This project's working tree has uncommitted changes."}
           </p>
           <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>How would you like to proceed?</p>
         </div>
@@ -39,7 +46,7 @@ export default function ProjectNotReadyModal({ pendingConfirmation, onResolve, o
             autoFocus
             style={{ padding: "8px 16px", background: "var(--accent)", border: "none", borderRadius: "var(--radius-sm)", color: "#ffffff", fontSize: 13, cursor: "pointer" }}
           >
-            Send automatically once ready
+            {autoLabel}
           </button>
           <button
             className="new-task-btn"

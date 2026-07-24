@@ -1105,7 +1105,7 @@ export default function HomePage() {
       }
       return "Send (Enter)";
     } else if (isDraftSession) {
-      return "Send this draft now";
+      return prompt.trim().length > 0 ? "Send (Enter)" : "Send this draft now";
     } else {
       if (!selectedSessionId) {
         return "No active session selected";
