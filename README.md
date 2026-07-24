@@ -18,10 +18,11 @@ All execution goes through a Runner — there is no local fallback on the server
 ## Features
 
 - **Multi-Machine Runners**: Install Go runners on any development machine. The UI lets you pick which runner runs each session. Supports deleting disconnected runners from the Runners dashboard.
-- **Todo Messages (Drafts, Auto-Queue Follow-ups & Quota Retry)**: "Send this message later" is a single `user-todo` chat message with a status/trigger (manual, codebaseReady, afterSession, quotaAvailable, or a fixed time), rendered inline with a three-dot menu (Cancel / Send Now / Change Trigger). Covers TODO drafts saved while a project has uncommitted changes or a running agent, follow-ups queued behind a running agent, and automatic quota-exhaustion retries — all shown as first-class tasks in the Tasks dashboard.
+- **Todo Messages (Drafts, Auto-Queue Follow-ups & Quota Retry)**: "Send this message later" is a single `user-todo` chat message with a status/trigger (manual, codebaseReady, afterSession, quotaAvailable, or a fixed time), rendered inline with a three-dot menu (Cancel / Send Now / Change Trigger). Covers TODO drafts saved while a project has uncommitted changes or a running agent, follow-ups queued behind a running agent, and automatic quota-exhaustion retries — all shown as first-class tasks in the Tasks dashboard. A session can queue multiple todo messages at once; the chat input stays enabled while a draft/pending todo exists so you can keep composing further follow-ups.
 - **Session Archiving**: Automatically archive sessions idle for more than a configured period, or manually archive/unarchive them. Archived sessions are read-only to prevent sending new messages, while preserving history, logs, and diff views. The default idle day count before auto-archiving is configurable in the Settings page. Unarchiving a session is disabled if its parent project has been deleted. Before deleting a project, a warning dialog flags any associated archived sessions that would become unusable.
 - **Session Pinning, Filtering & Three-dot Menu**: Pin important sessions to the top of the sidebar session list (ordered by pinned timestamp). When sessions span multiple projects, horizontally scrollable project filter chips appear in the sidebar to let users filter sessions by project. A per-session three-dot menu in the sidebar and detailed session view provides quick access to Pin, Rename, Archive, and Delete actions.
-- **Project Readiness Warnings**: Warns before sending a message to a session when the project has uncommitted changes or a running agent, offering options to send anyway, auto-send once ready, or save as a TODO session.
+- **Project Readiness Warnings**: Warns before creating a session or sending the first message on an empty session when the project has uncommitted changes or a running agent, offering options to send anyway, auto-send once ready, or save as a TODO session. Follow-up messages on a session that already has history skip this check and only block on that session's own running state or an already-queued todo.
+- **Project Three-dot Menu**: The Project Page header offers a three-dot menu with File Browser, Open Terminal, Show Changes (a sessionless visual diff of the project's working tree, disabled when clean), and Delete Project.
 - **Multi-User Token-Based Authentication**: Secure the application with token-based authentication supporting `admin` and `user` roles. Automatically generates an admin access token on first startup if not already configured. Admins can manage access tokens and configure runner-specific access control lists (restricting runners to specific user token UUIDs) from the Settings dashboard.
 - **Secure WebSocket Communication**: Browser-to-server WebSocket connections are secured by passing the authentication token via the `Sec-WebSocket-Protocol` header (`arondo-token`), preventing exposure of sensitive credentials in query parameters or server logs.
 - **Session-Based Workspaces**: Each task is encapsulated inside a self-contained session under the configuration directory (`~/.arondo/sessions/[sessionId]/` by default), tracking history, settings, and outputs.
@@ -168,12 +169,14 @@ Content-Type: application/json
 x-arondo-token: <token>
 
 {
-  "message": "Also add a test for this" // required
+  "message": "Also add a test for this", // required
+  "force": false                         // optional — bypass the dirty-working-tree / already-running checks
 }
 ```
 
 - Runs the agent again with the new message appended to the session's history (agent session continuity/resume is preserved).
 - Returns `403` if the session is archived — unarchive it first.
+- If this is the first message ever sent on the session, the same dirty/busy confirmation gate as session creation applies: returns `409 { needsConfirmation: true, reason: { dirty, busy, isFollowup: false } }` unless `force: true` is set. For later follow-ups, only this session's own running state and already-queued todo messages block the send: returns `409 { needsConfirmation: true, reason: { dirty: false, busy, queued, isFollowup: true } }`.
 
 ### 3. Query session status
 
