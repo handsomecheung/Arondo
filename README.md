@@ -122,6 +122,82 @@ Open [http://localhost:3251](http://localhost:3251) in your browser. Select the 
 - `agent-commands.json` – User-defined agent slash commands.
 - `settings.json` – Global application configuration settings (e.g. custom session archive day count overrides).
 
+## Automation API
+
+Scripts and external programs can drive Arondo directly over HTTP using the same REST endpoints as the UI. Three endpoints cover the full create → message → poll lifecycle:
+
+### Authentication
+
+Every request must include a valid client token, either as a header or a query parameter:
+
+```
+x-arondo-token: <client_access_token>
+# or
+?token=<client_access_token>
+```
+
+Tokens are issued by an admin from Settings → Client Tokens (`/api/auth/client-tokens`), stored in `~/.arondo/tokens.json`. A `user`-role token must also be granted access to the target runner via its `allowedUserTokenUuids` list; `admin`-role tokens can access any runner.
+
+### 1. Create a session
+
+```
+POST /api/sessions
+Content-Type: application/json
+x-arondo-token: <token>
+
+{
+  "repoPath": "/path/to/repo",   // repository path on the runner — required unless "tempDir" is set
+  "tempDir": false,              // optional — create the session in a fresh temp dir generated on the runner instead of "repoPath" (mutually exclusive with "repoPath")
+  "runnerId": "runner-id",       // target runner (see GET /api/runners) — required, unless "tempDir" is set, in which case it's optional and a random available runner is picked
+  "prompt": "Fix the login bug", // prompt sent to the agent; omit/blank to create an idle session
+  "agentType": "auto",           // optional — "antigravity" | "claude" | "auto" (default: "auto")
+  "name": "My session",          // optional — defaults to first line of the prompt
+  "force": false                 // optional — bypass the dirty-working-tree / already-running checks
+}
+```
+
+- Set `tempDir: true` to have Arondo generate a temporary directory on the runner and use it as the repo path — do not pass `repoPath` in that case. `runnerId` also becomes optional; when omitted, a runner is picked at random among the runners the token is allowed to access.
+- Returns `201` with the created `Session` object (includes `id`).
+- Returns `409 { needsConfirmation: true, reason: { dirty, busy } }` if the repo has uncommitted changes or an agent is already running and `force` was not set — retry with `force: true` to proceed anyway.
+
+### 2. Send a message to a session
+
+```
+POST /api/sessions/{id}/messages
+Content-Type: application/json
+x-arondo-token: <token>
+
+{
+  "message": "Also add a test for this" // required
+}
+```
+
+- Runs the agent again with the new message appended to the session's history (agent session continuity/resume is preserved).
+- Returns `403` if the session is archived — unarchive it first.
+
+### 3. Query session status
+
+```
+GET /api/sessions/{id}
+x-arondo-token: <token>
+```
+
+- Returns the `Session` object. Check `status`, one of: `idle`, `running`, `script-running`, `done`, `error`.
+- `done`/`error` means the agent finished; poll this endpoint until the status leaves `running`/`script-running`.
+
+### Example script
+
+`examples/session_automation_demo.py` is a stdlib-only Python demo that chains the three calls above: create a session, send a follow-up, poll until done, and print the result.
+
+```bash
+python3 examples/session_automation_demo.py \
+  --server http://localhost:3251 \
+  --token <client_access_token> \
+  --temp-dir \
+  --prompt "Print the current date" \
+  --follow-up "Now also print the current directory"
+```
+
 ## Runner CLI
 
 ```

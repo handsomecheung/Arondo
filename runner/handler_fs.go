@@ -278,6 +278,24 @@ func (h *Handler) handleFsList(msg *Message) {
 	h.sendResponse(msg.ID, resp)
 }
 
+type fsMkdtempResponse struct {
+	OK   bool   `json:"ok"`
+	Path string `json:"path"`
+}
+
+func (h *Handler) handleFsMkdtemp(msg *Message) {
+	dir, err := os.MkdirTemp("", "arondo-session-*")
+	if err != nil {
+		h.sendError(msg.ID, "INTERNAL", "failed to create temp dir: "+err.Error())
+		return
+	}
+
+	h.sendResponse(msg.ID, fsMkdtempResponse{
+		OK:   true,
+		Path: dir,
+	})
+}
+
 type fsUploadRequest struct {
 	Filename string `json:"filename"`
 	Content  string `json:"content"` // base64-encoded

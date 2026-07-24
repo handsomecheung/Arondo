@@ -61,15 +61,28 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(valid);
 }
 
+async function pickRandomAllowedRunnerId(token: string | null): Promise<string | undefined> {
+  const connected = runnerManager.getRunners();
+  const allowed: string[] = [];
+  for (const r of connected) {
+    if (await runnerManager.isTokenAllowedForRunnerId(r.id, token)) {
+      allowed.push(r.id);
+    }
+  }
+  if (allowed.length === 0) return undefined;
+  return allowed[Math.floor(Math.random() * allowed.length)];
+}
+
 export async function POST(req: NextRequest) {
   const token = getArondoToken(req);
   const body = await req.json();
-  const { prompt, message, repoPath, agentType = "antigravity", runnerId, name, isDraft, draftTrigger = "codebaseReady", force } = body as {
+  const { prompt, message, repoPath: repoPathInput, tempDir, agentType = "auto", runnerId: runnerIdInput, name, isDraft, draftTrigger = "codebaseReady", force } = body as {
     prompt: string;
     message?: string;
-    repoPath: string;
+    repoPath?: string;
+    tempDir?: boolean;
     agentType?: string;
-    runnerId: string;
+    runnerId?: string;
     name?: string;
     isDraft?: boolean;
     draftTrigger?: "manual" | "codebaseReady";
@@ -78,11 +91,22 @@ export async function POST(req: NextRequest) {
 
   const isBlank = !prompt || !prompt.trim();
 
-  if (!repoPath) {
+  if (tempDir && repoPathInput) {
+    return NextResponse.json({ error: "repoPath must not be provided when tempDir is set" }, { status: 400 });
+  }
+  if (!tempDir && !repoPathInput) {
     return NextResponse.json({ error: "repoPath is required" }, { status: 400 });
   }
+
+  let runnerId = runnerIdInput;
   if (!runnerId) {
-    return NextResponse.json({ error: "runnerId is required" }, { status: 400 });
+    if (!tempDir) {
+      return NextResponse.json({ error: "runnerId is required" }, { status: 400 });
+    }
+    runnerId = await pickRandomAllowedRunnerId(token);
+    if (!runnerId) {
+      return NextResponse.json({ error: "No available runners" }, { status: 400 });
+    }
   }
 
   const isAllowed = await runnerManager.isTokenAllowedForRunnerId(runnerId, token);
@@ -93,6 +117,16 @@ export async function POST(req: NextRequest) {
   const run = runnerManager.getRunner(runnerId);
   if (!run) {
     return NextResponse.json({ error: "Runner not found or disconnected" }, { status: 400 });
+  }
+
+  let repoPath = repoPathInput as string;
+  if (tempDir) {
+    try {
+      const result = await runnerManager.sendRequest(runnerId, "fs.mkdtemp", {});
+      repoPath = result.path;
+    } catch (error: any) {
+      return NextResponse.json({ error: error.message || "Failed to create temp directory" }, { status: 500 });
+    }
   }
 
   if (isBlank) {

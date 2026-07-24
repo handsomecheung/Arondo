@@ -38,6 +38,8 @@ func (h *Handler) handleRequest(msg *Message) {
 		h.handleFsInfos(msg)
 	case "fs.upload":
 		h.handleFsUpload(msg)
+	case "fs.mkdtemp":
+		h.handleFsMkdtemp(msg)
 	case "exec.agent":
 		h.handleExecAgent(msg)
 	case "exec.script":

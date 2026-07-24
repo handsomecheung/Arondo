@@ -4,6 +4,24 @@ import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, verifySessionPermission } from "@/lib/auth";
 
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const token = getArondoToken(req);
+  if (!(await verifySessionPermission(id, token))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const session = await getSession(id);
+  if (!session) {
+    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+  }
+
+  return NextResponse.json(session);
+}
+
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
