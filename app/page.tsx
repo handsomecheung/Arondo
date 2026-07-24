@@ -111,6 +111,10 @@ export default function HomePage() {
   const [taskQueue, setTaskQueue] = useState<TaskItem[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Project panel menu state
+  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
+  const projectMenuRef = useRef<HTMLDivElement>(null);
+
   // Project states
   const [sidebarMode, setSidebarMode] = useState<"sessions" | "projects">(
     initUrl.project ? "projects" : "sessions",
@@ -215,6 +219,7 @@ export default function HomePage() {
     sessions.find((s) => s.id === selectedSessionId) ??
     archivedSessions.find((s) => s.id === selectedSessionId) ??
     null;
+  const selectedProjectForModals = projects.find((p) => p.id === selectedProjectId) ?? null;
   const isArchivedSession = !sessions.some((s) => s.id === selectedSessionId)
     && archivedSessions.some((s) => s.id === selectedSessionId);
   const isRunning =
@@ -337,6 +342,9 @@ export default function HomePage() {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setMenuOpen(false);
+      }
+      if (projectMenuRef.current && !projectMenuRef.current.contains(event.target as Node)) {
+        setProjectMenuOpen(false);
       }
     };
     document.addEventListener("click", handleClickOutside);
@@ -1241,6 +1249,13 @@ export default function HomePage() {
                 draggedIndex={draggedIndex}
                 runners={runners}
                 isAutoAnalyzing={taskQueue.some((t) => (t.name === "Agent: Auto Scripts Analysis" || t.scriptName === "Auto Scripts Analysis") && t.status === "running" && t.projectId === project.id)}
+                menuOpen={projectMenuOpen}
+                menuRef={projectMenuRef}
+                onSetMenuOpen={setProjectMenuOpen}
+                onOpenFileBrowser={() => {
+                  setFileBrowserOpen(true);
+                }}
+                onOpenShellModal={() => setShellModalOpen(true)}
                 onRunScript={handleRunGlobalScript}
                 onNewSession={() => {
                   setRepoPath(project.repoPath);
@@ -1457,8 +1472,8 @@ export default function HomePage() {
         key={selectedSessionId ?? ""}
         open={shellModalOpen}
         onClose={() => setShellModalOpen(false)}
-        repoPath={selectedSession?.repoPath}
-        runnerId={selectedSession?.runnerId}
+        repoPath={selectedSession?.repoPath ?? selectedProjectForModals?.repoPath}
+        runnerId={selectedSession?.runnerId ?? selectedProjectForModals?.runnerId}
         sessionId={selectedSessionId}
         ws={wsInstance}
       />
@@ -1466,8 +1481,8 @@ export default function HomePage() {
       <FileBrowserModal
         open={fileBrowserOpen}
         onClose={() => { setFileBrowserOpen(false); setFileBrowserTargetPath(undefined); }}
-        runnerId={selectedSession?.runnerId ?? runnerId}
-        initialPath={selectedSession?.repoPath ?? "/"}
+        runnerId={selectedSession?.runnerId ?? selectedProjectForModals?.runnerId ?? runnerId}
+        initialPath={selectedSession?.repoPath ?? selectedProjectForModals?.repoPath ?? "/"}
         initialFilePath={fileBrowserTargetPath}
       />
 

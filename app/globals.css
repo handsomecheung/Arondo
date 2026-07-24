@@ -2516,36 +2516,6 @@ body {
 /* ─── Task Log Panel ───────────────────────────────────────────────────────── */
 
 
-.delete-project-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  border-radius: var(--radius-sm);
-  color: #ef4444;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-family: inherit;
-  min-height: 36px;
-}
-.delete-project-btn:hover:not(:disabled) {
-  background: #ef4444;
-  color: white;
-  border-color: #ef4444;
-  box-shadow: 0 0 16px rgba(239, 68, 68, 0.35);
-}
-.delete-project-btn:disabled {
-  background: var(--bg-tertiary);
-  border-color: var(--border);
-  color: var(--text-muted);
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
 /* Custom Dropdown Container */
 .custom-dropdown-container {
   position: relative;

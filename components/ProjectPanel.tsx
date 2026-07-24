@@ -1,7 +1,7 @@
 "use client";
 
 import type { Project, Session, ProjectScript, Runner } from "@/types/home";
-import { IconPlus, IconTrash } from "@/components/Icons";
+import { IconPlus, IconTrash, IconMoreVertical, IconFileSearch, IconTerminal } from "@/components/Icons";
 
 interface ProjectPanelProps {
   project: Project;
@@ -10,8 +10,13 @@ interface ProjectPanelProps {
   draggedIndex: number | null;
   runners: Runner[];
   isAutoAnalyzing: boolean;
+  menuOpen: boolean;
+  menuRef: React.RefObject<HTMLDivElement | null>;
+  onSetMenuOpen: (v: boolean) => void;
   onNewSession: () => void;
   onDeleteProject: () => void;
+  onOpenFileBrowser: () => void;
+  onOpenShellModal: () => void;
   onOpenScriptModal: (editingName?: string, editingCommand?: string) => void;
   onAddScriptModal: () => void;
   onDeleteScript: (name: string) => void;
@@ -30,8 +35,13 @@ export default function ProjectPanel({
   draggedIndex,
   runners,
   isAutoAnalyzing,
+  menuOpen,
+  menuRef,
+  onSetMenuOpen,
   onNewSession,
   onDeleteProject,
+  onOpenFileBrowser,
+  onOpenShellModal,
   onOpenScriptModal,
   onAddScriptModal,
   onDeleteScript,
@@ -86,19 +96,71 @@ export default function ProjectPanel({
           >
             <IconPlus /> New Session
           </button>
-          <button
-            className="delete-project-btn"
-            disabled={projectSessions.length > 0}
-            style={{ padding: "8px 16px", fontSize: 13 }}
-            onClick={onDeleteProject}
-            title={
-              projectSessions.length > 0
-                ? "Cannot delete project with associated sessions"
-                : "Delete project"
-            }
-          >
-            <IconTrash /> Delete Project
-          </button>
+          <div ref={menuRef} style={{ position: "relative" }}>
+            <button
+              className="menu-trigger-btn"
+              onClick={() => onSetMenuOpen(!menuOpen)}
+              id="project-menu-btn"
+              title="Project Menu"
+            >
+              <IconMoreVertical />
+            </button>
+
+            {menuOpen && (
+              <div className="session-dropdown-menu">
+                <button
+                  className="menu-item"
+                  disabled={!runners.some((r) => r.id === project.runnerId && r.connected)}
+                  onClick={() => {
+                    onOpenFileBrowser();
+                    onSetMenuOpen(false);
+                  }}
+                  title={
+                    !runners.some((r) => r.id === project.runnerId && r.connected)
+                      ? "Runner is offline"
+                      : undefined
+                  }
+                  id="menu-file-browser"
+                >
+                  <IconFileSearch /> File Browser
+                </button>
+
+                <button
+                  className="menu-item"
+                  disabled={!runners.some((r) => r.id === project.runnerId && r.connected)}
+                  onClick={() => {
+                    onOpenShellModal();
+                    onSetMenuOpen(false);
+                  }}
+                  title={
+                    !runners.some((r) => r.id === project.runnerId && r.connected)
+                      ? "Runner is offline"
+                      : undefined
+                  }
+                  id="menu-open-terminal"
+                >
+                  <IconTerminal /> Open Terminal
+                </button>
+
+                <button
+                  className="menu-item delete"
+                  disabled={projectSessions.length > 0}
+                  onClick={() => {
+                    onDeleteProject();
+                    onSetMenuOpen(false);
+                  }}
+                  title={
+                    projectSessions.length > 0
+                      ? "Cannot delete project with associated sessions"
+                      : "Delete project"
+                  }
+                  id="menu-delete-project"
+                >
+                  <IconTrash /> Delete Project
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
