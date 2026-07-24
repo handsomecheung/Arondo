@@ -18,7 +18,7 @@ All execution goes through a Runner — there is no local fallback on the server
 ## Features
 
 - **Multi-Machine Runners**: Install Go runners on any development machine. The UI lets you pick which runner runs each session. Supports deleting disconnected runners from the Runners dashboard.
-- **TODO Sessions**: Jot down tasks as "TODO" sessions while a project has uncommitted changes or active agents. Fully unified with the normal Session model, they support auto/manual send modes, holding the prompt until the codebase is clean and no agent is running.
+- **Todo Messages (Drafts, Auto-Queue Follow-ups & Quota Retry)**: "Send this message later" is a single `user-todo` chat message with a status/trigger (manual, codebaseReady, afterSession, quotaAvailable, or a fixed time), rendered inline with a three-dot menu (Cancel / Send Now / Change Trigger). Covers TODO drafts saved while a project has uncommitted changes or a running agent, follow-ups queued behind a running agent, and automatic quota-exhaustion retries — all shown as first-class tasks in the Tasks dashboard.
 - **Session Archiving**: Automatically archive sessions idle for more than a configured period, or manually archive/unarchive them. Archived sessions are read-only to prevent sending new messages, while preserving history, logs, and diff views. The default idle day count before auto-archiving is configurable in the Settings page. Unarchiving a session is disabled if its parent project has been deleted. Before deleting a project, a warning dialog flags any associated archived sessions that would become unusable.
 - **Session Pinning, Filtering & Three-dot Menu**: Pin important sessions to the top of the sidebar session list (ordered by pinned timestamp). When sessions span multiple projects, horizontally scrollable project filter chips appear in the sidebar to let users filter sessions by project. A per-session three-dot menu in the sidebar and detailed session view provides quick access to Pin, Rename, Archive, and Delete actions.
 - **Project Readiness Warnings**: Warns before sending a message to a session when the project has uncommitted changes or a running agent, offering options to send anyway, auto-send once ready, or save as a TODO session.
@@ -53,6 +53,7 @@ All execution goes through a Runner — there is no local fallback on the server
 - **Mobile-Friendly UI**: Designed with collapsible panels, modal logs, responsive menus, and touch-friendly actions. Supports a swipe-to-delete gesture for session items in the mobile sidebar.
 - **Project Management**: Scopes and tracks sessions within resolved repository paths. Supports custom project scripts and AI auto-script discovery (executed safely on the selected runner).
 - **Unread Session Completion Indicator**: Automatically tracks when background running sessions complete (`done` or `error`). It compares the session's `completedAt` timestamp with the user's `lastViewedAt` timestamp. If a session has unviewed completions, the UI displays a colored dot next to the session in the sidebar (green for success, red for error) and an unread count badge in the header menu button.
+- **PWA / Installable App**: Ships a web app manifest (`app/manifest.ts`) and a registered service worker (`public/sw.js`) so the app can be installed to the home screen with a standalone window, including on Android Chrome which requires a service worker with a fetch handler for full installability.
 
 ## Getting Started
 
@@ -93,7 +94,7 @@ Open [http://localhost:3251](http://localhost:3251) in your browser. Select the 
 
 ### Configuration Files (in `ARONDO_CONFIG_DIR` or `~/.arondo/`)
 
-- `tokens.json` – Multi-user and runner access tokens database. Stored with the following structure:
+- `tokens.json` – Multi-user and per-runner access tokens database. Stored with the following structure:
   ```json
   {
     "clients": [
@@ -104,10 +105,19 @@ Open [http://localhost:3251](http://localhost:3251) in your browser. Select the 
         "type": "admin"
       }
     ],
-    "runner": "32-character-runner-access-token"
+    "runners": [
+      {
+        "id": "token-id",
+        "token": "32-character-hex-string",
+        "name": "Runner Token Name",
+        "createdAt": 1720000000000,
+        "lastUsedAt": 1720000100000,
+        "boundRunnerId": "server-generated-runner-id"
+      }
+    ]
   }
   ```
-  If no token with `type: "admin"` exists on startup, or if the `runner` token is missing, they are generated automatically, written to the config, and printed in the server logs.
+  If no token with `type: "admin"` exists on startup, one is generated automatically, written to the config, and printed in the server logs. Runner tokens are created and managed individually by an admin in Settings (Runner Tokens section); each locks to the first runner identity that registers with it (`boundRunnerId`).
 - `global-rules.md` – Rules synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on connected runners.
 - `agent-commands.json` – User-defined agent slash commands.
 - `settings.json` – Global application configuration settings (e.g. custom session archive day count overrides).
