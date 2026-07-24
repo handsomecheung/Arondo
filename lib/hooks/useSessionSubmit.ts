@@ -88,6 +88,7 @@ export function useSessionSubmit({
     agentType: string;
     runnerId: string;
     reason: { dirty: boolean; busy: boolean };
+    existingSessionId?: string;
   } | null>(null);
 
   const getVisibleMenuItems = useCallback((): string[] => {
@@ -288,8 +289,51 @@ export function useSessionSubmit({
   // an auto-send draft, or create a manual draft — all reuse the same /api/sessions POST.
   const resolvePendingConfirmation = useCallback(async (choice: "force" | "pendingAuto" | "draft") => {
     if (!pendingConfirmation) return;
-    const { displayMessage, agentPrompt, repoPath: pendingRepoPath, agentType: pendingAgentType, runnerId: pendingRunnerId } = pendingConfirmation;
+    const { displayMessage, agentPrompt, repoPath: pendingRepoPath, agentType: pendingAgentType, runnerId: pendingRunnerId, existingSessionId } = pendingConfirmation;
     setPendingConfirmation(null);
+
+    // First message on an already-created (empty) session: resolve against
+    // that session directly instead of going through session creation.
+    if (existingSessionId) {
+      try {
+        if (choice === "force") {
+          const tempTaskId = `agent-${existingSessionId}-${Date.now()}`;
+          setTaskQueue((prev) => [
+            ...prev,
+            { id: tempTaskId, type: "agent", name: `Agent: ${displayMessage}`, sessionId: existingSessionId, status: "running", createdAt: Date.now() },
+          ]);
+          const res = await fetch(`/api/sessions/${existingSessionId}/messages`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: displayMessage, prompt: agentPrompt, type: "chat-user", force: true }),
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            setApiError({ title: "Send Message Error", message: data.error || "Failed to send message" });
+            setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
+          }
+        } else {
+          const res = await fetch(`/api/sessions/${existingSessionId}/todo-messages`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message: displayMessage,
+              prompt: agentPrompt,
+              trigger: { kind: choice === "pendingAuto" ? "codebaseReady" : "manual" },
+            }),
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            setApiError({ title: "Send Error", message: data.error || "Failed to queue message" });
+            return;
+          }
+          setToast({ message: choice === "pendingAuto" ? "Will send automatically once the project is ready." : "Saved as draft — send it manually later.", type: "info" });
+        }
+      } catch (err: any) {
+        setApiError({ title: "Send Error", message: err.message || "Failed to send message" });
+      }
+      return;
+    }
 
     const body: Record<string, unknown> = { prompt: agentPrompt, message: displayMessage, repoPath: pendingRepoPath, agentType: pendingAgentType, runnerId: pendingRunnerId };
     if (choice === "force") body.force = true;
@@ -312,7 +356,7 @@ export function useSessionSubmit({
     } catch (err: any) {
       setApiError({ title: "Send Error", message: err.message || "Failed to create session" });
     }
-  }, [pendingConfirmation, finalizeNewSession, setApiError]);
+  }, [pendingConfirmation, finalizeNewSession, setApiError, setTaskQueue, setToast]);
 
   const cancelPendingConfirmation = useCallback(() => {
     if (!pendingConfirmation) return;
@@ -424,6 +468,21 @@ export function useSessionSubmit({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ message: displayMessage, prompt: agentPrompt, type: "chat-user" }),
           });
+          if (res.status === 409) {
+            setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
+            const data = await res.json();
+            setPendingConfirmation({
+              rawText: trimmed,
+              displayMessage,
+              agentPrompt,
+              repoPath,
+              agentType,
+              runnerId,
+              reason: data.reason,
+              existingSessionId: selectedSessionId,
+            });
+            return;
+          }
           if (!res.ok) {
             const data = await res.json();
             setApiError({ title: "Send Message Error", message: data.error || "Failed to send message" });

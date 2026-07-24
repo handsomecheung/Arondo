@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dispatchFollowupMessage } from "@/lib/session-actions";
-import { isSessionArchived } from "@/lib/store";
+import { getSession, isSessionArchived } from "@/lib/store";
 import { getArondoToken, verifySessionPermission, getUuidByToken } from "@/lib/auth";
+import { getProjectReadiness } from "@/lib/project-readiness";
 
 export async function POST(
   req: NextRequest,
@@ -17,9 +18,22 @@ export async function POST(
     return NextResponse.json({ error: "Session is archived. Unarchive it to send messages." }, { status: 403 });
   }
 
-  const { message, type, prompt } = await req.json();
+  const { message, type, prompt, force } = await req.json();
   if (!message || !message.trim()) {
     return NextResponse.json({ error: "message is required" }, { status: 400 });
+  }
+
+  // The first message on a freshly created (empty) session hasn't gone through
+  // the codebase-readiness check new sessions get in POST /api/sessions — apply
+  // the same confirmation gate here so behavior is consistent either way.
+  if (!force) {
+    const session = await getSession(id);
+    if (session && !session.prompt) {
+      const { dirty, busy } = await getProjectReadiness(session.runnerId, session.repoPath);
+      if (dirty || busy) {
+        return NextResponse.json({ needsConfirmation: true, reason: { dirty, busy } }, { status: 409 });
+      }
+    }
   }
 
   try {
