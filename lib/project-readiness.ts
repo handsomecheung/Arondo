@@ -4,15 +4,15 @@ import { runnerManager } from "./runner-manager";
 export type ProjectReadiness = { dirty: boolean; busy: boolean };
 
 /**
- * A project (runnerId + repoPath) is "ready" once no session is actively
+ * A project (runnerId + repoPath) is "ready" once no agent is actively
  * running against it and the working tree has no uncommitted changes.
- * Shared by the scheduler's codebaseReady trigger and the New Session
- * pre-send confirmation check.
+ * Running scripts don't count as busy. Shared by the scheduler's
+ * codebaseReady trigger and the New Session pre-send confirmation check.
  */
 export async function getProjectReadiness(runnerId: string, repoPath: string): Promise<ProjectReadiness> {
   const sessions = await getSessions();
   const busy = sessions.some(
-    (s) => s.runnerId === runnerId && s.repoPath === repoPath && (s.status === "running" || s.status === "script-running"),
+    (s) => s.runnerId === runnerId && s.repoPath === repoPath && s.status === "running",
   );
 
   const connectedRunnerId = runnerManager.resolveRunnerId(runnerId);

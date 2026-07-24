@@ -59,7 +59,7 @@ export async function executeAction(session: Session, todo: Message): Promise<vo
   }
 }
 
-// A draft's target codebase is "ready" once no session is actively running
+// A draft's target codebase is "ready" once no agent is actively running
 // against it and the working tree has no uncommitted changes.
 async function isCodebaseReady(runnerId: string, repoPath: string): Promise<boolean> {
   const { dirty, busy } = await getProjectReadiness(runnerId, repoPath);
