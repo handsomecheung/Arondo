@@ -23,7 +23,9 @@ export default function DiffModal({ open, onClose, sessionId, messageId, filePat
 
   const iframeSrc = filePath && messageId
     ? `/api/sessions/${sessionId}/diff?wrap=${wordWrap}&messageId=${messageId}&path=${encodeURIComponent(filePath)}&projectId=${projectId || ""}${tokenParam}`
-    : `/api/sessions/${sessionId}/diff?wrap=${wordWrap}${tokenParam}`;
+    : sessionId
+      ? `/api/sessions/${sessionId}/diff?wrap=${wordWrap}${tokenParam}`
+      : `/api/projects/${projectId}/diff?wrap=${wordWrap}${tokenParam}`;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>

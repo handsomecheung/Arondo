@@ -204,6 +204,16 @@ export default function HomePage() {
     menuOpen,
   });
 
+  const {
+    isCheckingGitChanges: isCheckingProjectGitChanges,
+    hasGitChanges: hasProjectGitChanges,
+    isGitRepo: isProjectGitRepo,
+  } = useGitHub({
+    selectedSessionId: null,
+    selectedProjectId,
+    menuOpen: projectMenuOpen,
+  });
+
   const { connected, wsInstance } = useWebSocket({
     selectedSessionId,
     setSessions,
@@ -1315,6 +1325,10 @@ export default function HomePage() {
                 onPointerUp={handlePointerUp}
                 onAutoAddScripts={handleAutoAddScripts}
                 onSelectSession={handleSelectSession}
+                onShowDiff={() => setDiffModalOpen(true)}
+                isCheckingGitChanges={isCheckingProjectGitChanges}
+                hasGitChanges={hasProjectGitChanges}
+                isGitRepo={isProjectGitRepo}
               />
             );
           })()
@@ -1490,6 +1504,7 @@ export default function HomePage() {
         open={diffModalOpen}
         onClose={() => setDiffModalOpen(false)}
         sessionId={selectedSessionId || ""}
+        projectId={!selectedSessionId ? (selectedProjectId || undefined) : undefined}
       />
 
       <CommandModal

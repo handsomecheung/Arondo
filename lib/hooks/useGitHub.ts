@@ -2,9 +2,11 @@ import { useState, useEffect } from "react";
 
 export function useGitHub({
   selectedSessionId,
+  selectedProjectId,
   menuOpen,
 }: {
   selectedSessionId: string | null;
+  selectedProjectId?: string | null;
   menuOpen: boolean;
 }) {
   const [isCheckingGitChanges, setIsCheckingGitChanges] = useState(false);
@@ -12,10 +14,18 @@ export function useGitHub({
   const [isGitRepo, setIsGitRepo] = useState(true);
 
   useEffect(() => {
-    if (!menuOpen || !selectedSessionId) return;
+    if (!menuOpen) return;
+
+    const url = selectedProjectId
+      ? `/api/projects/${selectedProjectId}/git-status`
+      : selectedSessionId
+        ? `/api/sessions/${selectedSessionId}/git-status`
+        : null;
+
+    if (!url) return;
 
     setIsCheckingGitChanges(true);
-    fetch(`/api/sessions/${selectedSessionId}/git-status`)
+    fetch(url)
       .then((r) => r.json())
       .then((data) => {
         setHasGitChanges(!!data.hasChanges);
@@ -29,7 +39,7 @@ export function useGitHub({
       .finally(() => {
         setIsCheckingGitChanges(false);
       });
-  }, [menuOpen, selectedSessionId]);
+  }, [menuOpen, selectedSessionId, selectedProjectId]);
 
   return { isCheckingGitChanges, hasGitChanges, isGitRepo };
 }

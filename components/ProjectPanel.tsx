@@ -26,6 +26,10 @@ interface ProjectPanelProps {
   onAutoAddScripts: () => void;
   onSelectSession: (id: string) => void;
   onRunScript: (name: string) => void;
+  onShowDiff: () => void;
+  isCheckingGitChanges: boolean;
+  hasGitChanges: boolean;
+  isGitRepo: boolean;
 }
 
 export default function ProjectPanel({
@@ -51,6 +55,10 @@ export default function ProjectPanel({
   onAutoAddScripts,
   onSelectSession,
   onRunScript,
+  onShowDiff,
+  isCheckingGitChanges,
+  hasGitChanges,
+  isGitRepo,
 }: ProjectPanelProps) {
   const folderName = project.repoPath.split("/").pop() || project.repoPath;
   const projectRunner = runners.find((r) => r.id === project.runnerId);
@@ -108,6 +116,41 @@ export default function ProjectPanel({
 
             {menuOpen && (
               <div className="session-dropdown-menu">
+                {!isGitRepo ? (
+                  <button
+                    className="menu-item"
+                    disabled={true}
+                    id="menu-show-diff"
+                    title="Not a git repository"
+                  >
+                    🔍 Show Changes
+                  </button>
+                ) : isCheckingGitChanges || !hasGitChanges ? (
+                  <button
+                    className="menu-item"
+                    disabled={true}
+                    id="menu-show-diff"
+                    title={
+                      isCheckingGitChanges
+                        ? "Checking git changes..."
+                        : "No changes detected in git repository"
+                    }
+                  >
+                    🔍 {isCheckingGitChanges ? "Show Changes" : "No Changes"}
+                  </button>
+                ) : (
+                  <button
+                    className="menu-item"
+                    onClick={() => {
+                      onSetMenuOpen(false);
+                      onShowDiff();
+                    }}
+                    id="menu-show-diff"
+                  >
+                    🔍 Show Changes
+                  </button>
+                )}
+
                 <button
                   className="menu-item"
                   disabled={!runners.some((r) => r.id === project.runnerId && r.connected)}
