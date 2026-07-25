@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { IconPlus, IconInbox, IconSettings, IconServer, IconMoreVertical, IconArchive, IconArrowLeft, IconTrash, IconPin, IconEdit } from "@/components/Icons";
+import { IconPlus, IconInbox, IconSettings, IconServer, IconMoreVertical, IconArchive, IconArrowLeft, IconTrash, IconPin, IconEdit, IconLogout } from "@/components/Icons";
 import { formatRelative, isUnviewedCompletion } from "@/lib/homeUtils";
 import type { Session, Project, Runner } from "@/types/home";
 
@@ -30,6 +30,7 @@ interface Props {
   onOpenArchivedSessions: () => void;
   onCloseArchivedSessions: () => void;
   onSelectArchivedSession: (id: string) => void;
+  onLogout: () => void;
 }
 
 export default function AppSidebar({
@@ -55,6 +56,7 @@ export default function AppSidebar({
   onOpenArchivedSessions,
   onCloseArchivedSessions,
   onSelectArchivedSession,
+  onLogout,
 }: Props) {
   const [userRole, setUserRole] = useState<"admin" | "user" | null>(null);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
@@ -189,6 +191,16 @@ export default function AppSidebar({
                       <IconSettings /> Settings
                     </Link>
                   )}
+                  <button
+                    className="menu-item"
+                    onClick={() => {
+                      setMoreMenuOpen(false);
+                      onLogout();
+                    }}
+                    id="menu-logout"
+                  >
+                    <IconLogout /> Log Out
+                  </button>
                 </div>
               )}
             </div>

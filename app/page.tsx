@@ -146,6 +146,9 @@ export default function HomePage() {
   const [confirmDialog, setConfirmDialog] = useState<{
     message: string;
     onConfirm: () => void;
+    title?: string;
+    confirmLabel?: string;
+    danger?: boolean;
   } | null>(null);
   const [renameModal, setRenameModal] = useState<{
     sessionId: string;
@@ -1240,6 +1243,19 @@ export default function HomePage() {
         onOpenArchivedSessions={handleOpenArchivedSessions}
         onCloseArchivedSessions={handleCloseArchivedSessions}
         onSelectArchivedSession={handleSelectArchivedSession}
+        onLogout={() => {
+          setConfirmDialog({
+            message: "Are you sure you want to log out?",
+            title: "Log Out",
+            confirmLabel: "Log Out",
+            danger: false,
+            onConfirm: () => {
+              setConfirmDialog(null);
+              localStorage.removeItem("arondo_token");
+              window.location.reload();
+            },
+          });
+        }}
       />
 
       {/* Main */}

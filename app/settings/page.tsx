@@ -686,27 +686,6 @@ export default function SettingsPage() {
         >
           <IconRefresh />
         </button>
-        <button
-          onClick={() => {
-            if (confirm("Are you sure you want to reset your access token?")) {
-              localStorage.removeItem("arondo_token");
-              window.location.reload();
-            }
-          }}
-          style={{
-            marginLeft: 12,
-            padding: "6px 12px",
-            fontSize: 12,
-            fontWeight: 500,
-            color: "var(--text-secondary)",
-            background: "transparent",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius-sm)",
-            cursor: "pointer",
-          }}
-        >
-          Reset Token
-        </button>
       </header>
 
       <main
