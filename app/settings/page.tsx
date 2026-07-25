@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ConfirmDialog from "@/components/modals/ConfirmDialog";
@@ -189,6 +189,7 @@ export default function SettingsPage() {
   const [sessionArchiveDays, setSessionArchiveDays] = useState<number | "">("");
   const [savingSessionArchiveDays, setSavingSessionArchiveDays] = useState(false);
   const [saveSessionArchiveDaysSuccess, setSaveSessionArchiveDaysSuccess] = useState(false);
+  const sessionArchiveDaysAutoSaveReady = useRef(false);
   const [serverVersion, setServerVersion] = useState<string>("");
 
   const [showHiddenFiles, setShowHiddenFiles] = useState(true);
@@ -408,15 +409,14 @@ export default function SettingsPage() {
     }
   }, [globalRules]);
 
-  const handleSaveSessionArchiveDays = useCallback(async () => {
-    if (sessionArchiveDays === "" || sessionArchiveDays < 1) return;
+  const saveSessionArchiveDays = useCallback(async (days: number) => {
     setSavingSessionArchiveDays(true);
     setSaveSessionArchiveDaysSuccess(false);
     try {
       const res = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionArchiveDays }),
+        body: JSON.stringify({ sessionArchiveDays: days }),
       });
       if (res.ok) {
         setSaveSessionArchiveDaysSuccess(true);
@@ -429,7 +429,7 @@ export default function SettingsPage() {
     } finally {
       setSavingSessionArchiveDays(false);
     }
-  }, [sessionArchiveDays]);
+  }, []);
 
   const handleToggleShowHiddenFiles = useCallback(async (checked: boolean) => {
     setShowHiddenFiles(checked);
@@ -517,6 +517,21 @@ export default function SettingsPage() {
   }, [userRole, loadSystemTokens, loadRunnerTokens]);
 
   useEffect(() => {
+    if (sessionArchiveDays === "" || sessionArchiveDays < 1) return;
+
+    if (!sessionArchiveDaysAutoSaveReady.current) {
+      sessionArchiveDaysAutoSaveReady.current = true;
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      saveSessionArchiveDays(sessionArchiveDays);
+    }, 500);
+
+    return () => window.clearTimeout(timeout);
+  }, [sessionArchiveDays, saveSessionArchiveDays]);
+
+  useEffect(() => {
     fetch("/api/auth/verify")
       .then((r) => r.json())
       .then((data) => {
@@ -550,7 +565,7 @@ export default function SettingsPage() {
 
     const poll = setInterval(loadRunners, 10_000);
     return () => clearInterval(poll);
-  }, [loadRunners, loadCustomCommands]);
+  }, [loadRunners, loadCustomCommands, loadGlobalRules, loadSettings, router]);
 
   const handleDeleteCommand = useCallback(
     async (command: string) => {
@@ -1210,24 +1225,11 @@ export default function SettingsPage() {
                   outline: "none",
                 }}
               />
-              <button
-                onClick={handleSaveSessionArchiveDays}
-                disabled={savingSessionArchiveDays || sessionArchiveDays === "" || sessionArchiveDays < 1}
-                style={{
-                  padding: "7px 18px",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: "#fff",
-                  background: "var(--accent)",
-                  border: "none",
-                  borderRadius: "var(--radius-sm)",
-                  cursor: "pointer",
-                  opacity:
-                    savingSessionArchiveDays || sessionArchiveDays === "" || sessionArchiveDays < 1 ? 0.5 : 1,
-                }}
-              >
-                {savingSessionArchiveDays ? "Saving…" : "Save"}
-              </button>
+              {savingSessionArchiveDays && (
+                <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 500 }}>
+                  Saving…
+                </span>
+              )}
               {saveSessionArchiveDaysSuccess && (
                 <span style={{ fontSize: 13, color: "var(--accent)", fontWeight: 500 }}>
                   ✓ Saved successfully!
