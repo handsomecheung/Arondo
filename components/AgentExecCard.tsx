@@ -5,10 +5,13 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import remarkFileLinks, { extractCandidatePaths, candidateToPath } from "@/lib/remarkFileLinks";
+import remarkSoftLineBreaks from "@/lib/remarkSoftLineBreaks";
 import { resolveRepoFilePath } from "@/lib/homeUtils";
 import ExecCard, { ExecCardProps } from "@/components/ExecCard";
 import { IconTerminal, IconFileText, IconCopy } from "@/components/Icons";
 import DiffModal from "@/components/modals/DiffModal";
+
+const RENDERED_HTML_CACHE_MARKER = "<!--arondo-agent-output-html-v3-->";
 
 // Terminal mode-control sequences (cursor visibility, mouse tracking, bracketed paste, etc.)
 // leak into agent PTY output but carry no visual meaning outside a real terminal emulator.
@@ -60,7 +63,7 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
     fetch(url)
       .then((r) => r.json())
       .then(({ html }: { html?: string }) => {
-        if (html) {
+        if (html?.includes(RENDERED_HTML_CACHE_MARKER)) {
           setCachedHtml(html);
         }
         setIsHtmlLoaded(true);
@@ -185,7 +188,7 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
 
     const timer = setTimeout(() => {
       if (!outputRef.current) return;
-      const html = outputRef.current.innerHTML;
+      const html = `${RENDERED_HTML_CACHE_MARKER}${outputRef.current.innerHTML}`;
       if (!html) return;
 
       const url = sessionId
@@ -310,7 +313,7 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
             onClick={handleOutputClick}
           >
             <ReactMarkdown
-              remarkPlugins={[remarkGfm, [remarkFileLinks, { verified: verifiedPaths }]]}
+              remarkPlugins={[remarkGfm, [remarkFileLinks, { verified: verifiedPaths }], remarkSoftLineBreaks]}
               rehypePlugins={[rehypeHighlight]}
               urlTransform={(url) => url}
               components={{
@@ -375,4 +378,3 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
     </>
   );
 }
-
