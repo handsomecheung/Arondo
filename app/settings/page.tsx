@@ -191,6 +191,9 @@ export default function SettingsPage() {
   const [saveSessionArchiveDaysSuccess, setSaveSessionArchiveDaysSuccess] = useState(false);
   const [serverVersion, setServerVersion] = useState<string>("");
 
+  const [showHiddenFiles, setShowHiddenFiles] = useState(true);
+  const [savingShowHiddenFiles, setSavingShowHiddenFiles] = useState(false);
+
   const loadRunners = useCallback(() => {
     fetch("/api/runners")
       .then((r) => r.json())
@@ -217,8 +220,11 @@ export default function SettingsPage() {
   const loadSettings = useCallback(() => {
     fetch("/api/settings")
       .then((r) => r.json())
-      .then((data: { sessionArchiveDays: number; version?: string }) => {
+      .then((data: { sessionArchiveDays: number; showHiddenFiles?: boolean; version?: string }) => {
         setSessionArchiveDays(data.sessionArchiveDays);
+        if (data.showHiddenFiles !== undefined) {
+          setShowHiddenFiles(data.showHiddenFiles);
+        }
         if (data.version) {
           setServerVersion(data.version);
         }
@@ -424,6 +430,27 @@ export default function SettingsPage() {
       setSavingSessionArchiveDays(false);
     }
   }, [sessionArchiveDays]);
+
+  const handleToggleShowHiddenFiles = useCallback(async (checked: boolean) => {
+    setShowHiddenFiles(checked);
+    setSavingShowHiddenFiles(true);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ showHiddenFiles: checked }),
+      });
+      if (!res.ok) {
+        setShowHiddenFiles(!checked);
+        alert("Failed to save hidden files setting");
+      }
+    } catch (err) {
+      console.error("Failed to save hidden files setting:", err);
+      setShowHiddenFiles(!checked);
+    } finally {
+      setSavingShowHiddenFiles(false);
+    }
+  }, []);
 
   const saveRunnerUserTokenUuids = useCallback(async (runnerId: string, allowedUserTokenUuids: string[]) => {
     try {
@@ -1228,6 +1255,55 @@ export default function SettingsPage() {
                 </span>
               )}
             </div>
+          </div>
+
+          {/* File Browser Section */}
+          <div
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-md)",
+              padding: 16,
+            }}
+          >
+            <h2
+              style={{
+                fontSize: 16,
+                fontWeight: 600,
+                color: "var(--text-primary)",
+                marginBottom: 4,
+              }}
+            >
+              File Browser
+            </h2>
+            <p
+              style={{
+                fontSize: 12,
+                color: "var(--text-muted)",
+                marginBottom: 12,
+              }}
+            >
+              Show hidden files and directories (e.g. .env, .git) in the file browser and @ path selector.
+            </p>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 13,
+                color: "var(--text-primary)",
+                cursor: savingShowHiddenFiles ? "default" : "pointer",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={showHiddenFiles}
+                disabled={savingShowHiddenFiles}
+                onChange={(e) => handleToggleShowHiddenFiles(e.target.checked)}
+                style={{ cursor: savingShowHiddenFiles ? "default" : "pointer" }}
+              />
+              <span>Show hidden files</span>
+            </label>
           </div>
 
           {/* Global Agent Rules Section */}

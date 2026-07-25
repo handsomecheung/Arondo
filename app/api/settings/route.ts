@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getArondoToken, getRoleByToken, isValidToken } from "@/lib/auth";
-import { getAppSettings, updateAppSettings, getSessionArchiveDays } from "@/lib/store";
+import { getAppSettings, updateAppSettings, getSessionArchiveDays, getShowHiddenFiles } from "@/lib/store";
 import fs from "fs/promises";
 import path from "path";
 
@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
   }
 
   const sessionArchiveDays = await getSessionArchiveDays();
+  const showHiddenFiles = await getShowHiddenFiles();
 
   let version = "unknown";
   try {
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
     console.error("Failed to read package.json version:", err);
   }
 
-  return NextResponse.json({ sessionArchiveDays, version });
+  return NextResponse.json({ sessionArchiveDays, showHiddenFiles, version });
 }
 
 export async function POST(request: NextRequest) {
@@ -32,13 +33,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Admin role required" }, { status: 403 });
   }
 
-  const { sessionArchiveDays } = await request.json();
+  const { sessionArchiveDays, showHiddenFiles } = await request.json();
   if (sessionArchiveDays !== undefined) {
     if (typeof sessionArchiveDays !== "number" || !Number.isFinite(sessionArchiveDays) || sessionArchiveDays < 1) {
       return NextResponse.json({ error: "sessionArchiveDays must be a positive number" }, { status: 400 });
     }
   }
+  if (showHiddenFiles !== undefined && typeof showHiddenFiles !== "boolean") {
+    return NextResponse.json({ error: "showHiddenFiles must be a boolean" }, { status: 400 });
+  }
 
-  const updated = await updateAppSettings({ sessionArchiveDays });
+  const patch: { sessionArchiveDays?: number; showHiddenFiles?: boolean } = {};
+  if (sessionArchiveDays !== undefined) patch.sessionArchiveDays = sessionArchiveDays;
+  if (showHiddenFiles !== undefined) patch.showHiddenFiles = showHiddenFiles;
+
+  const updated = await updateAppSettings(patch);
   return NextResponse.json(updated);
 }

@@ -176,7 +176,8 @@ func (h *Handler) handleFsInfos(msg *Message) {
 }
 
 type fsListRequest struct {
-	Path string `json:"path"`
+	Path       string `json:"path"`
+	ShowHidden bool   `json:"showHidden"`
 }
 
 type dirEntry struct {
@@ -224,7 +225,7 @@ func (h *Handler) handleFsList(msg *Message) {
 	var dirs []dirEntry
 	var entriesList []fsEntry
 	for _, entry := range entries {
-		if strings.HasPrefix(entry.Name(), ".") {
+		if !req.ShowHidden && strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
 		isDir := entry.IsDir()

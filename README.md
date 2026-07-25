@@ -92,6 +92,7 @@ Open [http://localhost:3251](http://localhost:3251) in your browser. Select the 
 - `ARONDO_CONFIG_DIR` – (Optional) Custom directory to store configuration and runtime data. Defaults to `~/.arondo` in both development and production.
 - `PORT` – (Optional) Server port. Defaults to `3251` in development, `3250` in production.
 - `ARONDO_SESSION_ARCHIVE_DAYS_DEFAULT` – (Optional) Default number of idle days before active sessions are auto-archived, used when no override is set in Settings. Defaults to `7`.
+- `ARONDO_FILE_SHOW_HIDDEN_DEFAULT` – (Optional) Default for whether hidden files/directories (dotfiles) appear in the file browser and @ path selector, used when no override is set in Settings. Defaults to `true`; set to `false` to hide dotfiles by default.
 
 ### Configuration Files (in `ARONDO_CONFIG_DIR` or `~/.arondo/`)
 

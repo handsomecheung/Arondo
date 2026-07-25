@@ -14,8 +14,11 @@ const DEFAULT_SESSION_ARCHIVE_DAYS = 7;
 const SESSION_ARCHIVE_DAYS_DEFAULT =
   Number(process.env.ARONDO_SESSION_ARCHIVE_DAYS_DEFAULT) || DEFAULT_SESSION_ARCHIVE_DAYS;
 
+const FILE_SHOW_HIDDEN_DEFAULT = process.env.ARONDO_FILE_SHOW_HIDDEN_DEFAULT !== "false";
+
 export interface AppSettings {
   sessionArchiveDays?: number;
+  showHiddenFiles?: boolean;
 }
 
 export type SessionStatus = "idle" | "running" | "script-running" | "done" | "error";
@@ -653,6 +656,11 @@ export async function updateAppSettings(patch: Partial<AppSettings>): Promise<Ap
 export async function getSessionArchiveDays(): Promise<number> {
   const settings = await getAppSettings();
   return settings.sessionArchiveDays || SESSION_ARCHIVE_DAYS_DEFAULT;
+}
+
+export async function getShowHiddenFiles(): Promise<boolean> {
+  const settings = await getAppSettings();
+  return settings.showHiddenFiles !== undefined ? settings.showHiddenFiles : FILE_SHOW_HIDDEN_DEFAULT;
 }
 
 export async function getSessionArchiveAgeMs(): Promise<number> {

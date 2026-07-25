@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, verifyRunnerPermission } from "@/lib/auth";
+import { getShowHiddenFiles } from "@/lib/store";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -30,10 +31,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const showHidden = await getShowHiddenFiles();
     const result = await runnerManager.sendRequest(
       runnerId,
       "fs.list",
-      { path: requestedPath }
+      { path: requestedPath, showHidden }
     );
 
     return NextResponse.json({
