@@ -25,6 +25,8 @@ func (h *Handler) handleInfoFetch(msg *Message) {
 		go fetchClaudeQuota(h.client)
 	case "agy":
 		go fetchAgyQuota(h.client)
+	case "codex":
+		go fetchCodexQuota(h.client)
 	default:
 		log.Printf("[quota.fetch] unknown agent: %s", payload.Agent)
 	}
@@ -230,6 +232,14 @@ func fmtI(i *int64) string {
 
 func run(name string, args ...string) error {
 	return exec.Command(name, args...).Run()
+}
+
+// ansiRe matches ANSI/ECMA-48 escape sequences (SGR color codes, cursor
+// movement, etc.) found in raw tmux-captured pane output.
+var ansiRe = regexp.MustCompile("\x1b(?:[@-Z\\\\-_]|\\[[0-?]*[ -/]*[@-~])")
+
+func stripAnsi(s string) string {
+	return ansiRe.ReplaceAllString(s, "")
 }
 
 type timeoutError struct{}

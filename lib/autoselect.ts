@@ -4,6 +4,7 @@ import type { ConcreteAgentType } from "./agents/index";
 import type { Message } from "./store";
 import { getSessionLog } from "./store";
 import { getConfigDir } from "./config";
+import { stripAnsi } from "./ansi";
 
 const CONFIG_DIR = getConfigDir();
 
@@ -227,11 +228,6 @@ export async function isQuotaAvailable(agentType?: ConcreteAgentType): Promise<b
 }
 
 // ─── Cross-agent context injection ────────────────────────────────────────────
-
-const ANSI_RE = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
-function stripAnsi(s: string): string {
-  return s.replace(ANSI_RE, "");
-}
 
 const AGENT_LABEL: Record<string, string> = {
   claude: "Claude Code",

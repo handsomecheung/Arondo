@@ -9,18 +9,20 @@ const AGENTS_DIR = path.join(CONFIG_DIR, "agents");
 const OUTPUT_PATH = path.join(CONFIG_DIR, "autoselect", "agent", "quota.json");
 const STALE_THRESHOLD_S = 60 * 60; // 1 hour
 
-const AGENT_TYPES = ["claude", "antigravity"] as const;
+const AGENT_TYPES = ["claude", "antigravity", "codex"] as const;
 
 // Maps runner binary name → agent file type (used as filename stem and Type field).
 const BINARY_TO_AGENT_TYPE: Record<string, string> = {
   claude: "claude",
   agy: "antigravity",
+  codex: "codex",
 };
 
 // Maps quota Type → runner binary name (inverse of BINARY_TO_AGENT_TYPE).
 const TYPE_TO_BINARY: Record<string, string> = {
   claude: "claude",
   antigravity: "agy",
+  codex: "codex",
 };
 
 type QuotaEntry = Record<string, unknown> & {

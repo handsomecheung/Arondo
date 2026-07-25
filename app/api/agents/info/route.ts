@@ -9,7 +9,7 @@ const CONFIG_DIR = getConfigDir();
 export async function GET(req: NextRequest) {
   const runnerId = req.nextUrl.searchParams.get("runnerId");
   if (!runnerId) {
-    return NextResponse.json({ claude: null, antigravity: null });
+    return NextResponse.json({ claude: null, antigravity: null, codex: null });
   }
 
   const token = getArondoToken(req);
@@ -27,12 +27,13 @@ export async function GET(req: NextRequest) {
     }
   };
 
-  const [claude, antigravity] = await Promise.all([
+  const [claude, antigravity, codex] = await Promise.all([
     read("claude.json"),
     read("antigravity.json"),
+    read("codex.json"),
   ]);
 
-  return NextResponse.json({ claude, antigravity });
+  return NextResponse.json({ claude, antigravity, codex });
 }
 
 export const dynamic = "force-dynamic";

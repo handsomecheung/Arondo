@@ -1021,7 +1021,7 @@ export default function SessionView({
                         [
                           { value: "antigravity", label: "Antigravity CLI", cmd: "agy", comingSoon: false },
                           { value: "claude",       label: "Claude Code",     cmd: "claude", comingSoon: false },
-                          { value: "codex",        label: "Codex",           cmd: "codex",  comingSoon: true },
+                          { value: "codex",        label: "Codex",           cmd: "codex",  comingSoon: false },
                         ] as const
                       ).filter(({ cmd, comingSoon }) => !comingSoon && isAgentAvailable(cmd));
 

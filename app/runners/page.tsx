@@ -31,9 +31,19 @@ interface ClaudeQuota {
   updatedAt: number | null;
 }
 
+interface CodexQuota {
+  Account: string;
+  Plan: string;
+  DefaultModel: string;
+  WeeklyRemain: number | null;
+  WeeklyResetAt: number | null;
+  updatedAt: number | null;
+}
+
 interface AgentsQuota {
   claude: ClaudeQuota | null;
   antigravity: AgyQuota | null;
+  codex: CodexQuota | null;
 }
 
 interface Runner {
@@ -416,7 +426,7 @@ export default function RunnersPage() {
                   const agentDefs = [
                     { label: "Antigravity CLI", cmd: "agy", comingSoon: false },
                     { label: "Claude Code", cmd: "claude", comingSoon: false },
-                    { label: "Codex", cmd: "codex", comingSoon: true },
+                    { label: "Codex", cmd: "codex", comingSoon: false },
                     { label: "OpenCode", cmd: "opencode", comingSoon: true },
                   ];
                   const hasAgentInfo = Array.isArray(r.agents);
@@ -700,7 +710,7 @@ export default function RunnersPage() {
                           </div>
 
                           {/* Agent Quota */}
-                          {agentsQuota && (agentsQuota.claude || agentsQuota.antigravity) && (
+                          {agentsQuota && (agentsQuota.claude || agentsQuota.antigravity || agentsQuota.codex) && (
                             <div>
                               <h3
                                 style={{
@@ -744,6 +754,18 @@ export default function RunnersPage() {
                                       { label: "Gemini Weekly", used: agentsQuota.antigravity.GeminiWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.GeminiWeeklyRemain, remaining: agentsQuota.antigravity.GeminiWeeklyRemain, resetsAt: agentsQuota.antigravity.GeminiWeeklyResetsAt },
                                       { label: "Other Hour", used: agentsQuota.antigravity.OtherHourRemain == null ? null : 1 - agentsQuota.antigravity.OtherHourRemain, remaining: agentsQuota.antigravity.OtherHourRemain, resetsAt: agentsQuota.antigravity.OtherHourResetsAt },
                                       { label: "Other Weekly", used: agentsQuota.antigravity.OtherWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.OtherWeeklyRemain, remaining: agentsQuota.antigravity.OtherWeeklyRemain, resetsAt: agentsQuota.antigravity.OtherWeeklyResetsAt },
+                                    ]}
+                                  />
+                                )}
+                                {agentsQuota.codex && (
+                                  <QuotaCard
+                                    title="Codex"
+                                    account={agentsQuota.codex.Account}
+                                    plan={agentsQuota.codex.Plan}
+                                    model={agentsQuota.codex.DefaultModel}
+                                    updatedAt={agentsQuota.codex.updatedAt}
+                                    rows={[
+                                      { label: "Weekly", used: agentsQuota.codex.WeeklyRemain == null ? null : 1 - agentsQuota.codex.WeeklyRemain, remaining: agentsQuota.codex.WeeklyRemain, resetsAt: agentsQuota.codex.WeeklyResetAt },
                                     ]}
                                   />
                                 )}

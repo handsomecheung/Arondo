@@ -16,6 +16,7 @@ import {
   getAgySessionId,
   saveAgySessionId,
 } from "./agents/antigravity";
+import { extractCodexSessionId, saveCodexSessionId } from "./agents/codex";
 import fs from "fs/promises";
 import path from "path";
 import { getConfigDir } from "./config";
@@ -979,6 +980,7 @@ class RunnerManager {
     const fileNames: Record<string, string> = {
       claude: "claude.json",
       agy: "antigravity.json",
+      codex: "codex.json",
     };
     const fileName = fileNames[agent];
     if (!fileName) {
@@ -1127,6 +1129,18 @@ class RunnerManager {
           "[runner-manager] failed to save agy conversation:",
           err,
         );
+      }
+    }
+
+    if (resolvedAgentType === "codex") {
+      try {
+        const log = await getSessionLog(ctx.sessionId, ctx.messageId);
+        const codexId = extractCodexSessionId(log);
+        if (codexId) {
+          await saveCodexSessionId(ctx.sessionId, codexId);
+        }
+      } catch (err) {
+        console.error("[runner-manager] failed to save codex session id:", err);
       }
     }
 
