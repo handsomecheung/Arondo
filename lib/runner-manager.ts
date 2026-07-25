@@ -162,6 +162,7 @@ class RunnerManager {
         const msgs = await getMessages(s.id);
         const runMsgs = msgs.filter((m: any) => {
           if (m.type !== "agent-run" && m.type !== "script-run") return false;
+          if (m.taskDeleted) return false;
           const returnMsg = msgs.find((ret: any) => ret.parentId === m.id);
           if (returnMsg) {
             const completedAt = new Date(returnMsg.createdAt).getTime();
@@ -216,6 +217,7 @@ class RunnerManager {
         const msgs = await getMessages("", p.id);
         const runMsgs = msgs.filter((m: any) => {
           if (m.type !== "agent-run" && m.type !== "script-run") return false;
+          if (m.taskDeleted) return false;
           const returnMsg = msgs.find((ret: any) => ret.parentId === m.id);
           if (returnMsg) {
             const completedAt = new Date(returnMsg.createdAt).getTime();
@@ -825,6 +827,22 @@ class RunnerManager {
         `[runner-manager] removed ${toDelete.length} task(s) for deleted session ${sessionId}`,
       );
     }
+  }
+
+  async deleteTask(taskId: string): Promise<boolean> {
+    const ctx = this.tasks.get(taskId);
+    if (!ctx || !ctx.completedAt) return false;
+
+    const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
+    this.ptyKeyToTaskId.delete(ptyKey);
+    this.tasks.delete(taskId);
+
+    try {
+      await updateMessage(ctx.sessionId, ctx.messageId, { taskDeleted: true }, ctx.projectId);
+    } catch (err) {
+      console.error(`[runner-manager] failed to mark task ${taskId} deleted:`, err);
+    }
+    return true;
   }
 
   purgeExpiredTasks(): void {

@@ -100,6 +100,7 @@ export interface Message {
   projectId?: string;
   stoppedByUser?: boolean;
   taskId?: string;
+  taskDeleted?: boolean;
   resolvedAgentType?: string;
   prompt?: string;
   tokenUuid?: string;
