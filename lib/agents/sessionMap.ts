@@ -5,7 +5,7 @@ import { getConfigDir } from "../config";
 import { withFileLock, writeJsonAtomic } from "../fileLock";
 
 const CONFIG_DIR = getConfigDir();
-const AGENTS_SESSION_MAP_FILE = path.join(CONFIG_DIR, "agents-sessions.json");
+const AGENTS_SESSION_MAP_FILE = path.join(CONFIG_DIR, "agent-sessions.json");
 
 type AgentSessionMap = {
   agy: Record<string, string>;

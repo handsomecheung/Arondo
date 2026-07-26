@@ -5,9 +5,9 @@ import os from 'os';
 import { setupRunner, teardownRunner, waitForSessionNotRunning } from '../resume.helper';
 
 const CONFIG_DIR_RUNTIME = process.env.ARONDO_CONFIG_DIR || path.join(os.tmpdir(), 'arondo-test-config');
-const AGENTS_SESSION_MAP_FILE = path.join(CONFIG_DIR_RUNTIME, 'agents-sessions.json');
+const AGENTS_SESSION_MAP_FILE = path.join(CONFIG_DIR_RUNTIME, 'agent-sessions.json');
 
-/** Wait until agents-sessions.json contains an agy mapping for sessionId. */
+/** Wait until agent-sessions.json contains an agy mapping for sessionId. */
 async function waitForAgySessionMapped(sessionId: string, timeoutMs = 5000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -167,10 +167,10 @@ async function runTransitionTest(
   quotaPath: string
 ) {
   const mockBinDir = `${path.resolve(__dirname, '../../../mocks/bin/agy')}:${path.resolve(__dirname, '../../../mocks/bin/claude')}`;
-  
+
   const agyLogDir = path.join(os.tmpdir(), `mock_automode_agy_logs_${Math.random().toString(36).slice(2)}`);
   const claudeLogDir = path.join(os.tmpdir(), `mock_automode_claude_logs_${Math.random().toString(36).slice(2)}`);
-  
+
   await fs.mkdir(agyLogDir, { recursive: true }).catch(() => {});
   await fs.mkdir(claudeLogDir, { recursive: true }).catch(() => {});
   await fs.mkdir('/tmp/test-repo', { recursive: true }).catch(() => {});
@@ -249,7 +249,7 @@ async function runTransitionTest(
       // Assert that the context of previous conversation is prepended to the prompt
       const prevLabel = expectedFromAgent === 'claude' ? 'Claude Code' : 'Antigravity CLI';
       const mockLabel = expectedFromAgent === 'claude' ? 'claude' : 'agy';
-      
+
       expect(secondRunMsg.prompt).toContain(`[Previous conversation context from ${prevLabel}]`);
       expect(secondRunMsg.prompt).toContain('User: Hello Automode 1');
       expect(secondRunMsg.prompt).toContain(`Mock ${mockLabel} received: Hello Automode 1`);
@@ -511,7 +511,7 @@ async function runXXYXTest(
     const messages4 = await msgsRes4.json();
     const runMsgs4 = messages4.filter((m: any) => m.type === 'agent-run');
     expect(runMsgs4.length).toBe(4);
-    
+
     expect(runMsgs4[3].resolvedAgentType).toBe(xInfo.agent);
     if (xInfo.agent === 'antigravity') {
       expect(runMsgs4[3].content).toContain('--conversation');
