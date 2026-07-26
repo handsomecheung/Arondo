@@ -71,7 +71,11 @@ export async function PATCH(
   try {
     const patch: Record<string, any> = {};
     if (name !== undefined) patch.name = name;
-    if (agentType !== undefined) patch.agentType = agentType;
+    if (agentType !== undefined) {
+      patch.agentType = agentType;
+      patch.autoLockedAgentType = undefined;
+      patch.autoLockedAgentModel = undefined;
+    }
     if (pinned !== undefined) patch.pinnedAt = pinned ? new Date().toISOString() : undefined;
     const updated = await updateSession(id, patch);
     eventBus.publish({ type: "session_updated", payload: updated });

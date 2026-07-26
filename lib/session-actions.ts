@@ -53,7 +53,29 @@ export async function dispatchFollowupMessage(
   eventBus.publish({ type: "message_added", payload: userMsg });
 
   const runnerConn = runnerManager.getRunner(session.runnerId);
-  const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? []);
+
+  // For auto sessions, reuse the locked agent unless a quota error occurred.
+  const quotaErrorMessages = [
+    "agy quota exhausted — no output was produced",
+    "Claude session limit hit",
+  ];
+  const prevQuotaError = session.agentType === "auto" &&
+    session.errorMessage != null &&
+    quotaErrorMessages.some((s) => session.errorMessage!.includes(s));
+
+  let resolved: { agentType: import("./agents").ConcreteAgentType; model?: string };
+  if (
+    session.agentType === "auto" &&
+    session.autoLockedAgentType != null &&
+    !prevQuotaError
+  ) {
+    resolved = {
+      agentType: session.autoLockedAgentType as import("./agents").ConcreteAgentType,
+      model: session.autoLockedAgentModel,
+    };
+  } else {
+    resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? []);
+  }
   const resolvedType = resolved.agentType;
 
   const lastAgentRun = [...messages].reverse().find((m) => m.type === "agent-run" && m.resolvedAgentType);
@@ -89,6 +111,13 @@ export async function dispatchFollowupMessage(
         : firstLine;
     }
     patch.prompt = trimmedMessage;
+  }
+  if (session.agentType === "auto") {
+    patch.autoLockedAgentType = resolvedType;
+    patch.autoLockedAgentModel = resolved.model ?? undefined;
+    if (prevQuotaError) {
+      patch.errorMessage = undefined;
+    }
   }
   const updatedSession = await updateSession(sessionId, patch);
   eventBus.publish({ type: "session_updated", payload: updatedSession });
@@ -197,7 +226,10 @@ export async function dispatchCreateSession(
   const fullPrompt = agent.buildPrompt(trimmedPrompt);
   const command = agent.getCommand({ prompt: trimmedPrompt, repoPath, sessionId: session.id, isResume: false, model: resolved.model });
 
-  const updatedSession = await updateSession(session.id, { command });
+  const autoLockPatch = agentType === "auto"
+    ? { autoLockedAgentType: resolvedType, autoLockedAgentModel: resolved.model ?? undefined }
+    : {};
+  const updatedSession = await updateSession(session.id, { command, ...autoLockPatch });
   eventBus.publish({ type: "session_updated", payload: updatedSession });
 
   const userMessage = await addMessage({

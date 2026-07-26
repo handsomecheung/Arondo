@@ -78,6 +78,10 @@ export interface Session {
   // Denormalized kind of the (first) pending todo, so the sidebar/composer
   // can label Draft/Pending without reading messages.json.
   pendingTodoTrigger?: TodoTriggerKind;
+  // Concrete agent/model locked in when agentType is "auto". Set on first
+  // dispatch, cleared on quota error so the next run re-selects freely.
+  autoLockedAgentType?: string;
+  autoLockedAgentModel?: string;
 }
 
 export type MessageType =
