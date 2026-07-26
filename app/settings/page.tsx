@@ -22,24 +22,6 @@ interface Runner {
   syncGlobalRules?: boolean;
 }
 
-interface Project {
-  id: string;
-  repoPath: string;
-  runnerId: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface Session {
-  id: string;
-  name?: string;
-  status: string;
-  prompt: string;
-  projectId: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 interface AgentCommand {
   command: string;
   menuLabel?: string;
@@ -151,15 +133,12 @@ function IconInbox() {
 export default function SettingsPage() {
   const router = useRouter();
   const [runners, setRunners] = useState<Runner[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [sessions, setSessions] = useState<Session[]>([]);
   const [customCommands, setCustomCommands] = useState<AgentCommand[]>([]);
   const [showAddCommand, setShowAddCommand] = useState(false);
   const [newCommand, setNewCommand] = useState<AgentCommand>(EMPTY_COMMAND);
   const [savingCommand, setSavingCommand] = useState(false);
   const [editingCommand, setEditingCommand] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<AgentCommand>(EMPTY_COMMAND);
-  const [newTokenMap, setNewTokenMap] = useState<Record<string, string>>({});
   const [userRole, setUserRole] = useState<"admin" | "user" | null>(null);
   const [systemTokens, setSystemTokens] = useState<TokenInfo[]>([]);
   const [generatedUserToken, setGeneratedUserToken] = useState<string | null>(null);
@@ -460,29 +439,6 @@ export default function SettingsPage() {
     }
   }, []);
 
-  const handleAddToken = useCallback(async (runnerId: string) => {
-    const tokenToAdd = newTokenMap[runnerId]?.trim();
-    if (!tokenToAdd) return;
-
-    const runner = runners.find((r) => r.id === runnerId);
-    if (!runner) return;
-
-    const currentTokenUuids = runner.allowedUserTokenUuids || [];
-    if (currentTokenUuids.includes(tokenToAdd)) return;
-
-    const updatedTokenUuids = [...currentTokenUuids, tokenToAdd];
-    await saveRunnerUserTokenUuids(runnerId, updatedTokenUuids);
-  }, [newTokenMap, runners, saveRunnerUserTokenUuids]);
-
-  const handleRemoveToken = useCallback(async (runnerId: string, tokenToRemove: string) => {
-    const runner = runners.find((r) => r.id === runnerId);
-    if (!runner) return;
-
-    const currentTokenUuids = runner.allowedUserTokenUuids || [];
-    const updatedTokenUuids = currentTokenUuids.filter((t) => t !== tokenToRemove);
-    await saveRunnerUserTokenUuids(runnerId, updatedTokenUuids);
-  }, [runners, saveRunnerUserTokenUuids]);
-
   const handleToggleSyncGlobalRules = useCallback(async (runnerId: string, syncGlobalRules: boolean) => {
     try {
       const res = await fetch("/api/runners", {
@@ -541,19 +497,6 @@ export default function SettingsPage() {
     loadCustomCommands();
     loadGlobalRules();
     loadSettings();
-    fetch("/api/projects")
-      .then((r) => r.json())
-      .then((data: Project[]) => {
-        if (Array.isArray(data)) setProjects(data);
-      })
-      .catch(console.error);
-    fetch("/api/sessions")
-      .then((r) => r.json())
-      .then((data: Session[]) => {
-        if (Array.isArray(data)) setSessions(data);
-      })
-      .catch(console.error);
-
     const poll = setInterval(loadRunners, 10_000);
     return () => clearInterval(poll);
   }, [loadRunners, loadCustomCommands, loadGlobalRules, loadSettings, router]);
@@ -614,11 +557,6 @@ export default function SettingsPage() {
       setSavingCommand(false);
     }
   }, [editDraft, loadCustomCommands]);
-
-  const sortedRunners = [...runners].sort((a, b) => {
-    if (a.connected !== b.connected) return a.connected ? -1 : 1;
-    return (b.lastSeenAt ?? 0) - (a.lastSeenAt ?? 0);
-  });
 
   if (userRole !== "admin") {
     return null;
@@ -1029,7 +967,7 @@ export default function SettingsPage() {
                     fontSize: 13,
                   }}
                 >
-                  No custom commands. Click "+ Add" to create one.
+                  No custom commands. Click &quot;+ Add&quot; to create one.
                 </div>
               )}
               {customCommands.map((cmd) =>
@@ -1755,7 +1693,7 @@ export default function SettingsPage() {
               <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
                 Each Runner machine authenticates with its own dedicated token, generated here and passed to the
                 Runner binary via <code>--token</code> or <code>ARONDO_RUNNER_TOKEN</code>. A token locks to the
-                first Runner identity that connects with it, so it can't later be reused to impersonate a
+                first Runner identity that connects with it, so it can&apos;t later be reused to impersonate a
                 different Runner.
               </p>
 

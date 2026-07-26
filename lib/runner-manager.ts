@@ -2,7 +2,6 @@ import type { WebSocket } from "ws";
 import { eventBus } from "./event-bus";
 import {
   appendSessionLog,
-  clearSessionLog,
   updateSession,
   addMessage,
   getSession,
@@ -120,7 +119,7 @@ class RunnerManager {
         const filePath = path.join(RUNNERS_DIR, entry.name, "runner.json");
         try {
           const raw = await fs.readFile(filePath, "utf-8");
-          let info: any = JSON.parse(raw);
+          const info: any = JSON.parse(raw);
 
           // Migrate allowedTokens/allowedTokenUuids to allowedUserTokenUuids if legacy properties exist
           if ((info.allowedTokens || info.allowedTokenUuids) && !info.allowedUserTokenUuids) {
@@ -151,7 +150,7 @@ class RunnerManager {
 
   async restoreTasks(): Promise<void> {
     try {
-      const { getSessions, getProjects, getMessages } = require("./store");
+      const { getSessions, getProjects, getMessages } = await import("./store");
       const sessions = await getSessions();
       const projects = await getProjects();
       

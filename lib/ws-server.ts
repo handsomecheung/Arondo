@@ -1,5 +1,4 @@
 import { IncomingMessage } from "http";
-import url from "url";
 import { WebSocketServer, WebSocket } from "ws";
 import { eventBus, SseEvent } from "./event-bus";
 import { runnerManager } from "./runner-manager";
@@ -70,11 +69,11 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
       if (!runnerId) {
         const sid = event.payload.sessionId || event.payload.id;
         if (sid) {
-          const { getSession } = require("./store");
+          const { getSession } = await import("./store");
           const session = await getSession(sid);
           if (session) runnerId = session.runnerId;
         } else if (event.payload.projectId) {
-          const { getProject } = require("./store");
+          const { getProject } = await import("./store");
           const project = await getProject(event.payload.projectId);
           if (project) runnerId = project.runnerId;
         }

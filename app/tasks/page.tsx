@@ -126,7 +126,7 @@ function formatDuration(ms: number): string {
 
 export default function TasksPage() {
   const [taskQueue, setTaskQueue] = useState<TaskItem[]>([]);
-  const [taskTimeTicker, setTaskTimeTicker] = useState(Date.now());
+  const [taskTimeTicker, setTaskTimeTicker] = useState(() => Date.now());
   const [connected, setConnected] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -923,7 +923,7 @@ export default function TasksPage() {
                 No tasks matching the filter
               </p>
               <p style={{ color: "var(--text-muted)", fontSize: 12, margin: "4px 0 0" }}>
-                Try switching the filter to "Both" to view all tasks.
+                Try switching the filter to &quot;Both&quot; to view all tasks.
               </p>
             </div>
           ) : (

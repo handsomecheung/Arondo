@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, addMessage, updateSession, clearSessionLog } from "@/lib/store";
-import { getAgent, AgentType, resolveAgentType, PROMPT_ENV_VAR } from "@/lib/agents";
+import { getAgent, resolveAgentType, PROMPT_ENV_VAR } from "@/lib/agents";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, verifySessionPermission } from "@/lib/auth";

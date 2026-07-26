@@ -154,7 +154,7 @@ export default function FileBrowserModal({ open, onClose, runnerId, initialPath 
     } else {
       loadDir(initialPath);
     }
-  }, [open, runnerId, initialFilePath]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, runnerId, initialFilePath]);
 
   const navigateTo = (path: string) => {
     setCurrentPath(path);

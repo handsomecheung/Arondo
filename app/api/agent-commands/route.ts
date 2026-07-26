@@ -1,7 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import { NextRequest, NextResponse } from "next/server";
-import { AGENT_COMMANDS, mergeAgentCommands } from "@/lib/agentCommands";
+import { mergeAgentCommands } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
 import { getConfigDir } from "@/lib/config";
 import { getArondoToken, getRoleByToken, isValidToken } from "@/lib/auth";

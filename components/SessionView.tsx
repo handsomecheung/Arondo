@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import ScriptExecCard from "@/components/ScriptExecCard";
 import AgentExecCard from "@/components/AgentExecCard";
-import ExecCard, { ExecCardItem } from "@/components/ExecCard";
 import UserAgentCommandCard from "@/components/UserAgentCommandCard";
 import UserMessageCard from "@/components/UserMessageCard";
 import UserTodoMessageCard from "@/components/UserTodoMessageCard";
@@ -12,12 +11,12 @@ import type { ExecCardInfo } from "@/lib/homeUtils";
 import { formatTime, execCardInfoToItem, autoResizeTextarea } from "@/lib/homeUtils";
 import {
   IconLogo, IconPlus, IconSend, IconCheck,
-  IconGitPullRequest, IconPlay, IconTerminal, IconEdit, IconTrash,
+  IconPlay, IconTerminal, IconEdit, IconTrash,
   IconMoreVertical, IconFolder, IconChevronDown, IconFileSearch,
-  IconClaude, IconAntigravity, IconCodex, IconFileText, IconClock,
+  IconClaude, IconAntigravity, IconCodex, IconClock,
   IconArchive, IconPin, IconPaperclip, IconX,
 } from "@/components/Icons";
-import { getTriggerWord, resolveAgentCommand } from "@/lib/agentCommands";
+import { getTriggerWord } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
 
 interface SessionViewProps {
@@ -120,7 +119,6 @@ export default function SessionView({
   returnMsgIds,
   runners,
   projects,
-  runnerAgents,
   runnerId,
   agentType,
   repoPath,

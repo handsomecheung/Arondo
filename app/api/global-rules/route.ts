@@ -17,8 +17,8 @@ export async function GET(request: NextRequest) {
   try {
     const content = await fs.readFile(GLOBAL_RULES_FILE, "utf-8");
     return NextResponse.json({ content });
-  } catch (err: any) {
-    if (err.code === "ENOENT") {
+  } catch (err: unknown) {
+    if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") {
       return NextResponse.json({ content: "" });
     }
     return NextResponse.json({ error: "Failed to read global rules" }, { status: 500 });
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ ok: true });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json({ error: "Failed to save global rules" }, { status: 500 });
   }
 }

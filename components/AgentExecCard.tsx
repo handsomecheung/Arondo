@@ -44,7 +44,6 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
   const [diffsToSave, setDiffsToSave] = useState<Record<string, string>>({});
   const [hasVerified, setHasVerified] = useState(false);
   const [cachedHtml, setCachedHtml] = useState<string | null>(null);
-  const [isHtmlLoaded, setIsHtmlLoaded] = useState(false);
   const [diffModalOpen, setDiffModalOpen] = useState(false);
   const [selectedDiffPath, setSelectedDiffPath] = useState("");
   const outputRef = useRef<HTMLDivElement>(null);
@@ -52,7 +51,6 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
   // Fetch cached HTML if exists
   useEffect(() => {
     if (!props.item.messageId || onViewLog) {
-      setIsHtmlLoaded(true);
       return;
     }
 
@@ -66,10 +64,8 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
         if (html?.includes(RENDERED_HTML_CACHE_MARKER)) {
           setCachedHtml(html);
         }
-        setIsHtmlLoaded(true);
       })
       .catch(() => {
-        setIsHtmlLoaded(true);
       });
   }, [props.item.messageId, sessionId, projectId, onViewLog]);
 
@@ -236,7 +232,7 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
 
   const verifiedPaths = new Set(
     Object.entries(pathInfos)
-      .filter(([_, info]) => info.exists)
+      .filter(([, info]) => info.exists)
       .map(([path]) => path)
   );
 

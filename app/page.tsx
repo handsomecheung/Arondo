@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import dynamic from "next/dynamic";
 import Link from "next/link";
-import type { Session, Project, Runner, ProjectScript, Message, TaskItem } from "@/types/home";
-import { AGENT_COMMANDS, mergeAgentCommands } from "@/lib/agentCommands";
+import type { Session, Project, Runner, Message, TaskItem } from "@/types/home";
+import { AGENT_COMMANDS } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
 import { IconTaskQueue, IconLogo, IconMenu, IconRefresh } from "@/components/Icons";
 import AppSidebar from "@/components/AppSidebar";
@@ -25,8 +24,8 @@ import RenameSessionDialog from "@/components/modals/RenameSessionDialog";
 import ConfirmDialog from "@/components/modals/ConfirmDialog";
 import InfoDialog from "@/components/modals/InfoDialog";
 import {
-  formatTime, formatRelative, formatDuration, readUrlState,
-  parseExecCommand, execCardInfoToItem, resolveRepoFilePath, isUnviewedCompletion,
+  readUrlState,
+  parseExecCommand, resolveRepoFilePath, isUnviewedCompletion,
 } from "@/lib/homeUtils";
 import type { ExecCardInfo } from "@/lib/homeUtils";
 import { useFileSystem } from "@/lib/hooks/useFileSystem";
@@ -35,8 +34,6 @@ import { useWebSocket } from "@/lib/hooks/useWebSocket";
 import { useScripts } from "@/lib/hooks/useScripts";
 import { useInitialLoad } from "@/lib/hooks/useInitialLoad";
 import { useSessionSubmit } from "@/lib/hooks/useSessionSubmit";
-
-const Terminal = dynamic(() => import("@/components/Terminal"), { ssr: false });
 
 function renderMessageContent(content: string) {
   if (
@@ -83,7 +80,7 @@ export default function HomePage() {
     () => sessions.filter(isUnviewedCompletion).length,
     [sessions],
   );
-  const initUrl = useMemo(readUrlState, []);
+  const initUrl = useMemo(() => readUrlState(), []);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     initUrl.session,
   );
@@ -167,7 +164,7 @@ export default function HomePage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scriptSubMenuOpen, setScriptSubMenuOpen] = useState(false);
 
-  const [sessionLog, setSessionLog] = useState("");
+  const [, setSessionLog] = useState("");
   const [activeLogMsgId, setActiveLogMsgId] = useState<string | null>(null);
   const [logModalOpen, setLogModalOpen] = useState(false);
   const [commandModalText, setCommandModalText] = useState<string | null>(null);
@@ -250,15 +247,13 @@ export default function HomePage() {
   };
 
   const {
-    projectScripts, setProjectScripts,
+    projectScripts,
     draggedIndex,
     scriptModalOpen, setScriptModalOpen,
     scriptName, setScriptName,
     scriptCommand, setScriptCommand,
     editingScriptName, setEditingScriptName,
     sessionScripts,
-    isRunningScript,
-    loadProjectScripts,
     handleSaveScript,
     handleDeleteScript,
     handleCloseScriptModal,

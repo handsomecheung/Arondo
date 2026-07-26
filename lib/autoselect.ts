@@ -10,12 +10,6 @@ const CONFIG_DIR = getConfigDir();
 
 const QUOTA_PATH = path.join(CONFIG_DIR, "autoselect", "agent", "quota.json");
 
-// Maps ConcreteAgentType → binary name (must stay in sync with agents/index.ts).
-const AGENT_BINARY: Record<string, string> = {
-  claude: "claude",
-  antigravity: "agy",
-};
-
 export interface ResolvedAgent {
   agentType: ConcreteAgentType;
   model?: string;

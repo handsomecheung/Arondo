@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getArondoToken, getRoleByToken, TokenInfo, readTokensConfig, updateTokensConfig, generateToken } from "@/lib/auth";
+import { getArondoToken, getRoleByToken, readTokensConfig, updateTokensConfig, generateToken } from "@/lib/auth";
 import crypto from "crypto";
 
 function generateUUID(): string {
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   try {
     const config = await readTokensConfig();
     return NextResponse.json(config.clients);
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: "Failed to load tokens" }, { status: 500 });
   }
 }
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       success: true,
       token: generatedUserToken,
     });
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: "Failed to generate token" }, { status: 500 });
   }
 }
@@ -85,7 +85,7 @@ export async function PUT(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: "Failed to update token name" }, { status: 500 });
   }
 }
@@ -119,7 +119,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: "Failed to delete token" }, { status: 500 });
   }
 }

@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
       };
     });
     return NextResponse.json(enriched);
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: "Failed to load runner tokens" }, { status: 500 });
   }
 }
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       success: true,
       token: generatedRunnerToken,
     });
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: "Failed to generate runner token" }, { status: 500 });
   }
 }
@@ -101,7 +101,7 @@ export async function PUT(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: "Failed to update runner token name" }, { status: 500 });
   }
 }
@@ -140,7 +140,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: "Failed to delete runner token" }, { status: 500 });
   }
 }
