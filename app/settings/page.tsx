@@ -187,8 +187,6 @@ export default function SettingsPage() {
   const [saveRulesSuccess, setSaveRulesSuccess] = useState(false);
 
   const [sessionArchiveDays, setSessionArchiveDays] = useState<number | "">("");
-  const [savingSessionArchiveDays, setSavingSessionArchiveDays] = useState(false);
-  const [saveSessionArchiveDaysSuccess, setSaveSessionArchiveDaysSuccess] = useState(false);
   const sessionArchiveDaysAutoSaveReady = useRef(false);
   const [serverVersion, setServerVersion] = useState<string>("");
 
@@ -410,24 +408,17 @@ export default function SettingsPage() {
   }, [globalRules]);
 
   const saveSessionArchiveDays = useCallback(async (days: number) => {
-    setSavingSessionArchiveDays(true);
-    setSaveSessionArchiveDaysSuccess(false);
     try {
       const res = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionArchiveDays: days }),
       });
-      if (res.ok) {
-        setSaveSessionArchiveDaysSuccess(true);
-        setTimeout(() => setSaveSessionArchiveDaysSuccess(false), 3000);
-      } else {
+      if (!res.ok) {
         alert("Failed to save session archive days");
       }
     } catch (err) {
       console.error("Failed to save session archive days:", err);
-    } finally {
-      setSavingSessionArchiveDays(false);
     }
   }, []);
 
@@ -753,6 +744,109 @@ export default function SettingsPage() {
             )}
           </div>
 
+          {/* Session & File Settings Section */}
+          <section
+            aria-label="Session and file settings"
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-md)",
+              padding: 16,
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+            }}
+          >
+            <div>
+              <h2
+                style={{
+                  fontSize: 16,
+                  fontWeight: 600,
+                  color: "var(--text-primary)",
+                  marginBottom: 4,
+                }}
+              >
+                Session Management
+              </h2>
+              <p
+                style={{
+                  fontSize: 12,
+                  color: "var(--text-muted)",
+                  marginBottom: 12,
+                }}
+              >
+                Number of idle days before an active session is automatically archived.
+              </p>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <input
+                  type="number"
+                  min={1}
+                  value={sessionArchiveDays}
+                  onChange={(e) =>
+                    setSessionArchiveDays(e.target.value === "" ? "" : Number(e.target.value))
+                  }
+                  style={{
+                    width: 100,
+                    padding: "7px 10px",
+                    fontSize: 13,
+                    backgroundColor: "var(--bg-elevated)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius-sm)",
+                    color: "var(--text-primary)",
+                    outline: "none",
+                  }}
+                />
+              </div>
+            </div>
+
+            <div
+              style={{
+                height: 1,
+                background: "var(--border)",
+              }}
+            />
+
+            <div>
+              <h2
+                style={{
+                  fontSize: 16,
+                  fontWeight: 600,
+                  color: "var(--text-primary)",
+                  marginBottom: 4,
+                }}
+              >
+                File Browser
+              </h2>
+              <p
+                style={{
+                  fontSize: 12,
+                  color: "var(--text-muted)",
+                  marginBottom: 12,
+                }}
+              >
+                Show hidden files and directories (e.g. .env, .git) in the file browser and @ path selector.
+              </p>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 13,
+                  color: "var(--text-primary)",
+                  cursor: savingShowHiddenFiles ? "default" : "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={showHiddenFiles}
+                  disabled={savingShowHiddenFiles}
+                  onChange={(e) => handleToggleShowHiddenFiles(e.target.checked)}
+                  style={{ cursor: savingShowHiddenFiles ? "default" : "pointer" }}
+                />
+                <span>Show hidden files</span>
+              </label>
+            </div>
+          </section>
 
           {/* Agent Commands Section */}
           <div>
@@ -1176,115 +1270,6 @@ export default function SettingsPage() {
                 ),
               )}
             </div>
-          </div>
-
-          {/* Session Management Section */}
-          <div
-            style={{
-              background: "var(--bg-surface)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-md)",
-              padding: 16,
-            }}
-          >
-            <h2
-              style={{
-                fontSize: 16,
-                fontWeight: 600,
-                color: "var(--text-primary)",
-                marginBottom: 4,
-              }}
-            >
-              Session Management
-            </h2>
-            <p
-              style={{
-                fontSize: 12,
-                color: "var(--text-muted)",
-                marginBottom: 12,
-              }}
-            >
-              Number of idle days before an active session is automatically archived.
-            </p>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <input
-                type="number"
-                min={1}
-                value={sessionArchiveDays}
-                onChange={(e) =>
-                  setSessionArchiveDays(e.target.value === "" ? "" : Number(e.target.value))
-                }
-                style={{
-                  width: 100,
-                  padding: "7px 10px",
-                  fontSize: 13,
-                  backgroundColor: "var(--bg-elevated)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "var(--radius-sm)",
-                  color: "var(--text-primary)",
-                  outline: "none",
-                }}
-              />
-              {savingSessionArchiveDays && (
-                <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 500 }}>
-                  Saving…
-                </span>
-              )}
-              {saveSessionArchiveDaysSuccess && (
-                <span style={{ fontSize: 13, color: "var(--accent)", fontWeight: 500 }}>
-                  ✓ Saved successfully!
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* File Browser Section */}
-          <div
-            style={{
-              background: "var(--bg-surface)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-md)",
-              padding: 16,
-            }}
-          >
-            <h2
-              style={{
-                fontSize: 16,
-                fontWeight: 600,
-                color: "var(--text-primary)",
-                marginBottom: 4,
-              }}
-            >
-              File Browser
-            </h2>
-            <p
-              style={{
-                fontSize: 12,
-                color: "var(--text-muted)",
-                marginBottom: 12,
-              }}
-            >
-              Show hidden files and directories (e.g. .env, .git) in the file browser and @ path selector.
-            </p>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 13,
-                color: "var(--text-primary)",
-                cursor: savingShowHiddenFiles ? "default" : "pointer",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={showHiddenFiles}
-                disabled={savingShowHiddenFiles}
-                onChange={(e) => handleToggleShowHiddenFiles(e.target.checked)}
-                style={{ cursor: savingShowHiddenFiles ? "default" : "pointer" }}
-              />
-              <span>Show hidden files</span>
-            </label>
           </div>
 
           {/* Global Agent Rules Section */}
