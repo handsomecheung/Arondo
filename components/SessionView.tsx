@@ -372,8 +372,8 @@ export default function SessionView({
               <div ref={agentSwitchRef} style={{ position: "relative", flexShrink: 0 }}>
                 <button
                   type="button"
-                  onClick={() => !isRunning && !isArchived && setAgentSwitchOpen(!agentSwitchOpen)}
-                  disabled={isRunning || isArchived}
+                  onClick={() => !isArchived && setAgentSwitchOpen(!agentSwitchOpen)}
+                  disabled={isArchived}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -385,8 +385,8 @@ export default function SessionView({
                     fontSize: 11,
                     fontFamily: "monospace",
                     color: "var(--text-secondary)",
-                    cursor: isRunning ? "not-allowed" : "pointer",
-                    opacity: isRunning ? 0.5 : 1,
+                    cursor: "pointer",
+                    opacity: 1,
                     whiteSpace: "nowrap",
                   }}
                   title="Switch agent"
@@ -998,9 +998,8 @@ export default function SessionView({
                   type="button"
                   className="custom-dropdown-trigger"
                   onClick={() =>
-                    !isRunning && onSetAgentDropdownOpen(!agentDropdownOpen)
+                    onSetAgentDropdownOpen(!agentDropdownOpen)
                   }
-                  disabled={isRunning}
                   style={{
                     ...((isNewSession || isNewDraft) && !agentType
                       ? { borderColor: "var(--error)" }
