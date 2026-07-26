@@ -185,8 +185,7 @@ tests/                  # Playwright integration tests
     exec.spec.ts        # PTY script execution and lifecycle tracking
     runner.spec.ts      # Runner connection and handshake tests
 ~/.arondo/              # Runtime configuration & data directory (overridden by ARONDO_CONFIG_DIR)
-  tokens.json           # Persisted multi-user access tokens (admin and user roles)
-  settings.json         # Persisted global application configuration settings (e.g., sessionArchiveDays)
+  arondo.json           # Persisted access tokens and top-level setitngs
   agent-commands.json   # Persisted custom agent slash commands
   global-rules.md       # Global agent rules written from Settings
   agents-sessions.json  # Agent session map: { "agy": {}, "codex": {} }
@@ -292,7 +291,7 @@ Two WebSocket endpoints:
 
 The application enforces token-based authentication on all API routes and WebSocket connections to restrict access.
 
-- **Tokens Registry (`tokens.json`)**: Stored in `~/.arondo/tokens.json` with the following structure:
+- **Tokens Registry (`arondo.json`)**: Stored in `~/.arondo/arondo.json` with the following structure:
   ```json
   {
     "clients": [
@@ -312,12 +311,16 @@ The application enforces token-based authentication on all API routes and WebSoc
         "lastUsedAt": 1720000100000,
         "boundRunnerId": "server-generated-runner-id"
       }
-    ]
+    ],
+    "setitngs": {
+      "sessionArchiveDays": 7,
+      "showHiddenFiles": true
+    }
   }
   ```
-- **Automatic Initialization**: On server startup, `initializeAuth()` in `lib/auth.ts` verifies if at least one token of type `admin` exists in `clients`. If not, it automatically generates a 32-character hexadecimal token, writes it to `tokens.json`, and outputs it to the server console.
+- **Automatic Initialization**: On server startup, `initializeAuth()` in `lib/auth.ts` verifies if at least one token of type `admin` exists in `clients`. If not, it automatically generates a 32-character hexadecimal token, writes it to `arondo.json`, and outputs it to the server console.
 - **Runner Connection Authentication (per-runner tokens)**:
-  - Each runner authenticates with its own individually generated token, created and managed by an admin in Settings (Runner Tokens section) via `/api/auth/runner-tokens`, stored alongside client tokens under `runners` in `tokens.json`.
+  - Each runner authenticates with its own individually generated token, created and managed by an admin in Settings (Runner Tokens section) via `/api/auth/runner-tokens`, stored alongside client tokens under `runners` in `arondo.json`.
   - The token is sent only via the `x-runner-token` header (no longer accepted as a URL query param) and compared using a constant-time check (`timingSafeEqualStrings()` in `lib/auth.ts`).
   - A runner token **locks to the first runner identity** that successfully registers with it (`boundRunnerId`), so a leaked token can't be replayed to impersonate a different, already-registered runner. Revoking a token disconnects its bound runner immediately. Deleting a disconnected runner clears `boundRunnerId` on its token so a future reconnect starts as a fresh identity.
   - The runner binary has no `--name` flag; it has no notion of its own display name. The bound runner token's own `name` (configured by an admin in Settings) is the runner's display name everywhere in the system (`RunnerInfo.name`, session/project lists, Runners dashboard).
@@ -353,8 +356,8 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **Global Agent Rules Sync**: Settings screen allows specifying global agent rules. These are stored in `~/.arondo/global-rules.md` and automatically synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on runners upon connection. Each runner has a per-runner sync toggle (checked by default for new runners) in Settings; unchecking it stops future syncs to that runner and removes the previously synced block via a `rules.remove` runner method (`runner/handler_rules.go`).
 - **Session Pinning, Filtering & Three-dot Menu**: Important sessions can be pinned to the top of the sidebar session list (ordered by pinned timestamp). When sessions span multiple projects, horizontally scrollable project filter chips appear in the sidebar to let users filter sessions by project. A per-session three-dot menu in the sidebar and detailed session view provides quick access to Pin, Rename, Archive, and Delete actions.
 - **Project Three-dot Menu**: The Project Page header exposes a three-dot menu (`components/ProjectPanel.tsx`) with File Browser, Open Terminal, Show Changes, and Delete Project (moved into the menu, placed last) entries. "Show Changes" mirrors the session-level diff viewer but is sessionless — it checks/diffs the project's working tree directly via `GET /api/projects/[id]/git-status` and `GET /api/projects/[id]/diff`, and is disabled with "No Changes" when the tree is clean. `DiffModal` renders the project diff when no session is selected.
-- **Session Archive Day Override**: The Settings screen allows users to customize the number of idle days before active sessions are auto-archived. This overrides the default value defined by the `ARONDO_SESSION_ARCHIVE_DAYS_DEFAULT` environment variable and is persisted in `~/.arondo/settings.json`. Unarchiving is disabled for sessions whose projects have been deleted. Deleting a project warns the user in the confirmation dialog if it has archived sessions that would become unusable.
-- **Hidden Files Visibility Setting**: The runner's `fs.list` handler (`runner/handler_fs.go`) unconditionally skipped dotfiles/dot-directories until a `showHidden` flag was added to the request. The Settings screen exposes a "Show hidden files" toggle (persisted as `showHiddenFiles` in `~/.arondo/settings.json`, admin-only) that controls whether the Remote File Browser and the `@` path selector modal show entries starting with `.`. When unset, it falls back to the `ARONDO_FILE_SHOW_HIDDEN_DEFAULT` environment variable (defaults to `true`). `GET /api/fs` reads this setting server-side and passes it through to the runner on every `fs.list` request.
+- **Session Archive Day Override**: The Settings screen allows users to customize the number of idle days before active sessions are auto-archived. This overrides the default value defined by the `ARONDO_SESSION_ARCHIVE_DAYS_DEFAULT` environment variable and is persisted as `sessionArchiveDays` under `~/.arondo/arondo.json`'s top-level `setitngs` field. Unarchiving is disabled for sessions whose projects have been deleted. Deleting a project warns the user in the confirmation dialog if it has archived sessions that would become unusable.
+- **Hidden Files Visibility Setting**: The runner's `fs.list` handler (`runner/handler_fs.go`) unconditionally skipped dotfiles/dot-directories until a `showHidden` flag was added to the request. The Settings screen exposes a "Show hidden files" toggle (persisted as `showHiddenFiles` under `~/.arondo/arondo.json`'s top-level `setitngs` field, admin-only) that controls whether the Remote File Browser and the `@` path selector modal show entries starting with `.`. When unset, it falls back to the `ARONDO_FILE_SHOW_HIDDEN_DEFAULT` environment variable (defaults to `true`). `GET /api/fs` reads this setting server-side and passes it through to the runner on every `fs.list` request.
 - **AI Agent Quota Monitoring**: Runners collect agent quota usage from Claude and Antigravity via tmux pane capture, which is saved locally under `~/.arondo/agents/` on the server and displayed with progress bars in the Runners dashboard.
 - **Secure Prompt Passing**: Instead of command line arguments, prompts are passed to agents using temporary files on the runner. The file path is stored in the `ARONDO_PROMPT_FILE` environment variable (and resolved using shell redirection `$(< "$ARONDO_PROMPT_FILE")`), which mitigates command length constraints and process command argument exposure. The UI "Show Prompt" panel displays the real resolved prompt instead of the original raw inputs.
 - **AI Agent Auto-Selection (Auto Mode)**: Automatically selects the best agent and model based on hourly and weekly quota availability retrieved from the runner. New chat sessions default to using the Auto agent mode.

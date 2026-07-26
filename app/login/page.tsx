@@ -43,7 +43,7 @@ function LoginContent() {
       } else {
         setErrorMsg("Invalid access token.");
       }
-    } catch (err) {
+    } catch {
       setErrorMsg("Failed to connect to server.");
     } finally {
       setVerifying(false);
@@ -113,7 +113,7 @@ function LoginContent() {
           border: "1px solid rgba(255, 255, 255, 0.04)",
           textAlign: "left"
         }}>
-          💡 You can find the generated token in the server console logs on startup, or configure them in <code>~/.arondo/tokens.json</code>.
+          💡 You can find the generated token in the server console logs on startup, or configure them in <code>~/.arondo/arondo.json</code>.
         </p>
 
         <form onSubmit={handleSubmit} style={{ textAlign: "left" }}>

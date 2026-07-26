@@ -9,7 +9,7 @@ import { getConfigDir } from "./config";
 import { withFileLock, writeJsonAtomic } from "./fileLock";
 
 const CONFIG_DIR = getConfigDir();
-const TOKENS_FILE = path.join(CONFIG_DIR, "tokens.json");
+const TOKENS_FILE = path.join(CONFIG_DIR, "arondo.json");
 
 export interface TokenInfo {
   token: string;
@@ -31,9 +31,15 @@ export interface RunnerTokenInfo {
   boundRunnerId?: string | null;
 }
 
+export interface ArondoSettings {
+  sessionArchiveDays?: number;
+  showHiddenFiles?: boolean;
+}
+
 export interface TokensConfig {
   clients: TokenInfo[];
   runners: RunnerTokenInfo[];
+  setitngs?: ArondoSettings;
 }
 
 let cachedTokens: TokenInfo[] = [];
@@ -71,6 +77,10 @@ export async function readTokensConfig(): Promise<TokensConfig> {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed?.clients)) clients = parsed.clients;
       if (Array.isArray(parsed?.runners)) runners = parsed.runners;
+      const setitngs = typeof parsed?.setitngs === "object" && parsed.setitngs !== null
+        ? parsed.setitngs
+        : undefined;
+      return { clients, runners, setitngs };
     }
   } catch (err) {
     console.error("[auth] Failed to read tokens config:", err);
@@ -82,7 +92,7 @@ export async function writeTokensConfig(config: TokensConfig): Promise<void> {
   await writeJsonAtomic(TOKENS_FILE, config);
 }
 
-// Runs `mutator` under a per-file lock against tokens.json, serialized
+// Runs `mutator` under a per-file lock against arondo.json, serialized
 // against every other reader/writer of this helper (including
 // bindRunnerToken and the runner/client token API routes) so concurrent
 // runner reconnects or admin edits can't race into a lost update or
@@ -113,7 +123,7 @@ export async function initializeAuth(): Promise<void> {
 
         console.log("\n========================================================");
         console.log(`🔑 GENERATED ADMIN ACCESS TOKEN:\n\n   ${generatedAdminToken}\n`);
-        console.log("   Please save this token. It has been written to tokens.json");
+        console.log("   Please save this token. It has been written to arondo.json");
         console.log("========================================================\n");
       }
     });
@@ -121,7 +131,7 @@ export async function initializeAuth(): Promise<void> {
     const config = await readTokensConfig();
     cachedTokens = config.clients;
   } catch (err) {
-    console.error("[auth] Failed to initialize tokens.json:", err);
+    console.error("[auth] Failed to initialize arondo.json:", err);
   }
 }
 
@@ -148,7 +158,7 @@ export function getRoleByToken(token: string | null): "admin" | "user" | null {
       if (found) return found.type;
     }
   } catch (err) {
-    console.error("[auth] Failed to read tokens.json dynamically:", err);
+    console.error("[auth] Failed to read arondo.json dynamically:", err);
   }
 
   const foundCached = cachedTokens.find((t) => t.token === token);
@@ -168,7 +178,7 @@ export function getUuidByToken(token: string | null): string | null {
       if (found) return found.uuid;
     }
   } catch (err) {
-    console.error("[auth] Failed to read tokens.json dynamically for UUID:", err);
+    console.error("[auth] Failed to read arondo.json dynamically for UUID:", err);
   }
 
   const foundCached = cachedTokens.find((t) => t.token === token);

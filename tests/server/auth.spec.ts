@@ -1,6 +1,11 @@
 import { test, expect } from '@playwright/test';
 import crypto from 'crypto';
 
+type ClientTokenResponse = {
+  token: string;
+  name?: string;
+};
+
 test.describe('Authentication API tests', () => {
   test('should allow public access to GET /ping without tokens', async ({ request }) => {
     const response = await request.get('/ping');
@@ -55,13 +60,13 @@ test.describe('Authentication API tests', () => {
     expect(Array.isArray(list)).toBeTruthy();
   });
 
-  // Regression test for a tokens.json corruption bug: concurrent
-  // read-modify-write calls against tokens.json (e.g. several admins
+  // Regression test for an arondo.json corruption bug: concurrent
+  // read-modify-write calls against arondo.json (e.g. several admins
   // creating tokens around the same time, or a token create racing a
   // runner reconnect's bindRunnerToken) used to interleave and could drop
   // tokens or corrupt the file. lib/auth.ts now serializes every mutation
   // through updateTokensConfig()'s per-file lock.
-  test('concurrent client token creation does not corrupt tokens.json or drop tokens', async ({ request }) => {
+  test('concurrent client token creation does not corrupt arondo.json or drop tokens', async ({ request }) => {
     const total = 15;
     const names = Array.from({ length: total }, (_, i) => `Concurrent Token ${crypto.randomUUID()}-${i}`);
 
@@ -82,10 +87,10 @@ test.describe('Authentication API tests', () => {
       headers: { 'x-arondo-token': 'test-token-123456' },
     });
     expect(listRes.status()).toBe(200);
-    const tokens = await listRes.json();
+    const tokens = await listRes.json() as ClientTokenResponse[];
 
     for (const name of names) {
-      expect(tokens.some((t: any) => t.name === name)).toBeTruthy();
+      expect(tokens.some((t) => t.name === name)).toBeTruthy();
     }
 
     // Clean up the tokens created by this test.
@@ -98,5 +103,37 @@ test.describe('Authentication API tests', () => {
         })
       )
     );
+  });
+
+  test('settings stored in arondo.json survive token updates', async ({ request }) => {
+    const settingsRes = await request.post('/api/settings', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: { sessionArchiveDays: 3, showHiddenFiles: false },
+    });
+    expect(settingsRes.status()).toBe(200);
+    await expect(settingsRes.json()).resolves.toMatchObject({
+      sessionArchiveDays: 3,
+      showHiddenFiles: false,
+    });
+
+    const tokenRes = await request.post('/api/auth/client-tokens', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: { name: `Settings Preservation ${crypto.randomUUID()}` },
+    });
+    expect(tokenRes.status()).toBe(200);
+    const { token } = await tokenRes.json();
+
+    const getSettingsRes = await request.get('/api/settings', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+    });
+    expect(getSettingsRes.status()).toBe(200);
+    await expect(getSettingsRes.json()).resolves.toMatchObject({
+      sessionArchiveDays: 3,
+      showHiddenFiles: false,
+    });
+
+    await request.delete(`/api/auth/client-tokens?role=user&token=${token}`, {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+    });
   });
 });

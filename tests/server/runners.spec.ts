@@ -73,10 +73,10 @@ test.describe('Runners API tests', () => {
   });
 
   // Regression test: concurrent runner-token creation used to race on the
-  // same tokens.json read-modify-write, potentially dropping a token that
+  // same arondo.json read-modify-write, potentially dropping a token that
   // another concurrent create had just written. Now serialized via
   // updateTokensConfig()'s per-file lock in lib/auth.ts.
-  test('concurrent runner token creation does not corrupt tokens.json or drop tokens', async ({ request }) => {
+  test('concurrent runner token creation does not corrupt arondo.json or drop tokens', async ({ request }) => {
     const total = 15;
     const names = Array.from({ length: total }, (_, i) => `Concurrent Runner Token ${crypto.randomUUID()}-${i}`);
 

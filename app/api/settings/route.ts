@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getArondoToken, getRoleByToken, isValidToken } from "@/lib/auth";
-import { getAppSettings, updateAppSettings, getSessionArchiveDays, getShowHiddenFiles } from "@/lib/store";
+import { updateAppSettings, getSessionArchiveDays, getShowHiddenFiles } from "@/lib/store";
 import fs from "fs/promises";
 import path from "path";
 

@@ -68,7 +68,7 @@ async function globalSetup() {
   };
 
   await fs.writeFile(
-    path.join(testConfigDir, 'tokens.json'),
+    path.join(testConfigDir, 'arondo.json'),
     JSON.stringify(tokens, null, 2),
     'utf-8'
   );

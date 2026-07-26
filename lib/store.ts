@@ -8,7 +8,7 @@ const CONFIG_DIR = getConfigDir();
 const SESSIONS_DIR = path.join(CONFIG_DIR, "sessions");
 const ARCHIVED_SESSIONS_DIR = path.join(CONFIG_DIR, "archived", "sessions");
 const PROJECTS_DIR = path.join(CONFIG_DIR, "projects");
-const SETTINGS_FILE = path.join(CONFIG_DIR, "settings.json");
+const ARONDO_CONFIG_FILE = path.join(CONFIG_DIR, "arondo.json");
 
 const DEFAULT_SESSION_ARCHIVE_DAYS = 7;
 const SESSION_ARCHIVE_DAYS_DEFAULT =
@@ -19,6 +19,11 @@ const FILE_SHOW_HIDDEN_DEFAULT = process.env.ARONDO_FILE_SHOW_HIDDEN_DEFAULT !==
 export interface AppSettings {
   sessionArchiveDays?: number;
   showHiddenFiles?: boolean;
+}
+
+interface ArondoConfigWithSettings {
+  setitngs?: AppSettings;
+  [key: string]: unknown;
 }
 
 export type SessionStatus = "idle" | "running" | "script-running" | "done" | "error";
@@ -160,7 +165,7 @@ async function readJson<T>(filePath: string, defaultValue: T): Promise<T> {
     const raw = await fs.readFile(filePath, "utf-8");
     return JSON.parse(raw) as T;
   } catch (err) {
-    if ((err as any).code !== 'ENOENT') {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
       console.error(`[readJson error] path=${filePath}:`, err);
     }
     return defaultValue;
@@ -647,14 +652,16 @@ export async function deleteProject(id: string): Promise<void> {
 // ─── App Settings ─────────────────────────────────────────────────────────────
 
 export async function getAppSettings(): Promise<AppSettings> {
-  return readJson<AppSettings>(SETTINGS_FILE, {});
+  const config = await readJson<ArondoConfigWithSettings>(ARONDO_CONFIG_FILE, {});
+  return config.setitngs || {};
 }
 
 export async function updateAppSettings(patch: Partial<AppSettings>): Promise<AppSettings> {
-  return withFileLock(SETTINGS_FILE, async () => {
-    const current = await getAppSettings();
+  return withFileLock(ARONDO_CONFIG_FILE, async () => {
+    const config = await readJson<ArondoConfigWithSettings>(ARONDO_CONFIG_FILE, {});
+    const current = config.setitngs || {};
     const updated = { ...current, ...patch };
-    await writeJson(SETTINGS_FILE, updated);
+    await writeJson(ARONDO_CONFIG_FILE, { ...config, setitngs: updated });
     return updated;
   });
 }

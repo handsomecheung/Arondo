@@ -30,7 +30,7 @@ test.describe('Agent commands API tests', () => {
   });
 
   // Regression test: agent-commands.json used the same unlocked
-  // read-modify-write pattern as tokens.json and messages.json. Concurrent
+  // read-modify-write pattern as arondo.json and messages.json. Concurrent
   // POSTs used to be able to race and drop one another's command. Now
   // serialized via updateCustomCommands()'s per-file lock.
   test('concurrent custom command creation does not corrupt agent-commands.json or drop commands', async ({ request }) => {

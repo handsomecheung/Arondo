@@ -96,7 +96,7 @@ Open [http://localhost:3251](http://localhost:3251) in your browser. Select the 
 
 ### Configuration Files (in `ARONDO_CONFIG_DIR` or `~/.arondo/`)
 
-- `tokens.json` – Multi-user and per-runner access tokens database. Stored with the following structure:
+- `arondo.json` – Multi-user and per-runner access tokens database. Stored with the following structure:
   ```json
   {
     "clients": [
@@ -116,13 +116,17 @@ Open [http://localhost:3251](http://localhost:3251) in your browser. Select the 
         "lastUsedAt": 1720000100000,
         "boundRunnerId": "server-generated-runner-id"
       }
-    ]
+    ],
+    "setitngs": {
+      "sessionArchiveDays": 7,
+      "showHiddenFiles": true
+    }
   }
   ```
   If no token with `type: "admin"` exists on startup, one is generated automatically, written to the config, and printed in the server logs. Runner tokens are created and managed individually by an admin in Settings (Runner Tokens section); each locks to the first runner identity that registers with it (`boundRunnerId`).
 - `global-rules.md` – Rules synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on connected runners.
 - `agent-commands.json` – User-defined agent slash commands.
-- `settings.json` – Global application configuration settings (e.g. custom session archive day count overrides).
+- Global application configuration settings are stored under the top-level `setitngs` field in `arondo.json`.
 - `agents-sessions.json` – Agent conversation/session continuity map, stored as `{ "agy": {}, "codex": {} }`.
 
 ## Automation API
@@ -139,7 +143,7 @@ x-arondo-token: <client_access_token>
 ?token=<client_access_token>
 ```
 
-Tokens are issued by an admin from Settings → Client Tokens (`/api/auth/client-tokens`), stored in `~/.arondo/tokens.json`. A `user`-role token must also be granted access to the target runner via its `allowedUserTokenUuids` list; `admin`-role tokens can access any runner.
+Tokens are issued by an admin from Settings → Client Tokens (`/api/auth/client-tokens`), stored in `~/.arondo/arondo.json`. A `user`-role token must also be granted access to the target runner via its `allowedUserTokenUuids` list; `admin`-role tokens can access any runner.
 
 ### 1. Create a session
 
@@ -231,4 +235,3 @@ The test runner will:
 3. Spawn the Go runner to connect to the test server.
 4. Run server API tests (`tests/server/`) and runner-capabilities tests (`tests/runner/`).
 5. Terminate all test processes and clean up temporary test configurations and logs automatically.
-
