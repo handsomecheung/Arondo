@@ -423,6 +423,7 @@ export default function SessionView({
                         [
                           { value: "antigravity", label: "Antigravity CLI", cmd: "agy" },
                           { value: "claude",      label: "Claude Code",     cmd: "claude" },
+                          { value: "codex",       label: "Codex",           cmd: "codex" },
                         ] as const
                       ).filter(({ cmd }) => isAgentAvailable(cmd));
                       const showAuto = concreteAgents.length > 1;
