@@ -185,7 +185,7 @@ tests/                  # Playwright integration tests
     exec.spec.ts        # PTY script execution and lifecycle tracking
     runner.spec.ts      # Runner connection and handshake tests
 ~/.arondo/              # Runtime configuration & data directory (overridden by ARONDO_CONFIG_DIR)
-  arondo.json           # Persisted access tokens and top-level setitngs
+  arondo.json           # Unified runtime config: access tokens and top-level setitngs
   agent-commands.json   # Persisted custom agent slash commands
   global-rules.md       # Global agent rules written from Settings
   agent-sessions.json  # Agent session map: { "agy": {}, "codex": {} }
@@ -194,14 +194,16 @@ tests/                  # Playwright integration tests
       session.json      # Session metadata (status, prompt, agent, repoPath, runnerId)
       messages.json     # Message history within the session
       logs/
-        [messageId].log # Execution output logs bound to specific system message ID
+        [messageId].log        # Stdout execution log bound to specific system message ID
+        [messageId].stderr.log # Stderr execution log for piped agent runs
   projects/
     [projectId]/
       project.json      # Project metadata (id, repoPath, runnerId, createdAt, updatedAt)
       settings/
         scripts.json    # Configured custom scripts list for the project
       logs/
-        [taskId].log    # Project-scoped execution output logs
+        [taskId].log        # Project-scoped stdout execution logs
+        [taskId].stderr.log # Project-scoped stderr execution logs
   deleted-sessions/     # Soft-deleted sessions moved here upon deletion
   archived/
     sessions/
@@ -246,7 +248,7 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 `lib/runner-manager.ts` is the central coordinator. Key responsibilities:
 
 - **Connection management**: Tracks connected runners (including IP address). Runner IDs are stable across reconnections (derived from `name@hostname`). `RunnerInfo.lastSeenAt` is stamped on both connect and disconnect. Tracks connection start time with `RunnerInfo.connectedAt` to display runner connection time in the UI.
-- **Task routing**: Maps `taskId` → `TaskContext` (sessionId, messageId, runnerId, type, pid, completedAt, exitCode, stoppedByUser). Maps `sessionId:messageId` → `taskId` for PTY input routing.
+- **Task routing**: Maps `taskId` → `TaskContext` (sessionId, messageId, runnerId, type, pid, completedAt, exitCode, stoppedByUser). Maps `sessionId:messageId` → `taskId` for PTY input routing. Stopped/completed retained tasks can be deleted via `DELETE /api/tasks/[taskId]`, which marks the backing message as `taskDeleted`.
 - **Task persistence & retention**: Active task contexts are persisted by saving execution metadata directly to `messages.json` (for both sessions and projects). Completed tasks are retained for 3 days (`TASK_RETENTION_MS`), then purged on startup. On server restart, active tasks are restored and re-associated to the reconnecting runner.
 - **Task cleanup**: `removeTasksForSession()` cleans up tasks when a session is deleted. `getAllTasks()` returns all tasks (active + retained). `purgeExpiredTasks()` removes completed tasks older than 3 days.
 - **Runner discovery**: `getAllKnownRunners()` returns both connected runners and disconnected runners persisted on disk, used by the `/api/runners` route.
@@ -337,9 +339,9 @@ The application enforces token-based authentication on all API routes and WebSoc
   - The WebSocket server on `/ws` parses this subprotocol, extracts the token, and validates it before accepting the connection.
 
 ## Core Logging & Session Lifecycle Features
-- **Message-specific execution logs**: Every agent or script execution creates a specific system message (e.g. `⚙️ Executing command...`). The resulting terminal outputs are streamed via the runner and stored in `~/.arondo/sessions/[sessionId]/logs/[systemMsgId].log`.
+- **Message-specific execution logs**: Every agent or script execution creates a specific system message (e.g., `Executing command...`). The resulting terminal outputs are streamed via the runner and stored in `~/.arondo/sessions/[sessionId]/logs/[systemMsgId].log`. Agent runs that use piped stdout/stderr also write stderr to `~/.arondo/sessions/[sessionId]/logs/[systemMsgId].stderr.log`.
 - **Interactive Terminal (PTY) & Mobile Keyboard Bar**: Script execution uses Go's `creack/pty` on the runner for full pseudo-terminal support (stdin, ANSI colors, cursor control). The frontend renders output via `xterm.js` (`components/Terminal.tsx`) in two modes: live (WebSocket-connected for running scripts, with historical log pre-loaded) and history (loads saved log data for completed scripts). It includes a mobile-specific special-keys bar (`components/TerminalKeyboardBar.tsx`) containing ESC/TAB/CTRL/ALT, arrow keys, and an FN layer (F1-F12), dynamically positioning itself above the mobile software keyboard to prevent obstruction.
-- **Task Queue & Log Popup**: Tasks are tracked in a global header queue grouped by session, with session names always visible. Completed tasks are retained for 3 days. Clicking any task switches to its session and opens the log modal. Each running task has a kill button that sends SIGTERM via the runner. In the Tasks dashboard, users can toggle to display only non-completed tasks (active/running/stopped) and view execution logs inline.
+- **Task Queue & Log Popup**: Tasks are tracked in a global header queue grouped by session, with session names always visible. Completed tasks are retained for 3 days. Clicking any task switches to its session and opens the log modal. Each running task has a kill button that sends SIGTERM via the runner, and stopped/completed retained tasks can be deleted from their three-dot menu. In the Tasks dashboard, users can toggle to display only non-completed tasks (active/running/stopped) and view execution logs inline.
 - **User-stopped vs Failed distinction**: When a task is killed via the UI, `TaskContext.stoppedByUser` is set, producing a 🛑 "Stopped by user" completion message and `errorMessage` instead of an ❌ error. The terminal shows a “─── stopped by user ───” separator.
 - **Dedicated Execution Cards, Rich Markdown & Inline Logs**: Unified `ExecCard` is split into `ScriptExecCard` (using `xterm.js` for interactive output, and supporting inline log streaming for quick-run commands) and `AgentExecCard` (rendering outputs in Markdown with syntax highlighting and clickable file/URL links). Clicking verified file paths opens them in the Remote File Browser. If a file has git modifications, a diff button is displayed next to the path to trigger an inline visual diff viewer modal. Card rendering performance is optimized by caching generated HTML to the backend on the first render. Users can toggle between Markdown and raw text views. On entering a session, the chat area automatically scrolls to the latest message instantly, while normal updates use smooth scrolling. Because execution cards load content asynchronously and grow, a ResizeObserver and MutationObserver monitor the card elements for 2 seconds after session entry to keep the viewport pinned to the bottom.
 - **Restart/Retry actions**: `ScriptExecCard` shows a Restart button for script tasks (calls `restart-script` API → `exec.restart` on the runner) and `AgentExecCard` shows a Retry button for failed agent tasks (calls `rerun-agent` API). The terminal/view shows a “─── restarting ───” separator inline in the existing log.
@@ -350,15 +352,16 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **Concurrency**: Multiple background scripts can run concurrently in a single session. The chat prompt stays active during execution. Also allows running project scripts while an agent is executing.
 - **Task Persistence**: Active task contexts survive server restarts by restoring metadata from session and project `messages.json` files and dynamically restored on server restart. Runner IDs are stable across reconnections.
 - **Runner Disconnect Handling**: When a runner disconnects, orphaned tasks are automatically failed with exit code -1, updating session status and notifying the UI.
-- **Agent Session Continuity (Session Resume)**: Retains conversation context for AI agents across different runs.
+- **Agent Session Continuity (Session Resume)**: Retains conversation context for AI agents across different runs. Agent session mappings are stored in `~/.arondo/agent-sessions.json` as `{ "agy": {}, "codex": {} }`.
   - **Claude Code**: Supports `--session-id` (bound to the session) and `--resume` flags for native session continuity.
+  - **Codex CLI**: Uses `codex exec` with sandbox/approval bypass flags before the optional `resume` subcommand, stores returned Codex session IDs in the shared agent session map, and passes the resolved prompt from `ARONDO_PROMPT_FILE`.
   - **Antigravity CLI (agy)**: On task exit, the Go runner scans its local logs via process ID (`detectAgyConvIdByPid`) to extract the generated conversation UUID. This UUID is passed back in the `exec.exit` event and saved by the server. Subsequent runs of `agy` within the same session will automatically pass `--conversation <uuid>` to resume the session.
 - **Global Agent Rules Sync**: Settings screen allows specifying global agent rules. These are stored in `~/.arondo/global-rules.md` and automatically synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on runners upon connection. Each runner has a per-runner sync toggle (checked by default for new runners) in Settings; unchecking it stops future syncs to that runner and removes the previously synced block via a `rules.remove` runner method (`runner/handler_rules.go`).
 - **Session Pinning, Filtering & Three-dot Menu**: Important sessions can be pinned to the top of the sidebar session list (ordered by pinned timestamp). When sessions span multiple projects, horizontally scrollable project filter chips appear in the sidebar to let users filter sessions by project. A per-session three-dot menu in the sidebar and detailed session view provides quick access to Pin, Rename, Archive, and Delete actions.
 - **Project Three-dot Menu**: The Project Page header exposes a three-dot menu (`components/ProjectPanel.tsx`) with File Browser, Open Terminal, Show Changes, and Delete Project (moved into the menu, placed last) entries. "Show Changes" mirrors the session-level diff viewer but is sessionless — it checks/diffs the project's working tree directly via `GET /api/projects/[id]/git-status` and `GET /api/projects/[id]/diff`, and is disabled with "No Changes" when the tree is clean. `DiffModal` renders the project diff when no session is selected.
 - **Session Archive Day Override**: The Settings screen allows users to customize the number of idle days before active sessions are auto-archived. This overrides the default value defined by the `ARONDO_SESSION_ARCHIVE_DAYS_DEFAULT` environment variable and is persisted as `sessionArchiveDays` under `~/.arondo/arondo.json`'s top-level `setitngs` field. Unarchiving is disabled for sessions whose projects have been deleted. Deleting a project warns the user in the confirmation dialog if it has archived sessions that would become unusable.
 - **Hidden Files Visibility Setting**: The runner's `fs.list` handler (`runner/handler_fs.go`) unconditionally skipped dotfiles/dot-directories until a `showHidden` flag was added to the request. The Settings screen exposes a "Show hidden files" toggle (persisted as `showHiddenFiles` under `~/.arondo/arondo.json`'s top-level `setitngs` field, admin-only) that controls whether the Remote File Browser and the `@` path selector modal show entries starting with `.`. When unset, it falls back to the `ARONDO_FILE_SHOW_HIDDEN_DEFAULT` environment variable (defaults to `true`). `GET /api/fs` reads this setting server-side and passes it through to the runner on every `fs.list` request.
-- **AI Agent Quota Monitoring**: Runners collect agent quota usage from Claude and Antigravity via tmux pane capture, which is saved locally under `~/.arondo/agents/` on the server and displayed with progress bars in the Runners dashboard.
+- **AI Agent Quota Monitoring**: Runners collect agent quota usage from Claude, Antigravity, and Codex via tmux pane capture, which is saved locally under `~/.arondo/agents/` on the server and displayed with progress bars in the Runners dashboard.
 - **Secure Prompt Passing**: Instead of command line arguments, prompts are passed to agents using temporary files on the runner. The file path is stored in the `ARONDO_PROMPT_FILE` environment variable (and resolved using shell redirection `$(< "$ARONDO_PROMPT_FILE")`), which mitigates command length constraints and process command argument exposure. The UI "Show Prompt" panel displays the real resolved prompt instead of the original raw inputs.
 - **AI Agent Auto-Selection (Auto Mode)**: Automatically selects the best agent and model based on hourly and weekly quota availability retrieved from the runner. New chat sessions default to using the Auto agent mode.
   - **Choices**:
@@ -370,6 +373,8 @@ The application enforces token-based authentication on all API routes and WebSoc
     2. **Weekly Time-Remaining Score**: For active choices, calculate `score = WeekRemain - WeekTimeRemain`, where `WeekTimeRemain = max(0, min(1, (ResetsAt - Now) / 604800))`. This compares the remaining quota ratio against the remaining time ratio of the quota week.
     3. **Final Order**: Sort active choices by score in descending order and prepend them to the low-quota choices. The first candidate is selected and spawned with the mapped `--model` parameter.
 - **Manual Agent Switching**: Allows switching the active agent (Antigravity CLI, Claude Code, or Auto) of an existing session via a dropdown selector in the session header when no command is currently running.
+- **Settings Session Controls**: The Settings page groups session archive and file browser controls together. `sessionArchiveDays` auto-saves after edits instead of requiring a Save button, and the hidden-files toggle persists immediately.
+- **Authentication UI**: The old Settings-page reset-token button moved into the app sidebar as a Log Out action with a confirmation dialog.
 - **Inline Runner Details**: The Runners dashboard displays the runner details panel inline directly below the selected runner card for better usability.
 - **Disconnected Runner Deletion**: Allows deleting registered but disconnected runners from the Runners dashboard, which purges their corresponding metadata and directories.
 - **Automated Data Lifecycle**: Automatically purges orphan sessions or projects on load if their parent references (e.g. project or runner) no longer exist.
