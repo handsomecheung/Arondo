@@ -13,7 +13,7 @@ const CODEX_SESSION_MAP_FILE = path.join(CONFIG_DIR, "codex-sessions.json");
 // (fresh or resumed), e.g. "\x1b[1msession id:\x1b[0m 019f9883-...\r".
 const SESSION_ID_RE = /session id:\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/;
 
-/** Extracts Codex's own session id from a run's raw (PTY-captured) log output. */
+/** Extracts Codex's own session id from a run's raw stderr output. */
 export function extractCodexSessionId(log: string): string | undefined {
   return stripAnsi(log).match(SESSION_ID_RE)?.[1];
 }

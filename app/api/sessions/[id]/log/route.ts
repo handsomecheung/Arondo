@@ -10,6 +10,7 @@ export async function GET(
   const { searchParams } = new URL(req.url);
   const messageId = searchParams.get("messageId");
   const projectId = searchParams.get("projectId") || undefined;
+  const streamParam = searchParams.get("stream");
 
   const token = getArondoToken(req);
   if (id === "global") {
@@ -32,7 +33,8 @@ export async function GET(
     return NextResponse.json({ error: "messageId query parameter is required" }, { status: 400 });
   }
 
-  const log = await getSessionLog(id === "global" ? "" : id, messageId, projectId);
+  const stream = streamParam === "stderr" ? "stderr" : "stdout";
+  const log = await getSessionLog(id === "global" ? "" : id, messageId, projectId, stream);
   return NextResponse.json({ log });
 }
 

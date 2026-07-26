@@ -752,7 +752,7 @@ class RunnerManager {
       ctx.stoppedByUser = true;
 
       const separator = "\r\n\x1b[90m─── stopped by user ───\x1b[0m\r\n";
-      await appendSessionLog(ctx.sessionId, ctx.messageId, separator, true, ctx.projectId);
+      await appendSessionLog(ctx.sessionId, ctx.messageId, separator, true, ctx.projectId, "stdout");
       eventBus.publish({
         type: "terminal_output",
         payload: {
@@ -999,6 +999,7 @@ class RunnerManager {
     taskId: string;
     data: string;
     encoding?: string;
+    stream?: "stdout" | "stderr";
   }): Promise<void> {
     const ctx = this.tasks.get(payload.taskId);
     if (!ctx) {
@@ -1013,15 +1014,19 @@ class RunnerManager {
       data = Buffer.from(payload.data, "base64").toString("utf-8");
     }
 
-    await appendSessionLog(ctx.sessionId, ctx.messageId, data, true, ctx.projectId);
-    eventBus.publish({
-      type: "terminal_output",
-      payload: {
-        sessionId: ctx.sessionId,
-        messageId: ctx.messageId,
-        data,
-      },
-    });
+    const stream = payload.stream === "stderr" ? "stderr" : "stdout";
+    await appendSessionLog(ctx.sessionId, ctx.messageId, data, true, ctx.projectId, stream);
+
+    if (stream === "stdout") {
+      eventBus.publish({
+        type: "terminal_output",
+        payload: {
+          sessionId: ctx.sessionId,
+          messageId: ctx.messageId,
+          data,
+        },
+      });
+    }
   }
 
   private async onExecExit(payload: {
@@ -1134,7 +1139,7 @@ class RunnerManager {
 
     if (resolvedAgentType === "codex") {
       try {
-        const log = await getSessionLog(ctx.sessionId, ctx.messageId);
+        const log = await getSessionLog(ctx.sessionId, ctx.messageId, ctx.projectId, "stderr");
         const codexId = extractCodexSessionId(log);
         if (codexId) {
           await saveCodexSessionId(ctx.sessionId, codexId);

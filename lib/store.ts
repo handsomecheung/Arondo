@@ -471,31 +471,37 @@ export async function updateMessage(
 
 // ─── Logs ─────────────────────────────────────────────────────────────────────
 
-function getLogFilePath(sessionId: string, messageId: string, projectId?: string): string {
+export type LogStream = "stdout" | "stderr";
+
+function getLogFilePath(sessionId: string, messageId: string, projectId?: string, stream?: LogStream): string {
+  const suffix = stream === "stderr" ? ".stderr" : "";
   if (!sessionId) {
     if (!projectId) {
       throw new Error("getLogFilePath: projectId is required for project-scoped (sessionless) logs");
     }
-    return path.join(getProjectDir(projectId), "logs", `${messageId}.log`);
+    return path.join(getProjectDir(projectId), "logs", `${messageId}${suffix}.log`);
   }
-  return path.join(getSessionDir(sessionId), "logs", `${messageId}.log`);
+  return path.join(getSessionDir(sessionId), "logs", `${messageId}${suffix}.log`);
 }
 
 export async function clearSessionLog(sessionId: string, messageId: string, projectId?: string): Promise<void> {
-  const logPath = getLogFilePath(sessionId, messageId, projectId);
-  await ensureDir(path.dirname(logPath));
-  await fs.writeFile(logPath, "", "utf-8");
+  const paths = [
+    getLogFilePath(sessionId, messageId, projectId),
+    getLogFilePath(sessionId, messageId, projectId, "stderr"),
+  ];
+  await ensureDir(path.dirname(paths[0]));
+  await Promise.all(paths.map((logPath) => fs.writeFile(logPath, "", "utf-8")));
 }
 
-export async function appendSessionLog(sessionId: string, messageId: string, text: string, raw = false, projectId?: string): Promise<void> {
-  const logPath = getLogFilePath(sessionId, messageId, projectId);
+export async function appendSessionLog(sessionId: string, messageId: string, text: string, raw = false, projectId?: string, stream?: LogStream): Promise<void> {
+  const logPath = getLogFilePath(sessionId, messageId, projectId, stream);
   await ensureDir(path.dirname(logPath));
   await fs.appendFile(logPath, raw ? text : text + "\n", "utf-8");
 }
 
-export async function getSessionLog(sessionId: string, messageId: string, projectId?: string): Promise<string> {
+export async function getSessionLog(sessionId: string, messageId: string, projectId?: string, stream: LogStream = "stdout"): Promise<string> {
   try {
-    return await fs.readFile(getLogFilePath(sessionId, messageId, projectId), "utf-8");
+    return await fs.readFile(getLogFilePath(sessionId, messageId, projectId, stream), "utf-8");
   } catch {
     return "";
   }
@@ -667,5 +673,3 @@ export async function getSessionArchiveAgeMs(): Promise<number> {
   const days = await getSessionArchiveDays();
   return days * 24 * 60 * 60 * 1000;
 }
-
-

@@ -76,17 +76,26 @@ func (h *Handler) handleExecAgent(msg *Message) {
 	}
 
 	var pid int
-	pid, err = h.taskManager.Spawn(SpawnOptions{
+	pid, err = h.taskManager.SpawnPiped(SpawnPipedOptions{
 		TaskID:  req.TaskID,
 		Command: command,
 		Args:    args,
 		WorkDir: req.WorkDir,
 		Env:     env,
-		OnData: func(data []byte) {
+		OnStdout: func(data []byte) {
 			h.sendStream("exec.output", map[string]string{
 				"taskId":   req.TaskID,
 				"data":     base64.StdEncoding.EncodeToString(data),
 				"encoding": "base64",
+				"stream":   "stdout",
+			})
+		},
+		OnStderr: func(data []byte) {
+			h.sendStream("exec.output", map[string]string{
+				"taskId":   req.TaskID,
+				"data":     base64.StdEncoding.EncodeToString(data),
+				"encoding": "base64",
+				"stream":   "stderr",
 			})
 		},
 		OnExit: func(exitCode int) {

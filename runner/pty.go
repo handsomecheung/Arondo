@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"sync"
@@ -56,6 +57,17 @@ type SpawnOptions struct {
 	OnExit  func(exitCode int)
 }
 
+type SpawnPipedOptions struct {
+	TaskID   string
+	Command  string
+	Args     []string
+	WorkDir  string
+	Env      []string
+	OnStdout func(data []byte)
+	OnStderr func(data []byte)
+	OnExit   func(exitCode int)
+}
+
 func (tm *TaskManager) Spawn(opts SpawnOptions) (int, error) {
 	tm.mu.Lock()
 	if t, exists := tm.tasks[opts.TaskID]; exists {
@@ -93,6 +105,109 @@ func (tm *TaskManager) Spawn(opts SpawnOptions) (int, error) {
 		return 0, err
 	}
 	return t.cmd.Process.Pid, nil
+}
+
+func (tm *TaskManager) SpawnPiped(opts SpawnPipedOptions) (int, error) {
+	tm.mu.Lock()
+	if t, exists := tm.tasks[opts.TaskID]; exists {
+		fmt.Printf("[task-manager] task %s already exists, cleaning up older task first\n", opts.TaskID)
+		if t.ptyFile != nil {
+			t.ptyFile.Close()
+		}
+		if t.cmd != nil && t.cmd.Process != nil {
+			killTaskProcess(t.cmd, syscall.SIGKILL)
+		}
+		delete(tm.tasks, opts.TaskID)
+	}
+
+	cmd := execCommand(opts.Command, opts.Args...)
+	cmd.Dir = opts.WorkDir
+	if len(opts.Env) > 0 {
+		cmd.Env = append(os.Environ(), opts.Env...)
+	} else {
+		cmd.Env = os.Environ()
+	}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		tm.mu.Unlock()
+		return 0, fmt.Errorf("stdout pipe: %w", err)
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		tm.mu.Unlock()
+		return 0, fmt.Errorf("stderr pipe: %w", err)
+	}
+
+	t := &task{
+		id:        opts.TaskID,
+		cmd:       cmd,
+		onExit:    opts.OnExit,
+		procDoneC: make(chan struct{}),
+	}
+	tm.tasks[opts.TaskID] = t
+	tm.mu.Unlock()
+
+	if err := cmd.Start(); err != nil {
+		tm.mu.Lock()
+		delete(tm.tasks, opts.TaskID)
+		tm.mu.Unlock()
+		return 0, fmt.Errorf("start: %w", err)
+	}
+
+	go func() {
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go copyPipe(stdout, opts.OnStdout, &wg)
+		go copyPipe(stderr, opts.OnStderr, &wg)
+
+		exitCode := 0
+		if err := cmd.Wait(); err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				exitCode = exitErr.ExitCode()
+			} else {
+				exitCode = 1
+			}
+		}
+		wg.Wait()
+
+		t.mu.Lock()
+		t.done = true
+		t.exitCode = exitCode
+		isRestarting := t.isRestarting
+		onExit := t.onExit
+		t.mu.Unlock()
+
+		close(t.procDoneC)
+
+		if !isRestarting {
+			if onExit != nil {
+				onExit(exitCode)
+			}
+			tm.mu.Lock()
+			delete(tm.tasks, t.id)
+			tm.mu.Unlock()
+		}
+	}()
+
+	return cmd.Process.Pid, nil
+}
+
+func copyPipe(r io.Reader, onData func([]byte), wg *sync.WaitGroup) {
+	defer wg.Done()
+	buf := make([]byte, 4096)
+	for {
+		n, err := r.Read(buf)
+		if n > 0 && onData != nil {
+			data := make([]byte, n)
+			copy(data, buf[:n])
+			onData(data)
+		}
+		if err != nil {
+			break
+		}
+	}
 }
 
 // launchProcess starts a new process with a PTY for the given task.
