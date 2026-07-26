@@ -123,6 +123,7 @@ Open [http://localhost:3251](http://localhost:3251) in your browser. Select the 
 - `global-rules.md` – Rules synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on connected runners.
 - `agent-commands.json` – User-defined agent slash commands.
 - `settings.json` – Global application configuration settings (e.g. custom session archive day count overrides).
+- `agents-sessions.json` – Agent conversation/session continuity map, stored as `{ "agy": {}, "codex": {} }`.
 
 ## Automation API
 

@@ -189,7 +189,7 @@ tests/                  # Playwright integration tests
   settings.json         # Persisted global application configuration settings (e.g., sessionArchiveDays)
   agent-commands.json   # Persisted custom agent slash commands
   global-rules.md       # Global agent rules written from Settings
-  agy-sessions.json     # Map file matching Arondo sessionIds with agy conversation UUIDs
+  agents-sessions.json  # Agent session map: { "agy": {}, "codex": {} }
   sessions/
     [sessionId]/
       session.json      # Session metadata (status, prompt, agent, repoPath, runnerId)

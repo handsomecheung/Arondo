@@ -1,13 +1,6 @@
-import fs from "fs/promises";
-import fsSync from "fs";
-import path from "path";
 import { BaseAgent, AgentRunOptions, PROMPT_ENV_VAR } from "./base";
-import { getConfigDir } from "../config";
-import { withFileLock, writeJsonAtomic } from "../fileLock";
 import { stripAnsi } from "../ansi";
-
-const CONFIG_DIR = getConfigDir();
-const CODEX_SESSION_MAP_FILE = path.join(CONFIG_DIR, "codex-sessions.json");
+import { getAgentSessionIdSync, saveAgentSessionId } from "./sessionMap";
 
 // Codex prints this header line (bolded) at the start of every `exec` run
 // (fresh or resumed), e.g. "\x1b[1msession id:\x1b[0m 019f9883-...\r".
@@ -19,26 +12,12 @@ export function extractCodexSessionId(log: string): string | undefined {
 }
 
 function getCodexSessionIdSync(sessionId: string): string | undefined {
-  try {
-    const raw = fsSync.readFileSync(CODEX_SESSION_MAP_FILE, "utf-8");
-    const map = JSON.parse(raw);
-    return map[sessionId];
-  } catch {
-    return undefined;
-  }
+  return getAgentSessionIdSync("codex", sessionId);
 }
 
 export async function saveCodexSessionId(sessionId: string, codexId: string): Promise<void> {
   try {
-    await withFileLock(CODEX_SESSION_MAP_FILE, async () => {
-      let map: Record<string, string> = {};
-      try {
-        const raw = await fs.readFile(CODEX_SESSION_MAP_FILE, "utf-8");
-        map = JSON.parse(raw);
-      } catch {}
-      map[sessionId] = codexId;
-      await writeJsonAtomic(CODEX_SESSION_MAP_FILE, map);
-    });
+    await saveAgentSessionId("codex", sessionId, codexId);
   } catch (err) {
     console.error("Failed to save codex session mapping:", err);
   }

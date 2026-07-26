@@ -5,16 +5,16 @@ import os from 'os';
 import { setupRunner, teardownRunner, waitForSessionNotRunning } from '../resume.helper';
 
 const CONFIG_DIR_RUNTIME = process.env.ARONDO_CONFIG_DIR || path.join(os.tmpdir(), 'arondo-test-config');
-const AGY_SESSION_MAP_FILE = path.join(CONFIG_DIR_RUNTIME, 'agy-sessions.json');
+const AGENTS_SESSION_MAP_FILE = path.join(CONFIG_DIR_RUNTIME, 'agents-sessions.json');
 
-/** Wait until agy-sessions.json contains a mapping for sessionId. */
+/** Wait until agents-sessions.json contains an agy mapping for sessionId. */
 async function waitForAgySessionMapped(sessionId: string, timeoutMs = 5000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
-      const raw = await fs.readFile(AGY_SESSION_MAP_FILE, 'utf-8');
+      const raw = await fs.readFile(AGENTS_SESSION_MAP_FILE, 'utf-8');
       const map = JSON.parse(raw);
-      if (map[sessionId]) return;
+      if (map.agy?.[sessionId]) return;
     } catch {}
     await new Promise((r) => setTimeout(r, 50));
   }
