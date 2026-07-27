@@ -834,6 +834,25 @@ class RunnerManager {
     }
   }
 
+  removeCompletedTasksForSession(sessionId: string): void {
+    const toDelete: string[] = [];
+    for (const [taskId, ctx] of this.tasks) {
+      if (ctx.sessionId === sessionId && ctx.completedAt) {
+        const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
+        this.ptyKeyToTaskId.delete(ptyKey);
+        toDelete.push(taskId);
+      }
+    }
+    for (const taskId of toDelete) {
+      this.tasks.delete(taskId);
+    }
+    if (toDelete.length > 0) {
+      console.log(
+        `[runner-manager] removed ${toDelete.length} completed task(s) for archived session ${sessionId}`,
+      );
+    }
+  }
+
   async deleteTask(taskId: string): Promise<boolean> {
     const ctx = this.tasks.get(taskId);
     if (!ctx || !ctx.completedAt) return false;

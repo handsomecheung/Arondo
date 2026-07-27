@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { archiveSession, isSessionArchived } from "@/lib/store";
 import { eventBus } from "@/lib/event-bus";
 import { getArondoToken, verifySessionPermission } from "@/lib/auth";
+import { runnerManager } from "@/lib/runner-manager";
 
 export async function POST(
   req: NextRequest,
@@ -19,6 +20,7 @@ export async function POST(
 
   try {
     await archiveSession(id, true);
+    runnerManager.removeCompletedTasksForSession(id);
     eventBus.publish({ type: "session_deleted", payload: { id } });
     return NextResponse.json({ success: true });
   } catch (error: any) {

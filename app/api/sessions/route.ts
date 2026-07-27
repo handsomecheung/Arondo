@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
     if (!isActive && isStale && session.archivedManually !== false) {
       console.log(`[sessions] session ${session.id} last updated over ${sessionArchiveAgeMs / (24 * 60 * 60 * 1000)} days ago, archiving`);
       await archiveSession(session.id);
+      runnerManager.removeCompletedTasksForSession(session.id);
       eventBus.publish({ type: "session_deleted", payload: { id: session.id } });
       continue;
     }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken } from "@/lib/auth";
+import { isSessionArchived } from "@/lib/store";
 
 export async function GET(request: NextRequest) {
   const token = getArondoToken(request);
@@ -12,6 +13,9 @@ export async function GET(request: NextRequest) {
 
   const filtered = [];
   for (const task of tasks) {
+    if (isSessionArchived(task.sessionId)) {
+      continue;
+    }
     const isAllowed = await runnerManager.isTokenAllowedForRunnerId(task.runnerId, token);
     if (isAllowed) {
       filtered.push(task);
