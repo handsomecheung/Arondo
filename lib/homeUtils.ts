@@ -24,7 +24,24 @@ export function autoResizeTextarea(el: HTMLTextAreaElement, maxHeight = 260) {
 }
 
 export function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString([], {
+  const date = new Date(iso);
+  const now = new Date();
+  const isToday =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+
+  if (isToday) {
+    return date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  return date.toLocaleString([], {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
   });
