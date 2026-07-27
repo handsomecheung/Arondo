@@ -1,7 +1,7 @@
 "use client";
 
 import type { Project, Session, ProjectScript, Runner } from "@/types/home";
-import { IconPlus, IconTrash, IconMoreVertical, IconFileSearch, IconTerminal } from "@/components/Icons";
+import { IconPlus, IconTrash, IconMoreVertical, IconFileSearch, IconTerminal, IconCommit } from "@/components/Icons";
 
 interface ProjectPanelProps {
   project: Project;
@@ -27,6 +27,7 @@ interface ProjectPanelProps {
   onSelectSession: (id: string) => void;
   onRunScript: (name: string) => void;
   onShowDiff: () => void;
+  onShowCommits: () => void;
   isCheckingGitChanges: boolean;
   hasGitChanges: boolean;
   isGitRepo: boolean;
@@ -56,6 +57,7 @@ export default function ProjectPanel({
   onSelectSession,
   onRunScript,
   onShowDiff,
+  onShowCommits,
   isCheckingGitChanges,
   hasGitChanges,
   isGitRepo,
@@ -148,6 +150,19 @@ export default function ProjectPanel({
                     id="menu-show-diff"
                   >
                     🔍 Show Changes
+                  </button>
+                )}
+
+                {isGitRepo && (
+                  <button
+                    className="menu-item"
+                    onClick={() => {
+                      onSetMenuOpen(false);
+                      onShowCommits();
+                    }}
+                    id="menu-show-commits"
+                  >
+                    <IconCommit /> Show Commits
                   </button>
                 )}
 

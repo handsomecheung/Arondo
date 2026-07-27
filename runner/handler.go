@@ -60,6 +60,8 @@ func (h *Handler) handleRequest(msg *Message) {
 		h.handleGitStatus(msg)
 	case "git.diff":
 		h.handleGitDiff(msg)
+	case "git.log":
+		h.handleGitLog(msg)
 	case "rules.sync":
 		h.handleRulesSync(msg)
 	case "rules.remove":

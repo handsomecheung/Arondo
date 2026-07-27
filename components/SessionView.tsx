@@ -14,7 +14,7 @@ import {
   IconPlay, IconTerminal, IconEdit, IconTrash,
   IconMoreVertical, IconFolder, IconChevronDown, IconFileSearch,
   IconClaude, IconAntigravity, IconCodex, IconOpencode, IconClock,
-  IconArchive, IconPin, IconPaperclip, IconX,
+  IconArchive, IconPin, IconPaperclip, IconX, IconCommit,
 } from "@/components/Icons";
 import { getTriggerWord } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
@@ -93,6 +93,7 @@ interface SessionViewProps {
   onOpenShellModal: () => void;
   onOpenFileBrowser: () => void;
   onShowDiff: () => void;
+  onShowCommits: () => void;
   onOpenFilePath: (path: string) => void;
   onOpenRenameModal: () => void;
   onManageScripts: () => void;
@@ -182,6 +183,7 @@ export default function SessionView({
   onOpenShellModal,
   onOpenFileBrowser,
   onShowDiff,
+  onShowCommits,
   onOpenFilePath,
   onOpenRenameModal,
   onManageScripts,
@@ -539,6 +541,19 @@ export default function SessionView({
                     id="menu-show-diff"
                   >
                     🔍 Show Changes
+                  </button>
+                )}
+
+                {isGitRepo && (
+                  <button
+                    className="menu-item"
+                    onClick={() => {
+                      onSetMenuOpen(false);
+                      onShowCommits();
+                    }}
+                    id="menu-show-commits"
+                  >
+                    <IconCommit /> Show Commits
                   </button>
                 )}
 

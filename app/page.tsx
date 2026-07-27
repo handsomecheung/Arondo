@@ -15,6 +15,7 @@ import LogConsoleModal from "@/components/modals/LogConsoleModal";
 import ShellTerminalModal from "@/components/modals/ShellTerminalModal";
 import FileBrowserModal from "@/components/modals/FileBrowserModal";
 import DiffModal from "@/components/modals/DiffModal";
+import CommitsModal from "@/components/modals/CommitsModal";
 import CommandModal from "@/components/modals/CommandModal";
 import AddScriptModal from "@/components/modals/AddScriptModal";
 import ToastNotification from "@/components/modals/ToastNotification";
@@ -173,6 +174,8 @@ export default function HomePage() {
   const [fileBrowserOpen, setFileBrowserOpen] = useState(false);
   const [fileBrowserTargetPath, setFileBrowserTargetPath] = useState<string | undefined>(undefined);
   const [diffModalOpen, setDiffModalOpen] = useState(false);
+  const [commitsModalOpen, setCommitsModalOpen] = useState(false);
+  const [selectedCommitForDiff, setSelectedCommitForDiff] = useState<string | null>(null);
 
   const activeLogMsgIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -1337,6 +1340,7 @@ export default function HomePage() {
                 onAutoAddScripts={handleAutoAddScripts}
                 onSelectSession={handleSelectSession}
                 onShowDiff={() => setDiffModalOpen(true)}
+                onShowCommits={() => setCommitsModalOpen(true)}
                 isCheckingGitChanges={isCheckingProjectGitChanges}
                 hasGitChanges={hasProjectGitChanges}
                 isGitRepo={isProjectGitRepo}
@@ -1418,6 +1422,7 @@ export default function HomePage() {
             onOpenShellModal={() => setShellModalOpen(true)}
             onOpenFileBrowser={() => setFileBrowserOpen(true)}
             onShowDiff={() => setDiffModalOpen(true)}
+            onShowCommits={() => setCommitsModalOpen(true)}
             onOpenFilePath={(path) => {
               const base = selectedSession?.repoPath ?? repoPath;
               const decoded = decodeURIComponent(path);
@@ -1511,11 +1516,26 @@ export default function HomePage() {
         initialFilePath={fileBrowserTargetPath}
       />
 
+      <CommitsModal
+        open={commitsModalOpen}
+        onClose={() => setCommitsModalOpen(false)}
+        sessionId={selectedSessionId || undefined}
+        projectId={!selectedSessionId ? (selectedProjectId || undefined) : undefined}
+        onSelectCommit={(hash) => {
+          setSelectedCommitForDiff(hash);
+          setDiffModalOpen(true);
+        }}
+      />
+
       <DiffModal
         open={diffModalOpen}
-        onClose={() => setDiffModalOpen(false)}
+        onClose={() => {
+          setDiffModalOpen(false);
+          setSelectedCommitForDiff(null);
+        }}
         sessionId={selectedSessionId || ""}
         projectId={!selectedSessionId ? (selectedProjectId || undefined) : undefined}
+        commit={selectedCommitForDiff || undefined}
       />
 
       <CommandModal

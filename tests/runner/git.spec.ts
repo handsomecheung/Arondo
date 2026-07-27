@@ -99,4 +99,30 @@ test.describe('Runner Git API integration tests', () => {
     // It should either render the diff or say "No changes detected"
     expect(html).toContain('<!DOCTYPE html>');
   });
+
+  test('should return list of git commits', async ({ request }) => {
+    const response = await request.get(`/api/sessions/${sessionId}/git-log`, {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+    expect(response.status()).toBe(200);
+    const result = await response.json();
+    expect(result).toHaveProperty('commits');
+    expect(Array.isArray(result.commits)).toBe(true);
+    if (result.commits.length > 0) {
+      const commit = result.commits[0];
+      expect(commit).toHaveProperty('hash');
+      expect(commit).toHaveProperty('author');
+      expect(commit).toHaveProperty('email');
+      expect(commit).toHaveProperty('date');
+      expect(commit).toHaveProperty('subject');
+
+      // Test displaying diff for this specific commit
+      const diffResponse = await request.get(`/api/sessions/${sessionId}/diff?commit=${commit.hash}`, {
+        headers: { 'x-arondo-token': 'test-token-123456' }
+      });
+      expect(diffResponse.status()).toBe(200);
+      const diffHtml = await diffResponse.text();
+      expect(diffHtml).toContain('<!DOCTYPE html>');
+    }
+  });
 });

@@ -106,6 +106,7 @@ export async function GET(
   const { id } = await params;
   const { searchParams } = new URL(req.url);
   const wrap = searchParams.get("wrap") === "true";
+  const commit = searchParams.get("commit");
 
   const token = getArondoToken(req);
 
@@ -127,7 +128,7 @@ export async function GET(
     const result = await runnerManager.sendRequest(
       runnerId,
       "git.diff",
-      { workDir: project.repoPath }
+      { workDir: project.repoPath, commitHash: commit || undefined }
     );
 
     if (!result.hasChanges) {
@@ -154,7 +155,7 @@ export async function GET(
 <body>
   <div class="container">
     <h1>No changes detected</h1>
-    <p>All changes have been committed or there are no modifications.</p>
+    <p>${commit ? `Commit ${commit.substring(0, 7)} has no changes or does not exist.` : "All changes have been committed or there are no modifications."}</p>
   </div>
 </body>
 </html>`;

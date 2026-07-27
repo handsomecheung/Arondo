@@ -10,9 +10,10 @@ interface Props {
   messageId?: string;
   filePath?: string;
   projectId?: string;
+  commit?: string;
 }
 
-export default function DiffModal({ open, onClose, sessionId, messageId, filePath, projectId }: Props) {
+export default function DiffModal({ open, onClose, sessionId, messageId, filePath, projectId, commit }: Props) {
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [wordWrap, setWordWrap] = useState(false);
 
@@ -23,9 +24,13 @@ export default function DiffModal({ open, onClose, sessionId, messageId, filePat
 
   const iframeSrc = filePath && messageId
     ? `/api/sessions/${sessionId}/diff?wrap=${wordWrap}&messageId=${messageId}&path=${encodeURIComponent(filePath)}&projectId=${projectId || ""}${tokenParam}`
-    : sessionId
-      ? `/api/sessions/${sessionId}/diff?wrap=${wordWrap}${tokenParam}`
-      : `/api/projects/${projectId}/diff?wrap=${wordWrap}${tokenParam}`;
+    : commit
+      ? (sessionId
+        ? `/api/sessions/${sessionId}/diff?wrap=${wordWrap}&commit=${encodeURIComponent(commit)}${tokenParam}`
+        : `/api/projects/${projectId}/diff?wrap=${wordWrap}&commit=${encodeURIComponent(commit)}${tokenParam}`)
+      : sessionId
+        ? `/api/sessions/${sessionId}/diff?wrap=${wordWrap}${tokenParam}`
+        : `/api/projects/${projectId}/diff?wrap=${wordWrap}${tokenParam}`;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -48,7 +53,7 @@ export default function DiffModal({ open, onClose, sessionId, messageId, filePat
           }}
         >
           <span className="modal-title" style={{ fontSize: "1.1rem", fontWeight: 600 }}>
-            {filePath ? `Diff: ${filePath.split("/").pop()}` : "Git Diff"}
+            {filePath ? `Diff: ${filePath.split("/").pop()}` : commit ? `Commit Diff: ${commit.substring(0, 7)}` : "Git Diff"}
           </span>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <button

@@ -110,6 +110,7 @@ export async function GET(
   const messageId = searchParams.get("messageId");
   const filePath = searchParams.get("path");
   const projectId = searchParams.get("projectId") || undefined;
+  const commit = searchParams.get("commit");
 
   const token = getArondoToken(req);
   if (id === "global") {
@@ -273,7 +274,7 @@ export async function GET(
     const result = await runnerManager.sendRequest(
       runnerId,
       "git.diff",
-      { workDir: session.repoPath }
+      { workDir: session.repoPath, commitHash: commit || undefined }
     );
 
     if (!result.hasChanges) {
@@ -300,7 +301,7 @@ export async function GET(
 <body>
   <div class="container">
     <h1>No changes detected</h1>
-    <p>All changes have been committed or there are no modifications.</p>
+    <p>${commit ? `Commit ${commit.substring(0, 7)} has no changes or does not exist.` : "All changes have been committed or there are no modifications."}</p>
   </div>
 </body>
 </html>`;
