@@ -10,10 +10,11 @@ const AGENTS_SESSION_MAP_FILE = path.join(CONFIG_DIR, "agent-sessions.json");
 type AgentSessionMap = {
   agy: Record<string, string>;
   codex: Record<string, string>;
+  opencode: Record<string, string>;
 };
 
 function emptyAgentSessionMap(): AgentSessionMap {
-  return { agy: {}, codex: {} };
+  return { agy: {}, codex: {}, opencode: {} };
 }
 
 function parseAgentSessionMap(raw: string): AgentSessionMap {
@@ -21,6 +22,7 @@ function parseAgentSessionMap(raw: string): AgentSessionMap {
   return {
     agy: parsed.agy ?? {},
     codex: parsed.codex ?? {},
+    opencode: parsed.opencode ?? {},
   };
 }
 

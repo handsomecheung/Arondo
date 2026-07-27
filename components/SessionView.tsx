@@ -13,7 +13,7 @@ import {
   IconLogo, IconPlus, IconSend, IconCheck,
   IconPlay, IconTerminal, IconEdit, IconTrash,
   IconMoreVertical, IconFolder, IconChevronDown, IconFileSearch,
-  IconClaude, IconAntigravity, IconCodex, IconClock,
+  IconClaude, IconAntigravity, IconCodex, IconOpencode, IconClock,
   IconArchive, IconPin, IconPaperclip, IconX,
 } from "@/components/Icons";
 import { getTriggerWord } from "@/lib/agentCommands";
@@ -268,6 +268,7 @@ export default function SessionView({
     if (type === "antigravity") return "Antigravity CLI";
     if (type === "claude") return "Claude Code";
     if (type === "codex") return "Codex";
+    if (type === "opencode") return "OpenCode";
     if (type === "auto") return "Auto";
     return type;
   }
@@ -322,6 +323,8 @@ export default function SessionView({
                     return <IconClaude />;
                   } else if (activeAgentType === "codex") {
                     return <IconCodex />;
+                  } else if (activeAgentType === "opencode") {
+                    return <IconOpencode />;
                   } else {
                     return <IconAntigravity />;
                   }
@@ -424,6 +427,7 @@ export default function SessionView({
                           { value: "antigravity", label: "Antigravity CLI", cmd: "agy" },
                           { value: "claude",      label: "Claude Code",     cmd: "claude" },
                           { value: "codex",       label: "Codex",           cmd: "codex" },
+                          { value: "opencode",    label: "OpenCode",        cmd: "opencode" },
                         ] as const
                       ).filter(({ cmd }) => isAgentAvailable(cmd));
                       const showAuto = concreteAgents.length > 1;
@@ -1020,6 +1024,7 @@ export default function SessionView({
                           { value: "antigravity", label: "Antigravity CLI", cmd: "agy", comingSoon: false },
                           { value: "claude",       label: "Claude Code",     cmd: "claude", comingSoon: false },
                           { value: "codex",        label: "Codex",           cmd: "codex",  comingSoon: false },
+                          { value: "opencode",     label: "OpenCode",        cmd: "opencode", comingSoon: false },
                         ] as const
                       ).filter(({ cmd, comingSoon }) => !comingSoon && isAgentAvailable(cmd));
 

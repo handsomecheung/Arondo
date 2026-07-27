@@ -249,6 +249,15 @@ export function IconCodex() {
   );
 }
 
+export function IconOpencode() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+      <path d="M9 8v8M15 8v8M9 12h6" />
+    </svg>
+  );
+}
+
 export function IconFileText() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

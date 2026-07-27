@@ -66,6 +66,8 @@ func (h *Handler) handleRequest(msg *Message) {
 		h.handleRulesRemove(msg)
 	case "info.fetch":
 		h.handleInfoFetch(msg)
+	case "opencode.sessionList":
+		h.handleOpencodeSessionList(msg)
 	default:
 		h.sendError(msg.ID, "NOT_FOUND", "unknown method: "+msg.Method)
 	}

@@ -16,6 +16,11 @@ import {
   saveAgySessionId,
 } from "./agents/antigravity";
 import { extractCodexSessionId, saveCodexSessionId } from "./agents/codex";
+import {
+  extractOpencodeSessionId,
+  getOpencodeSessionIdSync,
+  saveOpencodeSessionId,
+} from "./agents/opencode";
 import fs from "fs/promises";
 import path from "path";
 import { getConfigDir } from "./config";
@@ -1145,6 +1150,20 @@ class RunnerManager {
         }
       } catch (err) {
         console.error("[runner-manager] failed to save codex session id:", err);
+      }
+    }
+
+    if (resolvedAgentType === "opencode" && !getOpencodeSessionIdSync(ctx.sessionId) && session?.repoPath) {
+      try {
+        const res = await this.sendRequest(ctx.runnerId, "opencode.sessionList", {
+          workDir: session.repoPath,
+        });
+        const opencodeId = extractOpencodeSessionId(res?.output ?? "", ctx.sessionId);
+        if (opencodeId) {
+          await saveOpencodeSessionId(ctx.sessionId, opencodeId);
+        }
+      } catch (err) {
+        console.error("[runner-manager] failed to fetch/save opencode session id:", err);
       }
     }
 

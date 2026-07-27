@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { IconClaude, IconAntigravity, IconTerminal } from "@/components/Icons";
+import { IconClaude, IconAntigravity, IconCodex, IconOpencode, IconTerminal } from "@/components/Icons";
 
 export interface ExecCardItem {
   id: string;
@@ -136,6 +136,10 @@ export default function ExecCard({ item, className, onShowCommand, onStopTask, o
             <IconShell />
           ) : item.agentType === "claude" ? (
             <IconClaude />
+          ) : item.agentType === "codex" ? (
+            <IconCodex />
+          ) : item.agentType === "opencode" ? (
+            <IconOpencode />
           ) : (
             <IconAntigravity />
           )}

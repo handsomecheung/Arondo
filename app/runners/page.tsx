@@ -427,7 +427,7 @@ export default function RunnersPage() {
                     { label: "Antigravity CLI", cmd: "agy", comingSoon: false },
                     { label: "Claude Code", cmd: "claude", comingSoon: false },
                     { label: "Codex", cmd: "codex", comingSoon: false },
-                    { label: "OpenCode", cmd: "opencode", comingSoon: true },
+                    { label: "OpenCode", cmd: "opencode", comingSoon: false },
                   ];
                   const hasAgentInfo = Array.isArray(r.agents);
                   const isSelected = selectedRunnerId === r.id;

@@ -62,6 +62,7 @@ export function agentTypeLabel(type: string): string {
   if (type === "antigravity") return "Antigravity CLI";
   if (type === "claude") return "Claude Code";
   if (type === "codex") return "Codex";
+  if (type === "opencode") return "OpenCode";
   if (type === "auto") return "Auto";
   return type;
 }

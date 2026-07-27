@@ -2,9 +2,10 @@ import { BaseAgent } from "./base";
 import { AntigravityAgent } from "./antigravity";
 import { ClaudeCodeAgent } from "./claude";
 import { CodexAgent } from "./codex";
+import { OpencodeAgent } from "./opencode";
 import { selectAgent } from "../autoselect";
 
-export type ConcreteAgentType = "antigravity" | "claude" | "codex";
+export type ConcreteAgentType = "antigravity" | "claude" | "codex" | "opencode";
 export type AgentType = ConcreteAgentType | "auto";
 
 /**
@@ -21,6 +22,7 @@ const AGENTS: Record<ConcreteAgentType, AgentEntry> = {
   antigravity: { factory: () => new AntigravityAgent(), binary: "agy" },
   claude:      { factory: () => new ClaudeCodeAgent(),  binary: "claude" },
   codex:       { factory: () => new CodexAgent(),       binary: "codex" },
+  opencode:    { factory: () => new OpencodeAgent(),    binary: "opencode" },
 };
 
 /**
