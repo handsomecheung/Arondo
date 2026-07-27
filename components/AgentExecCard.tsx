@@ -8,8 +8,9 @@ import remarkFileLinks, { extractCandidatePaths, candidateToPath } from "@/lib/r
 import remarkSoftLineBreaks from "@/lib/remarkSoftLineBreaks";
 import { resolveRepoFilePath } from "@/lib/homeUtils";
 import ExecCard, { ExecCardProps } from "@/components/ExecCard";
-import { IconTerminal, IconFileText, IconCopy } from "@/components/Icons";
+import { IconTerminal, IconFileText, IconCopy, IconCode } from "@/components/Icons";
 import DiffModal from "@/components/modals/DiffModal";
+import CommandModal from "@/components/modals/CommandModal";
 
 const RENDERED_HTML_CACHE_MARKER = "<!--arondo-agent-output-html-v3-->";
 
@@ -46,6 +47,7 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
   const [cachedHtml, setCachedHtml] = useState<string | null>(null);
   const [diffModalOpen, setDiffModalOpen] = useState(false);
   const [selectedDiffPath, setSelectedDiffPath] = useState("");
+  const [stderrText, setStderrText] = useState<string | null>(null);
   const outputRef = useRef<HTMLDivElement>(null);
 
   // Fetch cached HTML if exists
@@ -245,7 +247,20 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
     navigator.clipboard.writeText(text).catch(() => {});
   };
 
-  const extraMenuItems = (onShowPrompt || (hasLog && onViewLog) || canCopy)
+  const showStderr = () => {
+    const url = sessionId
+      ? `/api/sessions/${sessionId}/log?messageId=${props.item.messageId}&stream=stderr`
+      : `/api/sessions/global/log?messageId=${props.item.messageId}&projectId=${projectId || ""}&stream=stderr`;
+
+    fetch(url)
+      .then((r) => r.json())
+      .then(({ log: stderrLog }: { log: string }) => {
+        setStderrText(stderrLog ? stripAnsi(stderrLog) : "(no stderr output)");
+      })
+      .catch(() => setStderrText("(failed to load stderr log)"));
+  };
+
+  const extraMenuItems = (onShowPrompt || (hasLog && onViewLog) || canCopy || hasLog)
     ? (closeMenu: () => void) => (
         <>
           {hasLog && onViewLog && (
@@ -282,6 +297,15 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
             >
               <IconFileText />
               <span>Show Prompt</span>
+            </button>
+          )}
+          {hasLog && (
+            <button
+              className="task-menu-item"
+              onClick={() => { closeMenu(); showStderr(); }}
+            >
+              <IconCode />
+              <span>Show Stderr</span>
             </button>
           )}
         </>
@@ -370,6 +394,11 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
         messageId={props.item.messageId}
         filePath={selectedDiffPath}
         projectId={projectId}
+      />
+      <CommandModal
+        text={stderrText}
+        onClose={() => setStderrText(null)}
+        title="Stderr Log"
       />
     </>
   );
