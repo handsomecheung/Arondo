@@ -104,9 +104,9 @@ interface SessionViewProps {
   onExecuteAgentCommand: (promptText: string) => void;
   onExecuteScriptCommand: (promptText: string) => void;
   onSwitchAgent: (agentType: string) => void;
-  pendingFile: File | null;
-  onSelectFile: (file: File) => void;
-  onRemovePendingFile: () => void;
+  pendingFiles: File[];
+  onSelectFiles: (files: File[]) => void;
+  onRemovePendingFile: (index: number) => void;
 }
 
 export default function SessionView({
@@ -193,8 +193,8 @@ export default function SessionView({
   onExecuteAgentCommand,
   onExecuteScriptCommand,
   onSwitchAgent,
-  pendingFile,
-  onSelectFile,
+  pendingFiles,
+  onSelectFiles,
   onRemovePendingFile,
 }: SessionViewProps) {
   const activeRunnerId = selectedSession ? selectedSession.runnerId : runnerId;
@@ -206,8 +206,8 @@ export default function SessionView({
 
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const handleUploadChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) onSelectFile(file);
+    const files = Array.from(e.target.files ?? []);
+    if (files.length > 0) onSelectFiles(files);
     e.target.value = "";
   };
 
@@ -1184,18 +1184,22 @@ export default function SessionView({
           );
         })()}
 
-        {pendingFile && (
-          <div className="pending-file-chip">
-            <IconPaperclip size={13} />
-            <span className="pending-file-name" title={pendingFile.name}>{pendingFile.name}</span>
-            <button
-              className="pending-file-remove"
-              onClick={onRemovePendingFile}
-              title="Remove attachment"
-              type="button"
-            >
-              <IconX />
-            </button>
+        {pendingFiles.length > 0 && (
+          <div className="pending-files-list">
+            {pendingFiles.map((file, i) => (
+              <div key={i} className="pending-file-chip">
+                <IconPaperclip size={13} />
+                <span className="pending-file-name" title={file.name}>{file.name}</span>
+                <button
+                  className="pending-file-remove"
+                  onClick={() => onRemovePendingFile(i)}
+                  title="Remove attachment"
+                  type="button"
+                >
+                  <IconX />
+                </button>
+              </div>
+            ))}
           </div>
         )}
 
@@ -1203,6 +1207,7 @@ export default function SessionView({
           <input
             ref={uploadInputRef}
             type="file"
+            multiple
             style={{ display: "none" }}
             onChange={handleUploadChange}
           />

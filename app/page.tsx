@@ -181,7 +181,7 @@ export default function HomePage() {
 
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
   const [viewportStyles, setViewportStyles] = useState<React.CSSProperties>({});
 
@@ -769,10 +769,10 @@ export default function HomePage() {
     setChatFsModalOpen(false);
   };
 
-  // File selection only stages the file; it's uploaded together with the
+  // File selection only stages the files; they are uploaded together with the
   // message text once the user actually hits Send (see useSessionSubmit).
-  const handleSelectFile = (file: File) => setPendingFile(file);
-  const handleRemovePendingFile = () => setPendingFile(null);
+  const handleSelectFile = (files: File[]) => setPendingFiles((prev) => [...prev, ...files]);
+  const handleRemovePendingFile = (index: number) => setPendingFiles((prev) => prev.filter((_, i) => i !== index));
 
   const uploadPendingFile = async (file: File, targetRunnerId: string): Promise<string> => {
     if (!targetRunnerId) {
@@ -797,8 +797,8 @@ export default function HomePage() {
     runnerId,
     isNewSession,
     isNewDraft,
-    pendingFile,
-    setPendingFile,
+    pendingFiles,
+    setPendingFiles,
     uploadPendingFile,
     draftTrigger,
     showCommandMenu,
@@ -1447,8 +1447,8 @@ export default function HomePage() {
             onExecuteAgentCommand={handleAgentCommand}
             onExecuteScriptCommand={handleScriptCommand}
             onSwitchAgent={handleSwitchAgent}
-            pendingFile={pendingFile}
-            onSelectFile={handleSelectFile}
+            pendingFiles={pendingFiles}
+            onSelectFiles={handleSelectFile}
             onRemovePendingFile={handleRemovePendingFile}
           />
         )}

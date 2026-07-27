@@ -13,8 +13,8 @@ interface UseSessionSubmitParams {
   runnerId: string;
   isNewSession: boolean;
   isNewDraft: boolean;
-  pendingFile: File | null;
-  setPendingFile: (v: File | null) => void;
+  pendingFiles: File[];
+  setPendingFiles: (v: File[] | ((prev: File[]) => File[])) => void;
   uploadPendingFile: (file: File, runnerId: string) => Promise<string>;
   draftTrigger: "manual" | "codebaseReady";
   showCommandMenu: boolean;
@@ -50,8 +50,8 @@ export function useSessionSubmit({
   runnerId,
   isNewSession,
   isNewDraft,
-  pendingFile,
-  setPendingFile,
+  pendingFiles,
+  setPendingFiles,
   uploadPendingFile,
   draftTrigger,
   showCommandMenu,
@@ -356,7 +356,7 @@ export function useSessionSubmit({
 
   const handleSubmit = useCallback(async () => {
     const trimmed = prompt.trim();
-    const isBlankSession = (isNewSession || (!selectedSessionId && !isNewDraft)) && !trimmed && !pendingFile;
+    const isBlankSession = (isNewSession || (!selectedSessionId && !isNewDraft)) && !trimmed && pendingFiles.length === 0;
 
     if (trimmed.startsWith("/new") && !isNewSession && selectedSessionId) {
       const rest = trimmed.slice(4).trim();
@@ -403,13 +403,20 @@ export function useSessionSubmit({
     // the agent, which does include the path so it can read the file.
     let displayMessage = trimmed;
     let agentPrompt = trimmed;
-    if (pendingFile) {
+    if (pendingFiles.length > 0) {
       try {
-        const path = await uploadPendingFile(pendingFile, targetRunnerId);
-        const attachmentNote = `📎 Uploaded a file: ${pendingFile.name}`;
+        const uploadedPaths: string[] = [];
+        const fileNames: string[] = [];
+        for (const file of pendingFiles) {
+          const path = await uploadPendingFile(file, targetRunnerId);
+          uploadedPaths.push(path);
+          fileNames.push(file.name);
+        }
+        const attachmentNote = fileNames.map((n) => `📎 Uploaded a file: ${n}`).join("\n");
+        const pathNote = uploadedPaths.map((p) => `Uploaded file path: ${p}`).join("\n");
         displayMessage = trimmed ? `${trimmed}\n${attachmentNote}` : attachmentNote;
-        agentPrompt = trimmed ? `${trimmed}\n\nUploaded file path: ${path}` : `Uploaded file path: ${path}`;
-        setPendingFile(null);
+        agentPrompt = trimmed ? `${trimmed}\n\n${pathNote}` : pathNote;
+        setPendingFiles([]);
       } catch (err: any) {
         setApiError({ title: "Upload Error", message: err.message || "Failed to upload file" });
         return;
@@ -485,7 +492,7 @@ export function useSessionSubmit({
     } catch (err) {
       console.error(err);
     }
-  }, [prompt, repoPath, agentType, runnerId, isNewSession, isNewDraft, pendingFile, setPendingFile, uploadPendingFile, draftTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, setApiError, handleNewSessionCommand, handleRenameSessionCommand, sendAgentMessage, sessionScripts, handleScriptCommand, agentCommands, finalizeNewSession]);
+  }, [prompt, repoPath, agentType, runnerId, isNewSession, isNewDraft, pendingFiles, setPendingFiles, uploadPendingFile, draftTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, setApiError, handleNewSessionCommand, handleRenameSessionCommand, sendAgentMessage, sessionScripts, handleScriptCommand, agentCommands, finalizeNewSession]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return;
