@@ -165,6 +165,7 @@ lib/
     base.ts             # Abstract BaseAgent interface
     antigravity.ts      # Antigravity CLI (agy) adapter
     claude.ts           # Claude Code CLI adapter (supports --session-id and --resume for session continuity)
+    opencode.ts         # OpenCode CLI adapter
     index.ts            # AgentFactory (add new agents here)
 scripts/
   run.server.sh         # Start the Next.js dev server
@@ -188,7 +189,7 @@ tests/                  # Playwright integration tests
   arondo.json           # Unified runtime config: access tokens and top-level setitngs
   agent-commands.json   # Persisted custom agent slash commands
   global-rules.md       # Global agent rules written from Settings
-  agent-sessions.json  # Agent session map: { "agy": {}, "codex": {} }
+  agent-sessions.json  # Agent session map: { "agy": {}, "codex": {}, "opencode": {} }
   sessions/
     [sessionId]/
       session.json      # Session metadata (status, prompt, agent, repoPath, runnerId)
@@ -352,9 +353,10 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **Concurrency**: Multiple background scripts can run concurrently in a single session. The chat prompt stays active during execution. Also allows running project scripts while an agent is executing.
 - **Task Persistence**: Active task contexts survive server restarts by restoring metadata from session and project `messages.json` files and dynamically restored on server restart. Runner IDs are stable across reconnections.
 - **Runner Disconnect Handling**: When a runner disconnects, orphaned tasks are automatically failed with exit code -1, updating session status and notifying the UI.
-- **Agent Session Continuity (Session Resume)**: Retains conversation context for AI agents across different runs. Agent session mappings are stored in `~/.arondo/agent-sessions.json` as `{ "agy": {}, "codex": {} }`.
+- **Agent Session Continuity (Session Resume)**: Retains conversation context for AI agents across different runs. Agent session mappings are stored in `~/.arondo/agent-sessions.json` as `{ "agy": {}, "codex": {}, "opencode": {} }`.
   - **Claude Code**: Supports `--session-id` (bound to the session) and `--resume` flags for native session continuity.
   - **Codex CLI**: Uses `codex exec` with sandbox/approval bypass flags before the optional `resume` subcommand, stores returned Codex session IDs in the shared agent session map, and passes the resolved prompt from `ARONDO_PROMPT_FILE`.
+  - **OpenCode CLI**: Uses `opencode run` with target session title, fetches session list remotely to extract OpenCode session IDs to map and reuse on subsequent `--session` runs.
   - **Antigravity CLI (agy)**: On task exit, the Go runner scans its local logs via process ID (`detectAgyConvIdByPid`) to extract the generated conversation UUID. This UUID is passed back in the `exec.exit` event and saved by the server. Subsequent runs of `agy` within the same session will automatically pass `--conversation <uuid>` to resume the session.
 - **Global Agent Rules Sync**: Settings screen allows specifying global agent rules. These are stored in `~/.arondo/global-rules.md` and automatically synced to `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` on runners upon connection. Each runner has a per-runner sync toggle (checked by default for new runners) in Settings; unchecking it stops future syncs to that runner and removes the previously synced block via a `rules.remove` runner method (`runner/handler_rules.go`).
 - **Session Pinning, Filtering & Three-dot Menu**: Important sessions can be pinned to the top of the sidebar session list (ordered by pinned timestamp). When sessions span multiple projects, horizontally scrollable project filter chips appear in the sidebar to let users filter sessions by project. A per-session three-dot menu in the sidebar and detailed session view provides quick access to Pin, Rename, Archive, and Delete actions.
@@ -368,11 +370,12 @@ The application enforces token-based authentication on all API routes and WebSoc
     - **Choice A**: Antigravity (`agy`) + `Gemini 3.5 Flash (Medium)` (Quota: `GeminiHourRemain`, `GeminiWeeklyRemain`)
     - **Choice B**: Antigravity (`agy`) + `Claude Sonnet 4.6 (Thinking)` (Quota: `OtherHourRemain`, `OtherWeeklyRemain`)
     - **Choice C**: Claude (`claude`) + default `Sonnet` (Quota: `HourRemain`, `WeekRemain`)
+    - **Choice D**: Codex (`codex`) + default `gpt-5.5 medium` (Quota: `WeeklyRemain`, hourly is treated as always available)
   - **Selection Algorithm**:
     1. **Hourly Quota Filtering**: If any choice's remaining hourly ratio (`HourRemain`, `GeminiHourRemain`, `OtherHourRemain`) is below `0.15`, it is appended to the end of the candidate list and excluded from step 2. Exception: If *all* choices are below `0.15`, they are all kept for step 2 comparison.
     2. **Weekly Time-Remaining Score**: For active choices, calculate `score = WeekRemain - WeekTimeRemain`, where `WeekTimeRemain = max(0, min(1, (ResetsAt - Now) / 604800))`. This compares the remaining quota ratio against the remaining time ratio of the quota week.
     3. **Final Order**: Sort active choices by score in descending order and prepend them to the low-quota choices. The first candidate is selected and spawned with the mapped `--model` parameter.
-- **Manual Agent Switching**: Allows switching the active agent (Antigravity CLI, Claude Code, or Auto) of an existing session via a dropdown selector in the session header when no command is currently running.
+- **Manual Agent Switching**: Allows switching the active agent (Antigravity CLI, Claude Code, Codex, OpenCode, or Auto) of an existing session via a dropdown selector in the session header when no command is currently running.
 - **Settings Session Controls**: The Settings page groups session archive and file browser controls together. `sessionArchiveDays` auto-saves after edits instead of requiring a Save button, and the hidden-files toggle persists immediately.
 - **Authentication UI**: The old Settings-page reset-token button moved into the app sidebar as a Log Out action with a confirmation dialog.
 - **Inline Runner Details**: The Runners dashboard displays the runner details panel inline directly below the selected runner card for better usability.
