@@ -151,6 +151,18 @@ function getQuotaForChoice(choiceId: 'A' | 'B' | 'C') {
       "WeekRemain": choiceId === 'C' ? 0.9 : 0.1,
       "WeekResetsAt": null,
       "updatedAt": Math.floor(Date.now() / 1000)
+    },
+    // Kept permanently low so it never outscores the A/B/C choice under test,
+    // regardless of whether the test runner's PATH happens to expose a real
+    // codex binary alongside the agy/claude mocks.
+    "codex_arondo@gmail.com_Plus": {
+      "Type": "codex",
+      "Account": "arondo@gmail.com",
+      "Plan": "Plus",
+      "DefaultModel": "gpt-5.5 medium",
+      "WeeklyRemain": 0.1,
+      "WeeklyResetAt": null,
+      "updatedAt": Math.floor(Date.now() / 1000)
     }
   };
 }

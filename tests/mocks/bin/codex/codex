@@ -1,0 +1,88 @@
+#!/usr/bin/env node
+const fs = require('fs');
+const path = require('path');
+const execSync = require('child_process').execSync;
+
+const SCRIPT_DIR = __dirname;
+let mocksDir = null;
+if (fs.existsSync('/tmp/arondo-mocks-dir.txt')) {
+  mocksDir = fs.readFileSync('/tmp/arondo-mocks-dir.txt', 'utf8').trim();
+}
+const CODEX_STATUS_PATH = mocksDir
+  ? path.join(mocksDir, 'arondo-codex-status.txt')
+  : path.resolve(SCRIPT_DIR, '../../tmux/codex/arondo-codex-status.txt');
+
+const args = process.argv.slice(2);
+
+if (args[0] === 'exec') {
+  // Non-interactive `codex exec ...` mode is not exercised by the quota test.
+  console.log('Mock codex exec');
+  process.exit(0);
+}
+
+// Interactive mode (e.g. running bare `codex`, used for quota polling via /status)
+if (process.env.TMUX) {
+  try {
+    execSync('tmux clear-history 2>/dev/null');
+  } catch (e) {}
+}
+
+let statusContent = '';
+try {
+  statusContent = fs.readFileSync(CODEX_STATUS_PATH, 'utf8');
+} catch (e) {
+  console.error(`Error reading mock status file: ${e}`);
+  process.exit(1);
+}
+
+// codex reports resets as "HH:MM on D Mon" — 24h clock, no timezone.
+const targetDate = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const hh = String(targetDate.getHours()).padStart(2, '0');
+const mm = String(targetDate.getMinutes()).padStart(2, '0');
+const resetsStr = `${hh}:${mm} on ${targetDate.getDate()} ${months[targetDate.getMonth()]}`;
+statusContent = statusContent.replace(/__resets__/g, resetsStr);
+
+const statusLines = statusContent.split('\n');
+const initialScreen = [
+  '╭────────────────────────────────────────────────────╮',
+  '│ >_ OpenAI Codex (v0.145.0)                         │',
+  '│                                                    │',
+  '│ model:       gpt-5.5 medium   /model to change     │',
+  '│ directory:   /data/arondo                          │',
+  '│ permissions: YOLO mode                             │',
+  '╰────────────────────────────────────────────────────╯',
+  '',
+].join('\n');
+
+process.stdout.write(initialScreen);
+
+if (process.stdin.isTTY) {
+  process.stdin.setRawMode(true);
+}
+process.stdin.setEncoding('utf8');
+
+let buffer = '';
+process.stdin.on('data', (key) => {
+  for (let i = 0; i < key.length; i++) {
+    const char = key[i];
+    const code = char.charCodeAt(0);
+    if (char === '\r' || char === '\n') {
+      const cmd = buffer.trim();
+      buffer = '';
+      if (cmd === '/status') {
+        if (process.env.TMUX) {
+          try {
+            execSync('tmux clear-history 2>/dev/null');
+          } catch (e) {}
+        }
+        process.stdout.write('\033[H\033[2J');
+        process.stdout.write(statusLines.join('\n'));
+      }
+    } else if (code === 3 || code === 4) { // Ctrl+C or Ctrl+D
+      process.exit(0);
+    } else {
+      buffer += char;
+    }
+  }
+});

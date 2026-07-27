@@ -36,6 +36,21 @@ export async function saveCodexSessionId(sessionId: string, codexId: string): Pr
  * guess) could resume a different session's conversation. Starting fresh loses
  * context for that one run; grabbing the wrong session silently would be worse.
  */
+// Codex has no dedicated reasoning-effort flag on `--model`; it's set via the
+// `-c model_reasoning_effort=` config override instead. Callers (e.g. the auto
+// mode selector) pass model strings as "<model> <effort>" (e.g. "gpt-5.5 medium").
+const REASONING_EFFORTS = new Set(["minimal", "low", "medium", "high"]);
+
+function buildModelArgs(model: string): string {
+  const parts = model.trim().split(/\s+/);
+  const last = parts[parts.length - 1]?.toLowerCase();
+  if (parts.length > 1 && REASONING_EFFORTS.has(last)) {
+    const modelName = parts.slice(0, -1).join(" ");
+    return ` --model "${modelName}" -c model_reasoning_effort="${last}"`;
+  }
+  return ` --model "${model}"`;
+}
+
 export class CodexAgent extends BaseAgent {
   readonly name = "codex";
 
@@ -43,7 +58,7 @@ export class CodexAgent extends BaseAgent {
     // Flags for `exec` itself (sandbox/approval bypass, model) must precede the
     // `resume` subcommand — placed after it, they're parsed as `resume`'s own
     // args instead and silently fail to take effect.
-    const modelArg = model ? ` --model "${model}"` : "";
+    const modelArg = model ? buildModelArgs(model) : "";
     const codexId = isResume && sessionId ? getCodexSessionIdSync(sessionId) : undefined;
     const resumeArg = codexId ? `resume "${codexId}" ` : "";
     return `codex exec --dangerously-bypass-approvals-and-sandbox${modelArg} ${resumeArg}"$(< "$${PROMPT_ENV_VAR}")"`;

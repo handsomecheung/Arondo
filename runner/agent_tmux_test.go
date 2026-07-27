@@ -51,8 +51,9 @@ func TestAgentQuotas(t *testing.T) {
 	// The path to mock bin directories
 	mockAgyBinDir := filepath.Clean(filepath.Join(wd, "../tests/mocks/bin/agy"))
 	mockClaudeBinDir := filepath.Clean(filepath.Join(wd, "../tests/mocks/bin/claude"))
+	mockCodexBinDir := filepath.Clean(filepath.Join(wd, "../tests/mocks/bin/codex"))
 	originalPath := os.Getenv("PATH")
-	err = os.Setenv("PATH", mockAgyBinDir+":"+mockClaudeBinDir+":"+originalPath)
+	err = os.Setenv("PATH", mockAgyBinDir+":"+mockClaudeBinDir+":"+mockCodexBinDir+":"+originalPath)
 	if err != nil {
 		t.Fatalf("failed to set PATH: %v", err)
 	}
@@ -157,6 +158,42 @@ func TestAgentQuotas(t *testing.T) {
 			}
 		case <-time.After(35 * time.Second):
 			t.Fatal("timed out waiting for claude quota.update")
+		}
+	})
+
+	// 3. Fetch Codex Quota
+	t.Run("CodexQuota", func(t *testing.T) {
+		go fetchCodexQuota(client)
+
+		select {
+		case msg := <-quotaUpdates:
+			if msg.Method != "quota.update" {
+				t.Fatalf("expected quota.update event, got %s", msg.Method)
+			}
+			var payload struct {
+				Agent string         `json:"agent"`
+				Quota map[string]any `json:"quota"`
+			}
+			if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+				t.Fatalf("failed to unmarshal payload: %v", err)
+			}
+			if payload.Agent != "codex" {
+				t.Fatalf("expected agent codex, got %s", payload.Agent)
+			}
+			account, _ := payload.Quota["Account"].(string)
+			if account != "arondo@gmail.com" {
+				t.Fatalf("expected account arondo@gmail.com, got %s", account)
+			}
+			plan, _ := payload.Quota["Plan"].(string)
+			if plan != "Plus" {
+				t.Fatalf("expected plan Plus, got %s", plan)
+			}
+			weeklyRemain, _ := payload.Quota["WeeklyRemain"].(float64)
+			if weeklyRemain < 0.83 || weeklyRemain > 0.85 {
+				t.Fatalf("expected WeeklyRemain ~0.84, got %v", weeklyRemain)
+			}
+		case <-time.After(35 * time.Second):
+			t.Fatal("timed out waiting for codex quota.update")
 		}
 	})
 }

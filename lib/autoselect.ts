@@ -43,7 +43,17 @@ interface AntigravityQuota {
   updatedAt: number | null;
 }
 
-type QuotaEntry = ClaudeQuota | AntigravityQuota;
+interface CodexQuota {
+  Type: "codex";
+  Plan: string;
+  Account: string;
+  DefaultModel: string;
+  WeeklyRemain: number | null;
+  WeeklyResetAt: number | null;
+  updatedAt: number | null;
+}
+
+type QuotaEntry = ClaudeQuota | AntigravityQuota | CodexQuota;
 
 async function readQuota(): Promise<Record<string, QuotaEntry>> {
   try {
@@ -55,7 +65,7 @@ async function readQuota(): Promise<Record<string, QuotaEntry>> {
 }
 
 interface AgentChoice {
-  id: "A" | "B" | "C";
+  id: "A" | "B" | "C" | "D";
   agentType: ConcreteAgentType;
   model?: string;
 }
@@ -66,10 +76,12 @@ interface AgentChoice {
 export async function selectAgent(runnerAgentBinaries: string[]): Promise<ResolvedAgent | null> {
   const hasAgy = runnerAgentBinaries.includes("agy");
   const hasClaude = runnerAgentBinaries.includes("claude");
+  const hasCodex = runnerAgentBinaries.includes("codex");
 
   // A: agy + Gemini 3.5 Flash
   // B: agy + Claude Sonnet 4.6
   // C: claude + Sonnet
+  // D: codex + gpt-5.5 (medium)
   const choices: AgentChoice[] = [];
   if (hasAgy) {
     choices.push({ id: "A", agentType: "antigravity", model: "Gemini 3.5 Flash (Medium)" });
@@ -77,6 +89,9 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
   }
   if (hasClaude) {
     choices.push({ id: "C", agentType: "claude" });
+  }
+  if (hasCodex) {
+    choices.push({ id: "D", agentType: "codex", model: "gpt-5.5 medium" });
   }
 
   console.log(`[autoselect] Available runner binaries: ${runnerAgentBinaries.join(", ")}`);
@@ -122,6 +137,13 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
         hourRemain = q.HourRemain ?? 1.0;
         weekRemain = q.WeekRemain ?? 1.0;
         resetsAt = q.WeekResetsAt;
+      }
+    } else if (choice.id === "D") {
+      // Codex only reports a weekly limit; no hourly figure is available.
+      const q = entries.find((e) => e.Type === "codex") as CodexQuota | undefined;
+      if (q) {
+        weekRemain = q.WeeklyRemain ?? 1.0;
+        resetsAt = q.WeeklyResetAt;
       }
     }
 
@@ -216,6 +238,9 @@ export async function isQuotaAvailable(agentType?: ConcreteAgentType): Promise<b
       if ((e.HourRemain ?? 1) >= 0.15) return true;
     } else if (e.Type === "antigravity") {
       if ((e.GeminiHourRemain ?? 1) >= 0.15 || (e.OtherHourRemain ?? 1) >= 0.15) return true;
+    } else if (e.Type === "codex") {
+      // No hourly figure reported for codex — treat as always available.
+      return true;
     }
   }
   return false;
@@ -226,6 +251,7 @@ export async function isQuotaAvailable(agentType?: ConcreteAgentType): Promise<b
 const AGENT_LABEL: Record<string, string> = {
   claude: "Claude Code",
   antigravity: "Antigravity CLI",
+  codex: "Codex CLI",
 };
 
 /**

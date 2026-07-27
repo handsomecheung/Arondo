@@ -54,7 +54,6 @@ export async function dispatchFollowupMessage(
 
   const runnerConn = runnerManager.getRunner(session.runnerId);
 
-  // For auto sessions, reuse the locked agent unless a quota error occurred.
   const quotaErrorMessages = [
     "agy quota exhausted — no output was produced",
     "Claude session limit hit",
@@ -63,19 +62,7 @@ export async function dispatchFollowupMessage(
     session.errorMessage != null &&
     quotaErrorMessages.some((s) => session.errorMessage!.includes(s));
 
-  let resolved: { agentType: import("./agents").ConcreteAgentType; model?: string };
-  if (
-    session.agentType === "auto" &&
-    session.autoLockedAgentType != null &&
-    !prevQuotaError
-  ) {
-    resolved = {
-      agentType: session.autoLockedAgentType as import("./agents").ConcreteAgentType,
-      model: session.autoLockedAgentModel,
-    };
-  } else {
-    resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? []);
-  }
+  const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? []);
   const resolvedType = resolved.agentType;
 
   const lastAgentRun = [...messages].reverse().find((m) => m.type === "agent-run" && m.resolvedAgentType);
