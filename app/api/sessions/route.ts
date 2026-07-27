@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
   const sessions = await getSessions();
   const projects = await getProjects();
-  const projectIds = new Set(projects.map((p) => p.id));
+  const projectsById = new Map(projects.map((p) => [p.id, p]));
   const sessionArchiveAgeMs = await getSessionArchiveAgeMs();
 
   const valid: typeof sessions = [];
@@ -38,11 +38,16 @@ export async function GET(request: NextRequest) {
       continue;
     }
 
-    if (session.projectId && !projectIds.has(session.projectId)) {
+    const project = session.projectId ? projectsById.get(session.projectId) : undefined;
+    if (session.projectId && !project) {
       console.log(`[sessions] project ${session.projectId} for session ${session.id} no longer exists, deleting session`);
       runnerManager.removeTasksForSession(session.id);
       await deleteSession(session.id);
       eventBus.publish({ type: "session_deleted", payload: { id: session.id } });
+      continue;
+    }
+
+    if (project?.hidden) {
       continue;
     }
 
@@ -137,7 +142,7 @@ export async function POST(req: NextRequest) {
       agentType,
       repoPath,
       runnerId,
-    });
+    }, { hidden: tempDir });
     eventBus.publish({ type: "session_updated", payload: session });
     return NextResponse.json(session, { status: 201 });
   }
@@ -152,7 +157,7 @@ export async function POST(req: NextRequest) {
       agentType,
       repoPath,
       runnerId,
-    });
+    }, { hidden: tempDir });
     const todoMessage = await addTodoMessage(session.id, {
       content: trimmedMessage,
       prompt: trimmedPrompt,
@@ -176,6 +181,7 @@ export async function POST(req: NextRequest) {
     name,
     tokenUuid: getUuidByToken(token) || undefined,
     displayMessage: message,
+    hidden: tempDir,
   });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });

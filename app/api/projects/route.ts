@@ -3,6 +3,8 @@ import { getProjects, deleteProject } from "@/lib/store";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken } from "@/lib/auth";
 
+const TEMP_DIR_PROJECT_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
+
 export async function GET(request: NextRequest) {
   const token = getArondoToken(request);
   if (!isValidToken(token)) {
@@ -25,6 +27,16 @@ export async function GET(request: NextRequest) {
       await deleteProject(project.id);
       continue;
     }
+
+    if (project.hidden) {
+      const age = Date.now() - new Date(project.createdAt).getTime();
+      if (age > TEMP_DIR_PROJECT_MAX_AGE_MS) {
+        console.log(`[projects] hidden project ${project.id} older than 3 days, deleting`);
+        await deleteProject(project.id);
+      }
+      continue;
+    }
+
     valid.push(project);
   }
 

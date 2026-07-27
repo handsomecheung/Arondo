@@ -42,6 +42,11 @@ export interface Project {
   runnerId: string;
   createdAt: string;
   updatedAt: string;
+  // Hides the project from the sidebar/session list. Set when the project's
+  // repoPath was generated via the session-creation "tempDir" option
+  // (fs.mkdtemp) — such projects are also auto-deleted once older than
+  // TEMP_DIR_PROJECT_MAX_AGE_MS. Generic enough for other features to reuse.
+  hidden?: boolean;
 }
 
 export interface Session {
@@ -250,7 +255,7 @@ export interface ProjectScript {
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
 
-export async function getOrCreateProject(repoPath: string, runnerId: string): Promise<Project> {
+export async function getOrCreateProject(repoPath: string, runnerId: string, hidden?: boolean): Promise<Project> {
   await ensureDir(PROJECTS_DIR);
 
   const resolvedRepoPath = path.resolve(repoPath);
@@ -281,6 +286,7 @@ export async function getOrCreateProject(repoPath: string, runnerId: string): Pr
     runnerId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    ...(hidden ? { hidden: true } : {}),
   };
 
   await writeJson(getProjectFilePath(projectId), project);
@@ -378,10 +384,11 @@ export async function saveProjectScripts(
 
 
 export async function createSession(
-  data: Omit<Session, "id" | "projectId" | "createdAt" | "updatedAt">
+  data: Omit<Session, "id" | "projectId" | "createdAt" | "updatedAt">,
+  opts: { hidden?: boolean } = {}
 ): Promise<Session> {
   const id = crypto.randomUUID();
-  const project = await getOrCreateProject(data.repoPath, data.runnerId);
+  const project = await getOrCreateProject(data.repoPath, data.runnerId, opts.hidden);
   const session: Session = {
     ...data,
     id,
