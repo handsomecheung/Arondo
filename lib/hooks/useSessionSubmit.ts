@@ -20,6 +20,8 @@ interface UseSessionSubmitParams {
   draftAt: number | null;
   sendScheduledAt: number | null;
   setSendScheduledAt: (v: number | null) => void;
+  pendingSendTrigger: "manual" | "codebaseReady" | null;
+  setPendingSendTrigger: (v: "manual" | "codebaseReady" | null) => void;
   showCommandMenu: boolean;
   selectedSession: Session | null;
   selectedSessionId: string | null;
@@ -60,6 +62,8 @@ export function useSessionSubmit({
   draftAt,
   sendScheduledAt,
   setSendScheduledAt,
+  pendingSendTrigger,
+  setPendingSendTrigger,
   showCommandMenu,
   selectedSession,
   selectedSessionId,
@@ -450,6 +454,7 @@ export function useSessionSubmit({
         }
         const trimmedRepoPath = repoPath.trim();
         const useSchedule = !isNewDraft && !!sendScheduledAt && !!displayMessage;
+        const usePendingTrigger = !isNewDraft && !useSchedule && !!pendingSendTrigger && !!displayMessage;
         const res = await fetch("/api/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -463,7 +468,9 @@ export function useSessionSubmit({
               ? { isDraft: true, draftTrigger, ...(draftTrigger === "at" ? { draftAt } : {}) }
               : useSchedule
                 ? { isDraft: true, draftTrigger: "at", draftAt: sendScheduledAt }
-                : {}),
+                : usePendingTrigger
+                  ? { isDraft: true, draftTrigger: pendingSendTrigger }
+                  : {}),
           }),
         });
         if (res.status === 409) {
@@ -473,26 +480,29 @@ export function useSessionSubmit({
         }
         const newSession: Session = await res.json();
         if (useSchedule) setSendScheduledAt(null);
-        finalizeNewSession(newSession, displayMessage, !isBlankSession && !isNewDraft && !useSchedule);
-      } else if (sendScheduledAt) {
-        if (sendScheduledAt <= Date.now()) {
+        if (usePendingTrigger) setPendingSendTrigger(null);
+        finalizeNewSession(newSession, displayMessage, !isBlankSession && !isNewDraft && !useSchedule && !usePendingTrigger);
+      } else if (sendScheduledAt || pendingSendTrigger) {
+        if (sendScheduledAt && sendScheduledAt <= Date.now()) {
           setApiError({ title: "Send Error", message: "The scheduled time must be in the future." });
           return;
         }
         try {
+          const trigger = sendScheduledAt ? { kind: "at" as const, timestamp: sendScheduledAt } : { kind: pendingSendTrigger! };
           const res = await fetch(`/api/sessions/${selectedSessionId}/todo-messages`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: displayMessage, prompt: agentPrompt, trigger: { kind: "at", timestamp: sendScheduledAt } }),
+            body: JSON.stringify({ message: displayMessage, prompt: agentPrompt, trigger }),
           });
           if (!res.ok) {
             const data = await res.json().catch(() => ({}));
-            setApiError({ title: "Send Error", message: data.error || "Failed to schedule message" });
+            setApiError({ title: "Send Error", message: data.error || "Failed to queue message" });
             return;
           }
           setSendScheduledAt(null);
+          setPendingSendTrigger(null);
         } catch (err: any) {
-          setApiError({ title: "Send Error", message: err.message || "Failed to schedule message" });
+          setApiError({ title: "Send Error", message: err.message || "Failed to queue message" });
         }
       } else {
         const tempTaskId = `agent-${selectedSessionId}-${Date.now()}`;
@@ -535,7 +545,7 @@ export function useSessionSubmit({
     } catch (err) {
       console.error(err);
     }
-  }, [prompt, repoPath, agentType, runnerId, isNewSession, isNewDraft, pendingFiles, setPendingFiles, uploadPendingFile, draftTrigger, draftAt, sendScheduledAt, setSendScheduledAt, selectedSessionId, selectedSession, loadProjects, setTaskQueue, setApiError, setToast, handleNewSessionCommand, handleRenameSessionCommand, sendAgentMessage, sessionScripts, handleScriptCommand, agentCommands, finalizeNewSession]);
+  }, [prompt, repoPath, agentType, runnerId, isNewSession, isNewDraft, pendingFiles, setPendingFiles, uploadPendingFile, draftTrigger, draftAt, sendScheduledAt, setSendScheduledAt, pendingSendTrigger, setPendingSendTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, setApiError, setToast, handleNewSessionCommand, handleRenameSessionCommand, sendAgentMessage, sessionScripts, handleScriptCommand, agentCommands, finalizeNewSession]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return;

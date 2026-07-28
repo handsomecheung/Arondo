@@ -45,6 +45,8 @@ interface SessionViewProps {
   draftAt: number | null;
   sendScheduledAt: number | null;
   onSetSendScheduledAt: (v: number | null) => void;
+  pendingSendTrigger: "manual" | "codebaseReady" | null;
+  onSetPendingSendTrigger: (v: "manual" | "codebaseReady" | null) => void;
   canSubmit: boolean;
   menuOpen: boolean;
   scriptSubMenuOpen: boolean;
@@ -141,6 +143,8 @@ export default function SessionView({
   draftAt,
   sendScheduledAt,
   onSetSendScheduledAt,
+  pendingSendTrigger,
+  onSetPendingSendTrigger,
   canSubmit,
   menuOpen,
   scriptSubMenuOpen,
@@ -1288,7 +1292,7 @@ export default function SessionView({
           );
         })()}
 
-        {(pendingFiles.length > 0 || sendScheduledAt) && (
+        {(pendingFiles.length > 0 || sendScheduledAt || pendingSendTrigger) && (
           <div className="pending-files-list">
             {sendScheduledAt && (
               <div className="pending-file-chip scheduled-send-chip">
@@ -1298,6 +1302,24 @@ export default function SessionView({
                   className="pending-file-remove"
                   onClick={() => onSetSendScheduledAt(null)}
                   title="Cancel scheduled send"
+                  type="button"
+                >
+                  <IconX />
+                </button>
+              </div>
+            )}
+            {pendingSendTrigger && (
+              <div className="pending-file-chip scheduled-send-chip">
+                <IconClock size={13} />
+                <span className="pending-file-name">
+                  {pendingSendTrigger === "manual"
+                    ? "Will be queued — send manually later"
+                    : "Will send once the codebase is clean"}
+                </span>
+                <button
+                  className="pending-file-remove"
+                  onClick={() => onSetPendingSendTrigger(null)}
+                  title="Cancel"
                   type="button"
                 >
                   <IconX />
@@ -1370,11 +1392,36 @@ export default function SessionView({
                     className="attach-menu-item"
                     onClick={() => {
                       setAttachMenuOpen("schedule");
+                      onSetPendingSendTrigger(null);
                       if (!sendScheduledAt) onSetSendScheduledAt(defaultScheduleTime());
                     }}
                   >
                     <IconClock />
-                    <span>Send Scheduled</span>
+                    <span>Schedule Send</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="attach-menu-item"
+                    onClick={() => {
+                      setAttachMenuOpen("closed");
+                      onSetSendScheduledAt(null);
+                      onSetPendingSendTrigger("manual");
+                    }}
+                  >
+                    <IconClock />
+                    <span>Send Later</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="attach-menu-item"
+                    onClick={() => {
+                      setAttachMenuOpen("closed");
+                      onSetSendScheduledAt(null);
+                      onSetPendingSendTrigger("codebaseReady");
+                    }}
+                  >
+                    <IconClock />
+                    <span>Send When Clean</span>
                   </button>
                 </div>
               )}

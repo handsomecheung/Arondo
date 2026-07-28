@@ -187,6 +187,7 @@ export default function HomePage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [sendScheduledAt, setSendScheduledAt] = useState<number | null>(null);
+  const [pendingSendTrigger, setPendingSendTrigger] = useState<"manual" | "codebaseReady" | null>(null);
 
   const [viewportStyles, setViewportStyles] = useState<React.CSSProperties>({});
 
@@ -820,6 +821,8 @@ export default function HomePage() {
     draftAt,
     sendScheduledAt,
     setSendScheduledAt,
+    pendingSendTrigger,
+    setPendingSendTrigger,
     showCommandMenu,
     selectedSession,
     selectedSessionId,
@@ -1145,6 +1148,12 @@ export default function HomePage() {
       if (sendScheduledAt) {
         return `Will send at ${new Date(sendScheduledAt).toLocaleString()}`;
       }
+      if (pendingSendTrigger === "manual") {
+        return "Will be queued to send manually later";
+      }
+      if (pendingSendTrigger === "codebaseReady") {
+        return "Will send once the codebase is clean";
+      }
       return "Send (Enter)";
     } else if (isDraftSession) {
       return prompt.trim().length > 0 ? "Send (Enter)" : "Send this draft now";
@@ -1157,6 +1166,12 @@ export default function HomePage() {
       }
       if (sendScheduledAt) {
         return `Will send at ${new Date(sendScheduledAt).toLocaleString()}`;
+      }
+      if (pendingSendTrigger === "manual") {
+        return "Will be queued to send manually later";
+      }
+      if (pendingSendTrigger === "codebaseReady") {
+        return "Will send once the codebase is clean";
       }
       if (isAgentRunning) {
         return "Agent is working — message will be sent once it finishes";
@@ -1407,6 +1422,8 @@ export default function HomePage() {
             draftAt={draftAt}
             sendScheduledAt={sendScheduledAt}
             onSetSendScheduledAt={setSendScheduledAt}
+            pendingSendTrigger={pendingSendTrigger}
+            onSetPendingSendTrigger={setPendingSendTrigger}
             canSubmit={canSubmit}
             menuOpen={menuOpen}
             scriptSubMenuOpen={scriptSubMenuOpen}
