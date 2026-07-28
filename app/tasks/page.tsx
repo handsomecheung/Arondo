@@ -1081,7 +1081,7 @@ export default function TasksPage() {
                                   onShowCommand={task.command ? () => setCommandTask(task) : undefined}
                                   onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
                                   onRetryTask={task.status === "error" ? () => handleRetryTask(task) : undefined}
-                                  onDeleteTask={!isRunning ? () => handleDeleteTask(task) : undefined}
+                                  onDeleteTask={!isRunning && !task.sessionId ? () => handleDeleteTask(task) : undefined}
                                   onShowPrompt={task.prompt ? () => setCommandTask({ ...task, name: `Agent Prompt`, command: task.prompt }) : undefined}
                                   onViewLog={task.messageId ? () => setTerminalTask(task) : undefined}
                                 />
@@ -1108,7 +1108,7 @@ export default function TasksPage() {
                                 onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
                                 onRestartScript={isRunning && task.type === "script" && task.scriptName && task.messageId ? () => handleRestartScript(task) : undefined}
                                 onRetryTask={task.status === "error" ? () => handleRetryTask(task) : undefined}
-                                onDeleteTask={!isRunning ? () => handleDeleteTask(task) : undefined}
+                                onDeleteTask={!isRunning && !task.sessionId ? () => handleDeleteTask(task) : undefined}
                               />
                             );
                           })}
@@ -1249,7 +1249,7 @@ export default function TasksPage() {
                                   onShowCommand={task.command ? () => setCommandTask(task) : undefined}
                                   onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
                                   onRetryTask={task.status === "error" ? () => handleRetryTask(task) : undefined}
-                                  onDeleteTask={!isRunning ? () => handleDeleteTask(task) : undefined}
+                                  onDeleteTask={!isRunning && !task.sessionId ? () => handleDeleteTask(task) : undefined}
                                   onShowPrompt={task.prompt ? () => setCommandTask({ ...task, name: `Agent Prompt`, command: task.prompt }) : undefined}
                                   onViewLog={task.messageId ? () => setTerminalTask(task) : undefined}
                                 />
@@ -1277,7 +1277,7 @@ export default function TasksPage() {
                                 onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
                                 onRestartScript={isRunning && task.type === "script" && task.scriptName && task.messageId ? () => handleRestartScript(task) : undefined}
                                 onRetryTask={task.status === "error" ? () => handleRetryTask(task) : undefined}
-                                onDeleteTask={!isRunning ? () => handleDeleteTask(task) : undefined}
+                                onDeleteTask={!isRunning && !task.sessionId ? () => handleDeleteTask(task) : undefined}
                               />
                             );
                           })}
