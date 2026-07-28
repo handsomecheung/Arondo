@@ -147,9 +147,8 @@ export function useSessionSubmit({
     const agentTriggers = getUniqueTriggers(agentCommands);
     const matchesAgentCmd = agentTriggers.some((t) => v.startsWith("/" + t) || ("/" + t).startsWith(v));
     const matchesCommand = v.startsWith("/new") || "/new".startsWith(v) || v.startsWith("/delete") || "/delete".startsWith(v) || v.startsWith("/rename") || "/rename".startsWith(v) || matchesAgentCmd;
-    const matchesScript = sessionScripts.some((s) => v.startsWith("!" + s.name) || ("!" + s.name).startsWith(v));
     setShowCommandMenu(
-      ((v.startsWith("/") && matchesCommand) || (value.startsWith("!") && matchesScript)) &&
+      ((v.startsWith("/") && matchesCommand) || value.startsWith("!")) &&
         !isNewSession &&
         !!selectedSessionId
     );

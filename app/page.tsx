@@ -203,6 +203,7 @@ export default function HomePage() {
     fsCurrentPath: chatFsCurrentPath, setFsCurrentPath: setChatFsCurrentPath,
     fsEntries: chatFsEntries, fsParentPath: chatFsParentPath, fsLoading: chatFsLoading,
   } = useFileSystem(runnerId);
+  const [chatFsMode, setChatFsMode] = useState<"insert" | "run">("insert");
 
   const { isCheckingGitChanges, hasGitChanges, isGitRepo } = useGitHub({
     selectedSessionId,
@@ -741,6 +742,15 @@ export default function HomePage() {
       }
     }
 
+    if (chatFsMode === "run") {
+      setChatFsModalOpen(false);
+      const execPath = relativePath.startsWith("/") || relativePath.startsWith(".")
+        ? relativePath
+        : "./" + relativePath;
+      handleScriptCommand("!" + execPath);
+      return;
+    }
+
     const el = textareaRef.current;
     if (el) {
       const selectionStart = el.selectionStart;
@@ -833,11 +843,22 @@ export default function HomePage() {
     onDeleteSession: handleDeleteSession,
     onRenameSession: (id, newName) => handleRenameSession(id, newName),
     onTriggerFsModal: () => {
+      setChatFsMode("insert");
       const sessionRunnerId = selectedSession?.runnerId || runnerId;
       const path = selectedSession?.repoPath || "/";
       openChatFsModal(sessionRunnerId, path);
     },
   });
+
+  const handleTriggerRunFileSelector = () => {
+    setChatFsMode("run");
+    if (textareaRef.current) {
+      textareaRef.current.blur();
+    }
+    const sessionRunnerId = selectedSession?.runnerId || runnerId;
+    const path = selectedSession?.repoPath || "/";
+    openChatFsModal(sessionRunnerId, path);
+  };
 
   const handleNewSession = () => {
     setSelectedSessionId(null);
@@ -1467,6 +1488,7 @@ export default function HomePage() {
             onRenameSessionCommand={handleRenameSessionCommand}
             onExecuteAgentCommand={handleAgentCommand}
             onExecuteScriptCommand={handleScriptCommand}
+            onTriggerRunFileSelector={handleTriggerRunFileSelector}
             onSwitchAgent={handleSwitchAgent}
             pendingFiles={pendingFiles}
             onSelectFiles={handleSelectFile}
