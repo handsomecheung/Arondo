@@ -260,6 +260,7 @@ export default function HomePage() {
     scriptCommand, setScriptCommand,
     editingScriptName, setEditingScriptName,
     sessionScripts,
+    scriptHistory,
     handleSaveScript,
     handleDeleteScript,
     handleCloseScriptModal,
@@ -1412,6 +1413,7 @@ export default function HomePage() {
             showCommandMenu={showCommandMenu}
             commandMenuIndex={commandMenuIndex}
             sessionScripts={sessionScripts}
+            scriptHistory={scriptHistory}
             isCheckingGitChanges={isCheckingGitChanges}
             hasGitChanges={hasGitChanges}
             isGitRepo={isGitRepo}

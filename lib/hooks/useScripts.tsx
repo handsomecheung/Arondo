@@ -86,6 +86,7 @@ export function useScripts({
   const [editingScriptName, setEditingScriptName] = useState<string | null>(null);
 
   const [sessionScripts, setSessionScripts] = useState<ProjectScript[]>([]);
+  const [scriptHistory, setScriptHistory] = useState<Record<string, number>>({});
   const [isRunningScript, setIsRunningScript] = useState(false);
 
   const loadProjectScripts = useCallback((projectId: string) => {
@@ -128,8 +129,13 @@ export function useScripts({
         .then((r) => r.json())
         .then((data: ProjectScript[]) => setSessionScripts(Array.isArray(data) ? data : []))
         .catch(() => setSessionScripts([]));
+      fetch(`/api/projects/${selectedSessionProjectId}/script-history`)
+        .then((r) => r.json())
+        .then((data: Record<string, number>) => setScriptHistory(data && typeof data === "object" ? data : {}))
+        .catch(() => setScriptHistory({}));
     } else {
       setSessionScripts([]);
+      setScriptHistory({});
     }
   }, [selectedSessionProjectId]);
 
@@ -378,6 +384,7 @@ export function useScripts({
     scriptCommand, setScriptCommand,
     editingScriptName, setEditingScriptName,
     sessionScripts,
+    scriptHistory,
     isRunningScript,
     loadProjectScripts,
     handleSaveScript,

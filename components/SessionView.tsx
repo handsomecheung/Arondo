@@ -51,6 +51,7 @@ interface SessionViewProps {
   showCommandMenu: boolean;
   commandMenuIndex: number;
   sessionScripts: ProjectScript[];
+  scriptHistory: Record<string, number>;
   isCheckingGitChanges: boolean;
   hasGitChanges: boolean;
   isGitRepo: boolean;
@@ -146,6 +147,7 @@ export default function SessionView({
   showCommandMenu,
   commandMenuIndex,
   sessionScripts,
+  scriptHistory,
   isCheckingGitChanges,
   hasGitChanges,
   isGitRepo,
@@ -1153,6 +1155,11 @@ export default function SessionView({
             const trigger = "!" + s.name;
             return trigger.startsWith(trimmedPrompt) || trimmedPrompt.startsWith(trigger);
           });
+          const topHistoryCommands = Object.entries(scriptHistory)
+            .filter(([command]) => !sessionScripts.some((s) => s.command === command))
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([command]) => command);
           return (
             <div className="command-menu">
               {visibleScripts.map((s, idx) => {
@@ -1169,6 +1176,22 @@ export default function SessionView({
                   >
                     <span className="command-menu-name">{trigger}</span>
                     <span className="command-menu-desc">{s.command}</span>
+                  </button>
+                );
+              })}
+              {topHistoryCommands.map((command) => {
+                const trigger = "!" + command;
+                const isActive = trimmedPrompt === trigger;
+                return (
+                  <button
+                    key={`history-${command}`}
+                    className={`command-menu-item${isActive ? " active" : ""}`}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      onExecuteScriptCommand(trigger);
+                    }}
+                  >
+                    <span className="command-menu-name">{command}</span>
                   </button>
                 );
               })}

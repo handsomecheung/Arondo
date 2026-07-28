@@ -7,6 +7,7 @@ import {
   clearSessionLog,
   getMessages,
   getProjectScripts,
+  recordScriptHistory,
 } from "./store";
 import { getAgent, resolveAgentType, PROMPT_ENV_VAR } from "./agents";
 import { buildCrossAgentContext } from "./autoselect";
@@ -297,6 +298,10 @@ export async function dispatchSessionScript(
 
   const scripts = await getProjectScripts(session.projectId);
   const script = scripts.find((s) => s.name === scriptName) ?? { name: scriptName, command: scriptName };
+
+  if (opts.prompt?.startsWith("!")) {
+    await recordScriptHistory(session.projectId, script.command);
+  }
 
   const systemMsg = await addMessage({
     sessionId,

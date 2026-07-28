@@ -381,6 +381,22 @@ export async function saveProjectScripts(
   });
 }
 
+function getScriptHistoryFilePath(projectId: string): string {
+  return path.join(getProjectDir(projectId), "script-history.json");
+}
+
+export async function getScriptHistory(projectId: string): Promise<Record<string, number>> {
+  return readJson<Record<string, number>>(getScriptHistoryFilePath(projectId), {});
+}
+
+export async function recordScriptHistory(projectId: string, command: string): Promise<void> {
+  const filePath = getScriptHistoryFilePath(projectId);
+  await withFileLock(filePath, async () => {
+    const history = await readJson<Record<string, number>>(filePath, {});
+    history[command] = (history[command] || 0) + 1;
+    await writeJson(filePath, history);
+  });
+}
 
 export async function createSession(
   data: Omit<Session, "id" | "projectId" | "createdAt" | "updatedAt">,
