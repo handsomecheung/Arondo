@@ -82,7 +82,7 @@ async function pickRandomAllowedRunnerId(token: string | null): Promise<string |
 export async function POST(req: NextRequest) {
   const token = getArondoToken(req);
   const body = await req.json();
-  const { prompt, message, repoPath: repoPathInput, tempDir, agentType = "auto", runnerId: runnerIdInput, name, isDraft, draftTrigger = "codebaseReady", force } = body as {
+  const { prompt, message, repoPath: repoPathInput, tempDir, agentType = "auto", runnerId: runnerIdInput, name, isDraft, draftTrigger = "codebaseReady", draftAt, force } = body as {
     prompt: string;
     message?: string;
     repoPath?: string;
@@ -91,9 +91,14 @@ export async function POST(req: NextRequest) {
     runnerId?: string;
     name?: string;
     isDraft?: boolean;
-    draftTrigger?: "manual" | "codebaseReady";
+    draftTrigger?: "manual" | "codebaseReady" | "at";
+    draftAt?: number;
     force?: boolean;
   };
+
+  if (isDraft && draftTrigger === "at" && (typeof draftAt !== "number" || draftAt <= Date.now())) {
+    return NextResponse.json({ error: "draftAt must be a timestamp in the future" }, { status: 400 });
+  }
 
   const isBlank = !prompt || !prompt.trim();
 
@@ -162,7 +167,10 @@ export async function POST(req: NextRequest) {
     const todoMessage = await addTodoMessage(session.id, {
       content: trimmedMessage,
       prompt: trimmedPrompt,
-      trigger: { kind: draftTrigger === "manual" ? "manual" : "codebaseReady" },
+      trigger:
+        draftTrigger === "at"
+          ? { kind: "at", timestamp: draftAt }
+          : { kind: draftTrigger === "manual" ? "manual" : "codebaseReady" },
       tokenUuid: getUuidByToken(token) || undefined,
     });
     const updated = (await getSession(session.id)) || session;

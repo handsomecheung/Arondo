@@ -2,6 +2,7 @@ import { eventBus } from "./event-bus";
 import {
   getSessions,
   getSession,
+  getMessages,
   getPendingTodoMessages,
   resolveTodoMessage,
   type Message,
@@ -158,6 +159,38 @@ function onSessionUpdated(session: Session): void {
     .catch((err) => console.error("[scheduler] fast-path codebaseReady lookup failed:", err));
 }
 
+// "triggered" only exists transiently while executeAction is running within
+// this process — nothing else advances it. If the process dies (crash,
+// restart) between marking a todo "triggered" and it resolving to
+// done/pending/failed, the entry is orphaned: excluded from
+// getPendingTodoMessages() forever, so the scheduler would never look at it
+// again and the UI would show "Sending…" indefinitely. Resolve any such
+// leftovers to a terminal "failed" state on startup so the user gets a clear
+// notification instead of a stuck spinner, and can resend manually.
+async function recoverStuckTriggeredTodos(): Promise<void> {
+  let sessions: Session[];
+  try {
+    sessions = await getSessions();
+  } catch (err) {
+    console.error("[scheduler] failed to read sessions during startup recovery:", err);
+    return;
+  }
+  for (const session of sessions) {
+    try {
+      const messages = await getMessages(session.id);
+      const stuck = messages.filter((m) => m.type === "user-todo" && m.todoStatus === "triggered");
+      for (const todo of stuck) {
+        await resolveAndBroadcast(session.id, todo.id, {
+          todoStatus: "failed",
+          todoError: "Interrupted before completion (server restarted) — please resend.",
+        });
+      }
+    } catch (err) {
+      console.error(`[scheduler] startup recovery failed for session ${session.id}:`, err);
+    }
+  }
+}
+
 export function startScheduler(): void {
   const p = process as typeof process & { __arondoSchedulerStarted?: boolean };
   if (p.__arondoSchedulerStarted) return;
@@ -168,9 +201,13 @@ export function startScheduler(): void {
       onSessionUpdated(event.payload as Session);
     }
   });
-  setInterval(() => {
-    tick().catch((err) => console.error("[scheduler] tick failed:", err));
-  }, TICK_MS);
-  tick().catch((err) => console.error("[scheduler] initial tick failed:", err));
+  recoverStuckTriggeredTodos()
+    .catch((err) => console.error("[scheduler] startup recovery failed:", err))
+    .finally(() => {
+      setInterval(() => {
+        tick().catch((err) => console.error("[scheduler] tick failed:", err));
+      }, TICK_MS);
+      tick().catch((err) => console.error("[scheduler] initial tick failed:", err));
+    });
   console.log("[scheduler] started");
 }

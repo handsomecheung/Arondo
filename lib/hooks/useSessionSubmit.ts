@@ -16,7 +16,10 @@ interface UseSessionSubmitParams {
   pendingFiles: File[];
   setPendingFiles: (v: File[] | ((prev: File[]) => File[])) => void;
   uploadPendingFile: (file: File, runnerId: string) => Promise<string>;
-  draftTrigger: "manual" | "codebaseReady";
+  draftTrigger: "manual" | "codebaseReady" | "at";
+  draftAt: number | null;
+  sendScheduledAt: number | null;
+  setSendScheduledAt: (v: number | null) => void;
   showCommandMenu: boolean;
   selectedSession: Session | null;
   selectedSessionId: string | null;
@@ -54,6 +57,9 @@ export function useSessionSubmit({
   setPendingFiles,
   uploadPendingFile,
   draftTrigger,
+  draftAt,
+  sendScheduledAt,
+  setSendScheduledAt,
   showCommandMenu,
   selectedSession,
   selectedSessionId,
@@ -431,7 +437,20 @@ export function useSessionSubmit({
       if (isNewSession || isNewDraft || !selectedSessionId) {
         if (!repoPath.trim() || !runnerId) return;
         if (isNewDraft && !displayMessage) return;
+        if (isNewDraft && draftTrigger === "at" && !draftAt) {
+          setApiError({ title: "Send Error", message: "Choose a date and time for the scheduled send." });
+          return;
+        }
+        if (isNewDraft && draftTrigger === "at" && draftAt && draftAt <= Date.now()) {
+          setApiError({ title: "Send Error", message: "The scheduled time must be in the future." });
+          return;
+        }
+        if (!isNewDraft && sendScheduledAt && sendScheduledAt <= Date.now()) {
+          setApiError({ title: "Send Error", message: "The scheduled time must be in the future." });
+          return;
+        }
         const trimmedRepoPath = repoPath.trim();
+        const useSchedule = !isNewDraft && !!sendScheduledAt && !!displayMessage;
         const res = await fetch("/api/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -441,7 +460,11 @@ export function useSessionSubmit({
             repoPath: trimmedRepoPath,
             agentType,
             runnerId,
-            ...(isNewDraft ? { isDraft: true, draftTrigger } : {}),
+            ...(isNewDraft
+              ? { isDraft: true, draftTrigger, ...(draftTrigger === "at" ? { draftAt } : {}) }
+              : useSchedule
+                ? { isDraft: true, draftTrigger: "at", draftAt: sendScheduledAt }
+                : {}),
           }),
         });
         if (res.status === 409) {
@@ -450,7 +473,28 @@ export function useSessionSubmit({
           return;
         }
         const newSession: Session = await res.json();
-        finalizeNewSession(newSession, displayMessage, !isBlankSession && !isNewDraft);
+        if (useSchedule) setSendScheduledAt(null);
+        finalizeNewSession(newSession, displayMessage, !isBlankSession && !isNewDraft && !useSchedule);
+      } else if (sendScheduledAt) {
+        if (sendScheduledAt <= Date.now()) {
+          setApiError({ title: "Send Error", message: "The scheduled time must be in the future." });
+          return;
+        }
+        try {
+          const res = await fetch(`/api/sessions/${selectedSessionId}/todo-messages`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: displayMessage, prompt: agentPrompt, trigger: { kind: "at", timestamp: sendScheduledAt } }),
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            setApiError({ title: "Send Error", message: data.error || "Failed to schedule message" });
+            return;
+          }
+          setSendScheduledAt(null);
+        } catch (err: any) {
+          setApiError({ title: "Send Error", message: err.message || "Failed to schedule message" });
+        }
       } else {
         const tempTaskId = `agent-${selectedSessionId}-${Date.now()}`;
         setTaskQueue((prev) => [
@@ -492,7 +536,7 @@ export function useSessionSubmit({
     } catch (err) {
       console.error(err);
     }
-  }, [prompt, repoPath, agentType, runnerId, isNewSession, isNewDraft, pendingFiles, setPendingFiles, uploadPendingFile, draftTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, setApiError, handleNewSessionCommand, handleRenameSessionCommand, sendAgentMessage, sessionScripts, handleScriptCommand, agentCommands, finalizeNewSession]);
+  }, [prompt, repoPath, agentType, runnerId, isNewSession, isNewDraft, pendingFiles, setPendingFiles, uploadPendingFile, draftTrigger, draftAt, sendScheduledAt, setSendScheduledAt, selectedSessionId, selectedSession, loadProjects, setTaskQueue, setApiError, setToast, handleNewSessionCommand, handleRenameSessionCommand, sendAgentMessage, sessionScripts, handleScriptCommand, agentCommands, finalizeNewSession]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return;

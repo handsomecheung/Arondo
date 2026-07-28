@@ -94,7 +94,8 @@ export default function HomePage() {
   const [runners, setRunners] = useState<Runner[]>([]);
   const [isNewSession, setIsNewSession] = useState(false);
   const [isNewDraft, setIsNewDraft] = useState(false);
-  const [draftTrigger, setDraftTrigger] = useState<"manual" | "codebaseReady">("codebaseReady");
+  const [draftTrigger, setDraftTrigger] = useState<"manual" | "codebaseReady" | "at">("codebaseReady");
+  const [draftAt, setDraftAt] = useState<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [archivedView, setArchivedView] = useState(false);
   const [archivedSessions, setArchivedSessions] = useState<Session[]>([]);
@@ -185,6 +186,7 @@ export default function HomePage() {
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [sendScheduledAt, setSendScheduledAt] = useState<number | null>(null);
 
   const [viewportStyles, setViewportStyles] = useState<React.CSSProperties>({});
 
@@ -804,6 +806,9 @@ export default function HomePage() {
     setPendingFiles,
     uploadPendingFile,
     draftTrigger,
+    draftAt,
+    sendScheduledAt,
+    setSendScheduledAt,
     showCommandMenu,
     selectedSession,
     selectedSessionId,
@@ -853,6 +858,7 @@ export default function HomePage() {
     setIsNewDraft(true);
     setIsNewSession(false);
     setDraftTrigger("codebaseReady");
+    setDraftAt(null);
     setMessages([]);
     setSidebarOpen(false);
     setSessionLog("");
@@ -1114,6 +1120,9 @@ export default function HomePage() {
       if (!prompt.trim()) {
         return "Create Blank Session";
       }
+      if (sendScheduledAt) {
+        return `Will send at ${new Date(sendScheduledAt).toLocaleString()}`;
+      }
       return "Send (Enter)";
     } else if (isDraftSession) {
       return prompt.trim().length > 0 ? "Send (Enter)" : "Send this draft now";
@@ -1123,6 +1132,9 @@ export default function HomePage() {
       }
       if (prompt.trim().length === 0) {
         return "Please enter a message";
+      }
+      if (sendScheduledAt) {
+        return `Will send at ${new Date(sendScheduledAt).toLocaleString()}`;
       }
       if (isAgentRunning) {
         return "Agent is working — message will be sent once it finishes";
@@ -1370,6 +1382,9 @@ export default function HomePage() {
             isDraftSession={isDraftSession}
             isDraftAutoSend={isDraftAutoSend}
             draftTrigger={draftTrigger}
+            draftAt={draftAt}
+            sendScheduledAt={sendScheduledAt}
+            onSetSendScheduledAt={setSendScheduledAt}
             canSubmit={canSubmit}
             menuOpen={menuOpen}
             scriptSubMenuOpen={scriptSubMenuOpen}
@@ -1395,6 +1410,7 @@ export default function HomePage() {
             onSetRepoPath={setRepoPath}
             onSetAgentType={setAgentType}
             onSetDraftTrigger={setDraftTrigger}
+            onSetDraftAt={setDraftAt}
             onSetRunnerDropdownOpen={setRunnerDropdownOpen}
             onSetAgentDropdownOpen={setAgentDropdownOpen}
             onSetFsCurrentPath={setFsCurrentPath}

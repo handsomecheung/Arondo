@@ -6,6 +6,7 @@ import AgentExecCard from "@/components/AgentExecCard";
 import UserAgentCommandCard from "@/components/UserAgentCommandCard";
 import UserMessageCard from "@/components/UserMessageCard";
 import UserTodoMessageCard from "@/components/UserTodoMessageCard";
+import { ScheduleDateTimeInputs, defaultScheduleTime } from "@/components/ScheduleDateTimeInputs";
 import type { Session, ProjectScript, Runner, Message, Project, TodoTrigger } from "@/types/home";
 import type { ExecCardInfo } from "@/lib/homeUtils";
 import { formatTime, execCardInfoToItem, autoResizeTextarea } from "@/lib/homeUtils";
@@ -40,7 +41,10 @@ interface SessionViewProps {
   onUnarchiveSession: () => void;
   isDraftSession: boolean;
   isDraftAutoSend: boolean;
-  draftTrigger: "manual" | "codebaseReady";
+  draftTrigger: "manual" | "codebaseReady" | "at";
+  draftAt: number | null;
+  sendScheduledAt: number | null;
+  onSetSendScheduledAt: (v: number | null) => void;
   canSubmit: boolean;
   menuOpen: boolean;
   scriptSubMenuOpen: boolean;
@@ -65,7 +69,8 @@ interface SessionViewProps {
   onSetRunnerId: (id: string) => void;
   onSetRepoPath: (path: string) => void;
   onSetAgentType: (type: string) => void;
-  onSetDraftTrigger: (v: "manual" | "codebaseReady") => void;
+  onSetDraftTrigger: (v: "manual" | "codebaseReady" | "at") => void;
+  onSetDraftAt: (v: number | null) => void;
   onSetRunnerDropdownOpen: (v: boolean) => void;
   onSetAgentDropdownOpen: (v: boolean) => void;
   onSetFsCurrentPath: (path: string) => void;
@@ -131,6 +136,9 @@ export default function SessionView({
   isDraftSession,
   isDraftAutoSend,
   draftTrigger,
+  draftAt,
+  sendScheduledAt,
+  onSetSendScheduledAt,
   canSubmit,
   menuOpen,
   scriptSubMenuOpen,
@@ -156,6 +164,7 @@ export default function SessionView({
   onSetRepoPath,
   onSetAgentType,
   onSetDraftTrigger,
+  onSetDraftAt,
   onSetRunnerDropdownOpen,
   onSetAgentDropdownOpen,
   onSetFsCurrentPath,
@@ -219,6 +228,8 @@ export default function SessionView({
   const [scriptSubMenuShift, setScriptSubMenuShift] = useState(0);
   const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);
   const projectSelectRef = useRef<HTMLDivElement>(null);
+  const [attachMenuOpen, setAttachMenuOpen] = useState<"closed" | "menu" | "schedule">("closed");
+  const attachMenuRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     if (!scriptSubMenuOpen || !scriptSubMenuRef.current) {
@@ -241,6 +252,21 @@ export default function SessionView({
     };
     document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
+  }, []);
+
+  // The attach menu swaps its own content on click (menu -> schedule panel),
+  // which unmounts the clicked node before a "click" listener on document
+  // would see it — contains() then wrongly reports "outside" and closes the
+  // menu right after it opens. "mousedown" fires before that re-render, so
+  // it still finds the node attached.
+  useEffect(() => {
+    const handleMouseDownOutside = (e: MouseEvent) => {
+      if (attachMenuRef.current && !attachMenuRef.current.contains(e.target as Node)) {
+        setAttachMenuOpen("closed");
+      }
+    };
+    document.addEventListener("mousedown", handleMouseDownOutside);
+    return () => document.removeEventListener("mousedown", handleMouseDownOutside);
   }, []);
 
   const chatInputPlaceholder = isArchived
@@ -1069,28 +1095,52 @@ export default function SessionView({
             </div>
 
             {isNewDraft && (
-              <div className="sidebar-mode-toggle draft-send-toggle" role="tablist" aria-label="Send mode">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={draftTrigger === "codebaseReady"}
-                  className={`sidebar-mode-tab${draftTrigger === "codebaseReady" ? " active" : ""}`}
-                  onClick={() => onSetDraftTrigger("codebaseReady")}
-                  id="draft-trigger-auto"
-                >
-                  Auto — when idle &amp; clean
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={draftTrigger === "manual"}
-                  className={`sidebar-mode-tab${draftTrigger === "manual" ? " active" : ""}`}
-                  onClick={() => onSetDraftTrigger("manual")}
-                  id="draft-trigger-manual"
-                >
-                  Manual only
-                </button>
-              </div>
+              <>
+                <div className="sidebar-mode-toggle draft-send-toggle" role="tablist" aria-label="Send mode">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={draftTrigger === "codebaseReady"}
+                    className={`sidebar-mode-tab${draftTrigger === "codebaseReady" ? " active" : ""}`}
+                    onClick={() => onSetDraftTrigger("codebaseReady")}
+                    id="draft-trigger-auto"
+                  >
+                    Auto
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={draftTrigger === "manual"}
+                    className={`sidebar-mode-tab${draftTrigger === "manual" ? " active" : ""}`}
+                    onClick={() => onSetDraftTrigger("manual")}
+                    id="draft-trigger-manual"
+                  >
+                    Manual
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={draftTrigger === "at"}
+                    className={`sidebar-mode-tab${draftTrigger === "at" ? " active" : ""}`}
+                    onClick={() => {
+                      onSetDraftTrigger("at");
+                      if (!draftAt) onSetDraftAt(defaultScheduleTime());
+                    }}
+                    id="draft-trigger-at"
+                  >
+                    Scheduled
+                  </button>
+                </div>
+                {draftTrigger === "at" ? (
+                  <ScheduleDateTimeInputs value={draftAt} onChange={onSetDraftAt} />
+                ) : (
+                  <div className="draft-trigger-hint">
+                    {draftTrigger === "codebaseReady"
+                      ? "Sends automatically once no agent is running and the codebase is clean."
+                      : "Saved as a draft — send it yourself whenever you're ready."}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -1204,8 +1254,22 @@ export default function SessionView({
           );
         })()}
 
-        {pendingFiles.length > 0 && (
+        {(pendingFiles.length > 0 || sendScheduledAt) && (
           <div className="pending-files-list">
+            {sendScheduledAt && (
+              <div className="pending-file-chip scheduled-send-chip">
+                <IconClock size={13} />
+                <span className="pending-file-name">Scheduled for {new Date(sendScheduledAt).toLocaleString()}</span>
+                <button
+                  className="pending-file-remove"
+                  onClick={() => onSetSendScheduledAt(null)}
+                  title="Cancel scheduled send"
+                  type="button"
+                >
+                  <IconX />
+                </button>
+              </div>
+            )}
             {pendingFiles.map((file, i) => (
               <div key={i} className="pending-file-chip">
                 <IconPaperclip size={13} />
@@ -1244,15 +1308,59 @@ export default function SessionView({
             id="chat-input"
           />
           <div className="input-actions-col">
-            <button
-              className="upload-btn"
-              onClick={() => uploadInputRef.current?.click()}
-              disabled={isRunnerOffline || isArchived}
-              title="Upload a file"
-              type="button"
-            >
-              <IconPaperclip />
-            </button>
+            <div className="attach-menu-container" ref={attachMenuRef}>
+              <button
+                className="upload-btn"
+                onClick={() => setAttachMenuOpen((v) => (v === "closed" ? "menu" : "closed"))}
+                disabled={isRunnerOffline || isArchived}
+                title="Attach a file or schedule this message"
+                type="button"
+              >
+                <IconPlus />
+              </button>
+              {attachMenuOpen === "menu" && (
+                <div className="attach-menu-popup">
+                  <button
+                    type="button"
+                    className="attach-menu-item"
+                    onClick={() => {
+                      setAttachMenuOpen("closed");
+                      uploadInputRef.current?.click();
+                    }}
+                  >
+                    <IconPaperclip />
+                    <span>Upload File</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="attach-menu-item"
+                    onClick={() => {
+                      setAttachMenuOpen("schedule");
+                      if (!sendScheduledAt) onSetSendScheduledAt(defaultScheduleTime());
+                    }}
+                  >
+                    <IconClock />
+                    <span>Send Scheduled</span>
+                  </button>
+                </div>
+              )}
+              {attachMenuOpen === "schedule" && (
+                <div className="attach-menu-popup attach-schedule-panel">
+                  <ScheduleDateTimeInputs value={sendScheduledAt} onChange={onSetSendScheduledAt} />
+                  <div className="attach-schedule-panel-actions">
+                    <button type="button" onClick={() => setAttachMenuOpen("menu")}>Back</button>
+                    <button
+                      type="button"
+                      className="primary"
+                      disabled={!sendScheduledAt}
+                      onClick={() => setAttachMenuOpen("closed")}
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             <button
               className="send-btn"
               onClick={isDraftSession && !prompt.trim() ? onSendDraftNow : onSubmit}

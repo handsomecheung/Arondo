@@ -36,6 +36,9 @@ export async function POST(
   if (!trigger || !trigger.kind) {
     return NextResponse.json({ error: "trigger is required" }, { status: 400 });
   }
+  if (trigger.kind === "at" && (typeof trigger.timestamp !== "number" || trigger.timestamp <= Date.now())) {
+    return NextResponse.json({ error: "trigger.timestamp must be a timestamp in the future" }, { status: 400 });
+  }
 
   const todoMessage = await addTodoMessage(id, {
     content: message.trim(),

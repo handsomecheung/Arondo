@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { IconMoreVertical, IconSend, IconX, IconClock } from "@/components/Icons";
+import { ScheduleDateTimeInputs, defaultScheduleTime } from "@/components/ScheduleDateTimeInputs";
 import type { TodoTrigger, TodoTriggerKind } from "@/types/home";
 
 export interface UserTodoMessageCardProps {
@@ -17,13 +18,15 @@ export interface UserTodoMessageCardProps {
 }
 
 const FIRST_MESSAGE_TRIGGER_OPTIONS: { kind: TodoTriggerKind; label: string; title: string }[] = [
-  { kind: "manual", label: "Manually", title: "Send only when I choose" },
-  { kind: "codebaseReady", label: "Automatically", title: "Send automatically once no agent is running and the codebase is clean" },
+  { kind: "manual", label: "Manual", title: "Send only when I choose" },
+  { kind: "codebaseReady", label: "Auto", title: "Send automatically once no agent is running and the codebase is clean" },
+  { kind: "at", label: "Scheduled", title: "Send at a specific date and time" },
 ];
 
 const FOLLOWUP_TRIGGER_OPTIONS: { kind: TodoTriggerKind; label: string; title: string }[] = [
-  { kind: "manual", label: "Manually", title: "Send only when I choose" },
-  { kind: "afterSession", label: "Automatically", title: "Send automatically once the current run finishes successfully" },
+  { kind: "manual", label: "Manual", title: "Send only when I choose" },
+  { kind: "afterSession", label: "Auto", title: "Send automatically once the current run finishes successfully" },
+  { kind: "at", label: "Scheduled", title: "Send at a specific date and time" },
 ];
 
 function describeStatus(trigger: TodoTrigger | undefined, status: string | undefined): string {
@@ -83,6 +86,8 @@ export default function UserTodoMessageCard({
   const triggerOptions = isFollowup ? FOLLOWUP_TRIGGER_OPTIONS : FIRST_MESSAGE_TRIGGER_OPTIONS;
   const [menuOpen, setMenuOpen] = useState(false);
   const [triggerPickerOpen, setTriggerPickerOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleAt, setScheduleAt] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -91,6 +96,7 @@ export default function UserTodoMessageCard({
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
         setTriggerPickerOpen(false);
+        setScheduleOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -114,6 +120,7 @@ export default function UserTodoMessageCard({
                   e.stopPropagation();
                   setMenuOpen(!menuOpen);
                   setTriggerPickerOpen(false);
+                  setScheduleOpen(false);
                 }}
                 title="More actions"
               >
@@ -147,15 +154,20 @@ export default function UserTodoMessageCard({
                   </button>
                 </div>
               )}
-              {menuOpen && triggerPickerOpen && (
+              {menuOpen && triggerPickerOpen && !scheduleOpen && (
                 <div className="task-menu-dropdown">
                   {triggerOptions.map((opt) => (
                     <button
                       key={opt.kind}
                       className="task-menu-item"
-                      disabled={trigger?.kind === opt.kind}
+                      disabled={opt.kind !== "at" && trigger?.kind === opt.kind}
                       title={opt.title}
                       onClick={() => {
+                        if (opt.kind === "at") {
+                          setScheduleAt(trigger?.kind === "at" && trigger.timestamp ? trigger.timestamp : defaultScheduleTime());
+                          setScheduleOpen(true);
+                          return;
+                        }
                         setMenuOpen(false);
                         setTriggerPickerOpen(false);
                         onChangeTrigger({ kind: opt.kind });
@@ -164,6 +176,29 @@ export default function UserTodoMessageCard({
                       <span>{opt.label}</span>
                     </button>
                   ))}
+                </div>
+              )}
+              {menuOpen && triggerPickerOpen && scheduleOpen && (
+                <div className="task-menu-dropdown schedule-panel-dropdown">
+                  <ScheduleDateTimeInputs value={scheduleAt} onChange={setScheduleAt} />
+                  <div className="attach-schedule-panel-actions">
+                    <button type="button" onClick={() => setScheduleOpen(false)}>
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      className="primary"
+                      disabled={!scheduleAt || scheduleAt <= Date.now()}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setTriggerPickerOpen(false);
+                        setScheduleOpen(false);
+                        onChangeTrigger({ kind: "at", timestamp: scheduleAt! });
+                      }}
+                    >
+                      Set
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

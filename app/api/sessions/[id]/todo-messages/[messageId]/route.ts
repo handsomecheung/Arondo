@@ -44,6 +44,9 @@ export async function PATCH(
     if (!trigger || !trigger.kind) {
       return NextResponse.json({ error: "trigger is required" }, { status: 400 });
     }
+    if (trigger.kind === "at" && (typeof trigger.timestamp !== "number" || trigger.timestamp <= Date.now())) {
+      return NextResponse.json({ error: "trigger.timestamp must be a timestamp in the future" }, { status: 400 });
+    }
     const updated = await changeTodoTrigger(id, messageId, trigger);
     eventBus.publish({ type: "message_updated", payload: updated });
     const updatedSession = await getSession(id);
