@@ -14,6 +14,10 @@ export function resolveRepoFilePath(repoPath: string, path: string): string {
   return `${repoPath.replace(/\/$/, "")}/${path}`;
 }
 
+export function canForceSend(reason: { dirty: boolean; busy: boolean; queued?: boolean }): boolean {
+  return !reason.busy;
+}
+
 export function autoResizeTextarea(el: HTMLTextAreaElement, maxHeight = 260) {
   const text = el.value || el.placeholder;
   const original = el.value;

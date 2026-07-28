@@ -1,4 +1,5 @@
 import { IconX } from "@/components/Icons";
+import { canForceSend } from "@/lib/homeUtils";
 
 interface Props {
   pendingConfirmation: { reason: { dirty: boolean; busy: boolean; queued?: boolean }; isFollowup?: boolean } | null;
@@ -9,6 +10,7 @@ interface Props {
 export default function ProjectNotReadyModal({ pendingConfirmation, onResolve, onCancel }: Props) {
   if (!pendingConfirmation) return null;
   const { dirty, busy, queued } = pendingConfirmation.reason;
+  const showForceSend = canForceSend({ dirty, busy, queued });
   const autoLabel = pendingConfirmation.isFollowup
     ? "Send automatically once earlier messages are handled"
     : "Send automatically once ready";
@@ -55,13 +57,15 @@ export default function ProjectNotReadyModal({ pendingConfirmation, onResolve, o
           >
             Save as draft, send manually later
           </button>
-          <button
-            className="new-task-btn"
-            onClick={() => onResolve("force")}
-            style={{ padding: "8px 16px", background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", color: "var(--text-primary)", fontSize: 13, cursor: "pointer" }}
-          >
-            Send now anyway
-          </button>
+          {showForceSend && (
+            <button
+              className="new-task-btn"
+              onClick={() => onResolve("force")}
+              style={{ padding: "8px 16px", background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", color: "var(--text-primary)", fontSize: 13, cursor: "pointer" }}
+            >
+              Send now anyway
+            </button>
+          )}
         </div>
       </div>
     </div>
