@@ -33,6 +33,9 @@ export function useInitialLoad({
         const urlProject = initUrl.project;
         if (urlSession && data.some((s) => s.id === urlSession)) {
           // URL already set the correct session
+        } else if (urlSession) {
+          // URL points at a session that no longer exists — show the new-session prompt
+          setSelectedSessionId(null);
         } else if (!urlProject && data.length > 0) {
           setSelectedSessionId(data[0].id);
         }
