@@ -68,6 +68,7 @@ export default function AppSidebar({
   const sessionMenuTriggerRef = useRef<HTMLDivElement>(null);
   const sessionMenuPortalRef = useRef<HTMLDivElement>(null);
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string | null>(null);
+  const [selectedRunnerFilter, setSelectedRunnerFilter] = useState<string | null>(null);
 
   const handleSwipeTouchStart = (id: string) => (e: React.TouchEvent) => {
     setSwipe({ id, startX: e.touches[0].clientX, dx: 0 });
@@ -218,6 +219,7 @@ export default function AppSidebar({
               className="sidebar-settings-link"
               onClick={() => {
                 setSelectedProjectFilter(null);
+                setSelectedRunnerFilter(null);
                 onCloseArchivedSessions();
               }}
               id="close-archived-sessions-btn"
@@ -234,6 +236,7 @@ export default function AppSidebar({
                 className={`sidebar-mode-tab${sidebarMode === "sessions" ? " active" : ""}`}
                 onClick={() => {
                   setSelectedProjectFilter(null);
+                  setSelectedRunnerFilter(null);
                   onSetSidebarMode("sessions");
                 }}
               >
@@ -243,7 +246,11 @@ export default function AppSidebar({
                 role="tab"
                 aria-selected={sidebarMode === "projects"}
                 className={`sidebar-mode-tab${sidebarMode === "projects" ? " active" : ""}`}
-                onClick={() => onSetSidebarMode("projects")}
+                onClick={() => {
+                  setSelectedProjectFilter(null);
+                  setSelectedRunnerFilter(null);
+                  onSetSidebarMode("projects");
+                }}
               >
                 Projects
               </button>
@@ -309,6 +316,70 @@ export default function AppSidebar({
                       }}
                     >
                       {name}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
+          {sidebarMode === "projects" && (() => {
+            const projectRunnerIds = new Set(projects.map((p) => p.runnerId).filter(Boolean));
+            const visibleRunners = runners.filter((r) => projectRunnerIds.has(r.id));
+            if (visibleRunners.length < 2) return null;
+            return (
+              <div
+                style={{
+                  display: "flex",
+                  gap: 6,
+                  overflowX: "auto",
+                  scrollbarWidth: "none",
+                  WebkitOverflowScrolling: "touch",
+                  paddingBottom: 2,
+                } as React.CSSProperties}
+              >
+                <button
+                  onClick={() => setSelectedRunnerFilter(null)}
+                  style={{
+                    flexShrink: 0,
+                    padding: "3px 10px",
+                    borderRadius: 20,
+                    border: `1px solid ${selectedRunnerFilter === null ? "var(--accent)" : "var(--border)"}`,
+                    background: selectedRunnerFilter === null ? "var(--accent-muted, rgba(99,102,241,0.15))" : "transparent",
+                    color: selectedRunnerFilter === null ? "var(--accent)" : "var(--text-muted)",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  All
+                </button>
+                {visibleRunners.map((r) => {
+                  const active = selectedRunnerFilter === r.id;
+                  return (
+                    <button
+                      key={r.id}
+                      onClick={() => setSelectedRunnerFilter(active ? null : r.id)}
+                      title={r.name}
+                      style={{
+                        flexShrink: 0,
+                        maxWidth: 100,
+                        padding: "3px 10px",
+                        borderRadius: 20,
+                        border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+                        background: active ? "var(--accent-muted, rgba(99,102,241,0.15))" : "transparent",
+                        color: active ? "var(--accent)" : "var(--text-muted)",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      {r.name}
                     </button>
                   );
                 })}
@@ -555,14 +626,25 @@ export default function AppSidebar({
                 );
               })
             )
-          ) : (
-            projects.length === 0 ? (
-              <div className="empty-state">
-                <IconInbox />
-                <p>No projects yet.<br />Create a session to initialize a project.</p>
-              </div>
-            ) : (
-              [...projects]
+          ) : (() => {
+            const filteredProjects = projects.filter((p) => !selectedRunnerFilter || p.runnerId === selectedRunnerFilter);
+            if (projects.length === 0) {
+              return (
+                <div className="empty-state">
+                  <IconInbox />
+                  <p>No projects yet.<br />Create a session to initialize a project.</p>
+                </div>
+              );
+            }
+            if (filteredProjects.length === 0) {
+              return (
+                <div className="empty-state">
+                  <IconInbox />
+                  <p>No projects match the selected runner.</p>
+                </div>
+              );
+            }
+            return [...filteredProjects]
               .sort((a, b) => {
                 const lastActivity = (p: typeof a) => {
                   const sessionUpdatedAt = sortedSessions
@@ -615,9 +697,8 @@ export default function AppSidebar({
                     <div className="task-item-time">{formatRelative(project.createdAt)}</div>
                   </div>
                 );
-              })
-            )
-          )}
+              });
+          })()}
         </div>
       </aside>
     </>
