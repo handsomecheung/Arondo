@@ -620,7 +620,7 @@ export default function AppSidebar({
                       </div>
                     </div>
                     <div className="task-item-prompt">{session.name || session.prompt}</div>
-                    <div className="task-item-time">{formatRelative(session.createdAt)}</div>
+                    <div className="task-item-time">{formatRelative(session.updatedAt)}</div>
                     </div>
                   </div>
                 );
