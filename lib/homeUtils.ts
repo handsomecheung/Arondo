@@ -18,6 +18,30 @@ export function canForceSend(reason: { dirty: boolean; busy: boolean; queued?: b
   return !reason.busy;
 }
 
+export interface ConfirmationButton {
+  choice: "pendingAuto" | "draft" | "force";
+  label: string;
+}
+
+// Single source of truth for the "Project not ready" dialog's button set, so
+// ProjectNotReadyModal and its tests can't drift out of sync.
+export function getConfirmationButtons(
+  reason: { dirty: boolean; busy: boolean; queued?: boolean },
+  isFollowup?: boolean
+): ConfirmationButton[] {
+  const buttons: ConfirmationButton[] = [
+    {
+      choice: "pendingAuto",
+      label: isFollowup ? "Send automatically once earlier messages are handled" : "Send automatically once ready",
+    },
+    { choice: "draft", label: "Save as draft, send manually later" },
+  ];
+  if (canForceSend(reason)) {
+    buttons.push({ choice: "force", label: "Send now anyway" });
+  }
+  return buttons;
+}
+
 export function autoResizeTextarea(el: HTMLTextAreaElement, maxHeight = 260) {
   const text = el.value || el.placeholder;
   const original = el.value;

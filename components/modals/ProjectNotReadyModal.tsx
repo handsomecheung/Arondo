@@ -1,5 +1,5 @@
 import { IconX } from "@/components/Icons";
-import { canForceSend } from "@/lib/homeUtils";
+import { getConfirmationButtons } from "@/lib/homeUtils";
 
 interface Props {
   pendingConfirmation: { reason: { dirty: boolean; busy: boolean; queued?: boolean }; isFollowup?: boolean } | null;
@@ -10,10 +10,7 @@ interface Props {
 export default function ProjectNotReadyModal({ pendingConfirmation, onResolve, onCancel }: Props) {
   if (!pendingConfirmation) return null;
   const { dirty, busy, queued } = pendingConfirmation.reason;
-  const showForceSend = canForceSend({ dirty, busy, queued });
-  const autoLabel = pendingConfirmation.isFollowup
-    ? "Send automatically once earlier messages are handled"
-    : "Send automatically once ready";
+  const buttons = getConfirmationButtons({ dirty, busy, queued }, pendingConfirmation.isFollowup);
 
   return (
     <div className="modal-backdrop" onClick={onCancel}>
@@ -42,30 +39,21 @@ export default function ProjectNotReadyModal({ pendingConfirmation, onResolve, o
           className="modal-footer"
           style={{ display: "flex", flexDirection: "column", gap: 8, padding: "12px 16px", borderTop: "1px solid var(--border)" }}
         >
-          <button
-            className="new-task-btn"
-            onClick={() => onResolve("pendingAuto")}
-            autoFocus
-            style={{ padding: "8px 16px", background: "var(--accent)", border: "none", borderRadius: "var(--radius-sm)", color: "#ffffff", fontSize: 13, cursor: "pointer" }}
-          >
-            {autoLabel}
-          </button>
-          <button
-            className="new-task-btn"
-            onClick={() => onResolve("draft")}
-            style={{ padding: "8px 16px", background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", color: "var(--text-primary)", fontSize: 13, cursor: "pointer" }}
-          >
-            Save as draft, send manually later
-          </button>
-          {showForceSend && (
+          {buttons.map((btn, i) => (
             <button
+              key={btn.choice}
               className="new-task-btn"
-              onClick={() => onResolve("force")}
-              style={{ padding: "8px 16px", background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", color: "var(--text-primary)", fontSize: 13, cursor: "pointer" }}
+              onClick={() => onResolve(btn.choice)}
+              autoFocus={i === 0}
+              style={
+                i === 0
+                  ? { padding: "8px 16px", background: "var(--accent)", border: "none", borderRadius: "var(--radius-sm)", color: "#ffffff", fontSize: 13, cursor: "pointer" }
+                  : { padding: "8px 16px", background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", color: "var(--text-primary)", fontSize: 13, cursor: "pointer" }
+              }
             >
-              Send now anyway
+              {btn.label}
             </button>
-          )}
+          ))}
         </div>
       </div>
     </div>
