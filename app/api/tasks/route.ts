@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
 
   const filtered = [];
   for (const task of tasks) {
-    if (isSessionArchived(task.sessionId)) {
+    if (task.sessionId && isSessionArchived(task.sessionId)) {
       continue;
     }
     const isAllowed = await runnerManager.isTokenAllowedForRunnerId(task.runnerId, token);
