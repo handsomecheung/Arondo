@@ -16,6 +16,93 @@ export interface TokenInfo {
   uuid: string;
   name: string;
   type: "admin" | "user";
+  color?: string;
+}
+
+const PRESET_COLORS = [
+  "#3b82f6", // Blue
+  "#10b981", // Emerald
+  "#8b5cf6", // Violet
+  "#f59e0b", // Amber
+  "#ec4899", // Pink
+  "#06b6d4", // Cyan
+  "#f43f5e", // Rose
+  "#6366f1", // Indigo
+  "#14b8a6", // Teal
+  "#a855f7", // Purple
+  "#f97316", // Orange
+  "#22c55e", // Green
+];
+
+function hslToHex(h: number, s: number, l: number): string {
+  l /= 100;
+  const a = (s * Math.min(l, 1 - l)) / 100;
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color).toString(16).padStart(2, "0");
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+function hexToHue(hex: string): number {
+  const r = parseInt(hex.substring(1, 3), 16) / 255;
+  const g = parseInt(hex.substring(3, 5), 16) / 255;
+  const b = parseInt(hex.substring(5, 7), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0;
+  if (max !== min) {
+    const d = max - min;
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return Math.round(h * 360);
+}
+
+export function generateUniqueColor(existingColors: string[]): string {
+  const normalizedExisting = existingColors.map(c => c.toLowerCase());
+  for (const color of PRESET_COLORS) {
+    if (!normalizedExisting.includes(color.toLowerCase())) {
+      return color;
+    }
+  }
+
+  const hues = existingColors
+    .filter(c => /^#[0-9a-fA-F]{6}$/.test(c))
+    .map(c => hexToHue(c));
+
+  if (hues.length === 0) {
+    return PRESET_COLORS[0];
+  }
+
+  const uniqueHues = Array.from(new Set(hues)).sort((a, b) => a - b);
+
+  if (uniqueHues.length === 1) {
+    return hslToHex((uniqueHues[0] + 180) % 360, 85, 55);
+  }
+
+  let maxGap = 0;
+  let targetHue = 0;
+
+  for (let i = 0; i < uniqueHues.length; i++) {
+    const current = uniqueHues[i];
+    const next = uniqueHues[(i + 1) % uniqueHues.length];
+    let gap = next - current;
+    if (gap < 0) {
+      gap += 360;
+    }
+    if (gap > maxGap) {
+      maxGap = gap;
+      targetHue = (current + gap / 2) % 360;
+    }
+  }
+
+  return hslToHex(targetHue, 85, 55);
 }
 
 export interface RunnerTokenInfo {
@@ -119,6 +206,7 @@ export async function initializeAuth(): Promise<void> {
           uuid: generateUUID(),
           name: "Default Admin",
           type: "admin",
+          color: "#3b82f6",
         });
 
         console.log("\n========================================================");

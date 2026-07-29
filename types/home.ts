@@ -69,6 +69,9 @@ export interface Message {
   todoTrigger?: TodoTrigger;
   todoResultMessageId?: string;
   todoError?: string;
+  tokenUuid?: string;
+  userName?: string;
+  userColor?: string;
 }
 
 export interface TaskItem {

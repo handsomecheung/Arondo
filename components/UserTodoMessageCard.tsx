@@ -15,6 +15,8 @@ export interface UserTodoMessageCardProps {
   onCancel: () => void;
   onSendNow: () => void;
   onChangeTrigger: (trigger: TodoTrigger) => void;
+  userName?: string;
+  userColor?: string;
 }
 
 const FIRST_MESSAGE_TRIGGER_OPTIONS: { kind: TodoTriggerKind; label: string; title: string }[] = [
@@ -82,6 +84,8 @@ export default function UserTodoMessageCard({
   onCancel,
   onSendNow,
   onChangeTrigger,
+  userName,
+  userColor,
 }: UserTodoMessageCardProps) {
   const triggerOptions = isFollowup ? FOLLOWUP_TRIGGER_OPTIONS : FIRST_MESSAGE_TRIGGER_OPTIONS;
   const [menuOpen, setMenuOpen] = useState(false);
@@ -105,9 +109,31 @@ export default function UserTodoMessageCard({
 
   const isPending = !status || status === "pending";
 
+  const displayName = userName || "User";
+  const displayColor = userColor || "#6b7280";
+
   return (
     <div className="exec-card user-message-card user-todo-message-card">
       <div className="exec-card-header">
+        <div
+          title={displayName}
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: "50%",
+            backgroundColor: displayColor,
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 12,
+            fontWeight: 600,
+            flexShrink: 0,
+            textTransform: "uppercase",
+          }}
+        >
+          {displayName.charAt(0) || "?"}
+        </div>
         <div className="exec-card-info user-message-card-content">
           {renderContent ? renderContent(content) : content}
         </div>

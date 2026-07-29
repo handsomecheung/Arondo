@@ -35,6 +35,7 @@ interface TokenInfo {
   uuid: string;
   name: string;
   type: "admin" | "user";
+  color?: string;
 }
 
 interface RunnerTokenInfo {
@@ -1370,7 +1371,7 @@ export default function SettingsPage() {
                     Admin Tokens (Name / Token)
                   </h3>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {systemTokens.filter(t => t.type === "admin").map(({ token: tokenKey, name }) => {
+                    {systemTokens.filter(t => t.type === "admin").map(({ token: tokenKey, name, color }) => {
                       const isEditing = editingTokenKey === tokenKey;
                       const masked = tokenKey.substring(0, 3) + "...";
                       return (
@@ -1387,6 +1388,24 @@ export default function SettingsPage() {
                             borderRadius: "6px",
                           }}
                         >
+                          <div
+                            style={{
+                              width: 22,
+                              height: 22,
+                              borderRadius: "50%",
+                              backgroundColor: color || "#6b7280",
+                              color: "#fff",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: 10,
+                              fontWeight: 600,
+                              flexShrink: 0,
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            {name.charAt(0) || "?"}
+                          </div>
                           <span style={{ fontSize: 11, fontFamily: "monospace", color: "var(--text-muted)", flexShrink: 0 }}>
                             {masked}
                           </span>
@@ -1463,7 +1482,7 @@ export default function SettingsPage() {
                         No user tokens configured
                       </span>
                     ) : (
-                      systemTokens.filter(t => t.type === "user").map(({ token: tokenKey, name }) => {
+                      systemTokens.filter(t => t.type === "user").map(({ token: tokenKey, name, color }) => {
                         const isEditing = editingTokenKey === tokenKey;
                         const masked = tokenKey.substring(0, 3) + "...";
                         return (
@@ -1480,6 +1499,24 @@ export default function SettingsPage() {
                               borderRadius: "6px",
                             }}
                           >
+                            <div
+                              style={{
+                                width: 22,
+                                height: 22,
+                                borderRadius: "50%",
+                                backgroundColor: color || "#6b7280",
+                                color: "#fff",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: 10,
+                                fontWeight: 600,
+                                flexShrink: 0,
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              {name.charAt(0) || "?"}
+                            </div>
                             <span style={{ fontSize: 11, fontFamily: "monospace", color: "var(--text-muted)", flexShrink: 0 }}>
                               {masked}
                             </span>
@@ -1979,7 +2016,7 @@ export default function SettingsPage() {
                               No user tokens configured. Go to Token Manager below to create one.
                             </span>
                           ) : (
-                            systemTokens.filter(t => t.type === "user").map(({ token: tokenKey, uuid: tokenUuid, name, type }) => {
+                            systemTokens.filter(t => t.type === "user").map(({ token: tokenKey, uuid: tokenUuid, name, type, color }) => {
                               const isAllowed = (r.allowedUserTokenUuids || []).includes(tokenUuid);
                               const isUserToken = type === "user";
                               const masked = tokenKey.substring(0, 3) + "...";
@@ -2011,6 +2048,24 @@ export default function SettingsPage() {
                                     }}
                                     style={{ cursor: "pointer" }}
                                   />
+                                  <div
+                                    style={{
+                                      width: 16,
+                                      height: 16,
+                                      borderRadius: "50%",
+                                      backgroundColor: color || "#6b7280",
+                                      color: "#fff",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      fontSize: 8,
+                                      fontWeight: 600,
+                                      flexShrink: 0,
+                                      textTransform: "uppercase",
+                                    }}
+                                  >
+                                    {name.charAt(0) || "?"}
+                                  </div>
                                   <span style={{ fontWeight: 500 }}>{name}</span>
                                   <span style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "monospace" }}>
                                     ({isUserToken ? "User" : "Admin"}: {masked})
@@ -2028,13 +2083,16 @@ export default function SettingsPage() {
                             </span>
                           ) : (
                             r.allowedUserTokenUuids.map((tokenUuid) => {
-                              const name = systemTokens.find(t => t.uuid === tokenUuid)?.name || tokenUuid.substring(0, 9) + "...";
+                              const foundToken = systemTokens.find(t => t.uuid === tokenUuid);
+                              const name = foundToken?.name || tokenUuid.substring(0, 9) + "...";
+                              const color = foundToken?.color;
                               return (
                                 <span
                                   key={tokenUuid}
                                   style={{
                                     display: "inline-flex",
                                     alignItems: "center",
+                                    gap: 6,
                                     fontSize: 11,
                                     background: "var(--bg-elevated)",
                                     border: "1px solid var(--border)",
@@ -2043,6 +2101,15 @@ export default function SettingsPage() {
                                     color: "var(--text-primary)",
                                   }}
                                 >
+                                  <span
+                                    style={{
+                                      display: "inline-block",
+                                      width: 8,
+                                      height: 8,
+                                      borderRadius: "50%",
+                                      backgroundColor: color || "#6b7280",
+                                    }}
+                                  />
                                   {name}
                                 </span>
                               );

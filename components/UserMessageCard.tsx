@@ -7,6 +7,8 @@ export interface UserMessageCardProps {
   content: string;
   timestamp?: string;
   renderContent?: (content: string) => React.ReactNode;
+  userName?: string;
+  userColor?: string;
 }
 
 /**
@@ -18,6 +20,8 @@ export default function UserMessageCard({
   content,
   timestamp,
   renderContent,
+  userName,
+  userColor,
 }: UserMessageCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -33,9 +37,31 @@ export default function UserMessageCard({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [menuOpen]);
 
+  const displayName = userName || "User";
+  const displayColor = userColor || "#6b7280";
+
   return (
     <div className="exec-card user-message-card">
       <div className="exec-card-header">
+        <div
+          title={displayName}
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: "50%",
+            backgroundColor: displayColor,
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 12,
+            fontWeight: 600,
+            flexShrink: 0,
+            textTransform: "uppercase",
+          }}
+        >
+          {displayName.charAt(0) || "?"}
+        </div>
         <div className="exec-card-info user-message-card-content">
           {renderContent ? renderContent(content) : content}
         </div>

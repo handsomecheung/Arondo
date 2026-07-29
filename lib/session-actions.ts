@@ -13,6 +13,7 @@ import { getAgent, resolveAgentType, PROMPT_ENV_VAR } from "./agents";
 import { buildCrossAgentContext } from "./autoselect";
 import { eventBus } from "./event-bus";
 import { runnerManager } from "./runner-manager";
+import { readTokensConfig } from "./auth";
 
 const MAX_SESSION_NAME_LENGTH = 80;
 
@@ -43,6 +44,22 @@ export async function dispatchFollowupMessage(
 
   const messages = await getMessages(sessionId);
 
+  // Resolve user name and color from token config
+  let userName: string | undefined;
+  let userColor: string | undefined;
+  if (opts.tokenUuid) {
+    try {
+      const authConfig = await readTokensConfig();
+      const client = authConfig.clients.find(c => c.uuid === opts.tokenUuid);
+      if (client) {
+        userName = client.name;
+        userColor = client.color;
+      }
+    } catch (err) {
+      console.error("Failed to resolve user color/name for message:", err);
+    }
+  }
+
   const userMsg = await addMessage({
     sessionId,
     role: "user",
@@ -50,6 +67,8 @@ export async function dispatchFollowupMessage(
     prompt: trimmedPrompt || undefined,
     type: (opts.type as any) || "chat-user",
     tokenUuid: opts.tokenUuid,
+    userName,
+    userColor,
   });
   eventBus.publish({ type: "message_added", payload: userMsg });
 

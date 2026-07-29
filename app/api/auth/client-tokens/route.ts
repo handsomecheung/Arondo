@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getArondoToken, getRoleByToken, readTokensConfig, updateTokensConfig, generateToken } from "@/lib/auth";
+import { getArondoToken, getRoleByToken, readTokensConfig, updateTokensConfig, generateToken, generateUniqueColor } from "@/lib/auth";
 import crypto from "crypto";
 
 function generateUUID(): string {
@@ -18,7 +18,19 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const config = await readTokensConfig();
+    let config = await readTokensConfig();
+    const missingColor = config.clients.some((t) => !t.color);
+    if (missingColor) {
+      await updateTokensConfig((cfg) => {
+        for (const client of cfg.clients) {
+          if (!client.color) {
+            const existingColors = cfg.clients.map((t) => t.color).filter((c): c is string => !!c);
+            client.color = generateUniqueColor(existingColors);
+          }
+        }
+      });
+      config = await readTokensConfig();
+    }
     return NextResponse.json(config.clients);
   } catch {
     return NextResponse.json({ error: "Failed to load tokens" }, { status: 500 });
@@ -42,11 +54,14 @@ export async function POST(request: NextRequest) {
     // Generate a secure user token
     const generatedUserToken = generateToken();
     await updateTokensConfig((config) => {
+      const existingColors = config.clients.map((t) => t.color).filter((c): c is string => !!c);
+      const generatedColor = generateUniqueColor(existingColors);
       config.clients.push({
         token: generatedUserToken,
         uuid: generateUUID(),
         name: name.trim(),
-        type: "user"
+        type: "user",
+        color: generatedColor
       });
     });
 

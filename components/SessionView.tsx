@@ -845,6 +845,8 @@ export default function SessionView({
                 onCancel={() => onCancelTodo(msg.id)}
                 onSendNow={() => onSendTodoNow(msg.id)}
                 onChangeTrigger={(trigger) => onChangeTodoTrigger(msg.id, trigger)}
+                userName={msg.userName}
+                userColor={msg.userColor}
               />
             );
           }
@@ -857,6 +859,8 @@ export default function SessionView({
                 title={cmdWord}
                 statusText="Sent"
                 timestamp={formatTime(msg.createdAt)}
+                userName={msg.userName}
+                userColor={msg.userColor}
               />
             );
           }
@@ -868,6 +872,8 @@ export default function SessionView({
                 content={msg.content}
                 timestamp={formatTime(msg.createdAt)}
                 renderContent={renderMessageContent}
+                userName={msg.userName}
+                userColor={msg.userColor}
               />
             );
           }

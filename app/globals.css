@@ -1549,6 +1549,14 @@ body {
   align-items: flex-start;
 }
 
+/* Don't reserve flex layout width for the hover-only menu button —
+   it would otherwise starve the message text of horizontal space. */
+.user-message-card .exec-card-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+
 /* Match background color of UserAgentCommandCard */
 .exec-card.script-exec-card {
   background: rgba(79, 70, 229, 0.1);

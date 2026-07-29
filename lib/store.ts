@@ -120,6 +120,8 @@ export interface Message {
   resolvedAgentType?: string;
   prompt?: string;
   tokenUuid?: string;
+  userName?: string;
+  userColor?: string;
   // "user-todo" messages only:
   todoStatus?: TodoStatus;
   todoTrigger?: TodoTrigger;
@@ -613,6 +615,22 @@ export async function addTodoMessage(
   sessionId: string,
   data: { content: string; prompt?: string; trigger: TodoTrigger; tokenUuid?: string }
 ): Promise<Message> {
+  let userName: string | undefined;
+  let userColor: string | undefined;
+  if (data.tokenUuid) {
+    try {
+      const { readTokensConfig } = await import("./auth");
+      const authConfig = await readTokensConfig();
+      const client = authConfig.clients.find(c => c.uuid === data.tokenUuid);
+      if (client) {
+        userName = client.name;
+        userColor = client.color;
+      }
+    } catch (err) {
+      console.error("Failed to resolve user color/name for todo message:", err);
+    }
+  }
+
   const message = await addMessage({
     sessionId,
     role: "user",
@@ -622,6 +640,8 @@ export async function addTodoMessage(
     todoStatus: "pending",
     todoTrigger: data.trigger,
     tokenUuid: data.tokenUuid,
+    userName,
+    userColor,
   });
   await syncPendingTodoPointer(sessionId);
   return message;
