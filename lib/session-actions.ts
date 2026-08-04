@@ -14,6 +14,7 @@ import { buildCrossAgentContext } from "./autoselect";
 import { eventBus } from "./event-bus";
 import { runnerManager } from "./runner-manager";
 import { readTokensConfig } from "./auth";
+import { isQuotaErrorMessage } from "./agent-quota-errors";
 
 const MAX_SESSION_NAME_LENGTH = 80;
 
@@ -74,13 +75,9 @@ export async function dispatchFollowupMessage(
 
   const runnerConn = runnerManager.getRunner(session.runnerId);
 
-  const quotaErrorMessages = [
-    "agy quota exhausted — no output was produced",
-    "Claude session limit hit",
-  ];
   const prevQuotaError = session.agentType === "auto" &&
     session.errorMessage != null &&
-    quotaErrorMessages.some((s) => session.errorMessage!.includes(s));
+    isQuotaErrorMessage(session.errorMessage);
 
   const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? []);
   const resolvedType = resolved.agentType;

@@ -24,6 +24,11 @@ import {
 import fs from "fs/promises";
 import path from "path";
 import { getConfigDir } from "./config";
+import {
+  getAgentQuotaErrorMessage,
+  getQuotaRetryAgentType,
+  isAgentQuotaExhausted,
+} from "./agent-quota-errors";
 
 const CONFIG_DIR = getConfigDir();
 const RUNNERS_DIR = path.join(CONFIG_DIR, "runners");
@@ -1186,18 +1191,14 @@ class RunnerManager {
       }
     }
 
-    // Detect quota exhaustion: agy exits 0 but produces no output; claude logs session limit hit
     let quotaExhausted = false;
-    if (resolvedAgentType === "antigravity" && success) {
-      const log = await getSessionLog(ctx.sessionId, ctx.messageId);
-      if (!log.trim()) {
-        quotaExhausted = true;
-      }
-    } else if (resolvedAgentType === "claude") {
-      const log = await getSessionLog(ctx.sessionId, ctx.messageId);
-      if (log.includes("You've hit your session limit")) {
-        quotaExhausted = true;
-      }
+    if (resolvedAgentType === "antigravity" || resolvedAgentType === "claude") {
+      const [stdoutLog, stderrLog] = await Promise.all([
+        getSessionLog(ctx.sessionId, ctx.messageId, ctx.projectId),
+        getSessionLog(ctx.sessionId, ctx.messageId, ctx.projectId, "stderr"),
+      ]);
+      const log = `${stdoutLog}\n${stderrLog}`;
+      quotaExhausted = isAgentQuotaExhausted(resolvedAgentType, log, success);
     }
 
     const hasRunningScripts = (session?.runningScripts?.length ?? 0) > 0;
@@ -1213,9 +1214,7 @@ class RunnerManager {
     const updated = await updateSession(ctx.sessionId, {
       status: nextStatus as any,
       errorMessage: quotaExhausted
-        ? resolvedAgentType === "claude"
-          ? "Claude session limit hit"
-          : "agy quota exhausted — no output was produced"
+        ? getAgentQuotaErrorMessage(resolvedAgentType)
         : success
           ? undefined
           : stoppedByUser
@@ -1246,10 +1245,13 @@ class RunnerManager {
       const lastUserMsg = [...messages.slice(0, msgIdx)].reverse().find((m) => m.role === "user");
       if (lastUserMsg) {
         try {
+          const quotaRetryAgentType = getQuotaRetryAgentType(resolvedAgentType);
+          if (!quotaRetryAgentType) return;
+
           const todoMessage = await addTodoMessage(ctx.sessionId, {
             content: lastUserMsg.content,
             prompt: lastUserMsg.prompt,
-            trigger: { kind: "quotaAvailable", agentType: resolvedAgentType },
+            trigger: { kind: "quotaAvailable", agentType: quotaRetryAgentType },
           });
           eventBus.publish({ type: "message_added", payload: todoMessage });
           const withTodo = await getSession(ctx.sessionId);
