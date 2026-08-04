@@ -174,8 +174,8 @@ export async function POST(req: NextRequest) {
       tokenUuid: getUuidByToken(token) || undefined,
     });
     const updated = (await getSession(session.id)) || session;
-    eventBus.publish({ type: "message_added", payload: todoMessage });
     eventBus.publish({ type: "session_updated", payload: updated });
+    eventBus.publish({ type: "message_added", payload: todoMessage });
     return NextResponse.json(updated, { status: 201 });
   }
 

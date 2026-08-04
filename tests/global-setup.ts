@@ -63,6 +63,13 @@ async function globalSetup() {
         name: 'Test Sessions Runner',
         createdAt: Date.now(),
         boundRunnerId: null
+      },
+      {
+        id: 'test-runner-token-id-6',
+        token: 'test-runner-token-hidden',
+        name: 'Test Hidden Runner',
+        createdAt: Date.now(),
+        boundRunnerId: null
       }
     ]
   };

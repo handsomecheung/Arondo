@@ -49,6 +49,7 @@ interface Message {
   todoStatus?: string;
   todoTrigger?: TodoTrigger;
   prompt?: string;
+  projectId?: string;
 }
 
 interface ServerTask {
@@ -137,6 +138,8 @@ export default function TasksPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const sessionsRef = useRef<Session[]>([]);
+  const projectsRef = useRef<Project[]>([]);
+  const sessionProjectIdsRef = useRef<Map<string, string>>(new Map());
   const [groupBy, setGroupBy] = useState<"session" | "status">("session");
   const [filterType, setFilterType] = useState<"both" | "agent" | "script">("both");
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
@@ -155,6 +158,7 @@ export default function TasksPage() {
       setProjects(projectsList);
       setSessions(sessions);
       const sessionMap = new Map(sessions.map((s) => [s.id, s]));
+      const visibleProjectIds = new Set(projectsList.map((project) => project.id));
 
       const scriptProjectIds = new Set<string>();
       for (const t of serverTasks) {
@@ -181,46 +185,50 @@ export default function TasksPage() {
         const todoRes = await fetch("/api/todo-messages");
         const todos: { id: string; sessionId: string; sessionName?: string; content: string; trigger: TodoTrigger; createdAt: string }[] =
           await todoRes.json();
-        todoItems = todos.map((t) => todoMessageToTaskItem(t, t.sessionName || sessionMap.get(t.sessionId)?.name));
+        todoItems = todos
+          .filter((t) => visibleProjectIds.has(sessionMap.get(t.sessionId)?.projectId || ""))
+          .map((t) => todoMessageToTaskItem(t, t.sessionName || sessionMap.get(t.sessionId)?.name));
       } catch {
         // ignore
       }
 
-      const initTasks: TaskItem[] = serverTasks.map((t) => {
-        const session = sessionMap.get(t.sessionId);
-        let name: string;
-        if (t.type === "agent") {
-          name = `Agent: ${t.prompt || session?.prompt || t.sessionId}`;
-        } else {
-          name = `Script: ${t.scriptName || "unknown"}`;
-        }
-        let status: TaskItem["status"];
-        if (t.completedAt) {
-          status = t.stoppedByUser ? "stopped" : t.exitCode === 0 ? "done" : "error";
-        } else {
-          status = "running";
-        }
-        let command = t.command || session?.command;
-        if (!command && t.type === "script" && t.scriptName && session?.projectId) {
-          command = scriptMap.get(session.projectId)?.get(t.scriptName);
-        }
-        return {
-          id: t.taskId,
-          type: t.type,
-          name,
-          sessionId: t.sessionId,
-          sessionName: session?.name || "",
-          status,
-          createdAt: t.createdAt || (session ? new Date(session.createdAt).getTime() : Date.now()),
-          completedAt: t.completedAt,
-          messageId: t.messageId,
-          command,
-          scriptName: t.scriptName,
-          projectId: t.projectId || session?.projectId,
-          prompt: t.prompt || session?.prompt,
-          agentType: t.agentType || session?.agentType,
-        };
-      });
+      const initTasks: TaskItem[] = serverTasks
+        .filter((t) => visibleProjectIds.has(t.projectId || sessionMap.get(t.sessionId)?.projectId || ""))
+        .map((t) => {
+          const session = sessionMap.get(t.sessionId);
+          let name: string;
+          if (t.type === "agent") {
+            name = `Agent: ${t.prompt || session?.prompt || t.sessionId}`;
+          } else {
+            name = `Script: ${t.scriptName || "unknown"}`;
+          }
+          let status: TaskItem["status"];
+          if (t.completedAt) {
+            status = t.stoppedByUser ? "stopped" : t.exitCode === 0 ? "done" : "error";
+          } else {
+            status = "running";
+          }
+          let command = t.command || session?.command;
+          if (!command && t.type === "script" && t.scriptName && session?.projectId) {
+            command = scriptMap.get(session.projectId)?.get(t.scriptName);
+          }
+          return {
+            id: t.taskId,
+            type: t.type,
+            name,
+            sessionId: t.sessionId,
+            sessionName: session?.name || "",
+            status,
+            createdAt: t.createdAt || (session ? new Date(session.createdAt).getTime() : Date.now()),
+            completedAt: t.completedAt,
+            messageId: t.messageId,
+            command,
+            scriptName: t.scriptName,
+            projectId: t.projectId || session?.projectId,
+            prompt: t.prompt || session?.prompt,
+            agentType: t.agentType || session?.agentType,
+          };
+        });
 
       const statusPriority = (s: TaskItem["status"]) => (s === "running" ? 0 : s === "todo" ? 1 : 2);
       const allTasks = [...initTasks, ...todoItems];
@@ -247,15 +255,19 @@ export default function TasksPage() {
       const res = await fetch("/api/todo-messages");
       const items: { id: string; sessionId: string; sessionName?: string; content: string; trigger: TodoTrigger; createdAt: string }[] =
         await res.json();
+      const visibleProjectIds = new Set(projects.map((project) => project.id));
+      const sessionMap = new Map(sessions.map((session) => [session.id, session]));
       setTaskQueue((prev) => {
         const nonTodo = prev.filter((t) => t.status !== "todo");
-        const todoItems = items.map((t) => todoMessageToTaskItem(t, t.sessionName || sessionsRef.current.find((s) => s.id === t.sessionId)?.name));
+        const todoItems = items
+          .filter((t) => visibleProjectIds.has(sessionMap.get(t.sessionId)?.projectId || ""))
+          .map((t) => todoMessageToTaskItem(t, t.sessionName || sessionMap.get(t.sessionId)?.name));
         return [...todoItems, ...nonTodo];
       });
     } catch {
       // ignore
     }
-  }, []);
+  }, [projects, sessions]);
 
   useEffect(() => {
     loadInitialTasks();
@@ -263,6 +275,14 @@ export default function TasksPage() {
 
   useEffect(() => {
     sessionsRef.current = sessions;
+  }, [sessions]);
+
+  useEffect(() => {
+    projectsRef.current = projects;
+  }, [projects]);
+
+  useEffect(() => {
+    sessionProjectIdsRef.current = new Map(sessions.map((session) => [session.id, session.projectId]));
   }, [sessions]);
 
   useEffect(() => {
@@ -330,6 +350,20 @@ export default function TasksPage() {
 
           if (event.type === "session:updated") {
             const updated = event.payload as Session;
+            sessionProjectIdsRef.current.set(updated.id, updated.projectId);
+            setSessions((prev) => {
+              const idx = prev.findIndex((s) => s.id === updated.id);
+              if (idx === -1) return [...prev, updated];
+              const next = [...prev];
+              next[idx] = updated;
+              return next;
+            });
+            if (!projectsRef.current.some((project) => project.id === updated.projectId)) {
+              setTaskQueue((prev) =>
+                prev.filter((t) => t.sessionId !== updated.id && t.projectId !== updated.projectId),
+              );
+              return;
+            }
             if (updated.status === "running") {
               setTaskQueue((prev) => {
                 const exists = prev.some(
@@ -371,11 +405,17 @@ export default function TasksPage() {
 
           if (event.type === "session:deleted") {
             const { id } = event.payload as { id: string };
+            sessionProjectIdsRef.current.delete(id);
+            setSessions((prev) => prev.filter((s) => s.id !== id));
             setTaskQueue((prev) => prev.filter((t) => t.sessionId !== id));
           }
 
           if (event.type === "message:added") {
             const msg = event.payload as Message;
+            const resolvedProjectId = msg.projectId || sessionProjectIdsRef.current.get(msg.sessionId);
+            if (!resolvedProjectId || !projectsRef.current.some((project) => project.id === resolvedProjectId)) {
+              return;
+            }
             if (msg.type === "user-todo" && msg.todoStatus === "pending" && msg.todoTrigger) {
               const trigger = msg.todoTrigger;
               setTaskQueue((prev) => {
@@ -454,6 +494,11 @@ export default function TasksPage() {
           if (event.type === "message:updated") {
             const msg = event.payload as Message;
             if (msg.type === "user-todo") {
+              const resolvedProjectId = msg.projectId || sessionProjectIdsRef.current.get(msg.sessionId);
+              if (!resolvedProjectId || !projectsRef.current.some((project) => project.id === resolvedProjectId)) {
+                setTaskQueue((prev) => prev.filter((t) => t.id !== msg.id));
+                return;
+              }
               setTaskQueue((prev) => {
                 if (msg.todoStatus !== "pending") {
                   return prev.filter((t) => t.id !== msg.id);

@@ -72,6 +72,7 @@ export interface Message {
   tokenUuid?: string;
   userName?: string;
   userColor?: string;
+  projectId?: string;
 }
 
 export interface TaskItem {
