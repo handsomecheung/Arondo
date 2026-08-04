@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
 
     const isActive = session.status === "running" || session.status === "script-running";
     const isStale = Date.now() - new Date(session.updatedAt).getTime() > sessionArchiveAgeMs;
-    if (!isActive && isStale && session.archivedManually !== false) {
+    if (!isActive && isStale && session.archivedManually !== false && !session.pinnedAt) {
       console.log(`[sessions] session ${session.id} last updated over ${sessionArchiveAgeMs / (24 * 60 * 60 * 1000)} days ago, archiving`);
       await archiveSession(session.id);
       runnerManager.removeCompletedTasksForSession(session.id);
