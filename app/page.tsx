@@ -747,7 +747,7 @@ export default function HomePage() {
   };
 
   const handleSelectChatFsItem = (absolutePath: string) => {
-    const root = selectedSession?.repoPath || "";
+    const root = selectedSession?.repoPath || repoPath;
     let relativePath = absolutePath;
     if (root) {
       if (absolutePath === root) {
@@ -769,6 +769,8 @@ export default function HomePage() {
       return;
     }
 
+    const insertPath = isNewSession ? absolutePath : relativePath;
+
     const el = textareaRef.current;
     if (el) {
       const selectionStart = el.selectionStart;
@@ -777,11 +779,11 @@ export default function HomePage() {
       let newCursorPos = selectionStart;
 
       if (selectionStart > 0 && value[selectionStart - 1] === "@") {
-        newValue = value.substring(0, selectionStart) + relativePath + value.substring(selectionStart);
-        newCursorPos = selectionStart + relativePath.length;
+        newValue = value.substring(0, selectionStart) + insertPath + value.substring(selectionStart);
+        newCursorPos = selectionStart + insertPath.length;
       } else {
-        newValue = value.substring(0, selectionStart) + "@" + relativePath + value.substring(selectionStart);
-        newCursorPos = selectionStart + 1 + relativePath.length;
+        newValue = value.substring(0, selectionStart) + "@" + insertPath + value.substring(selectionStart);
+        newCursorPos = selectionStart + 1 + insertPath.length;
       }
 
       setPrompt(newValue);
@@ -794,9 +796,9 @@ export default function HomePage() {
       });
     } else {
       if (prompt.endsWith("@")) {
-        setPrompt(prompt + relativePath);
+        setPrompt(prompt + insertPath);
       } else {
-        setPrompt(prompt + "@" + relativePath);
+        setPrompt(prompt + "@" + insertPath);
       }
     }
     setChatFsModalOpen(false);
@@ -865,7 +867,7 @@ export default function HomePage() {
     onTriggerFsModal: () => {
       setChatFsMode("insert");
       const sessionRunnerId = selectedSession?.runnerId || runnerId;
-      const path = selectedSession?.repoPath || "/";
+      const path = selectedSession?.repoPath || repoPath || "/";
       openChatFsModal(sessionRunnerId, path);
     },
   });
@@ -876,7 +878,7 @@ export default function HomePage() {
       textareaRef.current.blur();
     }
     const sessionRunnerId = selectedSession?.runnerId || runnerId;
-    const path = selectedSession?.repoPath || "/";
+    const path = selectedSession?.repoPath || repoPath || "/";
     openChatFsModal(sessionRunnerId, path);
   };
 
@@ -1528,7 +1530,7 @@ export default function HomePage() {
         parentPath={chatFsParentPath}
         entries={chatFsEntries}
         loading={chatFsLoading}
-        projectRoot={selectedSession?.repoPath || "/"}
+        projectRoot={selectedSession?.repoPath || repoPath || "/"}
         onSelect={handleSelectChatFsItem}
       />
 
