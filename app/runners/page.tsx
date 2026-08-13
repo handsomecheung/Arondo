@@ -167,7 +167,7 @@ function QuotaCard({
                 <span>{row.label}</span>
                 <span>
                   {isDisabled
-                    ? "Disabled"
+                    ? "Unknown"
                     : `${Math.round(remainRatio * 100)}% left · resets ${formatTimestamp(row.resetsAt)}`}
                 </span>
               </div>
