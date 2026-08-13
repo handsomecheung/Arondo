@@ -42,6 +42,35 @@ func TestParseResetsTimestamp(t *testing.T) {
 	}
 }
 
+func TestParseAgyQuotaLatestUsageFormat(t *testing.T) {
+	usage, err := os.ReadFile(filepath.Join("..", "tests", "mocks", "tmux", "agy", "arondo-agy-usage.txt"))
+	if err != nil {
+		t.Fatalf("failed to read agy usage fixture: %v", err)
+	}
+
+	q := parseAgyQuota(string(usage))
+	if q.Account != "arondo@gmail.com" {
+		t.Fatalf("Account = %q, want arondo@gmail.com", q.Account)
+	}
+	assertAgyRemain(t, "GeminiWeeklyRemain", q.GeminiWeeklyRemain, 0.78)
+	assertAgyRemain(t, "GeminiHourRemain", q.GeminiHourRemain, 0)
+	assertAgyRemain(t, "OtherWeeklyRemain", q.OtherWeeklyRemain, 1)
+	assertAgyRemain(t, "OtherHourRemain", q.OtherHourRemain, 1)
+	if q.GeminiWeeklyResetsAt == nil || q.GeminiHourResetsAt == nil {
+		t.Fatal("expected Gemini reset timestamps")
+	}
+	if q.OtherWeeklyResetsAt != nil || q.OtherHourResetsAt != nil {
+		t.Fatal("available quotas must not have reset timestamps")
+	}
+}
+
+func assertAgyRemain(t *testing.T, name string, got *float64, want float64) {
+	t.Helper()
+	if got == nil || *got != want {
+		t.Fatalf("%s = %v, want %v", name, got, want)
+	}
+}
+
 func TestAgentQuotas(t *testing.T) {
 	// Set up mock bin directory in PATH
 	wd, err := os.Getwd()
@@ -121,8 +150,8 @@ func TestAgentQuotas(t *testing.T) {
 				t.Fatalf("expected account arondo@gmail.com, got %s", account)
 			}
 			plan, _ := payload.Quota["Plan"].(string)
-			if plan != "Google AI Pro" {
-				t.Fatalf("expected plan Google AI Pro, got %s", plan)
+			if plan != "" {
+				t.Fatalf("expected no plan in latest usage output, got %s", plan)
 			}
 		case <-time.After(35 * time.Second):
 			t.Fatal("timed out waiting for agy quota.update")

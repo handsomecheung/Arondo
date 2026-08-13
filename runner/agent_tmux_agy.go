@@ -67,21 +67,22 @@ func fetchAgyQuota(client *Client) {
 
 // AgyQuota holds parsed quota data from the /usage command.
 type AgyQuota struct {
-	Account               string
-	Plan                  string
-	DefaultModel          string
-	GeminiWeeklyRemain    *float64 // 0-1, null if unavailable
-	GeminiWeeklyResetsAt   *int64
-	GeminiHourRemain      *float64
-	GeminiHourResetsAt     *int64
-	OtherWeeklyRemain     *float64
-	OtherWeeklyResetsAt    *int64
-	OtherHourRemain       *float64
-	OtherHourResetsAt      *int64
+	Account              string
+	Plan                 string
+	DefaultModel         string
+	GeminiWeeklyRemain   *float64 // 0-1, null if unavailable
+	GeminiWeeklyResetsAt *int64
+	GeminiHourRemain     *float64
+	GeminiHourResetsAt   *int64
+	OtherWeeklyRemain    *float64
+	OtherWeeklyResetsAt  *int64
+	OtherHourRemain      *float64
+	OtherHourResetsAt    *int64
 }
 
 var (
 	accountPlanRe  = regexp.MustCompile(`(\S+@\S+)\s+\(([^)]+)\)`)
+	accountRe      = regexp.MustCompile(`(?m)^\s*Account:\s*(\S+@\S+)\s*$`)
 	defaultModelRe = regexp.MustCompile(`(?m)esc to cancel\s+(\S.*?)\s*$`)
 	remainRe       = regexp.MustCompile(`(\d+(?:\.\d+)?)\s*%\s+remaining\s+·\s+Refreshes in\s+(.+)`)
 	refreshOnlyRe  = regexp.MustCompile(`^Refreshes in\s+(.+)`)
@@ -93,6 +94,9 @@ func parseAgyQuota(text string) *AgyQuota {
 	if m := accountPlanRe.FindStringSubmatch(text); m != nil {
 		q.Account = m[1]
 		q.Plan = m[2]
+	}
+	if m := accountRe.FindStringSubmatch(text); m != nil {
+		q.Account = m[1]
 	}
 	if m := defaultModelRe.FindStringSubmatch(text); m != nil {
 		q.DefaultModel = strings.TrimSpace(m[1])
@@ -106,9 +110,9 @@ func parseAgyQuota(text string) *AgyQuota {
 			section, limitType = "gemini", ""
 		case strings.HasSuffix(line, "MODELS") && line != "GEMINI MODELS":
 			section, limitType = "other", ""
-		case line == "Weekly Limit":
+		case strings.HasPrefix(line, "Weekly Limit"):
 			limitType = "weekly"
-		case line == "Five Hour Limit":
+		case strings.HasPrefix(line, "Five Hour Limit"):
 			limitType = "fivehour"
 		case line == "Quota available":
 			applyAgyLimit(q, section, limitType, floatPtr(1.0), nil)
