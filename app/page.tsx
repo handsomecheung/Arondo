@@ -275,7 +275,7 @@ export default function HomePage() {
   } = useScripts({
     selectedProjectId,
     selectedSessionId,
-    selectedSessionProjectId: selectedSession?.projectId,
+    selectedSessionProjectId: selectedSession?.projectId || ((isNewSession || isNewDraft) ? projects.find((p) => p.runnerId === runnerId && p.repoPath === repoPath)?.id : undefined),
     setApiError,
     setConfirmDialog,
     setInfoDialog,

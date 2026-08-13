@@ -151,11 +151,19 @@ export function useSessionSubmit({
     const agentTriggers = getUniqueTriggers(agentCommands);
     const matchesAgentCmd = agentTriggers.some((t) => v.startsWith("/" + t) || ("/" + t).startsWith(v));
     const matchesCommand = v.startsWith("/new") || "/new".startsWith(v) || v.startsWith("/delete") || "/delete".startsWith(v) || v.startsWith("/rename") || "/rename".startsWith(v) || matchesAgentCmd;
-    setShowCommandMenu(
-      ((v.startsWith("/") && matchesCommand) || value.startsWith("!")) &&
-        !isNewSession &&
-        !!selectedSessionId
-    );
+    const showMenu = (() => {
+      if (value.startsWith("!")) {
+        const hasProject = (isNewSession || !selectedSessionId)
+          ? (!!repoPath.trim() && !!runnerId)
+          : true;
+        return hasProject;
+      }
+      if (v.startsWith("/") && matchesCommand) {
+        return !isNewSession && !!selectedSessionId;
+      }
+      return false;
+    })();
+    setShowCommandMenu(showMenu);
     autoResizeTextarea(e.target);
   };
 
@@ -238,29 +246,6 @@ export function useSessionSubmit({
     await sendAgentMessage(promptText, agentMessage);
   }, [sendAgentMessage, agentCommands]);
 
-  // Called from SessionView with the name typed after "/rename". Requires a
-  // non-empty name — unlike "/new", renaming to a blank name is not allowed.
-  const handleRenameSessionCommand = useCallback((newName: string) => {
-    if (!selectedSessionId || !newName.trim()) return;
-    setPrompt("");
-    setShowCommandMenu(false);
-    if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
-    onRenameSession(selectedSessionId, newName.trim());
-  }, [selectedSessionId, onRenameSession]);
-
-  // Called from SessionView with the raw prompt text (e.g. "!build" or "!ls").
-  // If the text after "!" matches a predefined script, that script runs; otherwise
-  // it's executed as a raw shell command.
-  const handleScriptCommand = useCallback((promptText: string) => {
-    const rest = promptText.trim().replace(/^!/, "").trim();
-    if (!rest) return;
-    setPrompt("");
-    setShowCommandMenu(false);
-    if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
-    const match = sessionScripts.find((s) => s.name === rest);
-    onRunScript(match ? match.name : rest, promptText);
-  }, [sessionScripts, onRunScript]);
-
   // Shared post-creation bookkeeping for a freshly created session, whether
   // it was sent immediately, forced past a confirmation, or created as a draft.
   const finalizeNewSession = useCallback((newSession: Session, trimmedPrompt: string, immediate: boolean) => {
@@ -279,6 +264,98 @@ export function useSessionSubmit({
     setLogModalOpen(false);
     loadProjects();
   }, [setTaskQueue, setSessions, setSelectedSessionId, setIsNewSession, setIsNewDraft, setSessionLog, setActiveLogMsgId, setLogModalOpen, loadProjects]);
+
+  // Called from SessionView with the name typed after "/rename". Requires a
+  // non-empty name — unlike "/new", renaming to a blank name is not allowed.
+  const handleRenameSessionCommand = useCallback((newName: string) => {
+    if (!selectedSessionId || !newName.trim()) return;
+    setPrompt("");
+    setShowCommandMenu(false);
+    if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
+    onRenameSession(selectedSessionId, newName.trim());
+  }, [selectedSessionId, onRenameSession]);
+
+  // Called from SessionView with the raw prompt text (e.g. "!build" or "!ls").
+  // If the text after "!" matches a predefined script, that script runs; otherwise
+  // it's executed as a raw shell command.
+  const handleScriptCommand = useCallback(async (promptText: string) => {
+    const rest = promptText.trim().replace(/^!/, "").trim();
+    if (!rest) return;
+    setPrompt("");
+    setShowCommandMenu(false);
+    if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
+
+    if (isNewSession || !selectedSessionId) {
+      if (!repoPath.trim() || !runnerId) return;
+      try {
+        const res = await fetch("/api/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: "",
+            repoPath: repoPath.trim(),
+            agentType,
+            runnerId,
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setApiError({ title: "Session Error", message: data.error || "Failed to create session for running script" });
+          return;
+        }
+        const newSession: Session = await res.json();
+        finalizeNewSession(newSession, "", false);
+
+        const match = sessionScripts.find((s) => s.name === rest);
+        const scriptName = match ? match.name : rest;
+
+        const tempTaskId = `script-${newSession.id}-${Date.now()}`;
+        setTaskQueue((prev) => [
+          ...prev,
+          {
+            id: tempTaskId,
+            type: "script",
+            name: `Script: ${scriptName}`,
+            sessionId: newSession.id,
+            status: "running",
+            createdAt: Date.now(),
+          },
+        ]);
+
+        const runRes = await fetch(`/api/sessions/${newSession.id}/run-script`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scriptName, prompt: promptText }),
+        });
+        if (!runRes.ok) {
+          const data = await runRes.json().catch(() => ({}));
+          setApiError({ title: "Run Script Error", message: data.error || "Failed to run script" });
+          setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
+        }
+      } catch (err: any) {
+        setApiError({ title: "System Error", message: err.message || String(err) });
+      }
+    } else {
+      const match = sessionScripts.find((s) => s.name === rest);
+      onRunScript(match ? match.name : rest, promptText);
+    }
+  }, [
+    isNewSession,
+    selectedSessionId,
+    repoPath,
+    runnerId,
+    agentType,
+    sessionScripts,
+    finalizeNewSession,
+    setApiError,
+    setTaskQueue,
+    onRunScript,
+    setPrompt,
+    setShowCommandMenu,
+    textareaRef,
+  ]);
+
+
 
   // Resolves the "project not ready" confirmation dialog: send anyway, queue
   // an auto-send draft, or create a manual draft — all reuse the same /api/sessions POST.
@@ -389,10 +466,11 @@ export function useSessionSubmit({
       return;
     }
 
-    if (prompt.startsWith("!") && !isNewSession && selectedSessionId) {
+    if (prompt.startsWith("!")) {
       const rest = trimmed.slice(1).trim();
-      if (rest) {
-        handleScriptCommand(trimmed);
+      const hasProject = (isNewSession || !selectedSessionId) ? (!!repoPath.trim() && !!runnerId) : true;
+      if (rest && hasProject) {
+        handleScriptCommand(prompt);
         return;
       }
     }
