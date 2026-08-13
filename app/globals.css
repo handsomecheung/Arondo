@@ -2680,6 +2680,12 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  overflow-y: auto;
+}
+
+.task-menu-dropdown-upward {
+  top: auto;
+  bottom: calc(100% + 4px);
 }
 
 .task-menu-dropdown.schedule-panel-dropdown {

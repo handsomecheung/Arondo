@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { IconClaude, IconAntigravity, IconCodex, IconOpencode, IconTerminal } from "@/components/Icons";
+import { useTaskMenuPlacement } from "@/components/useTaskMenuPlacement";
 
 export interface ExecCardItem {
   id: string;
@@ -93,6 +94,8 @@ function IconShell() {
 export default function ExecCard({ item, className, onShowCommand, onStopTask, onRestartScript, onRetryTask, onDeleteTask, extraMenuItems, children }: ExecCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const { opensUpward, maxHeight } = useTaskMenuPlacement(menuOpen, menuRef, dropdownRef);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -160,6 +163,7 @@ export default function ExecCard({ item, className, onShowCommand, onStopTask, o
             <div className="task-menu-container" ref={menuRef}>
               <button
                 className="task-menu-btn exec-card-menu-btn"
+                aria-expanded={menuOpen}
                 onClick={(e) => {
                   e.stopPropagation();
                   setMenuOpen(!menuOpen);
@@ -169,7 +173,11 @@ export default function ExecCard({ item, className, onShowCommand, onStopTask, o
                 <IconMoreVertical />
               </button>
               {menuOpen && (
-                <div className="task-menu-dropdown">
+                <div
+                  className={`task-menu-dropdown${opensUpward ? " task-menu-dropdown-upward" : ""}`}
+                  ref={dropdownRef}
+                  style={maxHeight ? { maxHeight } : undefined}
+                >
                   {extraMenuItems && extraMenuItems(() => setMenuOpen(false))}
                   {item.command && onShowCommand && (
                     <button

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { IconMoreVertical, IconSend, IconX, IconClock } from "@/components/Icons";
 import { ScheduleDateTimeInputs, defaultScheduleTime } from "@/components/ScheduleDateTimeInputs";
+import { useTaskMenuPlacement } from "@/components/useTaskMenuPlacement";
 import type { TodoTrigger, TodoTriggerKind } from "@/types/home";
 
 export interface UserTodoMessageCardProps {
@@ -93,6 +94,8 @@ export default function UserTodoMessageCard({
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduleAt, setScheduleAt] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const { opensUpward, maxHeight } = useTaskMenuPlacement(menuOpen, menuRef, dropdownRef);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -142,6 +145,7 @@ export default function UserTodoMessageCard({
             <div className="task-menu-container" ref={menuRef}>
               <button
                 className="task-menu-btn exec-card-menu-btn"
+                aria-expanded={menuOpen}
                 onClick={(e) => {
                   e.stopPropagation();
                   setMenuOpen(!menuOpen);
@@ -153,7 +157,11 @@ export default function UserTodoMessageCard({
                 <IconMoreVertical />
               </button>
               {menuOpen && !triggerPickerOpen && (
-                <div className="task-menu-dropdown">
+                <div
+                  className={`task-menu-dropdown${opensUpward ? " task-menu-dropdown-upward" : ""}`}
+                  ref={dropdownRef}
+                  style={maxHeight ? { maxHeight } : undefined}
+                >
                   <button
                     className="task-menu-item"
                     onClick={() => {
@@ -181,7 +189,11 @@ export default function UserTodoMessageCard({
                 </div>
               )}
               {menuOpen && triggerPickerOpen && !scheduleOpen && (
-                <div className="task-menu-dropdown">
+                <div
+                  className={`task-menu-dropdown${opensUpward ? " task-menu-dropdown-upward" : ""}`}
+                  ref={dropdownRef}
+                  style={maxHeight ? { maxHeight } : undefined}
+                >
                   {triggerOptions.map((opt) => (
                     <button
                       key={opt.kind}
@@ -205,7 +217,11 @@ export default function UserTodoMessageCard({
                 </div>
               )}
               {menuOpen && triggerPickerOpen && scheduleOpen && (
-                <div className="task-menu-dropdown schedule-panel-dropdown">
+                <div
+                  className={`task-menu-dropdown schedule-panel-dropdown${opensUpward ? " task-menu-dropdown-upward" : ""}`}
+                  ref={dropdownRef}
+                  style={maxHeight ? { maxHeight } : undefined}
+                >
                   <ScheduleDateTimeInputs value={scheduleAt} onChange={setScheduleAt} />
                   <div className="attach-schedule-panel-actions">
                     <button type="button" onClick={() => setScheduleOpen(false)}>

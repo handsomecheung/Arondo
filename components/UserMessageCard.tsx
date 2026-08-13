@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { IconMoreVertical, IconCopy } from "@/components/Icons";
+import { useTaskMenuPlacement } from "@/components/useTaskMenuPlacement";
 
 export interface UserMessageCardProps {
   content: string;
@@ -25,6 +26,8 @@ export default function UserMessageCard({
 }: UserMessageCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const { opensUpward, maxHeight } = useTaskMenuPlacement(menuOpen, menuRef, dropdownRef);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -69,6 +72,7 @@ export default function UserMessageCard({
           <div className="task-menu-container" ref={menuRef}>
             <button
               className="task-menu-btn exec-card-menu-btn"
+              aria-expanded={menuOpen}
               onClick={(e) => {
                 e.stopPropagation();
                 setMenuOpen(!menuOpen);
@@ -78,7 +82,11 @@ export default function UserMessageCard({
               <IconMoreVertical />
             </button>
             {menuOpen && (
-              <div className="task-menu-dropdown">
+              <div
+                className={`task-menu-dropdown${opensUpward ? " task-menu-dropdown-upward" : ""}`}
+                ref={dropdownRef}
+                style={maxHeight ? { maxHeight } : undefined}
+              >
                 <button
                   className="task-menu-item"
                   onClick={() => {
