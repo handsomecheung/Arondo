@@ -30,6 +30,7 @@ type QuotaEntry = Record<string, unknown> & {
   Account: string;
   Plan: string;
   updatedAt: number;
+  IsAPIKey?: boolean;
 };
 
 function makeKey(type: string, account: string, plan: string): string {
@@ -104,6 +105,7 @@ function requestStaleRefreshes(merged: Record<string, QuotaEntry>): void {
   const sentBinaries = new Set<string>();
 
   for (const entry of Object.values(merged)) {
+    if (entry.IsAPIKey) continue;
     if (now - entry.updatedAt <= STALE_THRESHOLD_S) continue;
 
     const binary = TYPE_TO_BINARY[entry.Type];

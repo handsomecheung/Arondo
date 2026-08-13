@@ -79,6 +79,53 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
     });
   });
 
+  test('prefers unknown Codex quota over Claude and agy API Key billing', async () => {
+    await fs.writeFile(quotaPath, JSON.stringify({
+      "antigravity_arondo@gmail.com_API Usage Billing": {
+        "Type": "antigravity",
+        "Account": "arondo@gmail.com",
+        "Plan": "API Usage Billing",
+        "IsAPIKey": true,
+        "DefaultModel": "",
+        "GeminiWeeklyRemain": null,
+        "GeminiWeeklyResetsAt": null,
+        "GeminiHourRemain": null,
+        "GeminiHourResetsAt": null,
+        "OtherWeeklyRemain": null,
+        "OtherWeeklyResetsAt": null,
+        "OtherHourRemain": null,
+        "OtherHourResetsAt": null,
+        "updatedAt": Math.floor(Date.now() / 1000),
+      },
+      "claude_arondo@gmail.com_API Usage Billing": {
+        "Type": "claude",
+        "Account": "arondo@gmail.com",
+        "Plan": "API Usage Billing",
+        "IsAPIKey": true,
+        "DefaultModel": "",
+        "HourRemain": null,
+        "HourResetAt": null,
+        "WeekRemain": null,
+        "WeekResetsAt": null,
+        "updatedAt": Math.floor(Date.now() / 1000),
+      },
+      "codex_arondo@gmail.com_Plus": {
+        "Type": "codex",
+        "Account": "arondo@gmail.com",
+        "Plan": "Plus",
+        "DefaultModel": "gpt-5.5 medium",
+        "WeeklyRemain": null,
+        "WeeklyResetAt": null,
+        "updatedAt": Math.floor(Date.now() / 1000),
+      },
+    }, null, 2), 'utf-8');
+
+    await expect(selectAgent(['agy', 'claude', 'codex'])).resolves.toEqual({
+      agentType: 'codex',
+      model: 'gpt-5.5 medium',
+    });
+  });
+
   test('C -> A: should successfully handoff context from claude to agy (Gemini Flash)', async ({ request }) => {
     await runTransitionTest(
       request,

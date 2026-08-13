@@ -25,6 +25,7 @@ interface ClaudeQuota {
   WeekRemain: number | null;
   WeekResetsAt: number | null;
   updatedAt: number | null;
+  IsAPIKey?: boolean;
 }
 
 interface AntigravityQuota {
@@ -41,6 +42,7 @@ interface AntigravityQuota {
   OtherHourRemain: number | null;
   OtherHourResetsAt: number | null;
   updatedAt: number | null;
+  IsAPIKey?: boolean;
 }
 
 interface CodexQuota {
@@ -51,6 +53,7 @@ interface CodexQuota {
   WeeklyRemain: number | null;
   WeeklyResetAt: number | null;
   updatedAt: number | null;
+  IsAPIKey?: boolean;
 }
 
 type QuotaEntry = ClaudeQuota | AntigravityQuota | CodexQuota;
@@ -147,7 +150,12 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
       }
     }
 
-    return { hourRemain, weekRemain, resetsAt };
+    const entry = choice.id === "A" || choice.id === "B"
+      ? entries.find((e) => e.Type === "antigravity")
+      : choice.id === "C"
+        ? entries.find((e) => e.Type === "claude")
+        : entries.find((e) => e.Type === "codex");
+    return { hourRemain, weekRemain, resetsAt, isAPIKey: entry?.IsAPIKey === true };
   };
 
   for (const choice of choices) {
@@ -158,12 +166,20 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
     );
   }
 
-  const knownQuotaChoices = choices.filter((choice) => getMetrics(choice).weekRemain !== null);
-  const unknownQuotaChoices = choices.filter((choice) => getMetrics(choice).weekRemain === null);
+  const knownQuotaChoices = choices.filter((choice) => {
+    const { weekRemain, isAPIKey } = getMetrics(choice);
+    return !isAPIKey && weekRemain !== null;
+  });
+  const unknownQuotaChoices = choices.filter((choice) => {
+    const { weekRemain, isAPIKey } = getMetrics(choice);
+    return !isAPIKey && weekRemain === null;
+  });
+  const apiKeyChoices = choices.filter((choice) => getMetrics(choice).isAPIKey);
 
   if (knownQuotaChoices.length === 0) {
-    console.log(`[autoselect] No known quota scores. Falling back to unknown choices: [${unknownQuotaChoices.map((c) => c.id).join(", ")}]`);
-    const fallback = unknownQuotaChoices[0];
+    const fallbackChoices = unknownQuotaChoices.length > 0 ? unknownQuotaChoices : apiKeyChoices;
+    console.log(`[autoselect] No known quota scores. Falling back to ${unknownQuotaChoices.length > 0 ? "unknown" : "API Key"} choices: [${fallbackChoices.map((c) => c.id).join(", ")}]`);
+    const fallback = fallbackChoices[0];
     return { agentType: fallback.agentType, model: fallback.model };
   }
 

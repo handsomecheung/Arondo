@@ -29,6 +29,7 @@ interface ClaudeQuota {
   WeekRemain: number | null;
   WeekResetsAt: number | null;
   updatedAt: number | null;
+  IsAPIKey?: boolean;
 }
 
 interface CodexQuota {
@@ -118,6 +119,7 @@ function QuotaCard({
   model,
   updatedAt,
   rows,
+  unavailableMessage,
 }: {
   title: string;
   account: string;
@@ -125,6 +127,7 @@ function QuotaCard({
   model: string;
   updatedAt: number | null;
   rows: QuotaRow[];
+  unavailableMessage?: string;
 }) {
   return (
     <div
@@ -147,54 +150,58 @@ function QuotaCard({
         </div>
         <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{model}</div>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {rows.map((row) => {
-          const usedRatio = row.used ?? 0;
-          const remainRatio = row.remaining ?? (1 - usedRatio);
-          const pct = Math.round(remainRatio * 100);
-          const isDisabled = row.used == null && row.remaining == null;
-          return (
-            <div key={row.label}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  fontSize: 11,
-                  color: "var(--text-muted)",
-                  marginBottom: 3,
-                }}
-              >
-                <span>{row.label}</span>
-                <span>
-                  {isDisabled
-                    ? "Unknown"
-                    : `${Math.round(remainRatio * 100)}% left · resets ${formatTimestamp(row.resetsAt)}`}
-                </span>
+      {unavailableMessage ? (
+        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{unavailableMessage}</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {rows.map((row) => {
+            const usedRatio = row.used ?? 0;
+            const remainRatio = row.remaining ?? (1 - usedRatio);
+            const pct = Math.round(remainRatio * 100);
+            const isDisabled = row.used == null && row.remaining == null;
+            return (
+              <div key={row.label}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: 11,
+                    color: "var(--text-muted)",
+                    marginBottom: 3,
+                  }}
+                >
+                  <span>{row.label}</span>
+                  <span>
+                    {isDisabled
+                      ? "Unknown"
+                      : `${Math.round(remainRatio * 100)}% left · resets ${formatTimestamp(row.resetsAt)}`}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    height: 4,
+                    borderRadius: 2,
+                    background: "var(--bg-secondary)",
+                    overflow: "hidden",
+                  }}
+                >
+                  {!isDisabled && (
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${pct}%`,
+                        borderRadius: 2,
+                        background: pct <= 10 ? "var(--error)" : pct <= 30 ? "var(--warning, #f59e0b)" : "var(--accent)",
+                        transition: "width 0.3s ease",
+                      }}
+                    />
+                  )}
+                </div>
               </div>
-              <div
-                style={{
-                  height: 4,
-                  borderRadius: 2,
-                  background: "var(--bg-secondary)",
-                  overflow: "hidden",
-                }}
-              >
-                {!isDisabled && (
-                  <div
-                    style={{
-                      height: "100%",
-                      width: `${pct}%`,
-                      borderRadius: 2,
-                      background: pct <= 10 ? "var(--error)" : pct <= 30 ? "var(--warning, #f59e0b)" : "var(--accent)",
-                      transition: "width 0.3s ease",
-                    }}
-                  />
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
       {updatedAt != null && (
         <div style={{ fontSize: 10, color: "var(--text-muted)", textAlign: "right" }}>
           Updated {formatTimestamp(updatedAt)}
@@ -736,6 +743,7 @@ export default function RunnersPage() {
                                     plan={agentsQuota.claude.Plan}
                                     model={agentsQuota.claude.DefaultModel}
                                     updatedAt={agentsQuota.claude.updatedAt}
+                                    unavailableMessage={agentsQuota.claude.IsAPIKey ? "Quota is unavailable when using API Key billing." : undefined}
                                     rows={[
                                       { label: "Hour", used: agentsQuota.claude.HourRemain == null ? null : 1 - agentsQuota.claude.HourRemain, remaining: agentsQuota.claude.HourRemain, resetsAt: agentsQuota.claude.HourResetAt },
                                       { label: "Week", used: agentsQuota.claude.WeekRemain == null ? null : 1 - agentsQuota.claude.WeekRemain, remaining: agentsQuota.claude.WeekRemain, resetsAt: agentsQuota.claude.WeekResetsAt },

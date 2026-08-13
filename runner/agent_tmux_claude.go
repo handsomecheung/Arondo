@@ -34,7 +34,7 @@ func fetchClaudeQuota(client *Client) {
 	}
 
 	statusOutput, err := pollTmuxPane(session, 30*time.Second, func(text string) bool {
-		return strings.Contains(text, "Login method") && strings.Contains(text, "Email")
+		return strings.Contains(text, "Email") && (strings.Contains(text, "Login method") || strings.Contains(text, "API key:"))
 	})
 	if err != nil {
 		log.Printf("[quota/claude] timed out waiting for status output: %v", err)
@@ -44,6 +44,13 @@ func fetchClaudeQuota(client *Client) {
 		log.Printf("[quota/claude] failed to write status output: %v", werr)
 	} else {
 		log.Printf("[quota/claude] status output saved to: %s", path)
+	}
+
+	sq := parseClaudeStatus(statusOutput)
+	if sq.IsAPIKey {
+		sendQuotaUpdate(client, "claude", sq)
+		log.Printf("[quota/claude] API Key billing detected; skipping quota fetch")
+		return
 	}
 
 	// Press ESC to close the /status modal, then wait for the main screen to settle.
@@ -68,7 +75,6 @@ func fetchClaudeQuota(client *Client) {
 		log.Printf("[quota/claude] usage output saved to: %s", path)
 	}
 
-	sq := parseClaudeStatus(statusOutput)
 	uq := parseClaudeUsage(usageOutput)
 	merged := *sq
 	merged.HourRemain = uq.HourRemain
@@ -87,21 +93,24 @@ func fetchClaudeQuota(client *Client) {
 
 // ClaudeQuota holds parsed account and quota data from /status and /usage.
 type ClaudeQuota struct {
-	Plan          string
-	Account       string
-	DefaultModel  string
-	HourRemain    *float64 // 0-1, null if unavailable
-	HourResetAt   *int64   // Unix timestamp, null if unavailable
-	WeekRemain    *float64
-	WeekResetsAt    *int64
+	Plan         string
+	Account      string
+	DefaultModel string
+	HourRemain   *float64 // 0-1, null if unavailable
+	HourResetAt  *int64   // Unix timestamp, null if unavailable
+	WeekRemain   *float64
+	WeekResetsAt *int64
+	IsAPIKey     bool
 }
 
 var (
-	claudeLoginRe  = regexp.MustCompile(`Login method:\s+(.+)`)
-	claudeEmailRe  = regexp.MustCompile(`Email:\s+(\S+@\S+)`)
-	claudeModelRe  = regexp.MustCompile(`Model:\s+(.+)`)
-	claudeUsedRe   = regexp.MustCompile(`(\d+)%\s+used`)
-	claudeResetsRe = regexp.MustCompile(`^Resets (.+)`)
+	claudeLoginRe      = regexp.MustCompile(`Login method:\s+(.+)`)
+	claudeEmailRe      = regexp.MustCompile(`Email:\s+(\S+@\S+)`)
+	claudeModelRe      = regexp.MustCompile(`Model:\s+(.+)`)
+	claudeAPIKeyRe     = regexp.MustCompile(`(?m)^\s*API key:\s+`)
+	claudeAPIBillingRe = regexp.MustCompile(`(?m)·\s*(API Usage Billing)\s*$`)
+	claudeUsedRe       = regexp.MustCompile(`(\d+)%\s+used`)
+	claudeResetsRe     = regexp.MustCompile(`^Resets (.+)`)
 )
 
 func parseClaudeStatus(text string) *ClaudeQuota {
@@ -114,6 +123,12 @@ func parseClaudeStatus(text string) *ClaudeQuota {
 	}
 	if m := claudeModelRe.FindStringSubmatch(text); m != nil {
 		q.DefaultModel = strings.TrimSpace(m[1])
+	}
+	q.IsAPIKey = claudeAPIKeyRe.MatchString(text)
+	if q.IsAPIKey {
+		if m := claudeAPIBillingRe.FindStringSubmatch(text); m != nil {
+			q.Plan = m[1]
+		}
 	}
 	return q
 }

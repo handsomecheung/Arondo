@@ -42,6 +42,24 @@ func TestParseResetsTimestamp(t *testing.T) {
 	}
 }
 
+func TestParseClaudeAPIKeyStatus(t *testing.T) {
+	status, err := os.ReadFile(filepath.Join("..", "tests", "mocks", "tmux", "claude", "arondo-claude-status.key.txt"))
+	if err != nil {
+		t.Fatalf("failed to read Claude API Key status fixture: %v", err)
+	}
+
+	q := parseClaudeStatus(string(status))
+	if q.Plan != "API Usage Billing" {
+		t.Fatalf("Plan = %q, want API Usage Billing", q.Plan)
+	}
+	if q.Account != "arondo@gmail.com" {
+		t.Fatalf("Account = %q, want arondo@gmail.com", q.Account)
+	}
+	if !q.IsAPIKey {
+		t.Fatal("IsAPIKey = false, want true")
+	}
+}
+
 func TestParseAgyQuotaLatestUsageFormat(t *testing.T) {
 	usage, err := os.ReadFile(filepath.Join("..", "tests", "mocks", "tmux", "agy", "arondo-agy-usage.txt"))
 	if err != nil {
