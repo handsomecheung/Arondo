@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
 import { setupRunner, teardownRunner, waitForSessionNotRunning } from '../resume.helper';
+import { selectAgent } from '../../../../lib/autoselect';
 
 const CONFIG_DIR_RUNTIME = process.env.ARONDO_CONFIG_DIR || path.join(os.tmpdir(), 'arondo-test-config');
 const AGENTS_SESSION_MAP_FILE = path.join(CONFIG_DIR_RUNTIME, 'agent-sessions.json');
@@ -31,6 +32,51 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
 
   test.afterEach(async () => {
     await fs.rm(quotaPath, { force: true }).catch(() => {});
+  });
+
+  test('selects codex when Claude and agy quotas are unknown', async () => {
+    await fs.writeFile(quotaPath, JSON.stringify({
+      "antigravity_arondo@gmail.com_Google AI Pro": {
+        "Type": "antigravity",
+        "Account": "arondo@gmail.com",
+        "Plan": "Google AI Pro",
+        "DefaultModel": "",
+        "GeminiWeeklyRemain": null,
+        "GeminiWeeklyResetsAt": null,
+        "GeminiHourRemain": null,
+        "GeminiHourResetsAt": null,
+        "OtherWeeklyRemain": null,
+        "OtherWeeklyResetsAt": null,
+        "OtherHourRemain": null,
+        "OtherHourResetsAt": null,
+        "updatedAt": Math.floor(Date.now() / 1000),
+      },
+      "claude_arondo@gmail.com_Claude Pro account": {
+        "Type": "claude",
+        "Account": "arondo@gmail.com",
+        "Plan": "Claude Pro account",
+        "DefaultModel": "",
+        "HourRemain": null,
+        "HourResetAt": null,
+        "WeekRemain": null,
+        "WeekResetsAt": null,
+        "updatedAt": Math.floor(Date.now() / 1000),
+      },
+      "codex_arondo@gmail.com_Plus": {
+        "Type": "codex",
+        "Account": "arondo@gmail.com",
+        "Plan": "Plus",
+        "DefaultModel": "gpt-5.5 medium",
+        "WeeklyRemain": 0.5,
+        "WeeklyResetAt": null,
+        "updatedAt": Math.floor(Date.now() / 1000),
+      },
+    }, null, 2), 'utf-8');
+
+    await expect(selectAgent(['agy', 'claude', 'codex'])).resolves.toEqual({
+      agentType: 'codex',
+      model: 'gpt-5.5 medium',
+    });
   });
 
   test('C -> A: should successfully handoff context from claude to agy (Gemini Flash)', async ({ request }) => {

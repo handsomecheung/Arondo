@@ -110,8 +110,8 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
 
   // Helper to extract relevant quota metrics for a choice
   const getMetrics = (choice: AgentChoice) => {
-    let hourRemain = 1.0;
-    let weekRemain = 1.0;
+    let hourRemain: number | null = null;
+    let weekRemain: number | null = null;
     let resetsAt: number | null = null;
 
     // Find the matching quota entries
@@ -120,29 +120,29 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
     if (choice.id === "A") {
       const q = entries.find((e) => e.Type === "antigravity") as AntigravityQuota | undefined;
       if (q) {
-        hourRemain = q.GeminiHourRemain ?? 1.0;
-        weekRemain = q.GeminiWeeklyRemain ?? 1.0;
+        hourRemain = q.GeminiHourRemain;
+        weekRemain = q.GeminiWeeklyRemain;
         resetsAt = q.GeminiWeeklyResetsAt;
       }
     } else if (choice.id === "B") {
       const q = entries.find((e) => e.Type === "antigravity") as AntigravityQuota | undefined;
       if (q) {
-        hourRemain = q.OtherHourRemain ?? 1.0;
-        weekRemain = q.OtherWeeklyRemain ?? 1.0;
+        hourRemain = q.OtherHourRemain;
+        weekRemain = q.OtherWeeklyRemain;
         resetsAt = q.OtherWeeklyResetsAt;
       }
     } else if (choice.id === "C") {
       const q = entries.find((e) => e.Type === "claude") as ClaudeQuota | undefined;
       if (q) {
-        hourRemain = q.HourRemain ?? 1.0;
-        weekRemain = q.WeekRemain ?? 1.0;
+        hourRemain = q.HourRemain;
+        weekRemain = q.WeekRemain;
         resetsAt = q.WeekResetsAt;
       }
     } else if (choice.id === "D") {
       // Codex only reports a weekly limit; no hourly figure is available.
       const q = entries.find((e) => e.Type === "codex") as CodexQuota | undefined;
       if (q) {
-        weekRemain = q.WeeklyRemain ?? 1.0;
+        weekRemain = q.WeeklyRemain;
         resetsAt = q.WeeklyResetAt;
       }
     }
@@ -158,14 +158,23 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
     );
   }
 
-  // Step 1: Filter choices where HourRemain < 0.15
+  const knownQuotaChoices = choices.filter((choice) => getMetrics(choice).weekRemain !== null);
+  const unknownQuotaChoices = choices.filter((choice) => getMetrics(choice).weekRemain === null);
+
+  if (knownQuotaChoices.length === 0) {
+    console.log(`[autoselect] No known quota scores. Falling back to unknown choices: [${unknownQuotaChoices.map((c) => c.id).join(", ")}]`);
+    const fallback = unknownQuotaChoices[0];
+    return { agentType: fallback.agentType, model: fallback.model };
+  }
+
+  // Step 1: Filter known-quota choices where HourRemain < 0.15.
   const now = Math.floor(Date.now() / 1000);
   const lowQuotaChoices: AgentChoice[] = [];
   const normalChoices: AgentChoice[] = [];
 
-  for (const choice of choices) {
+  for (const choice of knownQuotaChoices) {
     const { hourRemain } = getMetrics(choice);
-    if (hourRemain < 0.15) {
+    if (hourRemain !== null && hourRemain < 0.15) {
       lowQuotaChoices.push(choice);
     } else {
       normalChoices.push(choice);
@@ -196,10 +205,10 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
       weekTimeRemain = Math.max(0, Math.min(1, (resetsAt - now) / 604800));
     }
 
-    const score = weekRemain - weekTimeRemain;
+    const score = weekRemain! - weekTimeRemain;
     console.log(
       `[autoselect] Step 2 Scoring: Choice ${choice.id} -> ` +
-      `WeekRemain=${weekRemain.toFixed(3)}, WeekTimeRemain=${weekTimeRemain.toFixed(3)}, ` +
+      `WeekRemain=${weekRemain!.toFixed(3)}, WeekTimeRemain=${weekTimeRemain.toFixed(3)}, ` +
       `Score=${score.toFixed(3)} (Reset at ${resetsAt}, Current time ${now})`
     );
     return { choice, score };
