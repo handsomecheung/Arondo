@@ -453,6 +453,8 @@ export default function AppSidebar({
                 const clampedDx = Math.max(0, Math.min(120, swipeDx));
                 const unread = isUnviewedCompletion(session);
                 const unreadColor = session.status === "error" ? "var(--error)" : "var(--success)";
+                const hasPendingTodo = (session.pendingTodoMessageIds?.length ?? 0) > 0;
+                const statusBadgeClass = hasPendingTodo ? "todo" : session.status;
                 return (
                   <div
                     key={session.id ? `session-${session.id}` : `session-idx-${index}`}
@@ -487,15 +489,13 @@ export default function AppSidebar({
                           <IconPin size={11} />
                         </span>
                       )}
-                      <span className={`task-status-badge ${session.status}`}>
-                        {(session.status === "running" || session.status === "script-running") && "⟳ "}
-                        {session.status === "script-running"
+                      <span className={`task-status-badge ${statusBadgeClass}`}>
+                        {!hasPendingTodo && (session.status === "running" || session.status === "script-running") && "⟳ "}
+                        {hasPendingTodo
+                          ? "TODO"
+                          : session.status === "script-running"
                           ? "running"
-                          : session.pendingTodoTrigger === "manual"
-                            ? "draft"
-                            : session.pendingTodoTrigger === "codebaseReady"
-                              ? "pending"
-                              : session.status}
+                          : session.status}
                       </span>
                       {projectName && (
                         <span

@@ -224,6 +224,9 @@ export default function SessionView({
   const sessionProjectExists = selectedSession?.projectId
     ? projects.some((p) => p.id === selectedSession.projectId)
     : true;
+  const hasPendingTodo = messages.some(
+    (message) => message.type === "user-todo" && message.todoStatus === "pending",
+  );
 
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const handleUploadChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -325,9 +328,9 @@ export default function SessionView({
           }}
         >
           <span
-            className={`task-status-badge ${selectedSession.status}`}
+            className={`task-status-badge ${hasPendingTodo ? "todo" : selectedSession.status}`}
             style={
-              selectedSession.status === "running" || selectedSession.status === "script-running"
+              !hasPendingTodo && (selectedSession.status === "running" || selectedSession.status === "script-running")
                 ? {
                     padding: "4px",
                     width: "24px",
@@ -339,9 +342,9 @@ export default function SessionView({
                   }
                 : undefined
             }
-            title={selectedSession.status === "script-running" ? "Script running…" : "Agent working…"}
+            title={hasPendingTodo ? "TODO message pending" : selectedSession.status === "script-running" ? "Script running…" : "Agent working…"}
           >
-            {selectedSession.status === "running" || selectedSession.status === "script-running" ? (
+            {!hasPendingTodo && (selectedSession.status === "running" || selectedSession.status === "script-running") ? (
               <span className="agent-pulse">
                 {(() => {
                   if (selectedSession.status === "script-running") {
@@ -370,7 +373,7 @@ export default function SessionView({
                 })()}
               </span>
             ) : (
-              isDraftSession ? (isDraftAutoSend ? "pending" : "draft") : selectedSession.status
+              hasPendingTodo ? "TODO" : selectedSession.status
             )}
           </span>
           <div
