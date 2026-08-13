@@ -2354,6 +2354,25 @@ body {
   background: rgba(255, 74, 74, 0.1);
 }
 
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .session-dropdown-menu {
+    width: min(230px, calc(100vw - 32px));
+    min-width: 0;
+    padding: 6px 0;
+  }
+
+  .session-dropdown-menu .menu-item {
+    min-height: 44px;
+    padding: 10px 16px;
+    font-size: 14px;
+  }
+
+  .session-dropdown-menu .menu-item svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
 /* ── Run Script submenu ────────────────────────────────────────────────────── */
 .menu-item-with-sub {
   position: relative;
@@ -2405,6 +2424,21 @@ body {
 .script-submenu-manage {
   color: var(--text-muted);
   font-size: 12px;
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .script-submenu {
+    width: min(280px, calc(100vw - 32px));
+    min-width: 0;
+    max-width: min(280px, calc(100vw - 32px));
+  }
+
+  .script-submenu .menu-item {
+    min-height: 64px;
+    padding-right: 20px !important;
+    padding-left: 20px !important;
+    font-size: 14px;
+  }
 }
 
 .spinner {
@@ -2669,6 +2703,24 @@ body {
   color: var(--text-primary);
 }
 
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .exec-card .task-menu-btn {
+    width: 36px;
+    height: 36px;
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .exec-card .task-menu-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .user-message-card .exec-card-header {
+    padding-right: 48px;
+  }
+}
+
 .task-menu-dropdown {
   position: absolute;
   top: calc(100% + 4px);
@@ -2717,6 +2769,34 @@ body {
 .task-menu-item.danger:hover {
   background: rgba(239, 68, 68, 0.12);
   color: #ef4444;
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .task-menu-dropdown {
+    width: min(230px, calc(100vw - 32px));
+    min-width: 0;
+  }
+
+  .task-menu-dropdown.schedule-panel-dropdown {
+    width: min(270px, calc(100vw - 32px));
+    min-width: 0;
+  }
+
+  .task-menu-item {
+    min-height: 44px;
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .task-menu-item svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .task-menu-dropdown .attach-schedule-panel-actions button {
+    min-height: 44px;
+    font-size: 14px;
+  }
 }
 
 /* ─── Task Log Panel ───────────────────────────────────────────────────────── */
@@ -2871,6 +2951,52 @@ body {
   opacity: 0.5;
   cursor: not-allowed;
   text-align: left;
+}
+
+.session-agent-switch-menu {
+  width: min(260px, calc(100vw - 32px));
+  min-width: 0 !important;
+}
+
+.session-agent-switch-menu .custom-dropdown-item {
+  min-height: 48px;
+  padding: 12px 14px;
+  font-size: 15px;
+}
+
+.session-agent-switch-menu .custom-dropdown-item.active {
+  padding-left: 12px;
+}
+
+.new-session-dropdown-container .new-session-dropdown-menu {
+  right: 0;
+  left: auto;
+  width: min(240px, calc(100vw - 32px));
+}
+
+.new-session-dropdown-container .custom-dropdown-trigger {
+  min-height: 55px;
+  padding: 10px 14px;
+  font-size: 16px;
+}
+
+.input-meta-row:has(.new-session-dropdown-container) .input-meta-row-label {
+  font-size: 14px;
+}
+
+.input-meta-row:has(.new-session-dropdown-container) .browse-btn {
+  width: 55px;
+  height: 55px;
+}
+
+.new-session-dropdown-container .custom-dropdown-item {
+  min-height: 55px;
+  padding: 10px 12px;
+  font-size: 16px;
+}
+
+.new-session-dropdown-container .custom-dropdown-item.active {
+  padding-left: 10px;
 }
 
 /* ─── Terminal scrollbar: hide scrollbar, keep touch scrolling ────────────── */

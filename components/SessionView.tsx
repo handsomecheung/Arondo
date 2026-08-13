@@ -233,6 +233,7 @@ export default function SessionView({
   };
 
   const [agentSwitchOpen, setAgentSwitchOpen] = useState(false);
+  const [agentSwitchMenuPos, setAgentSwitchMenuPos] = useState<{ top: number; left: number } | null>(null);
   const agentSwitchRef = useRef<HTMLDivElement>(null);
   const scriptSubMenuRef = useRef<HTMLDivElement>(null);
   const [scriptSubMenuShift, setScriptSubMenuShift] = useState(0);
@@ -413,7 +414,20 @@ export default function SessionView({
               <div ref={agentSwitchRef} style={{ position: "relative", flexShrink: 0 }}>
                 <button
                   type="button"
-                  onClick={() => !isArchived && setAgentSwitchOpen(!agentSwitchOpen)}
+                  onClick={(e) => {
+                    if (isArchived) return;
+                    if (agentSwitchOpen) {
+                      setAgentSwitchOpen(false);
+                      return;
+                    }
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const menuWidth = Math.min(260, window.innerWidth - 32);
+                    setAgentSwitchMenuPos({
+                      top: rect.bottom + 4,
+                      left: Math.min(Math.max(8, rect.right - menuWidth), window.innerWidth - menuWidth - 8),
+                    });
+                    setAgentSwitchOpen(true);
+                  }}
                   disabled={isArchived}
                   style={{
                     display: "inline-flex",
@@ -443,12 +457,13 @@ export default function SessionView({
                     <IconChevronDown className="" />
                   </span>
                 </button>
-                {agentSwitchOpen && (
+                {agentSwitchOpen && agentSwitchMenuPos && (
                   <div
+                    className="session-agent-switch-menu"
                     style={{
-                      position: "absolute",
-                      top: "calc(100% + 4px)",
-                      left: 0,
+                      position: "fixed",
+                      top: agentSwitchMenuPos.top,
+                      left: agentSwitchMenuPos.left,
                       zIndex: 50,
                       background: "var(--bg-surface)",
                       backdropFilter: "blur(16px)",
@@ -456,7 +471,6 @@ export default function SessionView({
                       borderRadius: "var(--radius-md)",
                       boxShadow: "var(--shadow-card)",
                       padding: 6,
-                      minWidth: 140,
                     }}
                   >
                     {(() => {
@@ -906,7 +920,7 @@ export default function SessionView({
             <div className="input-meta-row">
               <span className="input-label input-meta-row-label">Runner:</span>
               <div
-                className="custom-dropdown-container"
+                className="custom-dropdown-container new-session-dropdown-container"
                 ref={runnerSelectRef}
               >
                 <button
@@ -933,7 +947,7 @@ export default function SessionView({
                   />
                 </button>
                 {runnerDropdownOpen && (
-                  <div className="custom-dropdown-menu">
+                  <div className="custom-dropdown-menu new-session-dropdown-menu">
                     {runners.filter((r) => r.connected).length === 0 ? (
                       <div className="custom-dropdown-item disabled">
                         No runners connected
@@ -966,7 +980,7 @@ export default function SessionView({
             <div className="input-meta-row">
               <span className="input-label input-meta-row-label">Project:</span>
               <div
-                className="custom-dropdown-container"
+                className="custom-dropdown-container new-session-dropdown-container"
                 ref={projectSelectRef}
               >
                 <button
@@ -997,7 +1011,7 @@ export default function SessionView({
                   />
                 </button>
                 {projectDropdownOpen && (
-                  <div className="custom-dropdown-menu">
+                  <div className="custom-dropdown-menu new-session-dropdown-menu">
                     {projects.filter((p) => p.runnerId === runnerId).length === 0 ? (
                       <div className="custom-dropdown-item disabled">
                         No projects on this runner
@@ -1052,7 +1066,7 @@ export default function SessionView({
             <div className="input-meta-row">
               <span className="input-label input-meta-row-label">Agent:</span>
               <div
-                className="custom-dropdown-container"
+                className="custom-dropdown-container new-session-dropdown-container"
                 ref={agentSelectRef}
               >
                 <button
@@ -1074,7 +1088,7 @@ export default function SessionView({
                   />
                 </button>
                 {agentDropdownOpen && (
-                  <div className="custom-dropdown-menu">
+                  <div className="custom-dropdown-menu new-session-dropdown-menu">
                     {(() => {
                       const concreteAgents = (
                         [

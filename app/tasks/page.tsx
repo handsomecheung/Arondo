@@ -833,12 +833,13 @@ export default function TasksPage() {
                 <button
                   onClick={() => setGroupBy("session")}
                   style={{
-                    padding: "6px 12px",
+                    minHeight: 44,
+                    padding: "10px 14px",
                     borderRadius: "calc(var(--radius-md) - 2px)",
                     border: "none",
                     background: groupBy === "session" ? "var(--bg-elevated)" : "transparent",
                     color: groupBy === "session" ? "var(--text-primary)" : "var(--text-muted)",
-                    fontSize: 12,
+                    fontSize: 14,
                     fontWeight: 600,
                     cursor: "pointer",
                     transition: "all 0.18s ease",
@@ -849,12 +850,13 @@ export default function TasksPage() {
                 <button
                   onClick={() => setGroupBy("status")}
                   style={{
-                    padding: "6px 12px",
+                    minHeight: 44,
+                    padding: "10px 14px",
                     borderRadius: "calc(var(--radius-md) - 2px)",
                     border: "none",
                     background: groupBy === "status" ? "var(--bg-elevated)" : "transparent",
                     color: groupBy === "status" ? "var(--text-primary)" : "var(--text-muted)",
-                    fontSize: 12,
+                    fontSize: 14,
                     fontWeight: 600,
                     cursor: "pointer",
                     transition: "all 0.18s ease",
@@ -877,18 +879,20 @@ export default function TasksPage() {
                     display: "flex",
                     alignItems: "center",
                     gap: 8,
-                    padding: "9px 12px",
+                    minHeight: 44,
+                    minWidth: 120,
+                    padding: "10px 14px",
                     borderRadius: "var(--radius-md)",
                     border: "1px solid var(--border)",
                     background: "var(--bg-surface)",
                     color: "var(--text-primary)",
-                    fontSize: 12,
+                    fontSize: 14,
                     fontWeight: 600,
                     cursor: "pointer",
                     transition: "all 0.18s ease",
                   }}
                 >
-                  <span style={{ fontSize: 12, color: "var(--text-primary)" }}>
+                  <span style={{ fontSize: 14, color: "var(--text-primary)" }}>
                     {filterType === "both" ? "Both" : filterType === "agent" ? "Agent" : "Script"}
                   </span>
                   <span
@@ -914,8 +918,8 @@ export default function TasksPage() {
                       border: "1px solid var(--border)",
                       borderRadius: "var(--radius-md)",
                       boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)",
-                      padding: 4,
-                      minWidth: 110,
+                      padding: 6,
+                      minWidth: 150,
                       display: "flex",
                       flexDirection: "column",
                       gap: 2,
@@ -929,12 +933,13 @@ export default function TasksPage() {
                           setFilterDropdownOpen(false);
                         }}
                         style={{
-                          padding: "6px 12px",
+                          minHeight: 44,
+                          padding: "10px 14px",
                           borderRadius: "calc(var(--radius-md) - 2px)",
                           border: "none",
                           background: filterType === type ? "var(--bg-elevated)" : "transparent",
                           color: filterType === type ? "var(--text-primary)" : "var(--text-muted)",
-                          fontSize: 12,
+                          fontSize: 14,
                           fontWeight: 600,
                           textAlign: "left",
                           cursor: "pointer",

@@ -539,7 +539,9 @@ export default function AppSidebar({
                               return;
                             }
                             const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                            const MENU_WIDTH = 180;
+                            const MENU_WIDTH = window.matchMedia("(max-width: 768px), (hover: none) and (pointer: coarse)").matches
+                              ? Math.min(230, window.innerWidth - 32)
+                              : 180;
                             const MENU_HEIGHT_EST = 184;
                             const openUpward = rect.bottom + MENU_HEIGHT_EST > window.innerHeight;
                             setSessionMenuPos({
