@@ -72,6 +72,7 @@ interface SessionViewProps {
   onSetRunnerId: (id: string) => void;
   onSetRepoPath: (path: string) => void;
   onSetAgentType: (type: string) => void;
+  onSetIsNewDraft: (v: boolean) => void;
   onSetDraftTrigger: (v: "manual" | "codebaseReady" | "at") => void;
   onSetDraftAt: (v: number | null) => void;
   onSetRunnerDropdownOpen: (v: boolean) => void;
@@ -170,6 +171,7 @@ export default function SessionView({
   onSetRunnerId,
   onSetRepoPath,
   onSetAgentType,
+  onSetIsNewDraft,
   onSetDraftTrigger,
   onSetDraftAt,
   onSetRunnerDropdownOpen,
@@ -284,7 +286,7 @@ export default function SessionView({
     : isDraftSession
       ? "This session has a pending Todo message — type to queue another, or hit Send to dispatch it now."
       : isNewDraft
-        ? "Describe what you want to do — unlike a Session, a Draft won't run right away. It's held and sent once no agent is running and the codebase is clean, or whenever you send it manually."
+        ? "Describe the TODO message to send later."
         : isAgentRunning
           ? "Agent is working… your message will be queued until it finishes"
           : isNewSession
@@ -784,7 +786,7 @@ export default function SessionView({
             <div className="welcome-screen">
               <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
                 {isNewDraft
-                  ? "A Draft is saved now and sent later — once no agent is running and the codebase is clean, or whenever you send it manually."
+                  ? "This TODO message is saved now and sent according to the selected mode."
                   : isNewSession
                     ? "Describe what you want the agent to do…"
                     : "No messages yet."}
@@ -1107,6 +1109,24 @@ export default function SessionView({
                 )}
               </div>
             </div>
+
+            <label className="todo-message-switch" htmlFor="todo-message-toggle">
+              <span>TODO Message</span>
+              <input
+                id="todo-message-toggle"
+                type="checkbox"
+                checked={isNewDraft}
+                onChange={(e) => {
+                  const enabled = e.target.checked;
+                  onSetIsNewDraft(enabled);
+                  if (enabled) {
+                    onSetDraftTrigger("codebaseReady");
+                    onSetDraftAt(null);
+                  }
+                }}
+              />
+              <span className="todo-message-switch-track" aria-hidden="true" />
+            </label>
 
             {isNewDraft && (
               <>

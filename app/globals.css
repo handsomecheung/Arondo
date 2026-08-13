@@ -313,7 +313,60 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
-/* New Draft Send Mode Toggle */
+.todo-message-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 2px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.todo-message-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.todo-message-switch-track {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  margin-left: auto;
+  border-radius: 999px;
+  background: var(--border);
+  transition: background 0.18s ease;
+}
+
+.todo-message-switch-track::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  content: "";
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+
+.todo-message-switch input:checked + .todo-message-switch-track {
+  background: var(--accent);
+}
+
+.todo-message-switch input:checked + .todo-message-switch-track::after {
+  transform: translateX(16px);
+  background: white;
+}
+
+.todo-message-switch input:focus-visible + .todo-message-switch-track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .draft-send-toggle {
   height: 36px !important;
   box-sizing: border-box !important;

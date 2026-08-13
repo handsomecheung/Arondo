@@ -885,19 +885,6 @@ export default function HomePage() {
     setSelectedProjectId(null);
     setIsNewSession(true);
     setIsNewDraft(false);
-    setMessages([]);
-    setSidebarOpen(false);
-    setSessionLog("");
-    setActiveLogMsgId(null);
-    setLogModalOpen(false);
-    setMenuOpen(false);
-  };
-
-  const handleNewDraft = () => {
-    setSelectedSessionId(null);
-    setSelectedProjectId(null);
-    setIsNewDraft(true);
-    setIsNewSession(false);
     setDraftTrigger("codebaseReady");
     setDraftAt(null);
     setMessages([]);
@@ -1149,7 +1136,7 @@ export default function HomePage() {
       if (!prompt.trim()) {
         return "Describe what you want to do";
       }
-      return "Save Draft (Enter)";
+      return "Save TODO Message (Enter)";
     }
     if (isNewSession) {
       if (!runnerId) {
@@ -1293,7 +1280,6 @@ export default function HomePage() {
         onSelectSession={handleSelectSession}
         onSelectProject={handleSelectProject}
         onNewSession={handleNewSession}
-        onNewDraft={handleNewDraft}
         onDeleteSession={handleDeleteSession}
         onArchiveSession={handleArchiveSession}
         onTogglePinSession={handleTogglePinSession}
@@ -1466,6 +1452,7 @@ export default function HomePage() {
             onSetRunnerId={setRunnerId}
             onSetRepoPath={setRepoPath}
             onSetAgentType={setAgentType}
+            onSetIsNewDraft={setIsNewDraft}
             onSetDraftTrigger={setDraftTrigger}
             onSetDraftAt={setDraftAt}
             onSetRunnerDropdownOpen={setRunnerDropdownOpen}

@@ -20,7 +20,6 @@ interface Props {
   onSelectSession: (id: string) => void;
   onSelectProject: (id: string) => void;
   onNewSession: () => void;
-  onNewDraft: () => void;
   onDeleteSession: (id: string) => void;
   onArchiveSession: (id: string) => void;
   onTogglePinSession: (id: string, pinned: boolean) => void;
@@ -47,7 +46,6 @@ export default function AppSidebar({
   onSelectSession,
   onSelectProject,
   onNewSession,
-  onNewDraft,
   onDeleteSession,
   onArchiveSession,
   onTogglePinSession,
@@ -210,9 +208,6 @@ export default function AppSidebar({
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <button className="new-task-btn" onClick={onNewSession} id="new-session-btn">
                 <IconPlus /> Session
-              </button>
-              <button className="new-task-btn" onClick={onNewDraft} id="new-draft-btn">
-                <IconPlus /> TODO
               </button>
             </div>
           </div>
