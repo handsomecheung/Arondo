@@ -208,7 +208,7 @@ export default function TasksPage() {
           } else {
             status = "running";
           }
-          let command = t.command || session?.command;
+          let command = t.command;
           if (!command && t.type === "script" && t.scriptName && session?.projectId) {
             command = scriptMap.get(session.projectId)?.get(t.scriptName);
           }

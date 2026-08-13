@@ -129,15 +129,7 @@ class RunnerManager {
         const filePath = path.join(RUNNERS_DIR, entry.name, "runner.json");
         try {
           const raw = await fs.readFile(filePath, "utf-8");
-          const info: any = JSON.parse(raw);
-
-          // Migrate allowedTokens/allowedTokenUuids to allowedUserTokenUuids if legacy properties exist
-          if ((info.allowedTokens || info.allowedTokenUuids) && !info.allowedUserTokenUuids) {
-            info.allowedUserTokenUuids = info.allowedTokens || info.allowedTokenUuids;
-            delete info.allowedTokens;
-            delete info.allowedTokenUuids;
-            await fs.writeFile(filePath, JSON.stringify(info, null, 2), "utf-8");
-          }
+          const info: RunnerInfo = JSON.parse(raw);
 
           this.cachedAllowedUserTokenUuids.set(info.id, info.allowedUserTokenUuids || []);
           this.cachedSyncGlobalRules.set(info.id, info.syncGlobalRules !== false);
@@ -199,6 +191,14 @@ class RunnerManager {
           const returnMsg = msgs.find((ret: any) => ret.parentId === m.id);
           const completedAt = returnMsg ? new Date(returnMsg.createdAt).getTime() : undefined;
 
+          let command = m.command;
+          if (!command && m.content) {
+            const cmdMatch = m.content.match(/```bash\n([\s\S]*?)```/);
+            if (cmdMatch) {
+              command = cmdMatch[1].trim();
+            }
+          }
+
           const ctx: TaskContext = {
             taskId,
             runnerId,
@@ -208,7 +208,7 @@ class RunnerManager {
             scriptName,
             pid: m.pid,
             createdAt: new Date(m.createdAt).getTime(),
-            command: m.command,
+            command,
             projectId: s.projectId,
             prompt: m.prompt,
             completedAt,

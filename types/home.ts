@@ -18,7 +18,6 @@ export interface Session {
   projectId: string;
   runnerId: string;
   errorMessage?: string;
-  command?: string;
   createdAt: string;
   updatedAt: string;
   runningScripts?: string[];

@@ -48,7 +48,7 @@ export async function POST(
     model: resolved.model,
   });
 
-  const updatedSession = await updateSession(id, { status: "running", command, errorMessage: undefined });
+  const updatedSession = await updateSession(id, { status: "running", errorMessage: undefined });
 
   const systemMsg = await addMessage({
     sessionId: id,
@@ -70,6 +70,7 @@ export async function POST(
     type: "agent",
     createdAt: Date.now(),
     agentType: resolvedType,
+    command,
   });
 
   await clearSessionLog(id, systemMsg.id);

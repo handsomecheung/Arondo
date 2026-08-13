@@ -106,7 +106,7 @@ export async function dispatchFollowupMessage(
     model: resolved.model,
   });
 
-  const patch: Record<string, any> = { status: "running", command };
+  const patch: Record<string, any> = { status: "running" };
   if (!session.prompt) {
     if (!session.name) {
       const firstLine = trimmedMessage.split("\n")[0];
@@ -150,6 +150,7 @@ export async function dispatchFollowupMessage(
     type: "agent",
     createdAt: Date.now(),
     agentType: resolvedType,
+    command,
   });
 
   await clearSessionLog(sessionId, systemMsg.id);
@@ -233,7 +234,7 @@ export async function dispatchCreateSession(
   const autoLockPatch = agentType === "auto"
     ? { autoLockedAgentType: resolvedType, autoLockedAgentModel: resolved.model ?? undefined }
     : {};
-  const updatedSession = await updateSession(session.id, { command, ...autoLockPatch });
+  const updatedSession = await updateSession(session.id, autoLockPatch);
   eventBus.publish({ type: "session_updated", payload: updatedSession });
 
   const userMessage = await addMessage({
@@ -264,6 +265,7 @@ export async function dispatchCreateSession(
     type: "agent",
     createdAt: Date.now(),
     agentType: resolvedType,
+    command,
   });
 
   await clearSessionLog(session.id, systemMsg.id);
