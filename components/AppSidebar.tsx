@@ -27,6 +27,7 @@ interface Props {
   onOpenRenameModal: (id: string, currentName: string) => void;
   archivedView: boolean;
   archivedSessions: Session[];
+  hasArchived: boolean;
   onOpenArchivedSessions: () => void;
   onCloseArchivedSessions: () => void;
   onSelectArchivedSession: (id: string) => void;
@@ -53,6 +54,7 @@ export default function AppSidebar({
   onOpenRenameModal,
   archivedView,
   archivedSessions,
+  hasArchived,
   onOpenArchivedSessions,
   onCloseArchivedSessions,
   onSelectArchivedSession,
@@ -240,19 +242,7 @@ export default function AppSidebar({
                   onSetSidebarMode("sessions");
                 }}
               >
-                Sessions
-              </button>
-              <button
-                role="tab"
-                aria-selected={sidebarMode === "projects"}
-                className={`sidebar-mode-tab${sidebarMode === "projects" ? " active" : ""}`}
-                onClick={() => {
-                  setSelectedProjectFilter(null);
-                  setSelectedRunnerFilter(null);
-                  onSetSidebarMode("projects");
-                }}
-              >
-                Projects
+                Recent Sessions
               </button>
             </div>
           )}
@@ -455,7 +445,8 @@ export default function AppSidebar({
                 <p>No sessions yet.<br />Start by creating a new session.</p>
               </div>
             ) : (
-              sortedSessions
+              [
+                ...sortedSessions
               .filter((s) => !selectedProjectFilter || s.projectId === selectedProjectFilter)
               .map((session, index) => {
                 const project = projects.find((p) => p.id === session.projectId);
@@ -624,7 +615,44 @@ export default function AppSidebar({
                     </div>
                   </div>
                 );
-              })
+              }),
+              ...(hasArchived ? [
+                <div
+                  key="archived-hint"
+                  onClick={onOpenArchivedSessions}
+                  style={{
+                    fontSize: 11,
+                    color: "var(--text-muted)",
+                    padding: "6px 8px",
+                    background: "var(--bg-elevated)",
+                    borderRadius: "var(--radius-md)",
+                    marginTop: 8,
+                    marginBottom: 8,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    border: "1px dashed var(--border)",
+                    transition: "color 0.15s ease, border-color 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = "var(--text-primary)";
+                    e.currentTarget.style.borderColor = "var(--accent)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = "var(--text-muted)";
+                    e.currentTarget.style.borderColor = "var(--border)";
+                  }}
+                >
+                  <span style={{ display: "inline-flex", flexShrink: 0 }}>
+                    <IconArchive size={12} />
+                  </span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    You have archived sessions. Click to view.
+                  </span>
+                </div>
+              ] : [])
+              ]
             )
           ) : (() => {
             const filteredProjects = projects.filter((p) => !selectedRunnerFilter || p.runnerId === selectedRunnerFilter);

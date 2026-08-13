@@ -247,6 +247,18 @@ export async function getArchivedSessions(): Promise<Session[]> {
   }
 }
 
+export async function getArchivedSessionPaths(): Promise<string[]> {
+  try {
+    await ensureDir(ARCHIVED_SESSIONS_DIR);
+    const entries = await fs.readdir(ARCHIVED_SESSIONS_DIR, { withFileTypes: true });
+    return entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => path.join(ARCHIVED_SESSIONS_DIR, entry.name, "session.json"));
+  } catch {
+    return [];
+  }
+}
+
 // ─── Projects ─────────────────────────────────────────────────────────────────
 
 export interface ProjectScript {

@@ -395,22 +395,6 @@ export default function ProjectPanel({
                   display: "block",
                 }}
               >
-                CREATED AT
-              </span>
-              <span
-                style={{ fontSize: 13, color: "var(--text-primary)" }}
-              >
-                {new Date(project.createdAt).toLocaleString()}
-              </span>
-            </div>
-            <div>
-              <span
-                style={{
-                  fontSize: 11,
-                  color: "var(--text-muted)",
-                  display: "block",
-                }}
-              >
                 SESSIONS
               </span>
               <span

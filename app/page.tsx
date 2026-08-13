@@ -99,6 +99,7 @@ export default function HomePage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [archivedView, setArchivedView] = useState(false);
   const [archivedSessions, setArchivedSessions] = useState<Session[]>([]);
+  const [hasArchived, setHasArchived] = useState<boolean>(false);
 
   // Custom dropdown states & refs
   const [runnerDropdownOpen, setRunnerDropdownOpen] = useState(false);
@@ -488,6 +489,15 @@ export default function HomePage() {
       .catch(console.error);
   }, []);
 
+  const checkArchivedSessions = useCallback(() => {
+    fetch("/api/sessions/archived/exists")
+      .then((r) => r.json())
+      .then((data: { exists: boolean }) => {
+        setHasArchived(!!data.exists);
+      })
+      .catch(console.error);
+  }, []);
+
   const handleOpenArchivedSessions = () => {
     setArchivedView(true);
     setSelectedProjectId(null);
@@ -521,6 +531,7 @@ export default function HomePage() {
           setActiveLogMsgId(null);
           setLogModalOpen(false);
         }
+        checkArchivedSessions();
       } else {
         const data = await res.json();
         setApiError({ title: "Archive Session Error", message: data.error || "Failed to archive session" });
@@ -560,6 +571,7 @@ export default function HomePage() {
         setSessions((prev) => [...prev.filter((s) => s.id !== id), updated]);
         setArchivedView(false);
         setSidebarMode("sessions");
+        checkArchivedSessions();
       } else {
         const data = await res.json();
         setApiError({ title: "Unarchive Session Error", message: data.error || "Failed to unarchive session" });
@@ -588,6 +600,10 @@ export default function HomePage() {
     loadProjects,
     loadRunners,
   });
+
+  useEffect(() => {
+    checkArchivedSessions();
+  }, [checkArchivedSessions]);
 
   useEffect(() => {
     if (!selectedSessionId) {
@@ -1287,6 +1303,7 @@ export default function HomePage() {
         }}
         archivedView={archivedView}
         archivedSessions={archivedSessions}
+        hasArchived={hasArchived}
         onOpenArchivedSessions={handleOpenArchivedSessions}
         onCloseArchivedSessions={handleCloseArchivedSessions}
         onSelectArchivedSession={handleSelectArchivedSession}
