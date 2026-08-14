@@ -668,52 +668,6 @@ export default function RunnersPage() {
                               </div>
                             </div>
 
-                            {/* Capabilities */}
-                            <div
-                              style={{
-                                background: "var(--bg-surface)",
-                                border: "1px solid var(--border)",
-                                borderRadius: "var(--radius-md)",
-                                padding: 16,
-                              }}
-                            >
-                              <h3
-                                style={{
-                                  fontSize: 12,
-                                  fontWeight: 600,
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.05em",
-                                  color: "var(--text-secondary)",
-                                  marginBottom: 12,
-                                }}
-                              >
-                                Capabilities
-                              </h3>
-                              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                                {r.capabilities && r.capabilities.length > 0 ? (
-                                  r.capabilities.map((cap) => (
-                                    <span
-                                      key={cap}
-                                      style={{
-                                        fontSize: 11,
-                                        fontWeight: 500,
-                                        color: "var(--accent)",
-                                        background: "var(--accent-glow)",
-                                        border: "1px solid var(--border-accent)",
-                                        padding: "2px 8px",
-                                        borderRadius: "4px",
-                                      }}
-                                    >
-                                      {cap}
-                                    </span>
-                                  ))
-                                ) : (
-                                  <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                                    Standard terminal execution
-                                  </span>
-                                )}
-                              </div>
-                            </div>
                           </div>
 
                           {/* Agent Quota */}
