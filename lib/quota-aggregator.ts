@@ -58,15 +58,6 @@ async function readAgentFile(
   }
 }
 
-async function fileExists(p: string): Promise<boolean> {
-  try {
-    await fs.access(p);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 // Checks every connected runner's installed agents. For each (runner, agentType)
 // pair that has no data file on disk, sends an info.fetch request to that runner.
 // Returns true if at least one request was sent.
@@ -80,11 +71,27 @@ async function requestMissingEntries(): Promise<boolean> {
       if (!agentType) continue;
 
       const filePath = path.join(AGENTS_DIR, runner.id, `${agentType}.json`);
-      if (await fileExists(filePath)) continue;
+      const entry = await readAgentFile(runner.id, agentType);
+      if (entry) continue;
+
+      // If the file exists but is invalid (e.g., empty account/plan because the
+      // agent is logged out or failed to parse), check if it was recently updated
+      // to avoid constantly spamming the runner with info.fetch requests.
+      try {
+        const raw = await fs.readFile(filePath, "utf-8");
+        const data = JSON.parse(raw) as Record<string, unknown>;
+        const updatedAt = (data.updatedAt as number) ?? 0;
+        const now = Math.floor(Date.now() / 1000);
+        if (now - updatedAt <= STALE_THRESHOLD_S) {
+          continue;
+        }
+      } catch {
+        // File doesn't exist or is invalid JSON
+      }
 
       runnerManager.sendFire(runner.id, "info.fetch", { agent: binary });
       console.log(
-        `[quota-aggregator] missing ${agentType} data for runner ${runner.id} — requested info.fetch`
+        `[quota-aggregator] missing or invalid ${agentType} data for runner ${runner.id} — requested info.fetch`
       );
       sent = true;
     }
