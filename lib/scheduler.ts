@@ -67,6 +67,10 @@ async function isCodebaseReady(runnerId: string, repoPath: string): Promise<bool
   return !dirty && !busy;
 }
 
+export function canDispatchAfterSessionTodo(session: Pick<Session, "status" | "errorMessage">): boolean {
+  return session.status === "done" || (session.status === "script-running" && !session.errorMessage);
+}
+
 async function evaluateTodo(session: Session, todo: Message): Promise<void> {
   const trigger = todo.todoTrigger;
   if (!trigger) return;
@@ -75,7 +79,7 @@ async function evaluateTodo(session: Session, todo: Message): Promise<void> {
   } else if (trigger.kind === "afterSession") {
     // Only fire once the current run finished successfully — an "error"
     // status leaves the todo pending so the user can decide manually.
-    if (session.status === "done") await executeAction(session, todo);
+    if (canDispatchAfterSessionTodo(session)) await executeAction(session, todo);
   } else if (trigger.kind === "quotaAvailable") {
     if (await isQuotaAvailable(trigger.agentType as any)) await executeAction(session, todo);
   } else if (trigger.kind === "codebaseReady") {
@@ -115,12 +119,12 @@ async function tick(): Promise<void> {
 // of waiting up to TICK_MS for an "afterSession" follow-up or another
 // session's "codebaseReady" todo to fire.
 function onSessionUpdated(session: Session): void {
-  if (session.status === "running" || session.status === "script-running") return;
+  if (session.status === "running") return;
 
   getPendingTodoMessages(session.id)
     .then(async (todos) => {
       // Success-only: an "error" status leaves the afterSession todo pending.
-      const followup = session.status === "done" ? todos.find((t) => t.todoTrigger?.kind === "afterSession") : undefined;
+      const followup = canDispatchAfterSessionTodo(session) ? todos.find((t) => t.todoTrigger?.kind === "afterSession") : undefined;
       if (followup) {
         await executeAction(session, followup).catch((err) =>
           console.error("[scheduler] fast-path dispatch failed:", err),
