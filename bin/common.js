@@ -77,6 +77,14 @@ async function getSession(server, token, sessionId) {
   return body;
 }
 
+async function listSessions(server, token) {
+  const [status, body] = await apiRequest(server, token, 'GET', '/api/sessions');
+  if (status !== 200) {
+    throw new Error(`list sessions failed (${status}): ${JSON.stringify(body)}`);
+  }
+  return body;
+}
+
 async function listRunners(server, token) {
   const [status, body] = await apiRequest(server, token, 'GET', '/api/runners');
   if (status !== 200) {
@@ -132,6 +140,7 @@ module.exports = {
   createSession,
   sendMessage,
   getSession,
+  listSessions,
   listRunners,
   getMessages,
   getSessionLog,

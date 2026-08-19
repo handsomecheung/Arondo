@@ -17,7 +17,7 @@ Usage:
   bin/arondo \\
     --server http://localhost:3251 \\
     --token <client_access_token> \\
-    --session-id <session_id> \\
+    --resume \\
     "Now also print the current directory"
 
 Options:
@@ -27,6 +27,7 @@ Options:
   --repo-path <path>           Repository path on the runner (default: current working directory)
   --temp-dir                   Create the session in a fresh temporary directory on the runner
   --session-id <id>            Send the message to an existing session
+  --resume                     Resume the most recently updated session for the runner and repository path
   --force                      Bypass the dirty-working-tree confirmation
   --agent-type <type>          auto, antigravity, or claude (default: auto)
   --poll-interval <seconds>    Seconds between status polls (default: 3)
@@ -63,6 +64,7 @@ function parseArgs(argv) {
     timeout: 600,
     tempDir: false,
     force: false,
+    resume: false,
   };
   const valueOptions = new Map([
     ['--server', 'server'],
@@ -96,6 +98,10 @@ function parseArgs(argv) {
       args.force = true;
       continue;
     }
+    if (option === '--resume') {
+      args.resume = true;
+      continue;
+    }
 
     const [name, inlineValue] = option.split(/=(.*)/s, 2);
     const property = valueOptions.get(name);
@@ -121,6 +127,12 @@ function parseArgs(argv) {
   }
   if (!args.prompt) {
     throw new Error('a message is required');
+  }
+  if (args.resume && args.sessionId) {
+    throw new Error('--resume cannot be used with --session-id');
+  }
+  if (args.resume && args.tempDir) {
+    throw new Error('--resume cannot be used with --temp-dir');
   }
   if (!args.sessionId && !args.tempDir && !args.repoPath) {
     args.repoPath = process.cwd();
@@ -152,6 +164,16 @@ async function resolveRunnerId(server, token, hostname) {
   throw new Error(`multiple connected runners match hostname ${JSON.stringify(hostname)}; specify --runner-id <id>`);
 }
 
+async function resolveRecentSessionId(server, token, runnerId, repoPath) {
+  const session = (await common.listSessions(server, token))
+    .filter((candidate) => candidate.runnerId === runnerId && candidate.repoPath === repoPath)
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
+  if (!session) {
+    throw new Error(`no session found for runner ${JSON.stringify(runnerId)} and repository path ${JSON.stringify(repoPath)}`);
+  }
+  return session.id;
+}
+
 async function getRawOutput(server, token, sessionId) {
   const messages = await common.getMessages(server, token, sessionId);
   const agentRun = [...messages].reverse().find((message) => message.type === 'agent-run');
@@ -163,6 +185,16 @@ async function getRawOutput(server, token, sessionId) {
 
 async function run() {
   const args = parseArgs(process.argv.slice(2));
+
+  if (args.resume) {
+    if (!args.runnerId) {
+      const hostname = os.hostname();
+      console.error(`Resolving runner for hostname ${hostname}...`);
+      args.runnerId = await resolveRunnerId(args.server, args.token, hostname);
+    }
+    args.sessionId = await resolveRecentSessionId(args.server, args.token, args.runnerId, args.repoPath);
+    console.error(`Resuming most recent session ${args.sessionId}...`);
+  }
 
   let sessionId = args.sessionId;
   if (sessionId) {
