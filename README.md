@@ -196,16 +196,32 @@ x-arondo-token: <token>
 
 ### Example script
 
-`examples/session_automation_demo.py` is a stdlib-only Python demo that chains the three calls above: create a session, send a follow-up, poll until done, and print the result.
+`bin/arondo.js` is a dependency-free Node.js demo that creates a session or sends a prompt to an existing session, then polls until it finishes and prints the result.
 
 ```bash
-python3 examples/session_automation_demo.py \
+node bin/arondo.js \
   --server http://localhost:3251 \
   --token <client_access_token> \
   --temp-dir \
-  --prompt "Print the current date" \
-  --follow-up "Now also print the current directory"
+  --prompt "Print the current date"
 ```
+
+The command prints the session ID. Use it to continue that conversation in a later invocation:
+
+```bash
+node bin/arondo.js \
+  --server http://localhost:3251 \
+  --token <client_access_token> \
+  --session-id <session_id> \
+  --prompt "Now also print the current directory"
+```
+
+When creating a session without `--temp-dir` or `--repo-path`, the script uses its current working directory as the repository path.
+When `--runner-id` is omitted, it selects the connected runner with the current hostname; use `--runner-id` when no runner or multiple runners share that hostname.
+Use `--force` to send `force: true` and bypass the server's dirty-working-tree confirmation.
+When the server returns `needsConfirmation: true`, the CLI prints a hint to retry with `--force`.
+The final JSON result uses `sessionId` and includes the agent's stdout as `rawOutput`.
+The final JSON result is written to stdout; progress messages and errors are written to stderr.
 
 ## Runner CLI
 

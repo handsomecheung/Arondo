@@ -1,0 +1,225 @@
+#!/usr/bin/env node
+
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const common = require('./common');
+
+const USAGE = `Create a session, send a message, poll until it finishes, and print the result.
+
+Usage:
+  node bin/arondo.js \\
+    --server http://localhost:3251 \\
+    --token <client_access_token> \\
+    --temp-dir \\
+    --prompt "Print the current date"
+
+  node bin/arondo.js \\
+    --server http://localhost:3251 \\
+    --token <client_access_token> \\
+    --session-id <session_id> \\
+    --prompt "Now also print the current directory"
+
+Options:
+  --server <url>               Arondo server base URL (overrides ARONDO_URL in bin/.env)
+  --token <token>              Client access token (overrides ARONDO_TOKEN in bin/.env)
+  --runner-id <id>             Target runner ID (default: connected runner with the current hostname)
+  --repo-path <path>           Repository path on the runner (default: current working directory)
+  --temp-dir                   Create the session in a fresh temporary directory on the runner
+  --session-id <id>            Send the prompt to an existing session
+  --force                      Bypass the dirty-working-tree confirmation
+  --agent-type <type>          auto, antigravity, or claude (default: auto)
+  --prompt <prompt>            Initial prompt (required)
+  --poll-interval <seconds>    Seconds between status polls (default: 3)
+  --timeout <seconds>          Maximum seconds to wait for completion (default: 600)
+  --help                       Show this help message`;
+
+function loadDotEnv(filePath) {
+  try {
+    const values = {};
+    for (const line of fs.readFileSync(filePath, 'utf8').split(/\r?\n/)) {
+      const match = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+      if (!match || match[0].trimStart().startsWith('#')) {
+        continue;
+      }
+      const [, key, rawValue] = match;
+      values[key] = rawValue.replace(/^(['"])(.*)\1$/, '$2');
+    }
+    return values;
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return {};
+    }
+    throw error;
+  }
+}
+
+function parseArgs(argv) {
+  const env = loadDotEnv(path.join(__dirname, '.env'));
+  const args = {
+    server: env.ARONDO_URL,
+    token: env.ARONDO_TOKEN,
+    agentType: 'auto',
+    pollInterval: 3,
+    timeout: 600,
+    tempDir: false,
+    force: false,
+  };
+  const valueOptions = new Map([
+    ['--server', 'server'],
+    ['--token', 'token'],
+    ['--runner-id', 'runnerId'],
+    ['--repo-path', 'repoPath'],
+    ['--session-id', 'sessionId'],
+    ['--agent-type', 'agentType'],
+    ['--prompt', 'prompt'],
+    ['--poll-interval', 'pollInterval'],
+    ['--timeout', 'timeout'],
+  ]);
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const option = argv[index];
+    if (option === '--help') {
+      console.error(USAGE);
+      process.exit(0);
+    }
+    if (option === '--temp-dir') {
+      args.tempDir = true;
+      continue;
+    }
+    if (option === '--force') {
+      args.force = true;
+      continue;
+    }
+
+    const [name, inlineValue] = option.split(/=(.*)/s, 2);
+    const property = valueOptions.get(name);
+    if (!property) {
+      throw new Error(`unknown option: ${option}`);
+    }
+    const value = inlineValue ?? argv[++index];
+    if (value === undefined || value.startsWith('--')) {
+      throw new Error(`option ${name} requires a value`);
+    }
+    args[property] = value;
+  }
+
+  const missingConfiguration = [];
+  if (!args.server) {
+    missingConfiguration.push('server: specify --server <url> or set ARONDO_URL in bin/.env');
+  }
+  if (!args.token) {
+    missingConfiguration.push('token: specify --token <token> or set ARONDO_TOKEN in bin/.env');
+  }
+  if (missingConfiguration.length > 0) {
+    throw new Error(`missing configuration:\n${missingConfiguration.join('\n')}`);
+  }
+  if (!args.prompt) {
+    throw new Error('--prompt is required');
+  }
+  if (!args.sessionId && !args.tempDir && !args.repoPath) {
+    args.repoPath = process.cwd();
+  }
+  if (!['auto', 'antigravity', 'claude'].includes(args.agentType)) {
+    throw new Error('--agent-type must be auto, antigravity, or claude');
+  }
+
+  args.pollInterval = Number(args.pollInterval);
+  args.timeout = Number(args.timeout);
+  if (!Number.isFinite(args.pollInterval) || args.pollInterval < 0) {
+    throw new Error('--poll-interval must be a non-negative number');
+  }
+  if (!Number.isFinite(args.timeout) || args.timeout < 0) {
+    throw new Error('--timeout must be a non-negative number');
+  }
+  return args;
+}
+
+async function resolveRunnerId(server, token, hostname) {
+  const runners = await common.listRunners(server, token);
+  const matches = runners.filter((runner) => runner.connected && runner.hostname === hostname);
+  if (matches.length === 1) {
+    return matches[0].id;
+  }
+  if (matches.length === 0) {
+    throw new Error(`no connected runner matches hostname ${JSON.stringify(hostname)}; specify --runner-id <id>`);
+  }
+  throw new Error(`multiple connected runners match hostname ${JSON.stringify(hostname)}; specify --runner-id <id>`);
+}
+
+async function getRawOutput(server, token, sessionId) {
+  const messages = await common.getMessages(server, token, sessionId);
+  const agentRun = [...messages].reverse().find((message) => message.type === 'agent-run');
+  if (!agentRun) {
+    return '';
+  }
+  return common.getSessionLog(server, token, sessionId, agentRun.id);
+}
+
+async function run() {
+  const args = parseArgs(process.argv.slice(2));
+
+  let sessionId = args.sessionId;
+  if (sessionId) {
+    console.error(`Sending message to session ${sessionId}...`);
+    await common.sendMessage(args.server, args.token, sessionId, args.prompt, args.force);
+  } else {
+    if (!args.runnerId) {
+      const hostname = os.hostname();
+      console.error(`Resolving runner for hostname ${hostname}...`);
+      args.runnerId = await resolveRunnerId(args.server, args.token, hostname);
+    }
+    console.error('Creating session...');
+    const session = await common.createSession(
+      args.server,
+      args.token,
+      args.runnerId,
+      args.repoPath,
+      args.tempDir,
+      args.prompt,
+      args.agentType,
+      args.force,
+    );
+    sessionId = session.id;
+    console.error(`Created session ${sessionId} (repoPath=${session.repoPath}, runnerId=${session.runnerId})`);
+  }
+
+  console.error(`Session ID: ${sessionId}`);
+  console.error('Waiting for the run to finish...');
+  const session = await common.pollUntilDone(
+    args.server,
+    args.token,
+    sessionId,
+    args.pollInterval,
+    args.timeout,
+  );
+
+  console.error('\n=== Result ===');
+  const sessionResult = { ...session };
+  delete sessionResult.id;
+  console.log(JSON.stringify({
+    sessionId,
+    rawOutput: await getRawOutput(args.server, args.token, sessionId),
+    ...sessionResult,
+  }, null, 2));
+  if (session.status === 'error') {
+    console.error(`\nSession finished with an error: ${session.errorMessage}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  console.error('\nSession finished successfully.');
+}
+
+run().catch((error) => {
+  if (error.body?.needsConfirmation) {
+    console.error(JSON.stringify({
+      ...error.body,
+      hint: 'Retry this command with --force to bypass the confirmation.',
+    }, null, 2));
+    process.exitCode = 1;
+    return;
+  }
+  console.error(error.message);
+  process.exitCode = 1;
+});
