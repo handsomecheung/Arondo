@@ -8,17 +8,17 @@ const common = require('./common');
 const USAGE = `Create a session, send a message, poll until it finishes, and print the result.
 
 Usage:
-  node bin/arondo.js \\
+  bin/arondo \\
     --server http://localhost:3251 \\
     --token <client_access_token> \\
     --temp-dir \\
-    --prompt "Print the current date"
+    "Print the current date"
 
-  node bin/arondo.js \\
+  bin/arondo \\
     --server http://localhost:3251 \\
     --token <client_access_token> \\
     --session-id <session_id> \\
-    --prompt "Now also print the current directory"
+    "Now also print the current directory"
 
 Options:
   --server <url>               Arondo server base URL (overrides ARONDO_URL in bin/.env)
@@ -26,10 +26,9 @@ Options:
   --runner-id <id>             Target runner ID (default: connected runner with the current hostname)
   --repo-path <path>           Repository path on the runner (default: current working directory)
   --temp-dir                   Create the session in a fresh temporary directory on the runner
-  --session-id <id>            Send the prompt to an existing session
+  --session-id <id>            Send the message to an existing session
   --force                      Bypass the dirty-working-tree confirmation
   --agent-type <type>          auto, antigravity, or claude (default: auto)
-  --prompt <prompt>            Initial prompt (required)
   --poll-interval <seconds>    Seconds between status polls (default: 3)
   --timeout <seconds>          Maximum seconds to wait for completion (default: 600)
   --help                       Show this help message`;
@@ -72,13 +71,19 @@ function parseArgs(argv) {
     ['--repo-path', 'repoPath'],
     ['--session-id', 'sessionId'],
     ['--agent-type', 'agentType'],
-    ['--prompt', 'prompt'],
     ['--poll-interval', 'pollInterval'],
     ['--timeout', 'timeout'],
   ]);
 
   for (let index = 0; index < argv.length; index += 1) {
     const option = argv[index];
+    if (!option.startsWith('--')) {
+      if (args.prompt !== undefined) {
+        throw new Error('only one message may be provided');
+      }
+      args.prompt = option;
+      continue;
+    }
     if (option === '--help') {
       console.error(USAGE);
       process.exit(0);
@@ -115,7 +120,7 @@ function parseArgs(argv) {
     throw new Error(`missing configuration:\n${missingConfiguration.join('\n')}`);
   }
   if (!args.prompt) {
-    throw new Error('--prompt is required');
+    throw new Error('a message is required');
   }
   if (!args.sessionId && !args.tempDir && !args.repoPath) {
     args.repoPath = process.cwd();

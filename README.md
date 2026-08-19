@@ -196,24 +196,24 @@ x-arondo-token: <token>
 
 ### Example script
 
-`bin/arondo.js` is a dependency-free Node.js demo that creates a session or sends a prompt to an existing session, then polls until it finishes and prints the result.
+`bin/arondo` is a dependency-free Node.js CLI that creates a session or sends a message to an existing session, then polls until it finishes and prints the result. The required message is passed as the final positional argument.
 
 ```bash
-node bin/arondo.js \
+bin/arondo \
   --server http://localhost:3251 \
   --token <client_access_token> \
   --temp-dir \
-  --prompt "Print the current date"
+  "Print the current date"
 ```
 
 The command prints the session ID. Use it to continue that conversation in a later invocation:
 
 ```bash
-node bin/arondo.js \
+bin/arondo \
   --server http://localhost:3251 \
   --token <client_access_token> \
   --session-id <session_id> \
-  --prompt "Now also print the current directory"
+  "Now also print the current directory"
 ```
 
 When creating a session without `--temp-dir` or `--repo-path`, the script uses its current working directory as the repository path.
