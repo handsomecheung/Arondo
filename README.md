@@ -216,7 +216,7 @@ bin/arondo \
   "Now also print the current directory"
 ```
 
-When creating a session without `--temp-dir` or `--repo-path`, the script uses its current working directory as the repository path.
+When creating a session without `--temp-dir` or `--path`, the script uses its current working directory as the repository path.
 When `--runner-id` is omitted, it selects the connected runner with the current hostname; use `--runner-id` when no runner or multiple runners share that hostname.
 Use `--resume` to send the message to the most recently updated session for the selected runner and repository path. It cannot be combined with `--session-id` or `--temp-dir`.
 Use `--force` to send `force: true` and bypass the server's dirty-working-tree confirmation.

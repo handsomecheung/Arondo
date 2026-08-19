@@ -24,12 +24,12 @@ Options:
   --server <url>               Arondo server base URL (overrides ARONDO_URL in bin/.env)
   --token <token>              Client access token (overrides ARONDO_TOKEN in bin/.env)
   --runner-id <id>             Target runner ID (default: connected runner with the current hostname)
-  --repo-path <path>           Repository path on the runner (default: current working directory)
+  --path <path>                Repository path on the runner (default: current working directory)
   --temp-dir                   Create the session in a fresh temporary directory on the runner
   --session-id <id>            Send the message to an existing session
   --resume                     Resume the most recently updated session for the runner and repository path
   --force                      Bypass the dirty-working-tree confirmation
-  --agent-type <type>          auto, antigravity, or claude (default: auto)
+  --agent <type>               auto, antigravity, claude, codex, or opencode (default: auto)
   --poll-interval <seconds>    Seconds between status polls (default: 3)
   --timeout <seconds>          Maximum seconds to wait for completion (default: 600)
   --help                       Show this help message`;
@@ -70,9 +70,9 @@ function parseArgs(argv) {
     ['--server', 'server'],
     ['--token', 'token'],
     ['--runner-id', 'runnerId'],
-    ['--repo-path', 'repoPath'],
+    ['--path', 'repoPath'],
     ['--session-id', 'sessionId'],
-    ['--agent-type', 'agentType'],
+    ['--agent', 'agentType'],
     ['--poll-interval', 'pollInterval'],
     ['--timeout', 'timeout'],
   ]);
@@ -137,8 +137,8 @@ function parseArgs(argv) {
   if (!args.sessionId && !args.tempDir && !args.repoPath) {
     args.repoPath = process.cwd();
   }
-  if (!['auto', 'antigravity', 'claude'].includes(args.agentType)) {
-    throw new Error('--agent-type must be auto, antigravity, or claude');
+  if (!['auto', 'antigravity', 'claude', 'codex', 'opencode'].includes(args.agentType)) {
+    throw new Error('--agent must be auto, antigravity, claude, codex, or opencode');
   }
 
   args.pollInterval = Number(args.pollInterval);
