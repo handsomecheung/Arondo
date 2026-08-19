@@ -986,6 +986,7 @@ body {
   border: none;
   cursor: pointer;
   text-align: left;
+  text-decoration: none;
   transition: background 0.12s ease;
 }
 
@@ -2374,7 +2375,7 @@ body {
   }
 }
 
-/* ── Run Script submenu ────────────────────────────────────────────────────── */
+/* ── Run Script and Run Command submenus ───────────────────────────────────── */
 .menu-item-with-sub {
   position: relative;
 }
@@ -2390,7 +2391,8 @@ body {
   opacity: 0.7;
 }
 
-.script-submenu {
+.script-submenu,
+.command-submenu {
   position: absolute;
   top: 0;
   right: 100%;
@@ -2410,7 +2412,8 @@ body {
   flex-direction: column;
 }
 
-.script-submenu .menu-item {
+.script-submenu .menu-item,
+.command-submenu .menu-item {
   padding-top: 20px !important;
   padding-bottom: 20px !important;
   white-space: nowrap;
@@ -2418,23 +2421,27 @@ body {
   text-overflow: ellipsis;
 }
 
-.script-submenu .menu-item:not(:first-child) {
+.script-submenu .menu-item:not(:first-child),
+.command-submenu .menu-item:not(:first-child) {
   border-top: 1px solid var(--border);
 }
 
-.script-submenu-manage {
+.script-submenu-manage,
+.command-submenu-manage {
   color: var(--text-muted);
   font-size: 12px;
 }
 
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
-  .script-submenu {
+  .script-submenu,
+  .command-submenu {
     width: min(280px, calc(100vw - 32px));
     min-width: 0;
     max-width: min(280px, calc(100vw - 32px));
   }
 
-  .script-submenu .menu-item {
+  .script-submenu .menu-item,
+  .command-submenu .menu-item {
     min-height: 64px;
     padding-right: 20px !important;
     padding-left: 20px !important;

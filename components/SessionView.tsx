@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import Link from "next/link";
 import ScriptExecCard from "@/components/ScriptExecCard";
 import AgentExecCard from "@/components/AgentExecCard";
 import UserAgentCommandCard from "@/components/UserAgentCommandCard";
@@ -240,6 +241,9 @@ export default function SessionView({
   const agentSwitchRef = useRef<HTMLDivElement>(null);
   const scriptSubMenuRef = useRef<HTMLDivElement>(null);
   const [scriptSubMenuShift, setScriptSubMenuShift] = useState(0);
+  const commandSubMenuRef = useRef<HTMLDivElement>(null);
+  const [commandSubMenuOpen, setCommandSubMenuOpen] = useState(false);
+  const [commandSubMenuShift, setCommandSubMenuShift] = useState(0);
   const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);
   const projectSelectRef = useRef<HTMLDivElement>(null);
   const [attachMenuOpen, setAttachMenuOpen] = useState<"closed" | "menu" | "schedule">("closed");
@@ -254,6 +258,16 @@ export default function SessionView({
     const overflow = 8 - rect.left;
     setScriptSubMenuShift(overflow > 0 ? overflow : 0);
   }, [scriptSubMenuOpen]);
+
+  useLayoutEffect(() => {
+    if (!commandSubMenuOpen || !commandSubMenuRef.current) {
+      setCommandSubMenuShift(0);
+      return;
+    }
+    const rect = commandSubMenuRef.current.getBoundingClientRect();
+    const overflow = 8 - rect.left;
+    setCommandSubMenuShift(overflow > 0 ? overflow : 0);
+  }, [commandSubMenuOpen]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -652,6 +666,57 @@ export default function SessionView({
                     )}
                   </div>
                 )}
+
+                <div
+                  className="menu-item-with-sub"
+                  onMouseEnter={() => setCommandSubMenuOpen(true)}
+                  onMouseLeave={() => setCommandSubMenuOpen(false)}
+                >
+                  <button
+                    className="menu-item"
+                    id="menu-run-command"
+                  >
+                    <IconPlay /> Run Command
+                    <span className="menu-item-arrow">›</span>
+                  </button>
+                  {commandSubMenuOpen && (
+                    <div
+                      className="command-submenu"
+                      ref={commandSubMenuRef}
+                      style={commandSubMenuShift > 0 ? { transform: `translateX(${commandSubMenuShift}px)` } : undefined}
+                    >
+                      {agentCommands.map((command) => {
+                        const trigger = `/${getTriggerWord(command)}`;
+                        return (
+                          <button
+                            key={command.command}
+                            className="menu-item"
+                            onClick={() => {
+                              onSetMenuOpen(false);
+                              setCommandSubMenuOpen(false);
+                              onExecuteAgentCommand(trigger);
+                            }}
+                            id={`menu-run-command-${command.command.replace(/\s+/g, "-")}`}
+                            title={command.menuDescription}
+                          >
+                            {command.menuLabel ?? trigger}
+                          </button>
+                        );
+                      })}
+                      <Link
+                        href="/settings"
+                        className="menu-item command-submenu-manage"
+                        id="menu-manage-commands"
+                        onClick={() => {
+                          onSetMenuOpen(false);
+                          setCommandSubMenuOpen(false);
+                        }}
+                      >
+                        ⚙ Edit Commands
+                      </Link>
+                    </div>
+                  )}
+                </div>
 
                 <button
                   className="menu-item"
@@ -1209,6 +1274,15 @@ export default function SessionView({
             .map(([command]) => command);
           return (
             <div className="command-menu">
+              <button
+                className="command-menu-item"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onManageScripts();
+                }}
+              >
+                <span className="command-menu-name">⚙ Edit Scripts</span>
+              </button>
               {visibleScripts.map((s, idx) => {
                 const trigger = "!" + s.name;
                 const isActive = trimmedPrompt === trigger;
@@ -1266,6 +1340,13 @@ export default function SessionView({
           const renameName = prompt.trim().slice("/rename".length).trim();
           return (
             <div className="command-menu">
+              <Link
+                href="/settings"
+                className="command-menu-item"
+                onMouseDown={(e) => e.preventDefault()}
+              >
+                <span className="command-menu-name">⚙ Edit Commands</span>
+              </Link>
               {newVisible ? (
                 <button
                   className={`command-menu-item${commandMenuIndex === newItemIndex ? " highlighted" : ""}${prompt.trim().startsWith("/new") ? " active" : ""}`}
