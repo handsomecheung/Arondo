@@ -2,6 +2,90 @@
 
 Arondo is a mobile-first developer workspace that delegates coding tasks to AI agents and monitors executions across multiple machines. It follows a **Frontend + Server + Runner** architecture where lightweight Go-based Runners are installed on development machines and the central Server coordinates all operations.
 
+## Basic Workflow
+
+Arondo lets you delegate work to an AI agent from a mobile-friendly workspace, review the changes, validate them, and continue the same conversation until the task is ready to commit.
+
+### 1. Start a session
+
+Choose a Runner, project, and agent, then describe the task and send it.
+
+<img src="public/images/basic-usage/01-create-session.jpg" alt="Creating a new session by choosing a runner, project, and agent, then entering a task" width="360">
+
+### 2. Review, validate, and commit
+
+Review the agent result and diff, run validation, provide follow-up instructions when needed, and finish by committing the completed work from the same session.
+
+<p>
+  <img src="public/images/basic-usage/02-review-result.jpg" alt="Completed Codex response with changed-file links and a follow-up message input" width="360">
+  <img src="public/images/basic-usage/03-review-changes.jpg" alt="Git diff viewer showing changed files and inline additions and deletions" width="360">
+  <img src="public/images/basic-usage/04-run-test.jpg" alt="Session script card showing integration test output" width="360">
+  <img src="public/images/basic-usage/05-follow-up-fix.jpg" alt="Failed test output followed by a request to reapply the application changes" width="360">
+  <img src="public/images/basic-usage/06-commit.jpg" alt="Completed commit agent command and final Codex response" width="360">
+</p>
+
+## Agent Commands
+
+Create reusable slash commands in **Settings → Agent Commands** by defining the command name, the instruction sent to the agent, and, when needed, a regular-expression matcher whose capture groups can be inserted as `$1`, `$2`, and so on; type `/` in a session to browse and run built-in and custom commands.
+
+<p>
+  <img src="public/images/agent-command-add.png" alt="Agent Commands settings form for creating a custom slash command" width="360">
+  <img src="public/images/agent-command-list.png" alt="Session command menu listing built-in and custom slash commands" width="360">
+</p>
+
+## Scripts
+
+Save a named shell command for a project through **Edit Scripts**, then type `!` in a session to select and run it, choose a file to execute, or enter an ad-hoc command.
+
+<p>
+  <img src="public/images/script-add.png" alt="Add Script dialog with name and command fields" width="360">
+  <img src="public/images/script-list.png" alt="Session quick-run menu showing saved scripts after typing an exclamation mark" width="360">
+</p>
+
+## Terminal
+
+Open a live shell on the selected Runner from a session’s three-dot menu when you need to inspect or recover from an exceptional situation.
+
+> **Fallback only:** Arondo is designed around agents and saved scripts, which are the recommended ways to work. The Terminal is provided as a safety net, not as the primary workflow; its dense command-line interface is particularly uncomfortable to use on mobile devices.
+
+<p>
+  <img src="public/images/terminal-menu.png" alt="Session three-dot menu with the Open Terminal action" width="360">
+  <img src="public/images/terminal-htop.png" alt="Live terminal running htop with the mobile special-key bar" width="360">
+</p>
+
+## Todo Messages
+
+Save a prompt as a Todo Message when the project is busy or has uncommitted changes, then choose whether to send it automatically once the codebase is ready, manually later, or at a scheduled time; pending messages remain visible in the session until they are dispatched.
+
+<p>
+  <img src="public/images/todo-confirm.png" alt="Project-not-ready dialog offering automatic, manual, and immediate send options" width="360">
+  <img src="public/images/todo-message.png" alt="Pending Todo message waiting for the codebase to be ready" width="360">
+  <img src="public/images/todo-new.png" alt="New session form with automatic, manual, and scheduled Todo Message modes" width="360">
+</p>
+
+## Auto Mode
+
+Select **Auto** in the agent picker to let Arondo choose among the agent CLIs installed on the selected Runner. The **Runners** page shows the quota data that informs this choice.
+
+Auto Mode uses the following order of preference:
+
+1. Consider installed Antigravity, Claude, and Codex CLIs with known subscription quota; API-key-billed accounts are held back as a last resort.
+2. Deprioritize agents with less than 15% hourly quota remaining when another candidate has sufficient capacity; if every candidate is low, keep all of them available.
+3. Rank the remaining candidates by weekly quota remaining, adjusted for how much time is left before the weekly reset.
+4. If no subscription quota is known, use an agent with unknown quota before falling back to an API-key-billed agent.
+
+<img src="public/images/auto-mode-quota.png" alt="Runner page showing Claude, Antigravity, and Codex quota information used by Auto Mode" width="360">
+
+## Access Control
+
+Configure authentication from **Settings** with three related controls:
+
+- **System Access Tokens** authenticate people and automations to Arondo. Create `admin` tokens for full administrative access and `user` tokens for restricted access; token values are only shown in full when generated, so store them securely.
+- **Runner Tokens** authenticate each Runner machine. Generate one dedicated token per Runner and pass it with `--token` or `ARONDO_RUNNER_TOKEN`; it binds to the first Runner identity that connects, preventing a leaked token from impersonating a different Runner.
+- **Runner Access Control** grants individual `user` tokens access to selected Runners. Admin tokens can access every Runner; users can access only the Runners that explicitly include their token, so a Runner with no selected users remains admin-only.
+
+<img src="public/images/access-control.png" alt="Settings page for system access tokens, runner tokens, and per-runner access control" width="360">
+
 ## Architecture
 
 ```
