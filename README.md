@@ -318,6 +318,16 @@ When the server returns `needsConfirmation: true`, the CLI prints a hint to retr
 The final JSON result uses `sessionId` and includes the agent's stdout as `rawOutput`.
 The final JSON result is written to stdout; progress messages and errors are written to stderr.
 
+### Install the Arondo Agent Skill
+
+Install the bundled `arondo-agent` skill so Codex, Claude Code, Antigravity CLI (`agy`), or OpenCode can delegate tasks through `bin/arondo`:
+
+```bash
+bin/install-skill
+```
+
+Install only selected agents with `bin/install-skill codex claude`, for example. The installer refuses to replace an existing skill unless `--force` is supplied.
+
 ## Runner CLI
 
 ```

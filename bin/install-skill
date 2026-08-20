@@ -1,0 +1,86 @@
+#!/usr/bin/env node
+
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+
+const SKILL_NAME = 'arondo-agent';
+const SOURCE = path.join(__dirname, 'skills', SKILL_NAME);
+const TARGETS = new Set(['codex', 'claude', 'agy', 'opencode']);
+
+const USAGE = `Install the bundled Arondo Agent skill for supported coding agents.
+
+Usage:
+  bin/install-skill [codex|claude|agy|opencode ...] [--force]
+
+Options:
+  --force    Replace an existing ${SKILL_NAME} skill.
+  --help     Show this help message.
+
+Without targets, installs for all supported agents.`;
+
+function destinationFor(target) {
+  const home = os.homedir();
+  switch (target) {
+    case 'codex':
+      return path.join(process.env.CODEX_HOME || path.join(home, '.codex'), 'skills', SKILL_NAME);
+    case 'claude':
+      return path.join(process.env.CLAUDE_CONFIG_DIR || path.join(home, '.claude'), 'skills', SKILL_NAME);
+    case 'agy':
+      return path.join(home, '.gemini', 'antigravity-cli', 'skills', SKILL_NAME);
+    case 'opencode':
+      return path.join(process.env.XDG_CONFIG_HOME || path.join(home, '.config'), 'opencode', 'skills', SKILL_NAME);
+    default:
+      throw new Error(`unsupported target: ${target}`);
+  }
+}
+
+function parseArgs(argv) {
+  let force = false;
+  const targets = [];
+  for (const arg of argv) {
+    if (arg === '--help' || arg === '-h') {
+      console.log(USAGE);
+      process.exit(0);
+    }
+    if (arg === '--force') {
+      force = true;
+      continue;
+    }
+    if (!TARGETS.has(arg)) {
+      throw new Error(`unknown target: ${arg}`);
+    }
+    if (!targets.includes(arg)) targets.push(arg);
+  }
+  return { force, targets: targets.length ? targets : [...TARGETS] };
+}
+
+function install(source, destination, force) {
+  if (fs.existsSync(destination)) {
+    if (!force) {
+      throw new Error(`${destination} already exists; rerun with --force to replace it`);
+    }
+    fs.rmSync(destination, { recursive: true, force: true });
+  }
+  fs.mkdirSync(path.dirname(destination), { recursive: true });
+  fs.cpSync(source, destination, { recursive: true });
+}
+
+function main() {
+  if (!fs.existsSync(path.join(SOURCE, 'SKILL.md'))) {
+    throw new Error(`bundled skill is missing: ${SOURCE}`);
+  }
+  const { force, targets } = parseArgs(process.argv.slice(2));
+  for (const target of targets) {
+    const destination = destinationFor(target);
+    install(SOURCE, destination, force);
+    console.log(`Installed ${SKILL_NAME} for ${target}: ${destination}`);
+  }
+}
+
+try {
+  main();
+} catch (error) {
+  console.error(`install-skill: ${error.message}`);
+  process.exitCode = 1;
+}
