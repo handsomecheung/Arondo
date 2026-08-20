@@ -1,3 +1,5 @@
+Translated by AI([日本語](README.ja.md) | [简体中文](README.zh-Hans.md) | [繁體中文](README.zh-Hant.md))
+
 # Arondo
 
 Arondo is a mobile-first developer workspace that delegates coding tasks to AI agents and monitors executions across multiple machines. It follows a **Frontend + Server + Runner** architecture where lightweight Go-based Runners are installed on development machines and the central Server coordinates all operations.
