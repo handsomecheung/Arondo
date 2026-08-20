@@ -406,7 +406,7 @@ export default function HomePage() {
 
       if (
         msg.role === "system" &&
-        (msg.type === "agent-run" || msg.type === "script-run")
+        (msg.type === "agent-run" || msg.type === "detached-agent-run" || msg.type === "script-run")
       ) {
         const parsed = parseExecCommand(msg.content);
         cards.set(msg.id, {
@@ -427,7 +427,7 @@ export default function HomePage() {
         continue;
       }
 
-      if (msg.type === "agent-return" || msg.type === "script-return") {
+      if (msg.type === "agent-return" || msg.type === "detached-agent-return" || msg.type === "script-return") {
         let card: ExecCardInfo | undefined;
 
         if (msg.parentId && cards.has(msg.parentId)) {
@@ -437,7 +437,7 @@ export default function HomePage() {
           if (idx !== -1) queue.splice(idx, 1);
         } else {
           const queue =
-            msg.type === "agent-return" ? unmatchedAgent : unmatchedScript;
+            msg.type === "agent-return" || msg.type === "detached-agent-return" ? unmatchedAgent : unmatchedScript;
           if (queue.length > 0) {
             card = cards.get(queue.shift()!)!;
           }

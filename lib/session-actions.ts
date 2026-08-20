@@ -8,6 +8,8 @@ import {
   getMessages,
   getProjectScripts,
   recordScriptHistory,
+  getSessionLog,
+  type DetachedAgentKind,
 } from "./store";
 import { getAgent, resolveAgentType, PROMPT_ENV_VAR } from "./agents";
 import { buildCrossAgentContext } from "./autoselect";
@@ -15,10 +17,127 @@ import { eventBus } from "./event-bus";
 import { runnerManager } from "./runner-manager";
 import { readTokensConfig } from "./auth";
 import { isQuotaErrorMessage } from "./agent-quota-errors";
+import { stripAnsi } from "./ansi";
 
 const MAX_SESSION_NAME_LENGTH = 80;
 
 export type ActionResult = { ok: true; [key: string]: any } | { ok: false; error: string; status: number };
+
+const DETACHED_CONTEXT_MAX_CHARS = 48_000;
+
+export async function buildDetachedAgentContext(sessionId: string): Promise<string> {
+  const messages = await getMessages(sessionId);
+  const parts: string[] = [];
+
+  for (const message of messages) {
+    if (message.type === "detached-agent-run" || message.type === "detached-agent-return") continue;
+    if (message.type === "chat-user") {
+      parts.push(`User:\n${message.content}`);
+      continue;
+    }
+    if (message.type === "agent-run") {
+      const output = stripAnsi(await getSessionLog(sessionId, message.id)).trim();
+      if (output) parts.push(`Agent (${message.resolvedAgentType || "unknown"}):\n${output}`);
+    }
+  }
+
+  const context = parts.join("\n\n---\n\n");
+  return context.length > DETACHED_CONTEXT_MAX_CHARS
+    ? `[Earlier session context omitted to stay within the context limit.]\n\n${context.slice(-DETACHED_CONTEXT_MAX_CHARS)}`
+    : context;
+}
+
+export async function dispatchDetachedAgent(
+  sessionId: string,
+  kind: DetachedAgentKind,
+  message: string,
+  agentType?: string,
+): Promise<ActionResult> {
+  const session = await getSession(sessionId);
+  if (!session) return { ok: false, error: "Session not found", status: 404 };
+
+  const runnerId = runnerManager.resolveRunnerId(session.runnerId);
+  if (!runnerId) return { ok: false, error: "No connected runner available", status: 503 };
+
+  const runner = runnerManager.getRunner(runnerId);
+  const selectedAgentType = agentType || session.agentType;
+  const resolved = await resolveAgentType(selectedAgentType, runner?.info.agents ?? []);
+  const context = await buildDetachedAgentContext(sessionId);
+  const trimmedMessage = message.trim();
+  const instructions = kind === "review"
+    ? "Review the current working tree for correctness, regressions, security issues, and missing tests. Use git diff to inspect changes. Do not modify files. Report findings in severity order with file and line references when possible. If there are no findings, say so clearly."
+    : "Answer the user's request using the supplied session context. This is an independent side conversation: do not modify files and do not assume your answer changes the parent session's plan.";
+  const prompt = [
+    "You are an independent agent. The following is context copied from a parent Arondo session.",
+    "Do not continue or alter the parent agent conversation.",
+    "<parent-session-context>",
+    context || "(The parent session has no normal conversation history yet.)",
+    "</parent-session-context>",
+    "",
+    instructions,
+    trimmedMessage ? `\nUser request:\n${trimmedMessage}` : "",
+  ].join("\n");
+
+  const agentSessionKey = crypto.randomUUID();
+  const agent = getAgent(resolved.agentType);
+  const fullPrompt = agent.buildPrompt(prompt);
+  const command = agent.getCommand({
+    prompt,
+    repoPath: session.repoPath,
+    sessionId: agentSessionKey,
+    isResume: false,
+    model: resolved.model,
+  });
+
+  const runMessage = await addMessage({
+    sessionId,
+    role: "system",
+    content: `⚙️ ${kind === "review" ? "Review" : "By the way"} · Executing command:\n\`\`\`bash\n${command}\n\`\`\``,
+    type: "detached-agent-run",
+    resolvedAgentType: resolved.agentType,
+    prompt: fullPrompt,
+    detachedKind: kind,
+    agentSessionKey,
+  });
+  eventBus.publish({ type: "message_added", payload: runMessage });
+
+  const taskId = `task_${crypto.randomUUID().slice(0, 8)}`;
+  await runnerManager.registerTask({
+    taskId,
+    runnerId,
+    sessionId,
+    messageId: runMessage.id,
+    type: "detached-agent",
+    createdAt: Date.now(),
+    agentType: resolved.agentType,
+    command,
+    detachedKind: kind,
+  });
+  await clearSessionLog(sessionId, runMessage.id);
+
+  runnerManager.sendRequest(runnerId, "exec.agent", {
+    taskId,
+    command,
+    workDir: session.repoPath,
+    prompt: fullPrompt,
+    promptEnvVar: PROMPT_ENV_VAR,
+  }, 10_000).then((res: any) => {
+    if (res?.pid) runnerManager.updateTaskPid(taskId, res.pid);
+  }).catch(async (err) => {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    const errorMessageRecord = await addMessage({
+      sessionId,
+      role: "system",
+      content: `❌ Failed to start agent: ${errorMessage}`,
+      type: "detached-agent-return",
+      parentId: runMessage.id,
+      detachedKind: kind,
+    });
+    eventBus.publish({ type: "message_added", payload: errorMessageRecord });
+  });
+
+  return { ok: true, messageId: runMessage.id };
+}
 
 /**
  * Starts (or resumes) the agent for a session with a follow-up message.

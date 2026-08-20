@@ -57,7 +57,7 @@ interface ServerTask {
   runnerId: string;
   sessionId: string;
   messageId: string;
-  type: "agent" | "script";
+  type: "agent" | "script" | "detached-agent";
   scriptName?: string;
   pid?: number;
   createdAt: number;
@@ -72,7 +72,7 @@ interface ServerTask {
 
 interface TaskItem {
   id: string;
-  type: "script" | "agent";
+  type: "script" | "agent" | "detached-agent";
   name: string;
   sessionId: string;
   sessionName: string;
@@ -197,8 +197,8 @@ export default function TasksPage() {
         .map((t) => {
           const session = sessionMap.get(t.sessionId);
           let name: string;
-          if (t.type === "agent") {
-            name = `Agent: ${t.prompt || session?.name || t.sessionId}`;
+          if (t.type === "agent" || t.type === "detached-agent") {
+            name = `${t.type === "detached-agent" ? "Separate Agent" : "Agent"}: ${t.prompt || session?.name || t.sessionId}`;
           } else {
             name = `Script: ${t.scriptName || "unknown"}`;
           }
@@ -1111,13 +1111,13 @@ export default function TasksPage() {
                                   : "Failed";
                             }
 
-                            if (task.type === "agent") {
+                            if (task.type === "agent" || task.type === "detached-agent") {
                               return (
                                 <AgentExecCard
                                   key={task.id}
                                   item={{
                                     id: task.id,
-                                    type: task.type,
+                                    type: "agent",
                                     agentType: task.agentType,
                                     title: task.agentType ? agentTypeLabel(task.agentType) : task.name.replace(/^(Agent|Script):\s*/, ""),
                                     status: task.status,
@@ -1130,7 +1130,7 @@ export default function TasksPage() {
                                   ws={wsInstance}
                                   onShowCommand={task.command ? () => setCommandTask(task) : undefined}
                                   onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
-                                  onRetryTask={task.status === "error" ? () => handleRetryTask(task) : undefined}
+                                  onRetryTask={task.type === "agent" && task.status === "error" ? () => handleRetryTask(task) : undefined}
                                   onDeleteTask={!isRunning && !task.sessionId ? () => handleDeleteTask(task) : undefined}
                                   onShowPrompt={task.prompt ? () => setCommandTask({ ...task, name: `Agent Prompt`, command: task.prompt }) : undefined}
                                   onViewLog={task.messageId ? () => setTerminalTask(task) : undefined}
@@ -1278,13 +1278,13 @@ export default function TasksPage() {
                               ? `Session: ${task.sessionName || "Unnamed Session"}`
                               : `Project: ${projectName}`;
 
-                            if (task.type === "agent") {
+                            if (task.type === "agent" || task.type === "detached-agent") {
                               return (
                                 <AgentExecCard
                                   key={task.id}
                                   item={{
                                     id: task.id,
-                                    type: task.type,
+                                    type: "agent",
                                     agentType: task.agentType,
                                     title: task.agentType ? agentTypeLabel(task.agentType) : task.name.replace(/^(Agent|Script):\s*/, ""),
                                     subtitle,
@@ -1298,7 +1298,7 @@ export default function TasksPage() {
                                   ws={wsInstance}
                                   onShowCommand={task.command ? () => setCommandTask(task) : undefined}
                                   onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
-                                  onRetryTask={task.status === "error" ? () => handleRetryTask(task) : undefined}
+                                  onRetryTask={task.type === "agent" && task.status === "error" ? () => handleRetryTask(task) : undefined}
                                   onDeleteTask={!isRunning && !task.sessionId ? () => handleDeleteTask(task) : undefined}
                                   onShowPrompt={task.prompt ? () => setCommandTask({ ...task, name: `Agent Prompt`, command: task.prompt }) : undefined}
                                   onViewLog={task.messageId ? () => setTerminalTask(task) : undefined}
@@ -1385,7 +1385,7 @@ export default function TasksPage() {
                 messageId={terminalTask.messageId}
                 ws={wsInstance}
                 mode={terminalTask.status === "running" ? "live" : "history"}
-                taskType={terminalTask.type}
+                taskType={terminalTask.type === "detached-agent" ? "agent" : terminalTask.type}
               />
             </div>
           </div>

@@ -95,7 +95,11 @@ export type MessageType =
   | "script-return"
   | "system-info"
   | "system-error"
-  | "user-todo";
+  | "user-todo"
+  | "detached-agent-run"
+  | "detached-agent-return";
+
+export type DetachedAgentKind = "review" | "btw";
 
 export type TodoStatus = "pending" | "triggered" | "done" | "failed" | "cancelled" | "expired";
 
@@ -120,6 +124,10 @@ export interface Message {
   tokenUuid?: string;
   userName?: string;
   userColor?: string;
+  // Detached agent runs use a fresh agent conversation and never participate
+  // in the parent session's normal conversation history.
+  detachedKind?: DetachedAgentKind;
+  agentSessionKey?: string;
   // "user-todo" messages only:
   todoStatus?: TodoStatus;
   todoTrigger?: TodoTrigger;

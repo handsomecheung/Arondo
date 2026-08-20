@@ -97,6 +97,8 @@ app/
           route.ts      # GET: check git changes via runner
         messages/
           route.ts      # POST: add user follow-up message & trigger agent via runner
+        detached-agent-runs/
+          route.ts      # POST: run a review or side question in a fresh agent context
         run-script/
           route.ts      # POST: run a project script via runner PTY
         restart-script/
@@ -163,7 +165,7 @@ lib/
   project-readiness.ts  # Utility to check project readiness (uncommitted changes, running agents)
   scheduler.ts          # Polls sessions' pending "user-todo" messages and dispatches them once their trigger (at, afterSession, quotaAvailable, codebaseReady) is satisfied
   project-actions.ts    # Extracted action helpers for executing project-scoped scripts
-  session-actions.ts    # Extracted action helpers for processing session messages and running agents
+  session-actions.ts    # Extracted action helpers for session messages, normal agent runs, and detached review/side-question runs
   agents/
     base.ts             # Abstract BaseAgent interface
     antigravity.ts      # Antigravity CLI (agy) adapter
@@ -182,6 +184,7 @@ tests/                  # Playwright integration tests
     runners.spec.ts     # Runner registration and authorization management
     global-rules.spec.ts # Reading and writing global agent rules
     sessions.spec.ts    # Session lifecycle (create, update, delete) integration
+    detached-agent-runs.spec.ts # Detached review and side-question agent integration
     server.spec.ts      # Health check and basic connectivity tests
   runner/               # Test suites for Go Runner handler capabilities
     fs.spec.ts          # File browsing and read capability tests
@@ -253,7 +256,7 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 `lib/runner-manager.ts` is the central coordinator. Key responsibilities:
 
 - **Connection management**: Tracks connected runners (including IP address). Runner IDs are stable across reconnections (derived from `name@hostname`). `RunnerInfo.lastSeenAt` is stamped on both connect and disconnect. Tracks connection start time with `RunnerInfo.connectedAt` to display runner connection time in the UI.
-- **Task routing**: Maps `taskId` → `TaskContext` (sessionId, messageId, runnerId, type, pid, completedAt, exitCode, stoppedByUser). Maps `sessionId:messageId` → `taskId` for PTY input routing. Stopped/completed retained tasks can be deleted via `DELETE /api/tasks/[taskId]`, which marks the backing message as `taskDeleted`.
+- **Task routing**: Maps `taskId` → `TaskContext` (sessionId, messageId, runnerId, type, pid, completedAt, exitCode, stoppedByUser). Task types include normal agents, scripts, and detached agents; a detached-agent exit creates a `detached-agent-return` message without changing the parent session's conversation state. Maps `sessionId:messageId` → `taskId` for PTY input routing. Stopped/completed retained tasks can be deleted via `DELETE /api/tasks/[taskId]`, which marks the backing message as `taskDeleted`.
 - **Task persistence & retention**: Active task contexts are persisted by saving execution metadata directly to `messages.json` (for both sessions and projects). Completed tasks are retained for 3 days (`TASK_RETENTION_MS`), then purged on startup. On server restart, active tasks are restored and re-associated to the reconnecting runner.
 - **Task cleanup**: `removeTasksForSession()` cleans up tasks when a session is deleted. `getAllTasks()` returns all tasks (active + retained). `purgeExpiredTasks()` removes completed tasks older than 3 days.
 - **Runner discovery**: `getAllKnownRunners()` returns both connected runners and disconnected runners persisted on disk, used by the `/api/runners` route.

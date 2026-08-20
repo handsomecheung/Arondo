@@ -71,11 +71,13 @@ export interface Message {
   userName?: string;
   userColor?: string;
   projectId?: string;
+  detachedKind?: "review" | "btw";
+  agentSessionKey?: string;
 }
 
 export interface TaskItem {
   id: string;
-  type: "script" | "agent";
+  type: "script" | "agent" | "detached-agent";
   name: string;
   sessionId: string;
   status: "running" | "done" | "error";

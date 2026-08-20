@@ -157,6 +157,9 @@ export function execCardInfoToItem(info: ExecCardInfo): ExecCardItem {
     type: info.isScript ? "script" : "agent",
     agentType: info.agentType,
     title: !info.isScript && info.agentType ? agentTypeLabel(info.agentType) : info.commandLabel,
+    subtitle: info.runMsg.detachedKind
+      ? info.runMsg.detachedKind === "review" ? "Review · separate context" : "By the way · separate context"
+      : undefined,
     status: !isDone ? "running" : isStopped ? "stopped" : isSuccess ? "done" : "error",
     statusText,
     command: info.command || undefined,

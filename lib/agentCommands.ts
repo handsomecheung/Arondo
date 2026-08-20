@@ -8,6 +8,20 @@ export interface AgentCommand {
 
 export const AGENT_COMMANDS: AgentCommand[] = [
   {
+    command: "review",
+    menuLabel: "/review [--agent agy] [instructions]",
+    menuDescription: "Review the current changes in a separate agent context",
+    matcher: "^review(?:\\s+.*)?$",
+    send: "",
+  },
+  {
+    command: "btw",
+    menuLabel: "/btw [--agent agy] <message>",
+    menuDescription: "Ask a separate agent with the current session context",
+    matcher: "^btw\\s+.+$",
+    send: "",
+  },
+  {
     command: "commit",
     menuLabel: "/commit",
     menuDescription: "Commit the changes",

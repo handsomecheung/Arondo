@@ -65,7 +65,7 @@ export interface TaskContext {
   runnerId: string;
   sessionId: string;
   messageId: string;
-  type: "agent" | "script";
+  type: "agent" | "script" | "detached-agent";
   scriptName?: string;
   pid?: number;
   createdAt: number;
@@ -76,6 +76,7 @@ export interface TaskContext {
   projectId?: string;
   prompt?: string;
   agentType?: string;
+  detachedKind?: "review" | "btw";
 }
 
 interface PendingRequest {
@@ -163,7 +164,7 @@ class RunnerManager {
       for (const s of sessions) {
         const msgs = await getMessages(s.id);
         const runMsgs = msgs.filter((m: any) => {
-          if (m.type !== "agent-run" && m.type !== "script-run") return false;
+          if (m.type !== "agent-run" && m.type !== "detached-agent-run" && m.type !== "script-run") return false;
           if (m.taskDeleted) return false;
           const returnMsg = msgs.find((ret: any) => ret.parentId === m.id);
           if (returnMsg) {
@@ -204,13 +205,14 @@ class RunnerManager {
             runnerId,
             sessionId: s.id,
             messageId: m.id,
-            type: m.type === "agent-run" ? "agent" : "script",
+            type: m.type === "agent-run" ? "agent" : m.type === "detached-agent-run" ? "detached-agent" : "script",
             scriptName,
             pid: m.pid,
             createdAt: new Date(m.createdAt).getTime(),
             command,
             projectId: s.projectId,
             prompt: m.prompt,
+            detachedKind: m.detachedKind,
             completedAt,
             exitCode: m.exitCode,
             stoppedByUser: m.stoppedByUser,
@@ -1094,7 +1096,9 @@ class RunnerManager {
       }
     }
 
-    if (ctx.type === "agent") {
+    if (ctx.type === "detached-agent") {
+      await this.handleDetachedAgentExit(ctx, payload.exitCode);
+    } else if (ctx.type === "agent") {
       await this.handleAgentExit(ctx, payload.exitCode);
     } else {
       await this.handleScriptExit(ctx, payload.exitCode);
@@ -1262,6 +1266,28 @@ class RunnerManager {
         }
       }
     }
+  }
+
+  private async handleDetachedAgentExit(
+    ctx: TaskContext,
+    exitCode: number,
+  ): Promise<void> {
+    const success = exitCode === 0;
+    const stoppedByUser = !!ctx.stoppedByUser;
+    const content = success
+      ? "✅ Done!"
+      : stoppedByUser
+        ? "🛑 Stopped by user"
+        : `❌ Error: Agent exited with code ${exitCode}`;
+    const message = await addMessage({
+      sessionId: ctx.sessionId,
+      role: success ? "agent" : "system",
+      content,
+      type: "detached-agent-return",
+      parentId: ctx.messageId,
+      detachedKind: ctx.detachedKind,
+    });
+    eventBus.publish({ type: "message_added", payload: message });
   }
 
   private async handleScriptExit(

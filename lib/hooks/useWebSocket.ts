@@ -113,7 +113,7 @@ export function useWebSocket({
           if (event.type === "message:added") {
             const msg = event.payload as Message;
 
-            if (msg.type === "script-return" || msg.type === "agent-return") {
+            if (msg.type === "script-return" || msg.type === "agent-return" || msg.type === "detached-agent-return") {
               setTaskQueue((prev) =>
                 prev.filter(
                   (t) =>
@@ -135,7 +135,20 @@ export function useWebSocket({
             }
 
             if (msg.role === "system") {
-              if (msg.type === "agent-run") {
+              if (msg.type === "detached-agent-run") {
+                setTaskQueue((prev) => [
+                  ...prev,
+                  {
+                    id: msg.id,
+                    type: "detached-agent",
+                    name: `${msg.detachedKind === "review" ? "Review" : "By the way"}: ${msg.resolvedAgentType || "Agent"}`,
+                    sessionId: msg.sessionId,
+                    messageId: msg.id,
+                    status: "running",
+                    createdAt: new Date(msg.createdAt).getTime(),
+                  },
+                ]);
+              } else if (msg.type === "agent-run") {
                 setTaskQueue((prev) => {
                   const idx = prev.findIndex(
                     (t) =>
