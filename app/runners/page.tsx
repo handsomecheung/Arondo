@@ -768,13 +768,18 @@ export default function RunnersPage() {
                                   const projSessions = sessions.filter((s) => s.projectId === project.id);
                                   const folderName = project.repoPath.split("/").pop() || project.repoPath;
                                   return (
-                                    <div
+                                    <a
                                       key={project.id}
+                                      href={`/project/${project.id}`}
                                       style={{
+                                        display: "block",
                                         background: "var(--bg-surface)",
                                         border: "1px solid var(--border)",
                                         borderRadius: "var(--radius-md)",
                                         padding: 16,
+                                        color: "inherit",
+                                        textDecoration: "none",
+                                        cursor: "pointer",
                                       }}
                                     >
                                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
@@ -787,7 +792,7 @@ export default function RunnersPage() {
                                         <span style={{ fontSize: 12, color: "var(--text-secondary)" }}><strong>Sessions:</strong> {projSessions.length} total</span>
                                         <span style={{ fontSize: 12, color: "var(--text-secondary)" }}><strong>Status:</strong> Active</span>
                                       </div>
-                                    </div>
+                                    </a>
                                   );
                                 })}
                               </div>
