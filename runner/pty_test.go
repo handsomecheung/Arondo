@@ -1,10 +1,27 @@
 package main
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestExtractAgyConversationIDUsesDedicatedLogFile(t *testing.T) {
+	logFile, err := os.CreateTemp(t.TempDir(), "agy-*.log")
+	if err != nil {
+		t.Fatalf("create log file: %v", err)
+	}
+	defer logFile.Close()
+
+	const conversationID = "a1b2c3d4-e5f6-4789-abcd-0123456789ab"
+	if _, err := logFile.WriteString("I0820 19:53:40.909542       1 server.go:1074] Created conversation " + conversationID + "\n"); err != nil {
+		t.Fatalf("write log file: %v", err)
+	}
+	if got := extractAgyConversationID(logFile.Name()); got != conversationID {
+		t.Fatalf("conversation ID = %q, want %q", got, conversationID)
+	}
+}
 
 func TestSpawnPipedSeparatesStdoutAndStderr(t *testing.T) {
 	tm := NewTaskManager()

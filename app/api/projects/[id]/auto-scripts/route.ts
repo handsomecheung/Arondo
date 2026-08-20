@@ -70,6 +70,7 @@ Requirements:
         taskId,
         command,
         workDir: repoPath,
+        agentType: "antigravity",
         prompt: promptInstructions,
         promptEnvVar: PROMPT_ENV_VAR,
       },

@@ -2,12 +2,9 @@ package main
 
 import (
 	"encoding/base64"
-	"io/ioutil"
 	"log"
 	"os"
-	"path/filepath"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -21,6 +18,7 @@ type execAgentRequest struct {
 	Env          []string `json:"env,omitempty"`
 	Prompt       string   `json:"prompt,omitempty"`
 	PromptEnvVar string   `json:"promptEnvVar,omitempty"`
+	AgentType    string   `json:"agentType,omitempty"`
 }
 
 type execScriptRequest struct {
@@ -75,6 +73,25 @@ func (h *Handler) handleExecAgent(msg *Message) {
 		env = append(env, req.PromptEnvVar+"="+promptFile)
 	}
 
+	var agyLogFile string
+	if req.AgentType == "antigravity" {
+		f, err := os.CreateTemp("", "arondo-agy-*.log")
+		if err != nil {
+			if promptFile != "" {
+				os.Remove(promptFile)
+			}
+			h.sendError(msg.ID, "INTERNAL", "failed to create agy log file: "+err.Error())
+			return
+		}
+		agyLogFile = f.Name()
+		f.Close()
+		if len(req.Args) == 0 {
+			args[1] += " --log-file " + strconv.Quote(agyLogFile)
+		} else {
+			args = append(args, "--log-file", agyLogFile)
+		}
+	}
+
 	var pid int
 	pid, err = h.taskManager.SpawnPiped(SpawnPipedOptions{
 		TaskID:  req.TaskID,
@@ -102,7 +119,10 @@ func (h *Handler) handleExecAgent(msg *Message) {
 			if promptFile != "" {
 				os.Remove(promptFile)
 			}
-			agyConvID := detectAgyConvIdByPid(pid)
+			agyConvID := extractAgyConversationID(agyLogFile)
+			if agyLogFile != "" {
+				os.Remove(agyLogFile)
+			}
 			payload := map[string]any{
 				"taskId":   req.TaskID,
 				"exitCode": exitCode,
@@ -115,6 +135,12 @@ func (h *Handler) handleExecAgent(msg *Message) {
 	})
 
 	if err != nil {
+		if agyLogFile != "" {
+			os.Remove(agyLogFile)
+		}
+		if promptFile != "" {
+			os.Remove(promptFile)
+		}
 		h.sendError(msg.ID, "INTERNAL", "failed to start agent: "+err.Error())
 		return
 	}
@@ -125,48 +151,17 @@ func (h *Handler) handleExecAgent(msg *Message) {
 
 var convIDRe = regexp.MustCompile(`Created conversation ([0-9a-f-]{36})`)
 
-func detectAgyConvIdByPid(pid int) string {
-	if pid <= 0 {
+func extractAgyConversationID(logFile string) string {
+	if logFile == "" {
 		return ""
 	}
-	logDir := os.Getenv("AGY_DIR_LOG")
-	if logDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return ""
-		}
-		logDir = filepath.Join(home, ".gemini", "antigravity-cli", "log")
-	}
-	files, err := ioutil.ReadDir(logDir)
+	content, err := os.ReadFile(logFile)
 	if err != nil {
 		return ""
 	}
-
-	sort.Slice(files, func(i, j int) bool {
-		return files[i].ModTime().After(files[j].ModTime())
-	})
-
-	pidStr := " " + strconv.Itoa(pid) + " "
-
-	for _, file := range files {
-		if file.IsDir() || !strings.HasPrefix(file.Name(), "cli-") || !strings.HasSuffix(file.Name(), ".log") {
-			continue
-		}
-		path := filepath.Join(logDir, file.Name())
-		contentBytes, err := ioutil.ReadFile(path)
-		if err != nil {
-			continue
-		}
-		content := string(contentBytes)
-
-		if !strings.Contains(content, pidStr) {
-			continue
-		}
-
-		match := convIDRe.FindStringSubmatch(content)
-		if len(match) > 1 {
-			return match[1]
-		}
+	match := convIDRe.FindStringSubmatch(string(content))
+	if len(match) > 1 {
+		return match[1]
 	}
 	return ""
 }

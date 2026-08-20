@@ -18,6 +18,7 @@ const args = process.argv.slice(2);
 let conversationId = null;
 let prompt = null;
 let resumeMode = false;
+let explicitLogFile = null;
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--conversation') {
@@ -26,6 +27,9 @@ for (let i = 0; i < args.length; i++) {
     i++;
   } else if (args[i] === '--prompt') {
     prompt = args[i + 1];
+    i++;
+  } else if (args[i] === '--log-file') {
+    explicitLogFile = args[i + 1];
     i++;
   }
 }
@@ -52,7 +56,7 @@ if (conversationId !== null || prompt !== null) {
     String(now.getMinutes()).padStart(2, '0') +
     String(now.getSeconds()).padStart(2, '0');
   const pid = process.pid;
-  const logFile = path.join(agyDirLog, `cli-${timestamp}.log`);
+  const logFile = explicitLogFile || path.join(agyDirLog, `cli-${timestamp}.log`);
 
   if (!fs.existsSync(TEMPLATE_FILE)) {
     console.error(`Error: TEMPLATE_FILE (${TEMPLATE_FILE}) not found`);
@@ -61,6 +65,7 @@ if (conversationId !== null || prompt !== null) {
 
   let templateContent = fs.readFileSync(TEMPLATE_FILE, 'utf8');
   templateContent = templateContent.replace(/__pid__/g, String(pid)).replace(/__conversation_id__/g, conversationId);
+  fs.mkdirSync(path.dirname(logFile), { recursive: true });
   fs.writeFileSync(logFile, templateContent);
 
   const lines = prompt ? prompt.trim().split('\n') : [];

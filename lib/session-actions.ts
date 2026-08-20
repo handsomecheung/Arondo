@@ -119,6 +119,7 @@ export async function dispatchDetachedAgent(
     taskId,
     command,
     workDir: session.repoPath,
+    agentType: resolved.agentType,
     prompt: fullPrompt,
     promptEnvVar: PROMPT_ENV_VAR,
   }, 10_000).then((res: any) => {
@@ -276,6 +277,7 @@ export async function dispatchFollowupMessage(
       taskId,
       command,
       workDir: session.repoPath,
+      agentType: resolvedType,
       prompt: fullPrompt,
       promptEnvVar: PROMPT_ENV_VAR,
     }, 10_000)
@@ -391,6 +393,7 @@ export async function dispatchCreateSession(
       taskId,
       command,
       workDir: repoPath,
+      agentType: resolvedType,
       prompt: fullPrompt,
       promptEnvVar: PROMPT_ENV_VAR,
     }, 10_000)

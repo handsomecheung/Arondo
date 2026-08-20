@@ -85,6 +85,7 @@ export async function POST(
       taskId,
       command,
       workDir: session.repoPath,
+      agentType: resolvedType,
       prompt: fullPrompt,
       promptEnvVar: PROMPT_ENV_VAR,
     }, 10_000)
