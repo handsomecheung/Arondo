@@ -732,7 +732,7 @@ export default function ProjectPanel({
                         textOverflow: "ellipsis",
                       }}
                     >
-                      {session.name || session.prompt}
+                      {session.name || "Untitled"}
                     </span>
                   </div>
                   <span

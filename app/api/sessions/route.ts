@@ -143,7 +143,6 @@ export async function POST(req: NextRequest) {
   if (isBlank) {
     const session = await createSession({
       status: "idle",
-      prompt: "",
       name: name?.trim() || deriveSessionName("", repoPath),
       agentType,
       repoPath,
@@ -158,7 +157,6 @@ export async function POST(req: NextRequest) {
     const trimmedMessage = message?.trim() || trimmedPrompt;
     const session = await createSession({
       status: "idle",
-      prompt: "",
       name: name?.trim() || deriveSessionName(trimmedMessage, repoPath),
       agentType,
       repoPath,

@@ -1493,8 +1493,8 @@ export default function HomePage() {
             }}
             onOpenRenameModal={() => {
               if (selectedSession && selectedSessionId) {
-                setRenameModal({ sessionId: selectedSessionId, currentName: selectedSession.name || selectedSession.prompt });
-                setRenameInput(selectedSession.name || selectedSession.prompt);
+                setRenameModal({ sessionId: selectedSessionId, currentName: selectedSession.name || "Untitled" });
+                setRenameInput(selectedSession.name || "Untitled");
               }
             }}
             onManageScripts={() => {

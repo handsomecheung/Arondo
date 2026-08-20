@@ -409,7 +409,7 @@ export default function SessionView({
                 whiteSpace: "nowrap",
               }}
             >
-              {selectedSession.name || selectedSession.prompt}
+              {selectedSession.name || "Untitled"}
             </span>
             <div
               style={{

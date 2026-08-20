@@ -107,14 +107,11 @@ export async function dispatchFollowupMessage(
   });
 
   const patch: Record<string, any> = { status: "running" };
-  if (!session.prompt) {
-    if (!session.name) {
-      const firstLine = trimmedMessage.split("\n")[0];
-      patch.name = firstLine.length > MAX_SESSION_NAME_LENGTH
-        ? firstLine.slice(0, MAX_SESSION_NAME_LENGTH) + "…"
-        : firstLine;
-    }
-    patch.prompt = trimmedMessage;
+  if (!session.name) {
+    const firstLine = trimmedMessage.split("\n")[0];
+    patch.name = firstLine.length > MAX_SESSION_NAME_LENGTH
+      ? firstLine.slice(0, MAX_SESSION_NAME_LENGTH) + "…"
+      : firstLine;
   }
   if (session.agentType === "auto") {
     patch.autoLockedAgentType = resolvedType;
@@ -218,7 +215,6 @@ export async function dispatchCreateSession(
 
   const session = await createSession({
     status: "running",
-    prompt: displayMessage,
     name: opts.name?.trim() || deriveSessionName(displayMessage, repoPath),
     agentType,
     repoPath,
@@ -241,6 +237,7 @@ export async function dispatchCreateSession(
     sessionId: session.id,
     role: "user",
     content: displayMessage,
+    prompt: trimmedPrompt,
     type: "chat-user",
     tokenUuid: opts.tokenUuid,
   });

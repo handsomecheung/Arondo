@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession, addMessage, updateSession, clearSessionLog } from "@/lib/store";
+import { getSession, getMessages, addMessage, updateSession, clearSessionLog } from "@/lib/store";
 import { getAgent, resolveAgentType, PROMPT_ENV_VAR } from "@/lib/agents";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
@@ -26,7 +26,12 @@ export async function POST(
     return NextResponse.json({ error: "Agent is already running" }, { status: 400 });
   }
 
-  if (!session.prompt) {
+  const messages = await getMessages(id);
+  const initialUserMessage = messages.find((message) =>
+    message.role === "user" && message.type !== "user-todo"
+  );
+  const prompt = initialUserMessage?.prompt || initialUserMessage?.content;
+  if (!prompt) {
     return NextResponse.json({ error: "Session has no prompt to re-run" }, { status: 400 });
   }
 
@@ -39,9 +44,9 @@ export async function POST(
   const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? []);
   const resolvedType = resolved.agentType;
   const agent = getAgent(resolvedType);
-  const fullPrompt = agent.buildPrompt(session.prompt);
+  const fullPrompt = agent.buildPrompt(prompt);
   const command = agent.getCommand({
-    prompt: session.prompt,
+    prompt,
     repoPath: session.repoPath,
     sessionId: session.id,
     isResume: false,

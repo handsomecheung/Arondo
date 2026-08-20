@@ -195,7 +195,7 @@ tests/                  # Playwright integration tests
   agent-sessions.json  # Agent session map: { "agy": {}, "codex": {}, "opencode": {} }
   sessions/
     [sessionId]/
-      session.json      # Session metadata (status, prompt, agent, repoPath, runnerId)
+      session.json      # Session metadata (status, agent, repoPath, runnerId)
       messages.json     # Message history within the session
       logs/
         [messageId].log        # Stdout execution log bound to specific system message ID

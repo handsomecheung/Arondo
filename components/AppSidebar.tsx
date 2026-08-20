@@ -426,7 +426,7 @@ export default function AppSidebar({
                           </span>
                         )}
                       </div>
-                      <div className="task-item-prompt">{session.name || session.prompt}</div>
+                      <div className="task-item-prompt">{session.name || "Untitled"}</div>
                       <div className="task-item-time">{formatRelative(session.updatedAt)}</div>
                     </div>
                   </div>
@@ -575,7 +575,7 @@ export default function AppSidebar({
                             <button
                               className="menu-item"
                               onClick={() => {
-                                onOpenRenameModal(session.id, session.name || session.prompt);
+                                onOpenRenameModal(session.id, session.name || "Untitled");
                                 setOpenSessionMenuId(null);
                               }}
                               id={`session-menu-rename-${session.id}`}
@@ -607,7 +607,7 @@ export default function AppSidebar({
                         )}
                       </div>
                     </div>
-                    <div className="task-item-prompt">{session.name || session.prompt}</div>
+                    <div className="task-item-prompt">{session.name || "Untitled"}</div>
                     <div className="task-item-time">{formatRelative(session.updatedAt)}</div>
                     </div>
                   </div>

@@ -198,7 +198,7 @@ export default function TasksPage() {
           const session = sessionMap.get(t.sessionId);
           let name: string;
           if (t.type === "agent") {
-            name = `Agent: ${t.prompt || session?.prompt || t.sessionId}`;
+            name = `Agent: ${t.prompt || session?.name || t.sessionId}`;
           } else {
             name = `Script: ${t.scriptName || "unknown"}`;
           }
@@ -225,7 +225,7 @@ export default function TasksPage() {
             command,
             scriptName: t.scriptName,
             projectId: t.projectId || session?.projectId,
-            prompt: t.prompt || session?.prompt,
+            prompt: t.prompt,
             agentType: t.agentType || session?.agentType,
           };
         });

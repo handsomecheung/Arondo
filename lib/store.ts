@@ -53,7 +53,6 @@ export interface Session {
   id: string;
   name?: string;
   status: SessionStatus;
-  prompt: string;
   agentType: string;
   repoPath: string;
   projectId: string;
