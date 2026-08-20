@@ -126,6 +126,16 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
     });
   });
 
+  test('does not select Claude Code when its latest quota entry uses API billing', async () => {
+    await fs.copyFile(
+      path.join(process.cwd(), 'tests', 'mocks', 'autoselect', 'agent', 'claude-latest-api-billing.json'),
+      quotaPath,
+    );
+
+    const selected = await selectAgent(['agy', 'claude']);
+    expect(selected?.agentType).not.toBe('claude');
+  });
+
   test('C -> A: should successfully handoff context from claude to agy (Gemini Flash)', async ({ request }) => {
     await runTransitionTest(
       request,

@@ -1,0 +1,49 @@
+{
+  "claude_fixture@example.com_Claude Pro account": {
+    "Plan": "Claude Pro account",
+    "Account": "fixture@example.com",
+    "DefaultModel": "Default (Sonnet 5 · Efficient for routine tasks)",
+    "HourRemain": 0.25,
+    "HourResetAt": 1782923340,
+    "WeekRemain": 0.77,
+    "WeekResetsAt": 1783454400,
+    "updatedAt": 1782917417,
+    "Type": "claude"
+  },
+  "antigravity_fixture@example.com_Google AI Pro": {
+    "Account": "fixture@example.com",
+    "Plan": "Google AI Pro",
+    "DefaultModel": "",
+    "GeminiWeeklyRemain": 0.74,
+    "GeminiWeeklyResetsAt": 1787790010,
+    "GeminiHourRemain": 0.41,
+    "GeminiHourResetsAt": 1787221690,
+    "OtherWeeklyRemain": 0.46,
+    "OtherWeeklyResetsAt": 1787241850,
+    "OtherHourRemain": 0.84,
+    "OtherHourResetsAt": 1787221330,
+    "updatedAt": 1787209030,
+    "Type": "antigravity"
+  },
+  "claude_fixture@example.com_API Usage Billing": {
+    "Plan": "API Usage Billing",
+    "Account": "fixture@example.com",
+    "DefaultModel": "Default (Claude Opus)",
+    "HourRemain": null,
+    "HourResetAt": null,
+    "WeekRemain": null,
+    "WeekResetsAt": null,
+    "IsAPIKey": true,
+    "updatedAt": 1787212485,
+    "Type": "claude"
+  },
+  "codex_fixture@example.com_Plus": {
+    "Account": "fixture@example.com",
+    "Plan": "Plus",
+    "DefaultModel": "gpt-5.6-terra (reasoning medium, summaries auto)",
+    "WeeklyRemain": 0.98,
+    "WeeklyResetAt": 1787806200,
+    "updatedAt": 1787209031,
+    "Type": "codex"
+  }
+}

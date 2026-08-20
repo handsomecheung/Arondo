@@ -110,6 +110,14 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
   }
 
   const quota = await readQuota();
+  const entries = Object.values(quota);
+  const latestEntryByType = new Map<QuotaEntry["Type"], QuotaEntry>();
+  for (const entry of entries) {
+    const existing = latestEntryByType.get(entry.Type);
+    if (!existing || (entry.updatedAt ?? 0) > (existing.updatedAt ?? 0)) {
+      latestEntryByType.set(entry.Type, entry);
+    }
+  }
 
   // Helper to extract relevant quota metrics for a choice
   const getMetrics = (choice: AgentChoice) => {
@@ -117,25 +125,22 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
     let weekRemain: number | null = null;
     let resetsAt: number | null = null;
 
-    // Find the matching quota entries
-    const entries = Object.values(quota);
-
     if (choice.id === "A") {
-      const q = entries.find((e) => e.Type === "antigravity") as AntigravityQuota | undefined;
+      const q = latestEntryByType.get("antigravity") as AntigravityQuota | undefined;
       if (q) {
         hourRemain = q.GeminiHourRemain;
         weekRemain = q.GeminiWeeklyRemain;
         resetsAt = q.GeminiWeeklyResetsAt;
       }
     } else if (choice.id === "B") {
-      const q = entries.find((e) => e.Type === "antigravity") as AntigravityQuota | undefined;
+      const q = latestEntryByType.get("antigravity") as AntigravityQuota | undefined;
       if (q) {
         hourRemain = q.OtherHourRemain;
         weekRemain = q.OtherWeeklyRemain;
         resetsAt = q.OtherWeeklyResetsAt;
       }
     } else if (choice.id === "C") {
-      const q = entries.find((e) => e.Type === "claude") as ClaudeQuota | undefined;
+      const q = latestEntryByType.get("claude") as ClaudeQuota | undefined;
       if (q) {
         hourRemain = q.HourRemain;
         weekRemain = q.WeekRemain;
@@ -143,7 +148,7 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
       }
     } else if (choice.id === "D") {
       // Codex only reports a weekly limit; no hourly figure is available.
-      const q = entries.find((e) => e.Type === "codex") as CodexQuota | undefined;
+      const q = latestEntryByType.get("codex") as CodexQuota | undefined;
       if (q) {
         weekRemain = q.WeeklyRemain;
         resetsAt = q.WeeklyResetAt;
@@ -151,10 +156,10 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
     }
 
     const entry = choice.id === "A" || choice.id === "B"
-      ? entries.find((e) => e.Type === "antigravity")
+      ? latestEntryByType.get("antigravity")
       : choice.id === "C"
-        ? entries.find((e) => e.Type === "claude")
-        : entries.find((e) => e.Type === "codex");
+        ? latestEntryByType.get("claude")
+        : latestEntryByType.get("codex");
     return { hourRemain, weekRemain, resetsAt, isAPIKey: entry?.IsAPIKey === true };
   };
 
