@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+.arondo.env
 
 # vercel
 .vercel
@@ -52,4 +53,3 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /runner/arondo-runner
-

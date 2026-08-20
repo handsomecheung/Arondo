@@ -21,8 +21,8 @@ Usage:
     "Now also print the current directory"
 
 Options:
-  --server <url>               Arondo server base URL (overrides ARONDO_URL in bin/.env)
-  --token <token>              Client access token (overrides ARONDO_TOKEN in bin/.env)
+  --server <url>               Arondo server base URL (overrides ARONDO_URL in bin/.arondo.env)
+  --token <token>              Client access token (overrides ARONDO_TOKEN in bin/.arondo.env)
   --runner-id <id>             Target runner ID (default: connected runner with the current hostname)
   --path <path>                Repository path on the runner (default: current working directory)
   --temp-dir                   Create the session in a fresh temporary directory on the runner
@@ -55,7 +55,7 @@ function loadDotEnv(filePath) {
 }
 
 function parseArgs(argv) {
-  const env = loadDotEnv(path.join(__dirname, '.env'));
+  const env = loadDotEnv(path.join(__dirname, '.arondo.env'));
   const args = {
     server: env.ARONDO_URL,
     token: env.ARONDO_TOKEN,
@@ -117,10 +117,10 @@ function parseArgs(argv) {
 
   const missingConfiguration = [];
   if (!args.server) {
-    missingConfiguration.push('server: specify --server <url> or set ARONDO_URL in bin/.env');
+    missingConfiguration.push('server: specify --server <url> or set ARONDO_URL in bin/.arondo.env');
   }
   if (!args.token) {
-    missingConfiguration.push('token: specify --token <token> or set ARONDO_TOKEN in bin/.env');
+    missingConfiguration.push('token: specify --token <token> or set ARONDO_TOKEN in bin/.arondo.env');
   }
   if (missingConfiguration.length > 0) {
     throw new Error(`missing configuration:\n${missingConfiguration.join('\n')}`);
