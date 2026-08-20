@@ -8,13 +8,13 @@ const common = require('./common');
 const USAGE = `Create a session, send a message, poll until it finishes, and print the result.
 
 Usage:
-  bin/arondo \\
+  bin/arondo send \\
     --server http://localhost:3251 \\
     --token <client_access_token> \\
     --temp-dir \\
     "Print the current date"
 
-  bin/arondo \\
+  bin/arondo send \\
     --server http://localhost:3251 \\
     --token <client_access_token> \\
     --resume \\
@@ -33,6 +33,13 @@ Options:
   --poll-interval <seconds>    Seconds between status polls (default: 3)
   --timeout <seconds>          Maximum seconds to wait for completion (default: 600)
   --help                       Show this help message`;
+
+const ROOT_USAGE = `Usage: bin/arondo <command> [options] <message>
+
+Commands:
+  send    Create a session or send a message to an existing session, then wait for the result
+
+Run \`bin/arondo send --help\` for command options.`;
 
 function loadDotEnv(filePath) {
   try {
@@ -184,7 +191,19 @@ async function getRawOutput(server, token, sessionId) {
 }
 
 async function run() {
-  const args = parseArgs(process.argv.slice(2));
+  const [command, ...commandArgs] = process.argv.slice(2);
+  if (command === '--help' || command === '-h') {
+    console.error(ROOT_USAGE);
+    return;
+  }
+  if (!command) {
+    throw new Error(`a command is required\n\n${ROOT_USAGE}`);
+  }
+  if (command !== 'send') {
+    throw new Error(`unknown command: ${command}\n\n${ROOT_USAGE}`);
+  }
+
+  const args = parseArgs(commandArgs);
 
   if (args.resume) {
     if (!args.runnerId) {

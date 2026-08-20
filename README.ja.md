@@ -282,10 +282,10 @@ x-arondo-token: <token>
 
 ### スクリプト例
 
-`bin/arondo` は、依存関係のない Node.js CLI で、セッションを作成するか、既存のセッションにメッセージを送信し、終了するまでポーリングして結果を出力します。必要なメッセージは最後の位置引数として渡されます。
+`bin/arondo` は依存関係のない Node.js CLI です。`send` コマンドは、セッションを作成するか、既存のセッションにメッセージを送信し、終了するまでポーリングして結果を出力します。必要なメッセージは最後の位置引数として渡されます。
 
 ```bash
-bin/arondo \
+bin/arondo send \
   --server http://localhost:3251 \
   --token <client_access_token> \
   --temp-dir \
@@ -295,7 +295,7 @@ bin/arondo \
 このコマンドはセッション ID を出力します。これを使用して、後の呼び出しで会話を継続します。
 
 ```bash
-bin/arondo \
+bin/arondo send \
   --server http://localhost:3251 \
   --token <client_access_token> \
   --resume \

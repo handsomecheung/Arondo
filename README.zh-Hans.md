@@ -282,10 +282,10 @@ x-arondo-token: <token>
 
 ### 示例 Script
 
-`bin/arondo` 是一个无依赖项的 Node.js CLI，它创建会话或向现有会话发送消息，然后轮询直到完成并打印结果。所需的消息作为最终位置参数传递。
+`bin/arondo` 是一个无依赖项的 Node.js CLI。它的 `send` 命令会创建会话或向现有会话发送消息，然后轮询直到完成并打印结果。所需的消息作为最终位置参数传递。
 
 ```bash
-bin/arondo \
+bin/arondo send \
   --server http://localhost:3251 \
   --token <client_access_token> \
   --temp-dir \
@@ -295,7 +295,7 @@ bin/arondo \
 该命令打印会话 ID。使用它在稍后的调用中继续该对话：
 
 ```bash
-bin/arondo \
+bin/arondo send \
   --server http://localhost:3251 \
   --token <client_access_token> \
   --resume \

@@ -290,10 +290,10 @@ x-arondo-token: <token>
 
 ### Example script
 
-`bin/arondo` is a dependency-free Node.js CLI that creates a session or sends a message to an existing session, then polls until it finishes and prints the result. The required message is passed as the final positional argument.
+`bin/arondo` is a dependency-free Node.js CLI. Its `send` command creates a session or sends a message to an existing session, then polls until it finishes and prints the result. The required message is passed as the final positional argument.
 
 ```bash
-bin/arondo \
+bin/arondo send \
   --server http://localhost:3251 \
   --token <client_access_token> \
   --temp-dir \
@@ -303,7 +303,7 @@ bin/arondo \
 The command prints the session ID. Use it to continue that conversation in a later invocation:
 
 ```bash
-bin/arondo \
+bin/arondo send \
   --server http://localhost:3251 \
   --token <client_access_token> \
   --resume \
