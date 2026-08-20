@@ -14,8 +14,11 @@ export function resolveRepoFilePath(repoPath: string, path: string): string {
   return `${repoPath.replace(/\/$/, "")}/${path}`;
 }
 
-export function canForceSend(reason: { dirty: boolean; busy: boolean; queued?: boolean }): boolean {
-  return !reason.busy;
+export function canForceSend(
+  reason: { dirty: boolean; busy: boolean; queued?: boolean },
+  isFollowup = false,
+): boolean {
+  return !isFollowup || !reason.busy;
 }
 
 export interface ConfirmationButton {
@@ -36,7 +39,7 @@ export function getConfirmationButtons(
     },
     { choice: "draft", label: "Save as draft, send manually later" },
   ];
-  if (canForceSend(reason)) {
+  if (canForceSend(reason, isFollowup)) {
     buttons.push({ choice: "force", label: "Send now anyway" });
   }
   return buttons;

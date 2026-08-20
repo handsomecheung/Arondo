@@ -1,23 +1,23 @@
 import { test, expect } from '@playwright/test';
 import { canForceSend } from '../../lib/homeUtils';
 
-// Regression tests for the "Project not ready" confirmation dialog offering a
-// "Send now anyway" option that can never actually succeed. The backend
-// (dispatchFollowupMessage in lib/session-actions.ts) unconditionally rejects
-// a follow-up message with "Agent is already running for this session" when
-// session.status is "running", even when force: true is passed. So whenever
-// reason.busy is true, "Send now anyway" must not be offered at all.
+// A new session can force-send despite another agent running on the same
+// project. A follow-up cannot force-send while its own agent is running.
 test.describe('canForceSend (Send now anyway button visibility)', () => {
-  test('is not offered when an agent is already running (busy)', () => {
-    expect(canForceSend({ dirty: false, busy: true })).toBe(false);
+  test('is not offered for a follow-up when its agent is already running', () => {
+    expect(canForceSend({ dirty: false, busy: true }, true)).toBe(false);
   });
 
-  test('is not offered when busy and dirty together', () => {
-    expect(canForceSend({ dirty: true, busy: true })).toBe(false);
+  test('is not offered for a follow-up when busy and dirty together', () => {
+    expect(canForceSend({ dirty: true, busy: true }, true)).toBe(false);
   });
 
-  test('is not offered when busy with a message already queued ahead', () => {
-    expect(canForceSend({ dirty: false, busy: true, queued: true })).toBe(false);
+  test('is not offered for a follow-up when busy with a message already queued ahead', () => {
+    expect(canForceSend({ dirty: false, busy: true, queued: true }, true)).toBe(false);
+  });
+
+  test('is offered for a new session when another project agent is running', () => {
+    expect(canForceSend({ dirty: false, busy: true }, false)).toBe(true);
   });
 
   test('is offered when only the working tree is dirty (not busy)', () => {
