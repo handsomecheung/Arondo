@@ -1,4 +1,4 @@
-name: Build Runner
+name: Build Binaries
 
 on:
   push:
@@ -14,22 +14,37 @@ jobs:
         include:
           - goos: linux
             goarch: amd64
-            artifact: runner-linux-amd64
+            component: runner
+            artifact: arondo-runner-linux-amd64
           - goos: darwin
             goarch: amd64
-            artifact: runner-macos-amd64
+            component: runner
+            artifact: arondo-runner-macos-amd64
           - goos: darwin
             goarch: arm64
-            artifact: runner-macos-arm64
+            component: runner
+            artifact: arondo-runner-macos-arm64
+          - goos: linux
+            goarch: amd64
+            component: cli
+            artifact: arondo-cli-linux-amd64
+          - goos: darwin
+            goarch: amd64
+            component: cli
+            artifact: arondo-cli-macos-amd64
+          - goos: darwin
+            goarch: arm64
+            component: cli
+            artifact: arondo-cli-macos-arm64
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: runner/go.mod
+          go-version-file: ${{ matrix.component }}/go.mod
 
       - name: Build
-        working-directory: runner
+        working-directory: ${{ matrix.component }}
         env:
           CGO_ENABLED: '0'
           GOOS: ${{ matrix.goos }}
@@ -39,7 +54,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: runner/${{ matrix.artifact }}
+          path: ${{ matrix.component }}/${{ matrix.artifact }}
 
   release:
     if: startsWith(github.ref, 'refs/tags/')

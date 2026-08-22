@@ -280,12 +280,12 @@ x-arondo-token: <token>
 - `Session` オブジェクトを返します。 `status`、`idle`、`running`、`script-running`、`done`、`error`のいずれかをチェックします。
 - `done`/`error` は、エージェントが終了したことを意味します。ステータスが `running`/`script-running` のままになるまで、このエンドポイントをポーリングします。
 
-### スクリプト例
+### CLI
 
-`bin/arondo` は依存関係のない Node.js CLI です。`send` コマンドは、セッションを作成するか、既存のセッションにメッセージを送信し、終了するまでポーリングして結果を出力します。必要なメッセージは最後の位置引数として渡されます。
+`cli/arondo-cli` は依存関係のない Go CLI です。`cd cli && go build -o arondo-cli . && cd ..` でビルドできます。`send` コマンドは、セッションを作成するか、既存のセッションにメッセージを送信し、終了するまでポーリングして結果を出力します。必要なメッセージは最後の位置引数として渡されます。
 
 ```bash
-bin/arondo send \
+cli/arondo-cli send \
   --server http://localhost:3251 \
   --token <client_access_token> \
   --temp-dir \
@@ -295,7 +295,7 @@ bin/arondo send \
 このコマンドはセッション ID を出力します。これを使用して、後の呼び出しで会話を継続します。
 
 ```bash
-bin/arondo send \
+cli/arondo-cli send \
   --server http://localhost:3251 \
   --token <client_access_token> \
   --resume \

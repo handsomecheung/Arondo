@@ -11,7 +11,7 @@ const TARGETS = new Set(['codex', 'claude', 'agy', 'opencode']);
 const USAGE = `Install the bundled Arondo Agent skill for supported coding agents.
 
 Usage:
-  bin/install-skill [codex|claude|agy|opencode ...] [--force]
+  cli/install-skill [codex|claude|agy|opencode ...] [--force]
 
 Options:
   --force    Replace an existing ${SKILL_NAME} skill.

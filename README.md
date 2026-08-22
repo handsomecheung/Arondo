@@ -177,7 +177,15 @@ Or use the convenience script:
 ./scripts/run.runner.sh
 ```
 
-### 3. Open the UI
+### 3. Build the CLI (optional)
+
+```bash
+cd cli
+go build -o arondo-cli .
+cd ..
+```
+
+### 4. Open the UI
 
 Open [http://localhost:3251](http://localhost:3251) in your browser. Select the connected runner, choose a project directory, and start a session.
 
@@ -288,12 +296,12 @@ x-arondo-token: <token>
 - Returns the `Session` object. Check `status`, one of: `idle`, `running`, `script-running`, `done`, `error`.
 - `done`/`error` means the agent finished; poll this endpoint until the status leaves `running`/`script-running`.
 
-### Example script
+### CLI
 
-`bin/arondo` is a dependency-free Node.js CLI. Its `send` command creates a session or sends a message to an existing session, then polls until it finishes and prints the result. The required message is passed as the final positional argument.
+`cli/arondo-cli` is a dependency-free Go CLI. Build it with `cd cli && go build -o arondo-cli . && cd ..`. Its `send` command creates a session or sends a message to an existing session, then polls until it finishes and prints the result. The required message is passed as the final positional argument.
 
 ```bash
-bin/arondo send \
+cli/arondo-cli send \
   --server http://localhost:3251 \
   --token <client_access_token> \
   --temp-dir \
@@ -303,7 +311,7 @@ bin/arondo send \
 The command prints the session ID. Use it to continue that conversation in a later invocation:
 
 ```bash
-bin/arondo send \
+cli/arondo-cli send \
   --server http://localhost:3251 \
   --token <client_access_token> \
   --resume \
@@ -320,13 +328,13 @@ The final JSON result is written to stdout; progress messages and errors are wri
 
 ### Install the Arondo Agent Skill
 
-Install the bundled `arondo-agent` skill so Codex, Claude Code, Antigravity CLI (`agy`), or OpenCode can delegate tasks through `bin/arondo`:
+Install the bundled `arondo-agent` skill so Codex, Claude Code, Antigravity CLI (`agy`), or OpenCode can delegate tasks through `cli/arondo-cli`:
 
 ```bash
-bin/install-skill
+cli/install-skill
 ```
 
-Install only selected agents with `bin/install-skill codex claude`, for example. The installer refuses to replace an existing skill unless `--force` is supplied.
+Install only selected agents with `cli/install-skill codex claude`, for example. The installer refuses to replace an existing skill unless `--force` is supplied.
 
 ## Runner CLI
 

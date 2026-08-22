@@ -5,14 +5,14 @@ description: Delegate a task to an LLM or coding agent through Arondo's CLI when
 
 # Arondo Agent
 
-Use `bin/arondo send` to delegate a bounded task to an Arondo-managed AI agent. The command creates or continues a server-side session, waits for completion, and writes one JSON result to stdout. Progress and errors are written to stderr.
+Use `cli/arondo-cli send` to delegate a bounded task to an Arondo-managed AI agent. The command creates or continues a server-side session, waits for completion, and writes one JSON result to stdout. Progress and errors are written to stderr.
 
 ## Before delegation
 
-Confirm that the target Arondo checkout provides `bin/arondo`, and obtain a permitted server URL and client token. The CLI accepts these either explicitly or from `bin/.arondo.env`:
+Confirm that the target Arondo checkout provides the built `cli/arondo-cli` binary, and obtain a permitted server URL and client token. The CLI accepts these either explicitly or from `cli/.arondo.env`:
 
 ```bash
-bin/arondo send --server "$ARONDO_URL" --token "$ARONDO_TOKEN" ...
+cli/arondo-cli send --server "$ARONDO_URL" --token "$ARONDO_TOKEN" ...
 ```
 
 Treat the token as a secret: do not echo it, include it in prompts, or put it in reports. Choose a connected Runner with `--runner-id` whenever the local hostname does not uniquely identify the intended Runner.
@@ -22,7 +22,7 @@ Treat the token as a secret: do not echo it, include it in prompts, or put it in
 Use an explicit repository path for work in an existing project. Keep the prompt self-contained: name the expected outcome, relevant files or constraints, and validation expected from the delegated agent.
 
 ```bash
-bin/arondo send \
+cli/arondo-cli send \
   --server "$ARONDO_URL" \
   --token "$ARONDO_TOKEN" \
   --runner-id "<runner-id>" \
@@ -40,7 +40,7 @@ The command blocks until completion (defaults: 3-second polling and 600-second t
 For a known session, preserve its conversation context with `--session-id`:
 
 ```bash
-bin/arondo send --server "$ARONDO_URL" --token "$ARONDO_TOKEN" \
+cli/arondo-cli send --server "$ARONDO_URL" --token "$ARONDO_TOKEN" \
   --session-id "<session-id>" "Address the failing test and rerun it."
 ```
 

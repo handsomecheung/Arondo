@@ -280,12 +280,12 @@ x-arondo-token: <token>
 - 返回 `Session` 对象。检查 `status`，其中之一：`idle`、`running`、`script-running`、`done`、`error`。
 - `done`/`error`表示 Agent 完成；轮询此端点，直到状态离开 `running`/`script-running`。
 
-### 示例 Script
+### CLI
 
-`bin/arondo` 是一个无依赖项的 Node.js CLI。它的 `send` 命令会创建会话或向现有会话发送消息，然后轮询直到完成并打印结果。所需的消息作为最终位置参数传递。
+`cli/arondo-cli` 是一个无依赖项的 Go CLI。使用 `cd cli && go build -o arondo-cli . && cd ..` 构建。它的 `send` 命令会创建会话或向现有会话发送消息，然后轮询直到完成并打印结果。所需的消息作为最终位置参数传递。
 
 ```bash
-bin/arondo send \
+cli/arondo-cli send \
   --server http://localhost:3251 \
   --token <client_access_token> \
   --temp-dir \
@@ -295,7 +295,7 @@ bin/arondo send \
 该命令打印会话 ID。使用它在稍后的调用中继续该对话：
 
 ```bash
-bin/arondo send \
+cli/arondo-cli send \
   --server http://localhost:3251 \
   --token <client_access_token> \
   --resume \
