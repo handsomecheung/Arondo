@@ -55,6 +55,9 @@ runner/                  # Go runner binary
   handler_git.go        # git.status, git.diff
   handler_pty.go        # pty.input (write to PTY), pty.resize
   pty.go                # TaskManager: spawn processes with PTY, scrollback buffer, auto-cleanup on exit
+cli/
+  main.go               # Dependency-free Go CLI: send/list-agents/get-quota/update-quota
+  install-skill         # Installs the bundled arondo-agent skill for supported agents
 app/
   page.tsx              # Main UI (runner selector, chat, status tracking, terminal modals, 3-dot dropdown)
   login/
@@ -176,6 +179,8 @@ scripts/
   run.server.sh         # Start the Next.js dev server
   run.runner1.sh        # Start Go runner 1 in dev mode (connects to localhost:3251)
   run.runner2.sh        # Start Go runner 2 in dev mode (connects to localhost:3251)
+.github/workflows/
+  build-binaries.yml    # Builds runner and CLI binaries for tagged releases
 tests/                  # Playwright integration tests
   global-setup.ts       # Test environment initialization (builds Go runner, writes dummy tokens)
   global-teardown.ts    # Cleanup of temporary config and build artifacts
@@ -277,7 +282,10 @@ Uses the `process` singleton pattern (shared across tsx and Turbopack contexts).
 ./scripts/run.server.sh      # Start server via tsx watch (dev: port 3251, prod: port 3250)
 ./scripts/run.runner1.sh     # Start runner 1 connecting to localhost:3251
 ./scripts/run.runner2.sh     # Start runner 2 connecting to localhost:3251
+cd cli && go build -o arondo-cli . && cd ..  # Build the Go CLI
 ```
+
+The CLI reads connection settings in this order: command flags (`--server`, `--token`), then `ARONDO_URL` / `ARONDO_TOKEN`, then `cli.url` / `cli.token` in `~/.arondo/arondo.json`. `send` creates or resumes sessions and waits for completion. `list-agents` reports Antigravity, Claude, Codex, and OpenCode availability per runner. `get-quota` prints recorded quota data, and `update-quota` queues an asynchronous quota refresh via `/api/agents/quota`.
 
 ## Real-time Communication
 

@@ -331,6 +331,16 @@ When the server returns `needsConfirmation: true`, the CLI prints a hint to retr
 The final JSON result uses `sessionId` and includes the agent's stdout as `rawOutput`.
 The final JSON result is written to stdout; progress messages and errors are written to stderr.
 
+Additional CLI commands help inspect runner readiness before sending work:
+
+```bash
+cli/arondo-cli list-agents
+cli/arondo-cli get-quota
+cli/arondo-cli update-quota
+```
+
+`list-agents` reports whether Antigravity, Claude, Codex, and OpenCode are available on each accessible runner, including quota-derived availability reasons. `get-quota` prints the latest recorded quota data, and `update-quota` queues an asynchronous quota refresh. All CLI commands use the same connection-setting precedence: explicit `--server` / `--token`, then `ARONDO_URL` / `ARONDO_TOKEN`, then `cli.url` / `cli.token` in `~/.arondo/arondo.json`.
+
 ### Install the Arondo Agent Skill
 
 Install the bundled `arondo-agent` skill so Codex, Claude Code, Antigravity CLI (`agy`), or OpenCode can delegate tasks through `cli/arondo-cli`:
@@ -352,6 +362,8 @@ Flags:
 ```
 
 The runner auto-reconnects with exponential backoff if the server connection drops. It has no display name of its own — the name shown across the UI comes from the runner token's `name`, set by an admin when generating the token in Settings.
+
+Tagged releases build both `runner/arondo-runner` and `cli/arondo-cli` binaries for Linux amd64, macOS amd64, and macOS arm64.
 
 ## Testing
 
