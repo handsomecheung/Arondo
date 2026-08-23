@@ -1,0 +1,6 @@
+{
+  "cli": {
+    "url": "https://arondo.example",
+    "token": "token value"
+  }
+}

@@ -9,7 +9,16 @@ Use `cli/arondo-cli send` to delegate a bounded task to an Arondo-managed AI age
 
 ## Before delegation
 
-Confirm that the target Arondo checkout provides the built `cli/arondo-cli` binary, and obtain a permitted server URL and client token. The CLI accepts these either explicitly or from `cli/.arondo.env`:
+Confirm that the target Arondo checkout provides the built `cli/arondo-cli` binary, and obtain a permitted server URL and client token. The CLI accepts command-line options, `ARONDO_URL` / `ARONDO_TOKEN`, or the `cli` object in `~/.arondo/arondo.json` (or `$ARONDO_CONFIG_DIR/arondo.json`). Earlier sources in that list take precedence:
+
+```json
+{
+  "cli": {
+    "url": "https://arondo.example",
+    "token": "client_access_token"
+  }
+}
+```
 
 ```bash
 cli/arondo-cli send --server "$ARONDO_URL" --token "$ARONDO_TOKEN" ...

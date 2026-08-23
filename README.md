@@ -219,6 +219,10 @@ Open [http://localhost:3251](http://localhost:3251) in your browser. Select the 
         "boundRunnerId": "server-generated-runner-id"
       }
     ],
+    "cli": {
+      "url": "https://arondo.example",
+      "token": "client-access-token"
+    },
     "setitngs": {
       "sessionArchiveDays": 7,
       "showHiddenFiles": true
@@ -226,6 +230,7 @@ Open [http://localhost:3251](http://localhost:3251) in your browser. Select the 
   }
   ```
   If no token with `type: "admin"` exists on startup, one is generated automatically, written to the config, and printed in the server logs. Runner tokens are created and managed individually by an admin in Settings (Runner Tokens section); each locks to the first runner identity that registers with it (`boundRunnerId`).
+  The CLI reads `cli.url` and `cli.token` from this same file. Its connection-setting precedence is `--server` / `--token`, then `ARONDO_URL` / `ARONDO_TOKEN`, then this config file.
 - `global-rules.md` – Rules synced to `~/.gemini/GEMINI.md`, `~/.claude/CLAUDE.md`, and `~/.codex/AGENTS.md` on connected runners.
 - `agent-commands.json` – User-defined agent slash commands.
 - Global application configuration settings are stored under the top-level `setitngs` field in `arondo.json`.

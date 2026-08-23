@@ -31,8 +31,8 @@ Usage:
     "Now also print the current directory"
 
 Options:
-  --server <url>               Arondo server base URL (overrides ARONDO_URL in cli/.arondo.env)
-  --token <token>              Client access token (overrides ARONDO_TOKEN in cli/.arondo.env)
+  --server <url>               Arondo server base URL (overrides ARONDO_URL and cli.url in arondo.json)
+  --token <token>              Client access token (overrides ARONDO_TOKEN and cli.token in arondo.json)
   --runner-id <id>             Target runner ID (default: connected runner with the current hostname)
   --path <path>                Repository path on the runner (default: current working directory)
   --temp-dir                   Create the session in a fresh temporary directory on the runner
@@ -72,49 +72,48 @@ type client struct {
 	http   *http.Client
 }
 
-func loadDotEnv(filePath string) (map[string]string, error) {
+type cliConfig struct {
+	CLI struct {
+		URL   string `json:"url"`
+		Token string `json:"token"`
+	} `json:"cli"`
+}
+
+func configDir() (string, error) {
+	if configured := os.Getenv("ARONDO_CONFIG_DIR"); configured != "" {
+		return filepath.Abs(configured)
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".arondo"), nil
+}
+
+func loadConfig(filePath string) (cliConfig, error) {
 	contents, err := os.ReadFile(filePath)
 	if errors.Is(err, os.ErrNotExist) {
-		return map[string]string{}, nil
+		return cliConfig{}, nil
 	}
 	if err != nil {
-		return nil, err
+		return cliConfig{}, err
 	}
 
-	values := make(map[string]string)
-	for _, line := range strings.Split(string(contents), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		line = strings.TrimSpace(strings.TrimPrefix(line, "export "))
-		key, value, found := strings.Cut(line, "=")
-		if !found || !validEnvKey(strings.TrimSpace(key)) {
-			continue
-		}
-		value = strings.TrimSpace(value)
-		if len(value) >= 2 && ((value[0] == '"' && value[len(value)-1] == '"') || (value[0] == '\'' && value[len(value)-1] == '\'')) {
-			value = value[1 : len(value)-1]
-		}
-		values[strings.TrimSpace(key)] = value
+	var config cliConfig
+	if err := json.Unmarshal(contents, &config); err != nil {
+		return cliConfig{}, fmt.Errorf("parse config file %s: %w", filePath, err)
 	}
-	return values, nil
+	return config, nil
 }
 
-func validEnvKey(key string) bool {
-	if key == "" {
-		return false
+func parseArgs(argv []string, config cliConfig) (arguments, error) {
+	args := arguments{server: config.CLI.URL, token: config.CLI.Token, agentType: "auto", pollInterval: 3, timeout: 600}
+	if server := os.Getenv("ARONDO_URL"); server != "" {
+		args.server = server
 	}
-	for index, char := range key {
-		if !(char == '_' || char >= 'A' && char <= 'Z' || char >= 'a' && char <= 'z' || index > 0 && char >= '0' && char <= '9') {
-			return false
-		}
+	if token := os.Getenv("ARONDO_TOKEN"); token != "" {
+		args.token = token
 	}
-	return true
-}
-
-func parseArgs(argv []string, env map[string]string) (arguments, error) {
-	args := arguments{server: env["ARONDO_URL"], token: env["ARONDO_TOKEN"], agentType: "auto", pollInterval: 3, timeout: 600}
 	valueOptions := map[string]*string{
 		"--server": &args.server, "--token": &args.token, "--runner-id": &args.runnerID, "--path": &args.repoPath,
 		"--session-id": &args.sessionID, "--agent": &args.agentType,
@@ -185,10 +184,10 @@ func parseArgs(argv []string, env map[string]string) (arguments, error) {
 
 	var missing []string
 	if args.server == "" {
-		missing = append(missing, "server: specify --server <url> or set ARONDO_URL in cli/.arondo.env")
+		missing = append(missing, "server: specify --server <url>, set ARONDO_URL, or set cli.url in ~/.arondo/arondo.json")
 	}
 	if args.token == "" {
-		missing = append(missing, "token: specify --token <token> or set ARONDO_TOKEN in cli/.arondo.env")
+		missing = append(missing, "token: specify --token <token>, set ARONDO_TOKEN, or set cli.token in ~/.arondo/arondo.json")
 	}
 	if len(missing) > 0 {
 		return arguments{}, fmt.Errorf("missing configuration:\n%s", strings.Join(missing, "\n"))
@@ -410,11 +409,15 @@ func run(argv []string) error {
 	if argv[0] != "send" {
 		return fmt.Errorf("unknown command: %s\n\n%s", argv[0], rootUsage)
 	}
-	env, err := loadDotEnv(filepath.Join(filepath.Dir(os.Args[0]), ".arondo.env"))
+	configDir, err := configDir()
 	if err != nil {
 		return err
 	}
-	args, err := parseArgs(argv[1:], env)
+	config, err := loadConfig(filepath.Join(configDir, "arondo.json"))
+	if err != nil {
+		return err
+	}
+	args, err := parseArgs(argv[1:], config)
 	if errors.Is(err, errHelp) {
 		fmt.Fprintln(os.Stderr, usage)
 		return nil
