@@ -1,6 +1,9 @@
 name: Build Binaries
 
 on:
+  pull_request:
+    paths:
+      - '.github/workflows/build-binaries.yml'
   push:
     tags:
       - 'v*'
