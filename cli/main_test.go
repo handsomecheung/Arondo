@@ -62,6 +62,30 @@ func TestParseListAgentsArgsReturnsHelp(t *testing.T) {
 	}
 }
 
+func TestParseQuotaArgs(t *testing.T) {
+	args, err := parseQuotaArgs([]string{"--server=https://arondo.example/", "--token", "secret"}, cliConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if args.server != "https://arondo.example/" || args.token != "secret" {
+		t.Fatalf("unexpected arguments: %#v", args)
+	}
+}
+
+func TestParseQuotaArgsRejectsUnexpectedArgument(t *testing.T) {
+	_, err := parseQuotaArgs([]string{"--server", "http://localhost", "--token", "secret", "message"}, cliConfig{})
+	if err == nil || err.Error() != "unexpected argument: message" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseQuotaArgsReturnsHelp(t *testing.T) {
+	_, err := parseQuotaArgs([]string{"--help"}, cliConfig{})
+	if !errors.Is(err, errHelp) {
+		t.Fatalf("expected help error, got %v", err)
+	}
+}
+
 func TestAnalyzeAgentStatusReasons(t *testing.T) {
 	disconnected := analyzeAgentStatus(runner{Connected: false, Agents: []string{"codex"}}, "codex", "codex", nil)
 	if disconnected.Available || disconnected.Reason != "runner disconnected" {

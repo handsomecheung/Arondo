@@ -49,6 +49,8 @@ const rootUsage = `Usage: cli/arondo-cli <command> [options] <message>
 Commands:
   send         Create a session or send a message to an existing session, then wait for the result
   list-agents  List agent availability for all accessible runners
+  get-quota    List the recorded quota usage for all accessible runners
+  update-quota Force an asynchronous quota refresh for all accessible runners
 
 Run cli/arondo-cli <command> --help for command options.`
 
@@ -65,6 +67,32 @@ Options:
   --runner-id <id>   Only show one runner
   --help             Show this help message`
 
+const getQuotaUsage = `List the recorded quota usage for all accessible runners.
+
+Usage:
+  cli/arondo-cli get-quota \
+    --server http://localhost:3251 \
+    --token <client_access_token>
+
+Options:
+  --server <url>     Arondo server base URL (overrides ARONDO_URL and cli.url in arondo.json)
+  --token <token>    Client access token (overrides ARONDO_TOKEN and cli.token in arondo.json)
+  --help             Show this help message`
+
+const updateQuotaUsage = `Force an asynchronous quota refresh for all accessible runners.
+
+Usage:
+  cli/arondo-cli update-quota \
+    --server http://localhost:3251 \
+    --token <client_access_token>
+
+The command returns after refresh requests have been queued. Use get-quota to read the updated values.
+
+Options:
+  --server <url>     Arondo server base URL (overrides ARONDO_URL and cli.url in arondo.json)
+  --token <token>    Client access token (overrides ARONDO_TOKEN and cli.token in arondo.json)
+  --help             Show this help message`
+
 type arguments struct {
 	server, token, runnerID, repoPath, sessionID, agentType, prompt string
 	pollInterval, timeout                                           float64
@@ -73,6 +101,10 @@ type arguments struct {
 
 type listAgentsArguments struct {
 	server, token, runnerID string
+}
+
+type quotaArguments struct {
+	server, token string
 }
 
 type apiError struct {
@@ -292,6 +324,39 @@ func parseListAgentsArgs(argv []string, config cliConfig) (listAgentsArguments, 
 	return args, validateServerAndToken(args.server, args.token)
 }
 
+func parseQuotaArgs(argv []string, config cliConfig) (quotaArguments, error) {
+	server, token := configuredServerAndToken(config)
+	args := quotaArguments{server: server, token: token}
+	valueOptions := map[string]*string{"--server": &args.server, "--token": &args.token}
+
+	for index := 0; index < len(argv); index++ {
+		option := argv[index]
+		if option == "--help" {
+			return quotaArguments{}, errHelp
+		}
+		if !strings.HasPrefix(option, "--") {
+			return quotaArguments{}, fmt.Errorf("unexpected argument: %s", option)
+		}
+		name, value, inline := strings.Cut(option, "=")
+		destination, ok := valueOptions[name]
+		if !ok {
+			return quotaArguments{}, fmt.Errorf("unknown option: %s", option)
+		}
+		if !inline {
+			index++
+			if index >= len(argv) {
+				return quotaArguments{}, fmt.Errorf("option %s requires a value", name)
+			}
+			value = argv[index]
+		}
+		if value == "" || strings.HasPrefix(value, "--") {
+			return quotaArguments{}, fmt.Errorf("option %s requires a value", name)
+		}
+		*destination = value
+	}
+	return args, validateServerAndToken(args.server, args.token)
+}
+
 func (c *client) request(method, path string, payload any, result any) error {
 	var body io.Reader
 	if payload != nil {
@@ -339,6 +404,11 @@ func (c *client) listSessions() ([]session, error) {
 func (c *client) getAgentInfo(runnerID string) (map[string]map[string]any, error) {
 	info := map[string]map[string]any{}
 	return info, c.request(http.MethodGet, "/api/agents/info?runnerId="+url.QueryEscape(runnerID), nil, &info)
+}
+
+func (c *client) updateQuota() (map[string]any, error) {
+	result := map[string]any{}
+	return result, c.request(http.MethodPost, "/api/agents/quota", map[string]any{}, &result)
 }
 
 func (c *client) getSession(sessionID string) (session, error) {
@@ -601,6 +671,40 @@ func listAgents(c *client, args listAgentsArguments) error {
 	return nil
 }
 
+func getQuota(c *client) error {
+	runners, err := c.listRunners()
+	if err != nil {
+		return err
+	}
+	type quotaReport struct {
+		RunnerID  string                    `json:"runnerId"`
+		Hostname  string                    `json:"hostname"`
+		Connected bool                      `json:"connected"`
+		Quotas    map[string]map[string]any `json:"quotas"`
+	}
+	reports := make([]quotaReport, 0, len(runners))
+	for _, runner := range runners {
+		quotas, err := c.getAgentInfo(runner.ID)
+		if err != nil {
+			return err
+		}
+		reports = append(reports, quotaReport{RunnerID: runner.ID, Hostname: runner.Hostname, Connected: runner.Connected, Quotas: quotas})
+	}
+	pretty, _ := json.MarshalIndent(reports, "", "  ")
+	fmt.Println(string(pretty))
+	return nil
+}
+
+func updateQuota(c *client) error {
+	result, err := c.updateQuota()
+	if err != nil {
+		return err
+	}
+	pretty, _ := json.MarshalIndent(result, "", "  ")
+	fmt.Println(string(pretty))
+	return nil
+}
+
 func run(argv []string) error {
 	if len(argv) == 1 && (argv[0] == "--help" || argv[0] == "-h") {
 		fmt.Fprintln(os.Stderr, rootUsage)
@@ -609,7 +713,7 @@ func run(argv []string) error {
 	if len(argv) == 0 {
 		return fmt.Errorf("a command is required\n\n%s", rootUsage)
 	}
-	if argv[0] != "send" && argv[0] != "list-agents" {
+	if argv[0] != "send" && argv[0] != "list-agents" && argv[0] != "get-quota" && argv[0] != "update-quota" {
 		return fmt.Errorf("unknown command: %s\n\n%s", argv[0], rootUsage)
 	}
 	configDir, err := configDir()
@@ -630,6 +734,25 @@ func run(argv []string) error {
 			return err
 		}
 		return listAgents(&client{server: args.server, token: args.token, http: http.DefaultClient}, args)
+	}
+	if argv[0] == "get-quota" || argv[0] == "update-quota" {
+		args, err := parseQuotaArgs(argv[1:], config)
+		if errors.Is(err, errHelp) {
+			if argv[0] == "get-quota" {
+				fmt.Fprintln(os.Stderr, getQuotaUsage)
+			} else {
+				fmt.Fprintln(os.Stderr, updateQuotaUsage)
+			}
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		c := &client{server: args.server, token: args.token, http: http.DefaultClient}
+		if argv[0] == "get-quota" {
+			return getQuota(c)
+		}
+		return updateQuota(c)
 	}
 
 	args, err := parseArgs(argv[1:], config)

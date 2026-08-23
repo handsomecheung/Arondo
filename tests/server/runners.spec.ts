@@ -38,6 +38,22 @@ test.describe('Runners API tests', () => {
     expect(json.error).toBe('Admin role required');
   });
 
+  test('should reject quota refresh with an invalid token', async ({ request }) => {
+    const response = await request.post('/api/agents/quota', {
+      headers: { 'x-arondo-token': 'invalid-token' },
+    });
+    expect(response.status()).toBe(403);
+  });
+
+  test('should queue asynchronous quota refreshes', async ({ request }) => {
+    const response = await request.post('/api/agents/quota', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+    });
+    expect(response.status()).toBe(200);
+    const json = await response.json();
+    expect(Array.isArray(json.requested)).toBeTruthy();
+  });
+
   test('should return 400 Bad Request for POST /api/runners with invalid payload structure', async ({ request }) => {
     const response = await request.post('/api/runners', {
       headers: { 'x-arondo-token': 'test-token-123456' },
