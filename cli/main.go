@@ -47,14 +47,32 @@ Options:
 const rootUsage = `Usage: cli/arondo-cli <command> [options] <message>
 
 Commands:
-  send    Create a session or send a message to an existing session, then wait for the result
+  send         Create a session or send a message to an existing session, then wait for the result
+  list-agents  List agent availability for all accessible runners
 
-Run cli/arondo-cli send --help for command options.`
+Run cli/arondo-cli <command> --help for command options.`
+
+const listAgentsUsage = `List agent availability for all accessible runners.
+
+Usage:
+  cli/arondo-cli list-agents \
+    --server http://localhost:3251 \
+    --token <client_access_token>
+
+Options:
+  --server <url>     Arondo server base URL (overrides ARONDO_URL and cli.url in arondo.json)
+  --token <token>    Client access token (overrides ARONDO_TOKEN and cli.token in arondo.json)
+  --runner-id <id>   Only show one runner
+  --help             Show this help message`
 
 type arguments struct {
 	server, token, runnerID, repoPath, sessionID, agentType, prompt string
 	pollInterval, timeout                                           float64
 	tempDir, force, resume                                          bool
+}
+
+type listAgentsArguments struct {
+	server, token, runnerID string
 }
 
 type apiError struct {
@@ -216,6 +234,64 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 
 var errHelp = errors.New("help requested")
 
+func configuredServerAndToken(config cliConfig) (string, string) {
+	server, token := config.CLI.URL, config.CLI.Token
+	if value := os.Getenv("ARONDO_URL"); value != "" {
+		server = value
+	}
+	if value := os.Getenv("ARONDO_TOKEN"); value != "" {
+		token = value
+	}
+	return server, token
+}
+
+func validateServerAndToken(server, token string) error {
+	var missing []string
+	if server == "" {
+		missing = append(missing, "server: specify --server <url>, set ARONDO_URL, or set cli.url in ~/.arondo/arondo.json")
+	}
+	if token == "" {
+		missing = append(missing, "token: specify --token <token>, set ARONDO_TOKEN, or set cli.token in ~/.arondo/arondo.json")
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("missing configuration:\n%s", strings.Join(missing, "\n"))
+	}
+	return nil
+}
+
+func parseListAgentsArgs(argv []string, config cliConfig) (listAgentsArguments, error) {
+	server, token := configuredServerAndToken(config)
+	args := listAgentsArguments{server: server, token: token}
+	valueOptions := map[string]*string{"--server": &args.server, "--token": &args.token, "--runner-id": &args.runnerID}
+
+	for index := 0; index < len(argv); index++ {
+		option := argv[index]
+		if option == "--help" {
+			return listAgentsArguments{}, errHelp
+		}
+		if !strings.HasPrefix(option, "--") {
+			return listAgentsArguments{}, fmt.Errorf("unexpected argument: %s", option)
+		}
+		name, value, inline := strings.Cut(option, "=")
+		destination, ok := valueOptions[name]
+		if !ok {
+			return listAgentsArguments{}, fmt.Errorf("unknown option: %s", option)
+		}
+		if !inline {
+			index++
+			if index >= len(argv) {
+				return listAgentsArguments{}, fmt.Errorf("option %s requires a value", name)
+			}
+			value = argv[index]
+		}
+		if value == "" || strings.HasPrefix(value, "--") {
+			return listAgentsArguments{}, fmt.Errorf("option %s requires a value", name)
+		}
+		*destination = value
+	}
+	return args, validateServerAndToken(args.server, args.token)
+}
+
 func (c *client) request(method, path string, payload any, result any) error {
 	var body io.Reader
 	if payload != nil {
@@ -258,6 +334,11 @@ func (c *client) listRunners() ([]runner, error) {
 func (c *client) listSessions() ([]session, error) {
 	var sessions []session
 	return sessions, c.request(http.MethodGet, "/api/sessions", nil, &sessions)
+}
+
+func (c *client) getAgentInfo(runnerID string) (map[string]map[string]any, error) {
+	info := map[string]map[string]any{}
+	return info, c.request(http.MethodGet, "/api/agents/info?runnerId="+url.QueryEscape(runnerID), nil, &info)
 }
 
 func (c *client) getSession(sessionID string) (session, error) {
@@ -309,9 +390,10 @@ func (c *client) rawOutput(sessionID string) (string, error) {
 }
 
 type runner struct {
-	ID        string `json:"id"`
-	Hostname  string `json:"hostname"`
-	Connected bool   `json:"connected"`
+	ID        string   `json:"id"`
+	Hostname  string   `json:"hostname"`
+	Connected bool     `json:"connected"`
+	Agents    []string `json:"agents"`
 }
 type message struct {
 	ID   string `json:"id"`
@@ -398,6 +480,127 @@ func pollUntilDone(c *client, sessionID string, interval, timeout time.Duration)
 
 func formatJSON(value any) string { encoded, _ := json.Marshal(value); return string(encoded) }
 
+type agentStatus struct {
+	Type      string         `json:"type"`
+	Binary    string         `json:"binary"`
+	Available bool           `json:"available"`
+	Reason    string         `json:"reason,omitempty"`
+	Quota     map[string]any `json:"quota,omitempty"`
+}
+
+type runnerAgentStatus struct {
+	RunnerID  string        `json:"runnerId"`
+	Hostname  string        `json:"hostname"`
+	Connected bool          `json:"connected"`
+	Agents    []agentStatus `json:"agents"`
+}
+
+var knownAgents = []struct {
+	agentType string
+	binary    string
+}{
+	{"antigravity", "agy"},
+	{"claude", "claude"},
+	{"codex", "codex"},
+	{"opencode", "opencode"},
+}
+
+func analyzeAgentStatus(runner runner, agentType, binary string, quota map[string]any) agentStatus {
+	status := agentStatus{Type: agentType, Binary: binary, Available: true, Quota: quota}
+	if !runner.Connected {
+		status.Available = false
+		status.Reason = "runner disconnected"
+		return status
+	}
+	if !containsString(runner.Agents, binary) {
+		status.Available = false
+		status.Reason = fmt.Sprintf("binary %q not found on runner PATH", binary)
+		return status
+	}
+	if reason := quotaUnavailableReason(agentType, quota); reason != "" {
+		status.Available = false
+		status.Reason = reason
+	}
+	return status
+}
+
+func quotaUnavailableReason(agentType string, quota map[string]any) string {
+	if quota == nil {
+		return ""
+	}
+	switch agentType {
+	case "claude":
+		return quotaBelowThreshold(quota, "HourRemain", "hourly quota below 15%")
+	case "antigravity":
+		geminiLow := quotaNumberBelow(quota, "GeminiHourRemain", 0.15)
+		otherLow := quotaNumberBelow(quota, "OtherHourRemain", 0.15)
+		if geminiLow && otherLow {
+			return "all hourly quotas below 15%"
+		}
+	case "codex":
+		if quotaNumberBelow(quota, "WeeklyRemain", 0.000001) {
+			return "weekly quota exhausted"
+		}
+	}
+	return ""
+}
+
+func quotaBelowThreshold(quota map[string]any, key, reason string) string {
+	if quotaNumberBelow(quota, key, 0.15) {
+		return reason
+	}
+	return ""
+}
+
+func quotaNumberBelow(quota map[string]any, key string, threshold float64) bool {
+	value, ok := quota[key]
+	if !ok || value == nil {
+		return false
+	}
+	number, ok := value.(float64)
+	return ok && number < threshold
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+func listAgents(c *client, args listAgentsArguments) error {
+	runners, err := c.listRunners()
+	if err != nil {
+		return err
+	}
+	var reports []runnerAgentStatus
+	for _, runner := range runners {
+		if args.runnerID != "" && runner.ID != args.runnerID {
+			continue
+		}
+		agentInfo := map[string]map[string]any{}
+		if runner.Connected {
+			agentInfo, err = c.getAgentInfo(runner.ID)
+			if err != nil {
+				return err
+			}
+		}
+		report := runnerAgentStatus{RunnerID: runner.ID, Hostname: runner.Hostname, Connected: runner.Connected}
+		for _, known := range knownAgents {
+			report.Agents = append(report.Agents, analyzeAgentStatus(runner, known.agentType, known.binary, agentInfo[known.agentType]))
+		}
+		reports = append(reports, report)
+	}
+	if args.runnerID != "" && len(reports) == 0 {
+		return fmt.Errorf("runner %q not found or not accessible", args.runnerID)
+	}
+	pretty, _ := json.MarshalIndent(reports, "", "  ")
+	fmt.Println(string(pretty))
+	return nil
+}
+
 func run(argv []string) error {
 	if len(argv) == 1 && (argv[0] == "--help" || argv[0] == "-h") {
 		fmt.Fprintln(os.Stderr, rootUsage)
@@ -406,7 +609,7 @@ func run(argv []string) error {
 	if len(argv) == 0 {
 		return fmt.Errorf("a command is required\n\n%s", rootUsage)
 	}
-	if argv[0] != "send" {
+	if argv[0] != "send" && argv[0] != "list-agents" {
 		return fmt.Errorf("unknown command: %s\n\n%s", argv[0], rootUsage)
 	}
 	configDir, err := configDir()
@@ -417,6 +620,18 @@ func run(argv []string) error {
 	if err != nil {
 		return err
 	}
+	if argv[0] == "list-agents" {
+		args, err := parseListAgentsArgs(argv[1:], config)
+		if errors.Is(err, errHelp) {
+			fmt.Fprintln(os.Stderr, listAgentsUsage)
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		return listAgents(&client{server: args.server, token: args.token, http: http.DefaultClient}, args)
+	}
+
 	args, err := parseArgs(argv[1:], config)
 	if errors.Is(err, errHelp) {
 		fmt.Fprintln(os.Stderr, usage)

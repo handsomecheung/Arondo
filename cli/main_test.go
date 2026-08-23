@@ -38,6 +38,52 @@ func TestParseArgsReturnsHelp(t *testing.T) {
 	}
 }
 
+func TestParseListAgentsArgs(t *testing.T) {
+	args, err := parseListAgentsArgs([]string{"--server=https://arondo.example/", "--token", "secret", "--runner-id", "runner-1"}, cliConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if args.server != "https://arondo.example/" || args.token != "secret" || args.runnerID != "runner-1" {
+		t.Fatalf("unexpected arguments: %#v", args)
+	}
+}
+
+func TestParseListAgentsArgsRejectsMessage(t *testing.T) {
+	_, err := parseListAgentsArgs([]string{"--server", "http://localhost", "--token", "secret", "message"}, cliConfig{})
+	if err == nil || err.Error() != "unexpected argument: message" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseListAgentsArgsReturnsHelp(t *testing.T) {
+	_, err := parseListAgentsArgs([]string{"--help"}, cliConfig{})
+	if !errors.Is(err, errHelp) {
+		t.Fatalf("expected help error, got %v", err)
+	}
+}
+
+func TestAnalyzeAgentStatusReasons(t *testing.T) {
+	disconnected := analyzeAgentStatus(runner{Connected: false, Agents: []string{"codex"}}, "codex", "codex", nil)
+	if disconnected.Available || disconnected.Reason != "runner disconnected" {
+		t.Fatalf("unexpected disconnected status: %#v", disconnected)
+	}
+
+	missing := analyzeAgentStatus(runner{Connected: true}, "codex", "codex", nil)
+	if missing.Available || missing.Reason != `binary "codex" not found on runner PATH` {
+		t.Fatalf("unexpected missing binary status: %#v", missing)
+	}
+
+	quotaLow := analyzeAgentStatus(runner{Connected: true, Agents: []string{"claude"}}, "claude", "claude", map[string]any{"HourRemain": 0.1})
+	if quotaLow.Available || quotaLow.Reason != "hourly quota below 15%" {
+		t.Fatalf("unexpected quota status: %#v", quotaLow)
+	}
+
+	available := analyzeAgentStatus(runner{Connected: true, Agents: []string{"opencode"}}, "opencode", "opencode", nil)
+	if !available.Available || available.Reason != "" {
+		t.Fatalf("unexpected available status: %#v", available)
+	}
+}
+
 func TestLoadConfig(t *testing.T) {
 	config, err := loadConfig("testdata/arondo.json")
 	if err != nil {
