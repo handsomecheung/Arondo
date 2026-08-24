@@ -297,6 +297,8 @@ export default function SessionView({
     return () => document.removeEventListener("mousedown", handleMouseDownOutside);
   }, []);
 
+  const showComposer = !!selectedSession || isNewSession || isNewDraft;
+
   const chatInputPlaceholder = isArchived
     ? "This session is archived. Unarchive it to send messages."
     : isRunnerOffline
@@ -1012,6 +1014,7 @@ export default function SessionView({
         <div ref={chatBottomRef} />
       </div>
 
+      {showComposer && (
       <div className="input-area">
         {(isNewSession || isNewDraft) && (
           <div className="input-meta">
@@ -1613,6 +1616,7 @@ export default function SessionView({
           </div>
         </div>
       </div>
+      )}
     </>
   );
 }
