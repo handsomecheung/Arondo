@@ -692,6 +692,62 @@ func pollUntilDone(c *client, sessionID string, interval, timeout time.Duration)
 
 func formatJSON(value any) string { encoded, _ := json.Marshal(value); return string(encoded) }
 
+func humanReadableQuotaValue(key string, value any) any {
+	if !strings.HasSuffix(key, "At") || value == nil {
+		return value
+	}
+	var t time.Time
+	switch v := value.(type) {
+	case float64:
+		t = timeFromQuotaTimestamp(int64(v))
+	case int64:
+		t = timeFromQuotaTimestamp(v)
+	case int:
+		t = timeFromQuotaTimestamp(int64(v))
+	case json.Number:
+		parsed, err := v.Int64()
+		if err != nil {
+			return value
+		}
+		t = timeFromQuotaTimestamp(parsed)
+	case string:
+		parsed, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			return value
+		}
+		t = parsed
+	default:
+		return value
+	}
+	return t.Local().Format("2006-01-02 15:04:05 MST")
+}
+
+func timeFromQuotaTimestamp(value int64) time.Time {
+	if absInt64(value) >= 1e12 {
+		return time.UnixMilli(value)
+	}
+	return time.Unix(value, 0)
+}
+
+func absInt64(value int64) int64 {
+	if value < 0 {
+		return -value
+	}
+	return value
+}
+
+func humanReadableQuotaTimes(quota map[string]any) map[string]any {
+	formatted := make(map[string]any, len(quota))
+	for key, value := range quota {
+		if nested, ok := value.(map[string]any); ok {
+			formatted[key] = humanReadableQuotaTimes(nested)
+			continue
+		}
+		formatted[key] = humanReadableQuotaValue(key, value)
+	}
+	return formatted
+}
+
 type agentStatus struct {
 	Type      string         `json:"type"`
 	Binary    string         `json:"binary"`
@@ -849,6 +905,9 @@ func getQuota(c *client, args quotaArguments) error {
 		quotas, err := c.getAgentInfo(runner.ID)
 		if err != nil {
 			return err
+		}
+		for agentType, quota := range quotas {
+			quotas[agentType] = humanReadableQuotaTimes(quota)
 		}
 		reports = append(reports, quotaReport{RunnerID: runner.ID, Hostname: runner.Hostname, Connected: runner.Connected, Quotas: quotas})
 	}

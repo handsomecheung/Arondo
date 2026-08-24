@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestParseArgs(t *testing.T) {
@@ -83,6 +84,42 @@ func TestParseQuotaArgsReturnsHelp(t *testing.T) {
 	_, err := parseQuotaArgs([]string{"--help"}, cliConfig{})
 	if !errors.Is(err, errHelp) {
 		t.Fatalf("expected help error, got %v", err)
+	}
+}
+
+func TestHumanReadableQuotaTimesFormatsAtFields(t *testing.T) {
+	quota := map[string]any{
+		"HourResetAt":    float64(1782923340),
+		"WeeklyResetAt":  int64(1787806200000),
+		"updatedAt":      "2026-06-30T12:30:00Z",
+		"HourRemain":     float64(0.5),
+		"notParseableAt": "unknown",
+		"nested":         map[string]any{"OtherHourResetsAt": 1787221330},
+	}
+
+	got := humanReadableQuotaTimes(quota)
+
+	assertQuotaTime(t, got["HourResetAt"], time.Unix(1782923340, 0))
+	assertQuotaTime(t, got["WeeklyResetAt"], time.UnixMilli(1787806200000))
+	assertQuotaTime(t, got["updatedAt"], time.Date(2026, 6, 30, 12, 30, 0, 0, time.UTC))
+	if got["HourRemain"] != float64(0.5) {
+		t.Fatalf("HourRemain changed: %#v", got["HourRemain"])
+	}
+	if got["notParseableAt"] != "unknown" {
+		t.Fatalf("notParseableAt changed: %#v", got["notParseableAt"])
+	}
+	nested, ok := got["nested"].(map[string]any)
+	if !ok {
+		t.Fatalf("nested quota was not preserved: %#v", got["nested"])
+	}
+	assertQuotaTime(t, nested["OtherHourResetsAt"], time.Unix(1787221330, 0))
+}
+
+func assertQuotaTime(t *testing.T, got any, want time.Time) {
+	t.Helper()
+	expected := want.Local().Format("2006-01-02 15:04:05 MST")
+	if got != expected {
+		t.Fatalf("formatted time = %#v, want %q", got, expected)
 	}
 }
 
