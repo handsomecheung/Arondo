@@ -42,6 +42,7 @@ Options:
   --agent <type>               auto, antigravity, claude, codex, or opencode (default: auto)
   --poll-interval <seconds>    Seconds between status polls (default: 3)
   --timeout <seconds>          Maximum seconds to wait for completion (default: 600)
+  --output <format>            Output format: plain or json (default: plain)
   --help                       Show this help message`
 
 const rootUsage = `Usage: cli/arondo-cli <command> [options] <message>
@@ -62,10 +63,11 @@ Usage:
     --token <client_access_token>
 
 Options:
-  --server <url>     Arondo server base URL (overrides ARONDO_URL and cli.url in arondo.json)
-  --token <token>    Client access token (overrides ARONDO_TOKEN and cli.token in arondo.json)
-  --runner-id <id>   Only show one runner
-  --help             Show this help message`
+  --server <url>      Arondo server base URL (overrides ARONDO_URL and cli.url in arondo.json)
+  --token <token>     Client access token (overrides ARONDO_TOKEN and cli.token in arondo.json)
+  --runner-id <id>    Only show one runner
+  --output <format>   Output format: plain or json (default: plain)
+  --help              Show this help message`
 
 const getQuotaUsage = `List the recorded quota usage for all accessible runners.
 
@@ -75,9 +77,10 @@ Usage:
     --token <client_access_token>
 
 Options:
-  --server <url>     Arondo server base URL (overrides ARONDO_URL and cli.url in arondo.json)
-  --token <token>    Client access token (overrides ARONDO_TOKEN and cli.token in arondo.json)
-  --help             Show this help message`
+  --server <url>      Arondo server base URL (overrides ARONDO_URL and cli.url in arondo.json)
+  --token <token>     Client access token (overrides ARONDO_TOKEN and cli.token in arondo.json)
+  --output <format>   Output format: plain or json (default: plain)
+  --help              Show this help message`
 
 const updateQuotaUsage = `Force an asynchronous quota refresh for all accessible runners.
 
@@ -89,22 +92,23 @@ Usage:
 The command returns after refresh requests have been queued. Use get-quota to read the updated values.
 
 Options:
-  --server <url>     Arondo server base URL (overrides ARONDO_URL and cli.url in arondo.json)
-  --token <token>    Client access token (overrides ARONDO_TOKEN and cli.token in arondo.json)
-  --help             Show this help message`
+  --server <url>      Arondo server base URL (overrides ARONDO_URL and cli.url in arondo.json)
+  --token <token>     Client access token (overrides ARONDO_TOKEN and cli.token in arondo.json)
+  --output <format>   Output format: plain or json (default: plain)
+  --help              Show this help message`
 
 type arguments struct {
-	server, token, runnerID, repoPath, sessionID, agentType, prompt string
-	pollInterval, timeout                                           float64
-	tempDir, force, resume                                          bool
+	server, token, runnerID, repoPath, sessionID, agentType, prompt, output string
+	pollInterval, timeout                                                    float64
+	tempDir, force, resume                                                   bool
 }
 
 type listAgentsArguments struct {
-	server, token, runnerID string
+	server, token, runnerID, output string
 }
 
 type quotaArguments struct {
-	server, token string
+	server, token, output string
 }
 
 type apiError struct {
@@ -157,7 +161,7 @@ func loadConfig(filePath string) (cliConfig, error) {
 }
 
 func parseArgs(argv []string, config cliConfig) (arguments, error) {
-	args := arguments{server: config.CLI.URL, token: config.CLI.Token, agentType: "auto", pollInterval: 3, timeout: 600}
+	args := arguments{server: config.CLI.URL, token: config.CLI.Token, agentType: "auto", pollInterval: 3, timeout: 600, output: "plain"}
 	if server := os.Getenv("ARONDO_URL"); server != "" {
 		args.server = server
 	}
@@ -166,7 +170,7 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 	}
 	valueOptions := map[string]*string{
 		"--server": &args.server, "--token": &args.token, "--runner-id": &args.runnerID, "--path": &args.repoPath,
-		"--session-id": &args.sessionID, "--agent": &args.agentType,
+		"--session-id": &args.sessionID, "--agent": &args.agentType, "--output": &args.output,
 	}
 
 	for index := 0; index < len(argv); index++ {
@@ -261,6 +265,9 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 	if !map[string]bool{"auto": true, "antigravity": true, "claude": true, "codex": true, "opencode": true}[args.agentType] {
 		return arguments{}, errors.New("--agent must be auto, antigravity, claude, codex, or opencode")
 	}
+	if args.output != "plain" && args.output != "json" {
+		return arguments{}, errors.New("--output must be plain or json")
+	}
 	return args, nil
 }
 
@@ -293,8 +300,8 @@ func validateServerAndToken(server, token string) error {
 
 func parseListAgentsArgs(argv []string, config cliConfig) (listAgentsArguments, error) {
 	server, token := configuredServerAndToken(config)
-	args := listAgentsArguments{server: server, token: token}
-	valueOptions := map[string]*string{"--server": &args.server, "--token": &args.token, "--runner-id": &args.runnerID}
+	args := listAgentsArguments{server: server, token: token, output: "plain"}
+	valueOptions := map[string]*string{"--server": &args.server, "--token": &args.token, "--runner-id": &args.runnerID, "--output": &args.output}
 
 	for index := 0; index < len(argv); index++ {
 		option := argv[index]
@@ -321,13 +328,16 @@ func parseListAgentsArgs(argv []string, config cliConfig) (listAgentsArguments, 
 		}
 		*destination = value
 	}
+	if args.output != "plain" && args.output != "json" {
+		return listAgentsArguments{}, errors.New("--output must be plain or json")
+	}
 	return args, validateServerAndToken(args.server, args.token)
 }
 
 func parseQuotaArgs(argv []string, config cliConfig) (quotaArguments, error) {
 	server, token := configuredServerAndToken(config)
-	args := quotaArguments{server: server, token: token}
-	valueOptions := map[string]*string{"--server": &args.server, "--token": &args.token}
+	args := quotaArguments{server: server, token: token, output: "plain"}
+	valueOptions := map[string]*string{"--server": &args.server, "--token": &args.token, "--output": &args.output}
 
 	for index := 0; index < len(argv); index++ {
 		option := argv[index]
@@ -353,6 +363,9 @@ func parseQuotaArgs(argv []string, config cliConfig) (quotaArguments, error) {
 			return quotaArguments{}, fmt.Errorf("option %s requires a value", name)
 		}
 		*destination = value
+	}
+	if args.output != "plain" && args.output != "json" {
+		return quotaArguments{}, errors.New("--output must be plain or json")
 	}
 	return args, validateServerAndToken(args.server, args.token)
 }
@@ -666,12 +679,32 @@ func listAgents(c *client, args listAgentsArguments) error {
 	if args.runnerID != "" && len(reports) == 0 {
 		return fmt.Errorf("runner %q not found or not accessible", args.runnerID)
 	}
-	pretty, _ := json.MarshalIndent(reports, "", "  ")
-	fmt.Println(string(pretty))
+	if args.output == "json" {
+		pretty, _ := json.MarshalIndent(reports, "", "  ")
+		fmt.Println(string(pretty))
+		return nil
+	}
+	for _, report := range reports {
+		connectedStr := "disconnected"
+		if report.Connected {
+			connectedStr = "connected"
+		}
+		fmt.Printf("runner: %s (%s) [%s]\n", report.Hostname, report.RunnerID, connectedStr)
+		for _, agent := range report.Agents {
+			status := "available"
+			if !agent.Available {
+				status = "unavailable"
+				if agent.Reason != "" {
+					status += ": " + agent.Reason
+				}
+			}
+			fmt.Printf("  %-14s %s\n", agent.Type, status)
+		}
+	}
 	return nil
 }
 
-func getQuota(c *client) error {
+func getQuota(c *client, args quotaArguments) error {
 	runners, err := c.listRunners()
 	if err != nil {
 		return err
@@ -690,18 +723,43 @@ func getQuota(c *client) error {
 		}
 		reports = append(reports, quotaReport{RunnerID: runner.ID, Hostname: runner.Hostname, Connected: runner.Connected, Quotas: quotas})
 	}
-	pretty, _ := json.MarshalIndent(reports, "", "  ")
-	fmt.Println(string(pretty))
+	if args.output == "json" {
+		pretty, _ := json.MarshalIndent(reports, "", "  ")
+		fmt.Println(string(pretty))
+		return nil
+	}
+	for _, report := range reports {
+		connectedStr := "disconnected"
+		if report.Connected {
+			connectedStr = "connected"
+		}
+		fmt.Printf("runner: %s (%s) [%s]\n", report.Hostname, report.RunnerID, connectedStr)
+		if len(report.Quotas) == 0 {
+			fmt.Println("  no quota data")
+			continue
+		}
+		for agentType, quota := range report.Quotas {
+			fmt.Printf("  %s:\n", agentType)
+			for key, val := range quota {
+				fmt.Printf("    %s: %v\n", key, val)
+			}
+		}
+	}
 	return nil
 }
 
-func updateQuota(c *client) error {
+func updateQuota(c *client, args quotaArguments) error {
 	result, err := c.updateQuota()
 	if err != nil {
 		return err
 	}
-	pretty, _ := json.MarshalIndent(result, "", "  ")
-	fmt.Println(string(pretty))
+	if args.output == "json" {
+		pretty, _ := json.MarshalIndent(result, "", "  ")
+		fmt.Println(string(pretty))
+		return nil
+	}
+	queued, _ := result["queued"].(float64)
+	fmt.Printf("Quota refresh queued for %d runner(s).\n", int(queued))
 	return nil
 }
 
@@ -750,9 +808,9 @@ func run(argv []string) error {
 		}
 		c := &client{server: args.server, token: args.token, http: http.DefaultClient}
 		if argv[0] == "get-quota" {
-			return getQuota(c)
+			return getQuota(c, args)
 		}
-		return updateQuota(c)
+		return updateQuota(c, args)
 	}
 
 	args, err := parseArgs(argv[1:], config)
@@ -817,13 +875,17 @@ func run(argv []string) error {
 	if err != nil {
 		return err
 	}
-	result := session.Raw
-	delete(result, "id")
-	result["sessionId"] = sessionID
-	result["rawOutput"] = rawOutput
-	fmt.Fprintln(os.Stderr, "\n=== Result ===")
-	pretty, _ := json.MarshalIndent(result, "", "  ")
-	fmt.Println(string(pretty))
+	if args.output == "json" {
+		result := session.Raw
+		delete(result, "id")
+		result["sessionId"] = sessionID
+		result["rawOutput"] = rawOutput
+		fmt.Fprintln(os.Stderr, "\n=== Result ===")
+		pretty, _ := json.MarshalIndent(result, "", "  ")
+		fmt.Println(string(pretty))
+	} else {
+		fmt.Print(rawOutput)
+	}
 	if session.Status == "error" {
 		fmt.Fprintf(os.Stderr, "\nSession finished with an error: %s\n", session.ErrorMessage)
 		return errSession
