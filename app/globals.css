@@ -1741,6 +1741,18 @@ body {
   opacity: 1;
 }
 
+.exec-card-collapse-btn {
+  opacity: 1;
+}
+
+.exec-card-collapse-btn svg {
+  transition: transform 0.16s ease;
+}
+
+.exec-card-collapse-icon-open {
+  transform: rotate(180deg);
+}
+
 .exec-card-time {
   padding: 0 12px 8px;
   font-size: 10px;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { IconClaude, IconAntigravity, IconCodex, IconOpencode, IconTerminal } from "@/components/Icons";
+import { IconClaude, IconAntigravity, IconCodex, IconOpencode, IconTerminal, IconChevronDown } from "@/components/Icons";
 import { useTaskMenuPlacement } from "@/components/useTaskMenuPlacement";
 
 export interface ExecCardItem {
@@ -25,6 +25,8 @@ export interface ExecCardProps {
   onRestartScript?: () => void;
   onRetryTask?: () => void;
   onDeleteTask?: () => void;
+  collapsible?: boolean;
+  defaultCollapsed?: boolean;
   extraMenuItems?: (closeMenu: () => void) => React.ReactNode;
   children?: React.ReactNode;
 }
@@ -91,8 +93,22 @@ function IconShell() {
   );
 }
 
-export default function ExecCard({ item, className, onShowCommand, onStopTask, onRestartScript, onRetryTask, onDeleteTask, extraMenuItems, children }: ExecCardProps) {
+export default function ExecCard({
+  item,
+  className,
+  onShowCommand,
+  onStopTask,
+  onRestartScript,
+  onRetryTask,
+  onDeleteTask,
+  collapsible,
+  defaultCollapsed,
+  extraMenuItems,
+  children,
+}: ExecCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(!!defaultCollapsed);
+  const userChangedCollapseRef = useRef(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { opensUpward, maxHeight } = useTaskMenuPlacement(menuOpen, menuRef, dropdownRef);
@@ -107,6 +123,15 @@ export default function ExecCard({ item, className, onShowCommand, onStopTask, o
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [menuOpen]);
+
+  useEffect(() => {
+    if (!collapsible && collapsed) setCollapsed(false);
+  }, [collapsible, collapsed]);
+
+  useEffect(() => {
+    if (!collapsible || !defaultCollapsed || userChangedCollapseRef.current) return;
+    setCollapsed(true);
+  }, [collapsible, defaultCollapsed]);
 
   const isRunning = item.status === "running";
   const isFailed = item.status === "error";
@@ -128,7 +153,7 @@ export default function ExecCard({ item, className, onShowCommand, onStopTask, o
     (!isRunning && !!onDeleteTask);
 
   return (
-    <div className={`exec-card ${statusClass} ${className || ""}`}>
+    <div className={`exec-card ${statusClass} ${collapsed ? "exec-card-collapsed" : ""} ${className || ""}`}>
       <div className="exec-card-header">
         <div className="exec-card-icon">
           {isRunning ? (
@@ -158,97 +183,113 @@ export default function ExecCard({ item, className, onShowCommand, onStopTask, o
           )}
           <div className="exec-card-status">{item.statusText}</div>
         </div>
-        {hasMenuItems && (
+        {(collapsible || hasMenuItems) && (
           <div className="exec-card-actions">
-            <div className="task-menu-container" ref={menuRef}>
+            {collapsible && (
               <button
-                className="task-menu-btn exec-card-menu-btn"
-                aria-expanded={menuOpen}
+                className="task-menu-btn exec-card-collapse-btn"
+                aria-expanded={!collapsed}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setMenuOpen(!menuOpen);
+                  userChangedCollapseRef.current = true;
+                  setCollapsed((v) => !v);
                 }}
-                title="More actions"
+                title={collapsed ? "Expand card" : "Collapse card"}
               >
-                <IconMoreVertical />
+                <IconChevronDown className={collapsed ? "" : "exec-card-collapse-icon-open"} />
               </button>
-              {menuOpen && (
-                <div
-                  className={`task-menu-dropdown${opensUpward ? " task-menu-dropdown-upward" : ""}`}
-                  ref={dropdownRef}
-                  style={maxHeight ? { maxHeight } : undefined}
+            )}
+            {hasMenuItems && (
+              <div className="task-menu-container" ref={menuRef}>
+                <button
+                  className="task-menu-btn exec-card-menu-btn"
+                  aria-expanded={menuOpen}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuOpen(!menuOpen);
+                  }}
+                  title="More actions"
                 >
-                  {extraMenuItems && extraMenuItems(() => setMenuOpen(false))}
-                  {item.command && onShowCommand && (
-                    <button
-                      className="task-menu-item"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        onShowCommand();
-                      }}
-                    >
-                      <IconCode />
-                      <span>Show Command</span>
-                    </button>
-                  )}
-                  {isRunning && item.type === "script" && onRestartScript && (
-                    <button
-                      className="task-menu-item"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        onRestartScript();
-                      }}
-                    >
-                      <IconRestart />
-                      <span>Restart</span>
-                    </button>
-                  )}
-                  {isFailed && onRetryTask && (
-                    <button
-                      className="task-menu-item"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        onRetryTask();
-                      }}
-                    >
-                      <IconRetry />
-                      <span>Retry</span>
-                    </button>
-                  )}
-                  {isRunning && hasLog && onStopTask && (
-                    <button
-                      className="task-menu-item danger"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        onStopTask();
-                      }}
-                    >
-                      <IconStop />
-                      <span>Stop Task</span>
-                    </button>
-                  )}
-                  {!isRunning && onDeleteTask && (
-                    <button
-                      className="task-menu-item danger"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        onDeleteTask();
-                      }}
-                    >
-                      <IconTrash />
-                      <span>Delete</span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
+                  <IconMoreVertical />
+                </button>
+                {menuOpen && (
+                  <div
+                    className={`task-menu-dropdown${opensUpward ? " task-menu-dropdown-upward" : ""}`}
+                    ref={dropdownRef}
+                    style={maxHeight ? { maxHeight } : undefined}
+                  >
+                    {extraMenuItems && extraMenuItems(() => setMenuOpen(false))}
+                    {item.command && onShowCommand && (
+                      <button
+                        className="task-menu-item"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onShowCommand();
+                        }}
+                      >
+                        <IconCode />
+                        <span>Show Command</span>
+                      </button>
+                    )}
+                    {isRunning && item.type === "script" && onRestartScript && (
+                      <button
+                        className="task-menu-item"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onRestartScript();
+                        }}
+                      >
+                        <IconRestart />
+                        <span>Restart</span>
+                      </button>
+                    )}
+                    {isFailed && onRetryTask && (
+                      <button
+                        className="task-menu-item"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onRetryTask();
+                        }}
+                      >
+                        <IconRetry />
+                        <span>Retry</span>
+                      </button>
+                    )}
+                    {isRunning && hasLog && onStopTask && (
+                      <button
+                        className="task-menu-item danger"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onStopTask();
+                        }}
+                      >
+                        <IconStop />
+                        <span>Stop Task</span>
+                      </button>
+                    )}
+                    {!isRunning && onDeleteTask && (
+                      <button
+                        className="task-menu-item danger"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onDeleteTask();
+                        }}
+                      >
+                        <IconTrash />
+                        <span>Delete</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
       {item.timestamp && (
         <div className="exec-card-time">{item.timestamp}</div>
       )}
-      {children}
+      {!collapsed && children}
     </div>
   );
 }

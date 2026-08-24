@@ -312,6 +312,7 @@ export default function SessionView({
             : "Send a message or follow-up feedback to the agent…";
 
   const chatInputValue = prompt;
+  const [collapseViewedAt, setCollapseViewedAt] = useState<string | false | null>(null);
 
   // Resize to fit the placeholder whenever it changes while the input is empty,
   // so the box previews how much room a longer message will need.
@@ -327,6 +328,33 @@ export default function SessionView({
     if (type === "opencode") return "OpenCode";
     if (type === "auto") return "Auto";
     return type;
+  }
+
+  useEffect(() => {
+    setCollapseViewedAt(null);
+  }, [selectedSessionId]);
+
+  useEffect(() => {
+    if (!selectedSessionId || !selectedSession || collapseViewedAt !== null) return;
+    setCollapseViewedAt(selectedSession.lastViewedAt ?? false);
+  }, [selectedSessionId, selectedSession, collapseViewedAt]);
+
+  const latestCompletedExecCardId = [...messages].reverse().find((message) => {
+    const cardInfo = execCards.get(message.id);
+    return !!cardInfo?.returnMsg;
+  })?.id;
+
+  function shouldDefaultCollapseExecCard(cardInfo: ExecCardInfo, cardStatus: string): boolean {
+    if (typeof collapseViewedAt !== "string") return false;
+    if (!cardInfo.returnMsg) return false;
+    if (cardStatus === "running" || cardStatus === "error") return false;
+    if (cardInfo.runMsg.id === latestCompletedExecCardId) return false;
+
+    const viewedAt = new Date(collapseViewedAt).getTime();
+    const cardCreatedAt = new Date(cardInfo.runMsg.createdAt).getTime();
+    if (!Number.isFinite(viewedAt) || !Number.isFinite(cardCreatedAt)) return false;
+
+    return cardCreatedAt <= viewedAt;
   }
 
   return (
@@ -886,6 +914,8 @@ export default function SessionView({
             const isCardFailed = cardItem.status === "error";
             const sharedProps = {
               item: cardItem,
+              collapsible: !isCardRunning,
+              defaultCollapsed: shouldDefaultCollapseExecCard(cardInfo, cardItem.status),
               onShowCommand: cardInfo.command ? () => onShowCommand(cardInfo.command) : undefined,
               onStopTask: isCardRunning ? () => onStopExecCard(cardInfo.runMsg.id) : undefined,
               onRetryTask: isCardFailed ? () => onRetryCard(cardInfo) : undefined,
