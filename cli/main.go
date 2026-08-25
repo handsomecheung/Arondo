@@ -1148,7 +1148,7 @@ func run(argv []string) error {
 			return err
 		}
 	} else {
-		if args.runnerID == "" {
+		if args.runnerID == "" && !args.tempDir {
 			hostname, err := os.Hostname()
 			if err != nil {
 				return err
