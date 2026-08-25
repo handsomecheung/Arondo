@@ -4,11 +4,11 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const SKILL_NAME = 'arondo-agent';
+const SKILL_NAME = 'arondo-cli';
 const SOURCE = path.join(__dirname, 'skills', SKILL_NAME);
 const TARGETS = new Set(['codex', 'claude', 'agy', 'opencode']);
 
-const USAGE = `Install the bundled Arondo Agent skill for supported coding agents.
+const USAGE = `Install the bundled Arondo CLI skill for supported coding agents.
 
 Usage:
   cli/install-skill [codex|claude|agy|opencode ...] [--force]

@@ -57,7 +57,7 @@ runner/                  # Go runner binary
   pty.go                # TaskManager: spawn processes with PTY, scrollback buffer, auto-cleanup on exit
 cli/
   main.go               # Dependency-free Go CLI: send/list-agents/get-quota/update-quota
-  install-skill         # Installs the bundled arondo-agent skill for supported agents
+  install-skill         # Installs the bundled arondo-cli skill for supported agents
 app/
   page.tsx              # Main UI (runner selector, chat, status tracking, terminal modals, 3-dot dropdown)
   login/

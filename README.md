@@ -341,9 +341,9 @@ cli/arondo-cli update-quota
 
 `list-agents` reports whether Antigravity, Claude, Codex, and OpenCode are available on each accessible runner, including quota-derived availability reasons. `get-quota` prints the latest recorded quota data, and `update-quota` queues an asynchronous quota refresh. All CLI commands use the same connection-setting precedence: explicit `--server` / `--token`, then `ARONDO_URL` / `ARONDO_TOKEN`, then `cli.url` / `cli.token` in `~/.arondo/arondo.json`.
 
-### Install the Arondo Agent Skill
+### Install the Arondo CLI Skill
 
-Install the bundled `arondo-agent` skill so Codex, Claude Code, Antigravity CLI (`agy`), or OpenCode can delegate tasks through `cli/arondo-cli`:
+Install the bundled `arondo-cli` skill so Codex, Claude Code, Antigravity CLI (`agy`), or OpenCode can delegate tasks through `cli/arondo-cli`:
 
 ```bash
 cli/install-skill

@@ -1,9 +1,9 @@
 ---
-name: arondo-agent
-description: Delegate a task to an LLM or coding agent through Arondo's CLI when a reachable Arondo server and Runner should perform the work. Use for creating, continuing, and collecting results from remote agent sessions; not for direct local model CLIs.
+name: arondo-cli
+description: Delegate a task to an LLM or coding agent through Arondo CLI when a reachable Arondo server and Runner should perform the work. Use for creating, continuing, and collecting results from remote agent sessions; not for direct local model CLIs.
 ---
 
-# Arondo Agent
+# Arondo CLI
 
 Use `cli/arondo-cli send` to delegate a bounded task to an Arondo-managed AI agent. The command creates or continues a server-side session, waits for completion, and writes one JSON result to stdout. Progress and errors are written to stderr.
 
