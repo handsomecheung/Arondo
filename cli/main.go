@@ -978,6 +978,11 @@ func getMessages(c *client, args getMessagesArguments) error {
 		fmt.Fprintf(os.Stderr, "Using most recent session %s...\n", args.sessionID)
 	}
 
+	sess, err := c.getSession(args.sessionID)
+	if err != nil {
+		return err
+	}
+
 	messages, err := c.listMessages(args.sessionID)
 	if err != nil {
 		return err
@@ -1011,6 +1016,8 @@ func getMessages(c *client, args getMessagesArguments) error {
 		return nil
 	}
 
+	isSessionRunning := sess.Status == "running"
+
 	separator := strings.Repeat("─", 60)
 	for _, msg := range messages {
 		ts := msg.CreatedAt
@@ -1035,6 +1042,8 @@ func getMessages(c *client, args getMessagesArguments) error {
 				label = agentLabel(msg.Command)
 				if msg.ExitCode != nil {
 					label += fmt.Sprintf(" (exit %d)", *msg.ExitCode)
+				} else if isSessionRunning {
+					label += " (Running)"
 				}
 			}
 			fmt.Printf("\n%s\n[%s] %s\n%s\n", separator, ts, label, separator)
