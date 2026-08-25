@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken } from "@/lib/auth";
-import { getProjects, getSessions, isSessionArchived } from "@/lib/store";
+import { getProjects, getSessions, isTempDirProject, isSessionArchived } from "@/lib/store";
 
 export async function GET(request: NextRequest) {
   const token = getArondoToken(request);
@@ -20,14 +20,14 @@ export async function GET(request: NextRequest) {
     const projectId = task.projectId || session?.projectId;
     if (projectId) {
       const project = projectsById.get(projectId);
-      if (!project || project.hidden) {
+      if (!project || isTempDirProject(project)) {
         continue;
       }
     }
 
     if (session?.projectId) {
       const project = projectsById.get(session.projectId);
-      if (!project || project.hidden) {
+      if (!project || isTempDirProject(project)) {
         continue;
       }
     }

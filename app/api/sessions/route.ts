@@ -1,6 +1,6 @@
 import path from "path";
 import { NextRequest, NextResponse } from "next/server";
-import { getSessions, getProjects, deleteSession, archiveSession, createSession, addTodoMessage, getSession, getSessionArchiveAgeMs } from "@/lib/store";
+import { getSessions, getProjects, deleteSession, archiveSession, createSession, addTodoMessage, getSession, getSessionArchiveAgeMs, isTempDirProject } from "@/lib/store";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken, getUuidByToken } from "@/lib/auth";
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
       continue;
     }
 
-    if (project?.hidden) {
+    if (project && isTempDirProject(project)) {
       continue;
     }
 
@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
       agentType,
       repoPath,
       runnerId,
-    }, { hidden: tempDir });
+    }, { tempDir });
     eventBus.publish({ type: "session_updated", payload: session });
     return NextResponse.json(session, { status: 201 });
   }
@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
       agentType,
       repoPath,
       runnerId,
-    }, { hidden: tempDir });
+    }, { tempDir });
     const todoMessage = await addTodoMessage(session.id, {
       content: trimmedMessage,
       prompt: trimmedPrompt,
@@ -188,7 +188,7 @@ export async function POST(req: NextRequest) {
     name,
     tokenUuid: getUuidByToken(token) || undefined,
     displayMessage: message,
-    hidden: tempDir,
+    tempDir,
   });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });

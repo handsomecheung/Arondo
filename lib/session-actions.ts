@@ -321,7 +321,7 @@ export async function dispatchCreateSession(
   repoPath: string,
   agentType: string,
   prompt: string,
-  opts: { name?: string; tokenUuid?: string; displayMessage?: string; hidden?: boolean } = {},
+  opts: { name?: string; tokenUuid?: string; displayMessage?: string; tempDir?: boolean } = {},
 ): Promise<ActionResult> {
   const trimmedPrompt = prompt.trim();
   if (!trimmedPrompt) {
@@ -340,7 +340,7 @@ export async function dispatchCreateSession(
     agentType,
     repoPath,
     runnerId,
-  }, { hidden: opts.hidden });
+  }, { tempDir: opts.tempDir });
 
   const resolved = await resolveAgentType(agentType, run.info.agents);
   const resolvedType = resolved.agentType;

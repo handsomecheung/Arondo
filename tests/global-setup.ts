@@ -66,8 +66,8 @@ async function globalSetup() {
       },
       {
         id: 'test-runner-token-id-6',
-        token: 'test-runner-token-hidden',
-        name: 'Test Hidden Runner',
+        token: 'test-runner-token-temp-dir',
+        name: 'Test Temp Dir Runner',
         createdAt: Date.now(),
         boundRunnerId: null
       }

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getArchivedSessionPaths } from "@/lib/store";
+import { getArchivedSessionPaths, getProjects, isTempDirProject } from "@/lib/store";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken } from "@/lib/auth";
 import fs from "fs/promises";
 
 // Helper to load only the minimal necessary metadata from each session file
-async function readSessionMetadata(filePath: string): Promise<{ runnerId: string } | null> {
+async function readSessionMetadata(filePath: string): Promise<{ runnerId: string; projectId: string } | null> {
   try {
     const data = await fs.readFile(filePath, "utf-8");
     return JSON.parse(data);
@@ -20,11 +20,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const filePaths = await getArchivedSessionPaths();
+  const [filePaths, projects] = await Promise.all([getArchivedSessionPaths(), getProjects()]);
+  const projectsById = new Map(projects.map((project) => [project.id, project]));
 
   for (const filePath of filePaths) {
     const session = await readSessionMetadata(filePath);
     if (session && session.runnerId) {
+      const project = projectsById.get(session.projectId);
+      if (!project || isTempDirProject(project)) continue;
+
       const isAllowed = await runnerManager.isTokenAllowedForRunnerId(session.runnerId, token);
       if (isAllowed) {
         // Short-circuit: we only need to know if at least one accessible archived session exists

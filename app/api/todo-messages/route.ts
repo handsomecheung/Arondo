@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProjects, getSessions, getPendingTodoMessages } from "@/lib/store";
+import { getProjects, getSessions, getPendingTodoMessages, isTempDirProject } from "@/lib/store";
 import { getArondoToken, isValidToken } from "@/lib/auth";
 import { runnerManager } from "@/lib/runner-manager";
 
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
   for (const session of sessions) {
     if (!session.pendingTodoMessageIds || session.pendingTodoMessageIds.length === 0) continue;
     const project = projectsById.get(session.projectId);
-    if (!project || project.hidden) continue;
+    if (!project || isTempDirProject(project)) continue;
     const isAllowed = await runnerManager.isTokenAllowedForRunnerId(session.runnerId, token);
     if (!isAllowed) continue;
 

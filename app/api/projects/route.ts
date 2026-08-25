@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProjects, deleteProject } from "@/lib/store";
+import { getProjects, deleteProject, isTempDirProject } from "@/lib/store";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken } from "@/lib/auth";
 
@@ -28,10 +28,10 @@ export async function GET(request: NextRequest) {
       continue;
     }
 
-    if (project.hidden) {
+    if (isTempDirProject(project)) {
       const age = Date.now() - new Date(project.createdAt).getTime();
       if (age > TEMP_DIR_PROJECT_MAX_AGE_MS) {
-        console.log(`[projects] hidden project ${project.id} older than 3 days, deleting`);
+        console.log(`[projects] temp dir project ${project.id} older than 3 days, deleting`);
         await deleteProject(project.id);
       }
       continue;

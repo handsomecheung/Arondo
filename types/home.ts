@@ -33,6 +33,7 @@ export interface Project {
   runnerId: string;
   createdAt: string;
   updatedAt: string;
+  tempDir?: boolean;
 }
 
 export interface Runner {

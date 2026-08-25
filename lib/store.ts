@@ -42,11 +42,9 @@ export interface Project {
   runnerId: string;
   createdAt: string;
   updatedAt: string;
-  // Hides the project from the sidebar/session list. Set when the project's
-  // repoPath was generated via the session-creation "tempDir" option
-  // (fs.mkdtemp) — such projects are also auto-deleted once older than
-  // TEMP_DIR_PROJECT_MAX_AGE_MS. Generic enough for other features to reuse.
-  hidden?: boolean;
+  // Set when the project's repoPath was generated via the session-creation
+  // "tempDir" option. Kept out of normal project/session/task lists.
+  tempDir?: boolean;
 }
 
 export interface Session {
@@ -274,7 +272,11 @@ export interface ProjectScript {
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
 
-export async function getOrCreateProject(repoPath: string, runnerId: string, hidden?: boolean): Promise<Project> {
+export function isTempDirProject(project: Pick<Project, "tempDir">): boolean {
+  return project.tempDir === true;
+}
+
+export async function getOrCreateProject(repoPath: string, runnerId: string, opts: { tempDir?: boolean } = {}): Promise<Project> {
   await ensureDir(PROJECTS_DIR);
 
   const resolvedRepoPath = path.resolve(repoPath);
@@ -305,7 +307,7 @@ export async function getOrCreateProject(repoPath: string, runnerId: string, hid
     runnerId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    ...(hidden ? { hidden: true } : {}),
+    ...(opts.tempDir ? { tempDir: true } : {}),
   };
 
   await writeJson(getProjectFilePath(projectId), project);
@@ -420,10 +422,10 @@ export async function recordScriptHistory(projectId: string, command: string): P
 
 export async function createSession(
   data: Omit<Session, "id" | "projectId" | "createdAt" | "updatedAt">,
-  opts: { hidden?: boolean } = {}
+  opts: { tempDir?: boolean } = {}
 ): Promise<Session> {
   const id = crypto.randomUUID();
-  const project = await getOrCreateProject(data.repoPath, data.runnerId, opts.hidden);
+  const project = await getOrCreateProject(data.repoPath, data.runnerId, { tempDir: opts.tempDir });
   const session: Session = {
     ...data,
     id,
