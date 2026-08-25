@@ -51,6 +51,7 @@ export interface ResolvedAgent {
 
 interface ResolveAgentOptions {
   prompt?: string;
+  automodelLog?: (text: string) => void | Promise<void>;
 }
 
 /**
@@ -72,6 +73,8 @@ export async function resolveAgentType(
       message: options.prompt,
       defaultModel: selected.model,
       modelOptions: selected.modelOptions,
+    }, {
+      writeLog: options.automodelLog,
     })
     : null;
   if (!routed) return selected;

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession, getMessages, addMessage, updateSession, clearSessionLog } from "@/lib/store";
+import { getSession, getMessages, addMessage, updateSession, clearSessionLog, appendAutomodelLog } from "@/lib/store";
 import { getAgent, resolveAgentType, PROMPT_ENV_VAR } from "@/lib/agents";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
@@ -41,7 +41,11 @@ export async function POST(
   }
 
   const runnerConn = runnerManager.getRunner(runnerId);
-  const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? [], { prompt });
+  const systemMessageId = crypto.randomUUID();
+  const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? [], {
+    prompt,
+    automodelLog: (text) => appendAutomodelLog(id, systemMessageId, text),
+  });
   const resolvedType = resolved.agentType;
   const agent = getAgent(resolvedType);
   const fullPrompt = agent.buildPrompt(prompt);
@@ -57,6 +61,7 @@ export async function POST(
   const updatedSession = await updateSession(id, { status: "running", errorMessage: undefined });
 
   const systemMsg = await addMessage({
+    id: systemMessageId,
     sessionId: id,
     role: "system",
     content: `⚙️ Executing command:\n\`\`\`bash\n${command}\n\`\`\``,

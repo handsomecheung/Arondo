@@ -5,6 +5,7 @@ import {
   updateSession,
   addMessage,
   clearSessionLog,
+  appendAutomodelLog,
   getMessages,
   getProjectScripts,
   recordScriptHistory,
@@ -77,7 +78,11 @@ export async function dispatchDetachedAgent(
 
   const runner = runnerManager.getRunner(runnerId);
   const selectedAgentType = agentType || session.agentType;
-  const resolved = await resolveAgentType(selectedAgentType, runner?.info.agents ?? [], { prompt });
+  const runMessageId = crypto.randomUUID();
+  const resolved = await resolveAgentType(selectedAgentType, runner?.info.agents ?? [], {
+    prompt,
+    automodelLog: (text) => appendAutomodelLog(sessionId, runMessageId, text),
+  });
 
   const agentSessionKey = crypto.randomUUID();
   const agent = getAgent(resolved.agentType);
@@ -92,6 +97,7 @@ export async function dispatchDetachedAgent(
   });
 
   const runMessage = await addMessage({
+    id: runMessageId,
     sessionId,
     role: "system",
     content: `⚙️ ${kind === "review" ? "Review" : "By the way"} · Executing command:\n\`\`\`bash\n${command}\n\`\`\``,
@@ -201,7 +207,11 @@ export async function dispatchFollowupMessage(
     session.errorMessage != null &&
     isQuotaErrorMessage(session.errorMessage);
 
-  const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? [], { prompt: trimmedPrompt || trimmedMessage });
+  const systemMessageId = crypto.randomUUID();
+  const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? [], {
+    prompt: trimmedPrompt || trimmedMessage,
+    automodelLog: (text) => appendAutomodelLog(sessionId, systemMessageId, text),
+  });
   const resolvedType = resolved.agentType;
 
   const lastAgentRun = [...messages].reverse().find((m) => m.type === "agent-run" && m.resolvedAgentType);
@@ -248,6 +258,7 @@ export async function dispatchFollowupMessage(
   eventBus.publish({ type: "session_updated", payload: updatedSession });
 
   const systemMsg = await addMessage({
+    id: systemMessageId,
     sessionId,
     role: "system",
     content: `⚙️ Executing command:\n\`\`\`bash\n${command}\n\`\`\``,
@@ -346,7 +357,11 @@ export async function dispatchCreateSession(
     runnerId,
   }, { tempDir: opts.tempDir });
 
-  const resolved = await resolveAgentType(agentType, run.info.agents, { prompt: trimmedPrompt });
+  const systemMessageId = crypto.randomUUID();
+  const resolved = await resolveAgentType(agentType, run.info.agents, {
+    prompt: trimmedPrompt,
+    automodelLog: (text) => appendAutomodelLog(session.id, systemMessageId, text),
+  });
   const resolvedType = resolved.agentType;
   const agent = getAgent(resolvedType);
   const fullPrompt = agent.buildPrompt(trimmedPrompt);
@@ -380,6 +395,7 @@ export async function dispatchCreateSession(
   eventBus.publish({ type: "message_added", payload: userMessage });
 
   const systemMsg = await addMessage({
+    id: systemMessageId,
     sessionId: session.id,
     role: "system",
     content: `⚙️ Executing command:\n\`\`\`bash\n${command}\n\`\`\``,

@@ -70,30 +70,83 @@ function normalizeDecision(choice: AutoModelOption, object: z.infer<typeof Decis
   };
 }
 
-export async function routeModel(input: AutoModelInput): Promise<AutoModelDecision | null> {
+interface RouteModelOptions {
+  writeLog?: (text: string) => void | Promise<void>;
+}
+
+function formatLogSection(title: string, value: unknown): string {
+  const body = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  return [`## ${title}`, body, ""].join("\n");
+}
+
+export async function routeModel(input: AutoModelInput, options: RouteModelOptions = {}): Promise<AutoModelDecision | null> {
+  const startedAt = Date.now();
+  const logParts: string[] = [
+    `# automodel ${new Date(startedAt).toISOString()}`,
+    "",
+    formatLogSection("Input", {
+      agentType: input.agentType,
+      defaultModel: input.defaultModel ?? null,
+      modelOptions: input.modelOptions,
+      message: input.message,
+    }),
+  ];
+  const flushLog = async () => {
+    if (!options.writeLog) return;
+    logParts.push(formatLogSection("Elapsed", `${Date.now() - startedAt}ms`));
+    await options.writeLog(logParts.join("\n"));
+  };
+
   const config = getAutomodelConfig();
-  if (!config) return null;
+  if (!config) {
+    logParts.push(formatLogSection("Result", "skipped: no automodel API key configured"));
+    await flushLog();
+    return null;
+  }
+  logParts.push(formatLogSection("Config", {
+    provider: config.provider,
+    model: config.model,
+    timeoutMs: config.timeoutMs,
+    apiKeyConfigured: true,
+  }));
 
   const choices = input.modelOptions;
-  if (choices.length === 0) return null;
+  if (choices.length === 0) {
+    logParts.push(formatLogSection("Result", "skipped: no model options"));
+    await flushLog();
+    return null;
+  }
 
   try {
     const model = createModel(config.provider, config.model, config.apiKey);
+    const prompt = buildPrompt(input, choices);
+    logParts.push(formatLogSection("Prompt", prompt));
     const result = await withTimeout(
       (abortSignal) => generateObject({
         model,
         schema: DecisionSchema,
-        prompt: buildPrompt(input, choices),
+        prompt,
         abortSignal,
       }),
       config.timeoutMs,
     );
+    logParts.push(formatLogSection("Raw Decision", result.object));
     const selected = choices.find((choice) => choice.id === result.object.choiceId);
-    if (!selected) return null;
-    return normalizeDecision(selected, result.object);
+    if (!selected) {
+      logParts.push(formatLogSection("Result", `skipped: invalid choiceId ${result.object.choiceId}`));
+      await flushLog();
+      return null;
+    }
+    const decision = normalizeDecision(selected, result.object);
+    logParts.push(formatLogSection("Selected Choice", selected));
+    logParts.push(formatLogSection("Result", decision));
+    await flushLog();
+    return decision;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.warn(`[automodel] skipped: ${message}`);
+    logParts.push(formatLogSection("Result", `skipped: ${message}`));
+    await flushLog();
     return null;
   }
 }

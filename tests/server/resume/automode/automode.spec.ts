@@ -359,6 +359,7 @@ async function runTransitionTest(
     const runMsgs1 = messages1.filter((m: any) => m.type === 'agent-run');
     expect(runMsgs1.length).toBe(1);
     expect(runMsgs1[0].resolvedAgentType).toBe(expectedFromAgent);
+    await expectAutomodelLog(sessionId, runMsgs1[0].id);
 
     // Write second quota
     await fs.writeFile(quotaPath, JSON.stringify(getQuotaForChoice(toChoice), null, 2), 'utf-8');
@@ -385,6 +386,7 @@ async function runTransitionTest(
     const runMsgs2 = messages2.filter((m: any) => m.type === 'agent-run');
     expect(runMsgs2.length).toBe(2);
     expect(runMsgs2[1].resolvedAgentType).toBe(expectedToAgent);
+    await expectAutomodelLog(sessionId, runMsgs2[1].id);
 
     const secondRunMsg = runMsgs2[1];
     console.log(`[automode-test] Second run prompt:\n${secondRunMsg.prompt}`);
@@ -420,6 +422,14 @@ async function runTransitionTest(
     await fs.rm(claudeLogDir, { recursive: true, force: true }).catch(() => {});
     await fs.rm('/tmp/test-repo', { recursive: true, force: true }).catch(() => {});
   }
+}
+
+async function expectAutomodelLog(sessionId: string, messageId: string) {
+  const logPath = path.join(CONFIG_DIR_RUNTIME, 'sessions', sessionId, 'logs', `${messageId}.automodel.log`);
+  const log = await fs.readFile(logPath, 'utf-8');
+  expect(log).toContain('# automodel');
+  expect(log).toContain('## Input');
+  expect(log).toContain('## Result');
 }
 
 async function runSameChoiceResumeTest(

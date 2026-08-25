@@ -489,7 +489,7 @@ export async function getMessages(sessionId: string, projectId?: string): Promis
 }
 
 export async function addMessage(
-  data: Omit<Message, "id" | "createdAt">
+  data: Omit<Message, "id" | "createdAt"> & { id?: string }
 ): Promise<Message> {
   const { sessionId, projectId } = data;
   const filePath = getMessagesFilePath(sessionId, projectId);
@@ -497,7 +497,7 @@ export async function addMessage(
     const all = await readJson<Message[]>(filePath, []);
     const message: Message = {
       ...data,
-      id: crypto.randomUUID(),
+      id: data.id ?? crypto.randomUUID(),
       createdAt: new Date().toISOString(),
     };
     all.push(message);
@@ -543,6 +543,10 @@ function getLogFilePath(sessionId: string, messageId: string, projectId?: string
   return path.join(getSessionDir(sessionId), "logs", `${messageId}${suffix}.log`);
 }
 
+function getAutomodelLogFilePath(sessionId: string, messageId: string): string {
+  return path.join(getSessionDir(sessionId), "logs", `${messageId}.automodel.log`);
+}
+
 export async function clearSessionLog(sessionId: string, messageId: string, projectId?: string): Promise<void> {
   const paths = [
     getLogFilePath(sessionId, messageId, projectId),
@@ -556,6 +560,12 @@ export async function appendSessionLog(sessionId: string, messageId: string, tex
   const logPath = getLogFilePath(sessionId, messageId, projectId, stream);
   await ensureDir(path.dirname(logPath));
   await fs.appendFile(logPath, raw ? text : text + "\n", "utf-8");
+}
+
+export async function appendAutomodelLog(sessionId: string, messageId: string, text: string): Promise<void> {
+  const logPath = getAutomodelLogFilePath(sessionId, messageId);
+  await ensureDir(path.dirname(logPath));
+  await fs.appendFile(logPath, text.endsWith("\n") ? text : `${text}\n`, "utf-8");
 }
 
 export async function getSessionLog(sessionId: string, messageId: string, projectId?: string, stream: LogStream = "stdout"): Promise<string> {
