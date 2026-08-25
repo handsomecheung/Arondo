@@ -19,7 +19,7 @@ const FILE_SHOW_HIDDEN_DEFAULT = process.env.ARONDO_FILE_SHOW_HIDDEN_DEFAULT !==
 export interface AppSettings {
   sessionArchiveDays?: number;
   showHiddenFiles?: boolean;
-  mrouterApiKeys?: {
+  llmApiKeys?: {
     ANTHROPIC_API_KEY?: string;
     OPENAI_API_KEY?: string;
     GOOGLE_GENERATIVE_AI_API_KEY?: string;

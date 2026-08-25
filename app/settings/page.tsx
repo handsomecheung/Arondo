@@ -49,43 +49,43 @@ interface RunnerTokenInfo {
   connected?: boolean;
 }
 
-type MRouterApiKeyName = "ANTHROPIC_API_KEY" | "OPENAI_API_KEY" | "GOOGLE_GENERATIVE_AI_API_KEY";
+type LlmApiKeyName = "ANTHROPIC_API_KEY" | "OPENAI_API_KEY" | "GOOGLE_GENERATIVE_AI_API_KEY";
 
-interface MRouterApiKeyStatus {
+interface AutoModelApiKeyStatus {
   configured: boolean;
   source: "env" | "settings" | "none";
   env: boolean;
 }
 
-const MROUTER_API_KEYS: {
-  name: MRouterApiKeyName;
+const LLM_API_KEYS: {
+  name: LlmApiKeyName;
   label: string;
   description: string;
 }[] = [
   {
     name: "ANTHROPIC_API_KEY",
     label: "Anthropic",
-    description: "First priority provider for mrouter classification.",
+    description: "First priority provider for Automodel classification.",
   },
   {
     name: "OPENAI_API_KEY",
     label: "OpenAI",
-    description: "Second priority provider for mrouter classification.",
+    description: "Second priority provider for Automodel classification.",
   },
   {
     name: "GOOGLE_GENERATIVE_AI_API_KEY",
     label: "Google",
-    description: "Third priority provider for mrouter classification.",
+    description: "Third priority provider for Automodel classification.",
   },
 ];
 
-const EMPTY_MROUTER_KEYS: Record<MRouterApiKeyName, string> = {
+const EMPTY_LLM_KEYS: Record<LlmApiKeyName, string> = {
   ANTHROPIC_API_KEY: "",
   OPENAI_API_KEY: "",
   GOOGLE_GENERATIVE_AI_API_KEY: "",
 };
 
-const EMPTY_MROUTER_STATUS: Record<MRouterApiKeyName, MRouterApiKeyStatus> = {
+const EMPTY_LLM_STATUS: Record<LlmApiKeyName, AutoModelApiKeyStatus> = {
   ANTHROPIC_API_KEY: { configured: false, source: "none", env: false },
   OPENAI_API_KEY: { configured: false, source: "none", env: false },
   GOOGLE_GENERATIVE_AI_API_KEY: { configured: false, source: "none", env: false },
@@ -214,10 +214,10 @@ export default function SettingsPage() {
 
   const [showHiddenFiles, setShowHiddenFiles] = useState(true);
   const [savingShowHiddenFiles, setSavingShowHiddenFiles] = useState(false);
-  const [mrouterApiKeys, setMrouterApiKeys] = useState<Record<MRouterApiKeyName, string>>(EMPTY_MROUTER_KEYS);
-  const [mrouterApiKeyStatus, setMrouterApiKeyStatus] = useState<Record<MRouterApiKeyName, MRouterApiKeyStatus>>(EMPTY_MROUTER_STATUS);
-  const [savingMrouterApiKeys, setSavingMrouterApiKeys] = useState(false);
-  const [mrouterApiKeysSaved, setMrouterApiKeysSaved] = useState(false);
+  const [llmApiKeys, setLlmApiKeys] = useState<Record<LlmApiKeyName, string>>(EMPTY_LLM_KEYS);
+  const [llmApiKeyStatus, setLlmApiKeyStatus] = useState<Record<LlmApiKeyName, AutoModelApiKeyStatus>>(EMPTY_LLM_STATUS);
+  const [savingLlmApiKeys, setSavingLlmApiKeys] = useState(false);
+  const [llmApiKeysSaved, setLlmApiKeysSaved] = useState(false);
 
   const loadRunners = useCallback(() => {
     fetch("/api/runners")
@@ -249,7 +249,7 @@ export default function SettingsPage() {
         sessionArchiveDays: number;
         showHiddenFiles?: boolean;
         version?: string;
-        mrouterApiKeys?: Record<MRouterApiKeyName, MRouterApiKeyStatus>;
+        llmApiKeys?: Record<LlmApiKeyName, AutoModelApiKeyStatus>;
       }) => {
         setSessionArchiveDays(data.sessionArchiveDays);
         if (data.showHiddenFiles !== undefined) {
@@ -258,8 +258,8 @@ export default function SettingsPage() {
         if (data.version) {
           setServerVersion(data.version);
         }
-        if (data.mrouterApiKeys) {
-          setMrouterApiKeyStatus({ ...EMPTY_MROUTER_STATUS, ...data.mrouterApiKeys });
+        if (data.llmApiKeys) {
+          setLlmApiKeyStatus({ ...EMPTY_LLM_STATUS, ...data.llmApiKeys });
         }
       })
       .catch(console.error);
@@ -477,45 +477,45 @@ export default function SettingsPage() {
     }
   }, []);
 
-  const saveMrouterApiKeys = useCallback(async (patch: Partial<Record<MRouterApiKeyName, string | null>>) => {
-    setSavingMrouterApiKeys(true);
-    setMrouterApiKeysSaved(false);
+  const saveLlmApiKeys = useCallback(async (patch: Partial<Record<LlmApiKeyName, string | null>>) => {
+    setSavingLlmApiKeys(true);
+    setLlmApiKeysSaved(false);
     try {
       const res = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mrouterApiKeys: patch }),
+        body: JSON.stringify({ llmApiKeys: patch }),
       });
       if (!res.ok) {
-        alert("Failed to save mrouter API keys");
+        alert("Failed to save automodel API keys");
         return;
       }
       const data = await res.json();
-      if (data.mrouterApiKeys) {
-        setMrouterApiKeyStatus({ ...EMPTY_MROUTER_STATUS, ...data.mrouterApiKeys });
+      if (data.llmApiKeys) {
+        setLlmApiKeyStatus({ ...EMPTY_LLM_STATUS, ...data.llmApiKeys });
       }
-      setMrouterApiKeys(EMPTY_MROUTER_KEYS);
-      setMrouterApiKeysSaved(true);
-      setTimeout(() => setMrouterApiKeysSaved(false), 3000);
+      setLlmApiKeys(EMPTY_LLM_KEYS);
+      setLlmApiKeysSaved(true);
+      setTimeout(() => setLlmApiKeysSaved(false), 3000);
     } catch (err) {
-      console.error("Failed to save mrouter API keys:", err);
-      alert("Failed to save mrouter API keys");
+      console.error("Failed to save automodel API keys:", err);
+      alert("Failed to save automodel API keys");
     } finally {
-      setSavingMrouterApiKeys(false);
+      setSavingLlmApiKeys(false);
     }
   }, []);
 
-  const handleSaveMrouterApiKeys = useCallback(async (e: React.FormEvent) => {
+  const handleSaveLlmApiKeys = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    const patch: Partial<Record<MRouterApiKeyName, string>> = {};
-    for (const { name } of MROUTER_API_KEYS) {
-      if (mrouterApiKeyStatus[name].env) continue;
-      const value = mrouterApiKeys[name].trim();
+    const patch: Partial<Record<LlmApiKeyName, string>> = {};
+    for (const { name } of LLM_API_KEYS) {
+      if (llmApiKeyStatus[name].env) continue;
+      const value = llmApiKeys[name].trim();
       if (value) patch[name] = value;
     }
     if (Object.keys(patch).length === 0) return;
-    await saveMrouterApiKeys(patch);
-  }, [mrouterApiKeys, mrouterApiKeyStatus, saveMrouterApiKeys]);
+    await saveLlmApiKeys(patch);
+  }, [llmApiKeys, llmApiKeyStatus, saveLlmApiKeys]);
 
   const saveRunnerUserTokenUuids = useCallback(async (runnerId: string, allowedUserTokenUuids: string[]) => {
     try {
@@ -881,9 +881,9 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          {/* Model Router Section */}
+          {/* Automodel Section */}
           <section
-            aria-label="Model router API keys"
+            aria-label="LLM API keys"
             style={{
               background: "var(--bg-surface)",
               border: "1px solid var(--border)",
@@ -903,7 +903,7 @@ export default function SettingsPage() {
                   marginBottom: 4,
                 }}
               >
-                Model Router
+                Automodel
               </h2>
               <p
                 style={{
@@ -913,21 +913,21 @@ export default function SettingsPage() {
                   lineHeight: 1.5,
                 }}
               >
-                mrouter uses these API keys to classify an Auto Mode message after Arondo has selected the agent, then chooses that agent&apos;s model and reasoning effort. Keys are checked in priority order: Anthropic, OpenAI, then Google. Environment variables take precedence over values saved here.
+                Automodel uses these API keys to classify an Auto Mode message after Arondo has selected the agent, then chooses that agent&apos;s model and reasoning effort. Keys are checked in priority order: Anthropic, OpenAI, then Google. Environment variables take precedence over values saved here.
               </p>
             </div>
 
             <form
-              onSubmit={handleSaveMrouterApiKeys}
+              onSubmit={handleSaveLlmApiKeys}
               style={{
                 display: "flex",
                 flexDirection: "column",
                 gap: 12,
               }}
             >
-              {MROUTER_API_KEYS.map(({ name, label, description }) => {
-                const status = mrouterApiKeyStatus[name];
-                const disabled = status.env || savingMrouterApiKeys;
+              {LLM_API_KEYS.map(({ name, label, description }) => {
+                const status = llmApiKeyStatus[name];
+                const disabled = status.env || savingLlmApiKeys;
                 const placeholder = status.env
                   ? "Configured by environment variable"
                   : status.source === "settings"
@@ -962,12 +962,12 @@ export default function SettingsPage() {
                       </span>
                       <input
                         type="password"
-                        value={mrouterApiKeys[name]}
+                        value={llmApiKeys[name]}
                         disabled={disabled}
                         autoComplete="off"
                         placeholder={placeholder}
                         onChange={(e) =>
-                          setMrouterApiKeys((prev) => ({
+                          setLlmApiKeys((prev) => ({
                             ...prev,
                             [name]: e.target.value,
                           }))
@@ -998,7 +998,7 @@ export default function SettingsPage() {
                     <button
                       type="button"
                       disabled={disabled || !status.configured || status.source !== "settings"}
-                      onClick={() => saveMrouterApiKeys({ [name]: null })}
+                      onClick={() => saveLlmApiKeys({ [name]: null })}
                       style={{
                         padding: "7px 12px",
                         fontSize: 12,
@@ -1020,8 +1020,8 @@ export default function SettingsPage() {
                 <button
                   type="submit"
                   disabled={
-                    savingMrouterApiKeys ||
-                    !MROUTER_API_KEYS.some(({ name }) => !mrouterApiKeyStatus[name].env && mrouterApiKeys[name].trim())
+                    savingLlmApiKeys ||
+                    !LLM_API_KEYS.some(({ name }) => !llmApiKeyStatus[name].env && llmApiKeys[name].trim())
                   }
                   style={{
                     padding: "7px 18px",
@@ -1032,20 +1032,20 @@ export default function SettingsPage() {
                     border: "none",
                     borderRadius: "var(--radius-sm)",
                     cursor:
-                      savingMrouterApiKeys ||
-                      !MROUTER_API_KEYS.some(({ name }) => !mrouterApiKeyStatus[name].env && mrouterApiKeys[name].trim())
+                      savingLlmApiKeys ||
+                      !LLM_API_KEYS.some(({ name }) => !llmApiKeyStatus[name].env && llmApiKeys[name].trim())
                         ? "not-allowed"
                         : "pointer",
                     opacity:
-                      savingMrouterApiKeys ||
-                      !MROUTER_API_KEYS.some(({ name }) => !mrouterApiKeyStatus[name].env && mrouterApiKeys[name].trim())
+                      savingLlmApiKeys ||
+                      !LLM_API_KEYS.some(({ name }) => !llmApiKeyStatus[name].env && llmApiKeys[name].trim())
                         ? 0.5
                         : 1,
                   }}
                 >
-                  {savingMrouterApiKeys ? "Saving…" : "Save API Keys"}
+                  {savingLlmApiKeys ? "Saving…" : "Save API Keys"}
                 </button>
-                {mrouterApiKeysSaved && (
+                {llmApiKeysSaved && (
                   <span style={{ fontSize: 13, color: "var(--accent)", fontWeight: 500 }}>
                     Saved
                   </span>

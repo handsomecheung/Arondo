@@ -5,16 +5,16 @@ import type { Message } from "./store";
 import { getSessionLog } from "./store";
 import { getConfigDir } from "./config";
 import { stripAnsi } from "./ansi";
-import type { MRouterModelOption } from "./mrouter";
+import type { AutoModelOption } from "./automodel";
 
 const CONFIG_DIR = getConfigDir();
 
-const QUOTA_PATH = path.join(CONFIG_DIR, "autoselect", "agent", "quota.json");
+const QUOTA_PATH = path.join(CONFIG_DIR, "autoagent", "agent", "quota.json");
 
 export interface ResolvedAgent {
   agentType: ConcreteAgentType;
   model?: string;
-  modelOptions?: MRouterModelOption[];
+  modelOptions?: AutoModelOption[];
 }
 
 interface ClaudeQuota {
@@ -73,10 +73,10 @@ interface AgentChoice {
   id: "A" | "B" | "C" | "D";
   agentType: ConcreteAgentType;
   model?: string;
-  modelOptions: MRouterModelOption[];
+  modelOptions: AutoModelOption[];
 }
 
-const AGY_GEMINI_MODEL_OPTIONS: MRouterModelOption[] = [
+const AGY_GEMINI_MODEL_OPTIONS: AutoModelOption[] = [
   { id: "gemini-3.7-flash-high", model: "Gemini 3.7 Flash (High)", costTier: "standard", description: "Gemini Flash 3.7 with high thinking for harder work." },
   { id: "gemini-3.7-flash-medium", model: "Gemini 3.7 Flash (Medium)", costTier: "standard", description: "Gemini Flash 3.7 balanced option." },
   { id: "gemini-3.7-flash-low", model: "Gemini 3.7 Flash (Low)", costTier: "cheap", description: "Gemini Flash 3.7 low thinking for small tasks." },
@@ -90,17 +90,17 @@ const AGY_GEMINI_MODEL_OPTIONS: MRouterModelOption[] = [
   { id: "gemini-3.1-pro-low", model: "Gemini 3.1 Pro (Low)", costTier: "standard", description: "Gemini Pro with low thinking for moderate work." },
 ];
 
-const AGY_OTHER_MODEL_OPTIONS: MRouterModelOption[] = [
+const AGY_OTHER_MODEL_OPTIONS: AutoModelOption[] = [
   { id: "claude-sonnet-4-6", model: "Claude Sonnet 4.6 (Thinking)", costTier: "strong", description: "Strong general coding model in Antigravity." },
   { id: "claude-opus-4-6-thinking", model: "Claude Opus 4.6 (Thinking)", costTier: "strong", description: "Highest-cost Antigravity model for the hardest tasks." },
   { id: "gpt-oss-120b-medium", model: "GPT-OSS 120B (Medium)", costTier: "standard", description: "Open-weight medium option for routine coding work." },
 ];
 
-const CLAUDE_MODEL_OPTIONS: MRouterModelOption[] = [
+const CLAUDE_MODEL_OPTIONS: AutoModelOption[] = [
   { id: "claude-default", costTier: "standard", description: "Use Claude Code's configured default model." },
 ];
 
-const CODEX_MODEL_OPTIONS: MRouterModelOption[] = [
+const CODEX_MODEL_OPTIONS: AutoModelOption[] = [
   { id: "codex-gpt-5.4-mini-low", model: "gpt-5.4-mini", effort: "low", costTier: "cheap", description: "Cheaper Codex option for small questions and low-risk changes." },
   { id: "codex-gpt-5.5-medium", model: "gpt-5.5", effort: "medium", costTier: "standard", description: "Default Codex option for normal coding tasks." },
   { id: "codex-gpt-5.5-high", model: "gpt-5.5", effort: "high", costTier: "strong", description: "Stronger Codex reasoning for hard debugging and broad changes." },
@@ -145,15 +145,15 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
     });
   }
 
-  console.log(`[autoselect] Available runner binaries: ${runnerAgentBinaries.join(", ")}`);
-  console.log(`[autoselect] Initial choices: ${choices.map((c) => c.id).join(", ")}`);
+  console.log(`[autoagent] Available runner binaries: ${runnerAgentBinaries.join(", ")}`);
+  console.log(`[autoagent] Initial choices: ${choices.map((c) => c.id).join(", ")}`);
 
   if (choices.length === 0) {
-    console.log("[autoselect] No choices available.");
+    console.log("[autoagent] No choices available.");
     return null;
   }
   if (choices.length === 1) {
-    console.log(`[autoselect] Only one choice available: ${choices[0].id}. Selecting it directly.`);
+    console.log(`[autoagent] Only one choice available: ${choices[0].id}. Selecting it directly.`);
     return { agentType: choices[0].agentType, model: choices[0].model, modelOptions: choices[0].modelOptions };
   }
 
@@ -214,7 +214,7 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
   for (const choice of choices) {
     const { hourRemain, weekRemain, resetsAt } = getMetrics(choice);
     console.log(
-      `[autoselect] Choice ${choice.id} (${choice.agentType} / ${choice.model ?? "default"}): ` +
+      `[autoagent] Choice ${choice.id} (${choice.agentType} / ${choice.model ?? "default"}): ` +
       `HourRemain=${hourRemain}, WeekRemain=${weekRemain}, ResetsAt=${resetsAt}`
     );
   }
@@ -231,7 +231,7 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
 
   if (knownQuotaChoices.length === 0) {
     const fallbackChoices = unknownQuotaChoices.length > 0 ? unknownQuotaChoices : apiKeyChoices;
-    console.log(`[autoselect] No known quota scores. Falling back to ${unknownQuotaChoices.length > 0 ? "unknown" : "API Key"} choices: [${fallbackChoices.map((c) => c.id).join(", ")}]`);
+    console.log(`[autoagent] No known quota scores. Falling back to ${unknownQuotaChoices.length > 0 ? "unknown" : "API Key"} choices: [${fallbackChoices.map((c) => c.id).join(", ")}]`);
     const fallback = fallbackChoices[0];
     return { agentType: fallback.agentType, model: fallback.model, modelOptions: fallback.modelOptions };
   }
@@ -251,7 +251,7 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
   }
 
   console.log(
-    `[autoselect] Step 1 Filter: Normal choices = [${normalChoices.map((c) => c.id).join(", ")}], ` +
+    `[autoagent] Step 1 Filter: Normal choices = [${normalChoices.map((c) => c.id).join(", ")}], ` +
     `Low quota choices (<0.15) = [${lowQuotaChoices.map((c) => c.id).join(", ")}]`
   );
 
@@ -259,7 +259,7 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
   let activeChoices = normalChoices;
   let excludedChoices = lowQuotaChoices;
   if (normalChoices.length === 0) {
-    console.log("[autoselect] Exception: All choices are low quota. Keeping all choices in active list.");
+    console.log("[autoagent] Exception: All choices are low quota. Keeping all choices in active list.");
     activeChoices = lowQuotaChoices;
     excludedChoices = [];
   }
@@ -276,7 +276,7 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
 
     const score = weekRemain! - weekTimeRemain;
     console.log(
-      `[autoselect] Step 2 Scoring: Choice ${choice.id} -> ` +
+      `[autoagent] Step 2 Scoring: Choice ${choice.id} -> ` +
       `WeekRemain=${weekRemain!.toFixed(3)}, WeekTimeRemain=${weekTimeRemain.toFixed(3)}, ` +
       `Score=${score.toFixed(3)} (Reset at ${resetsAt}, Current time ${now})`
     );
@@ -291,10 +291,10 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
     ...excludedChoices,
   ];
 
-  console.log(`[autoselect] Final Candidate Order: [${candidateAgents.map((c) => c.id).join(", ")}]`);
+  console.log(`[autoagent] Final Candidate Order: [${candidateAgents.map((c) => c.id).join(", ")}]`);
 
   const best = candidateAgents[0];
-  console.log(`[autoselect] Selection Result: Choice ${best.id} (Agent: ${best.agentType}, Model: ${best.model ?? "default"})`);
+  console.log(`[autoagent] Selection Result: Choice ${best.id} (Agent: ${best.agentType}, Model: ${best.model ?? "default"})`);
   return { agentType: best.agentType, model: best.model, modelOptions: best.modelOptions };
 }
 

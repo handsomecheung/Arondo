@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
 import { setupRunner, teardownRunner, waitForSessionNotRunning } from '../resume.helper';
-import { selectAgent } from '../../../../lib/autoselect';
+import { selectAgent } from '../../../../lib/autoagent';
 
 const CONFIG_DIR_RUNTIME = process.env.ARONDO_CONFIG_DIR || path.join(os.tmpdir(), 'arondo-test-config');
 const AGENTS_SESSION_MAP_FILE = path.join(CONFIG_DIR_RUNTIME, 'agent-sessions.json');
@@ -24,7 +24,7 @@ async function waitForAgySessionMapped(sessionId: string, timeoutMs = 5000): Pro
 
 test.describe('Automode Session Resume and Handoff Tests', () => {
   const CONFIG_DIR = process.env.ARONDO_CONFIG_DIR || path.join(os.tmpdir(), 'arondo-test-config');
-  const quotaPath = path.join(CONFIG_DIR, 'autoselect', 'agent', 'quota.json');
+  const quotaPath = path.join(CONFIG_DIR, 'autoagent', 'agent', 'quota.json');
 
   test.beforeEach(async () => {
     await fs.mkdir(path.dirname(quotaPath), { recursive: true }).catch(() => {});
@@ -128,7 +128,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
 
   test('does not select Claude Code when its latest quota entry uses API billing', async () => {
     await fs.copyFile(
-      path.join(process.cwd(), 'tests', 'mocks', 'autoselect', 'agent', 'claude-latest-api-billing.json'),
+      path.join(process.cwd(), 'tests', 'mocks', 'autoagent', 'agent', 'claude-latest-api-billing.json'),
       quotaPath,
     );
 
@@ -136,7 +136,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
     expect(selected?.agentType).not.toBe('claude');
   });
 
-  test('passes only the selected agy quota group model options to mrouter', async () => {
+  test('passes only the selected agy quota group model options to automodel', async () => {
     await fs.writeFile(quotaPath, JSON.stringify({
       "antigravity_arondo@gmail.com_Google AI Pro": {
         "Type": "antigravity",

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getArondoToken, getRoleByToken, isValidToken } from "@/lib/auth";
 import { updateAppSettings, getAppSettings, getSessionArchiveDays, getShowHiddenFiles } from "@/lib/store";
-import { getMRouterApiKeyEnvStatus, type MRouterApiKeyName } from "@/lib/mrouter/config";
+import { getLlmApiKeyEnvStatus, type LlmApiKeyName } from "@/lib/automodel/config";
 import fs from "fs/promises";
 import path from "path";
 
-const MROUTER_API_KEY_NAMES: MRouterApiKeyName[] = [
+const LLM_API_KEY_NAMES: LlmApiKeyName[] = [
   "ANTHROPIC_API_KEY",
   "OPENAI_API_KEY",
   "GOOGLE_GENERATIVE_AI_API_KEY",
@@ -20,10 +20,10 @@ export async function GET(request: NextRequest) {
   const sessionArchiveDays = await getSessionArchiveDays();
   const showHiddenFiles = await getShowHiddenFiles();
   const appSettings = await getAppSettings();
-  const envStatus = getMRouterApiKeyEnvStatus();
-  const mrouterApiKeys = Object.fromEntries(
-    MROUTER_API_KEY_NAMES.map((name) => {
-      const saved = !!appSettings.mrouterApiKeys?.[name]?.trim();
+  const envStatus = getLlmApiKeyEnvStatus();
+  const llmApiKeys = Object.fromEntries(
+    LLM_API_KEY_NAMES.map((name) => {
+      const saved = !!appSettings.llmApiKeys?.[name]?.trim();
       const env = envStatus[name];
       return [name, {
         configured: env || saved,
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     console.error("Failed to read package.json version:", err);
   }
 
-  return NextResponse.json({ sessionArchiveDays, showHiddenFiles, version, mrouterApiKeys });
+  return NextResponse.json({ sessionArchiveDays, showHiddenFiles, version, llmApiKeys });
 }
 
 export async function POST(request: NextRequest) {
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Admin role required" }, { status: 403 });
   }
 
-  const { sessionArchiveDays, showHiddenFiles, mrouterApiKeys } = await request.json();
+  const { sessionArchiveDays, showHiddenFiles, llmApiKeys } = await request.json();
   if (sessionArchiveDays !== undefined) {
     if (typeof sessionArchiveDays !== "number" || !Number.isFinite(sessionArchiveDays) || sessionArchiveDays < 1) {
       return NextResponse.json({ error: "sessionArchiveDays must be a positive number" }, { status: 400 });
@@ -62,24 +62,24 @@ export async function POST(request: NextRequest) {
   if (showHiddenFiles !== undefined && typeof showHiddenFiles !== "boolean") {
     return NextResponse.json({ error: "showHiddenFiles must be a boolean" }, { status: 400 });
   }
-  if (mrouterApiKeys !== undefined && (typeof mrouterApiKeys !== "object" || mrouterApiKeys === null || Array.isArray(mrouterApiKeys))) {
-    return NextResponse.json({ error: "mrouterApiKeys must be an object" }, { status: 400 });
+  if (llmApiKeys !== undefined && (typeof llmApiKeys !== "object" || llmApiKeys === null || Array.isArray(llmApiKeys))) {
+    return NextResponse.json({ error: "llmApiKeys must be an object" }, { status: 400 });
   }
 
   const patch: {
     sessionArchiveDays?: number;
     showHiddenFiles?: boolean;
-    mrouterApiKeys?: Partial<Record<MRouterApiKeyName, string | undefined>>;
+    llmApiKeys?: Partial<Record<LlmApiKeyName, string | undefined>>;
   } = {};
   if (sessionArchiveDays !== undefined) patch.sessionArchiveDays = sessionArchiveDays;
   if (showHiddenFiles !== undefined) patch.showHiddenFiles = showHiddenFiles;
-  if (mrouterApiKeys !== undefined) {
+  if (llmApiKeys !== undefined) {
     const current = await getAppSettings();
-    const envStatus = getMRouterApiKeyEnvStatus();
-    const next = { ...(current.mrouterApiKeys ?? {}) };
-    for (const name of MROUTER_API_KEY_NAMES) {
-      if (envStatus[name] || !(name in mrouterApiKeys)) continue;
-      const value = mrouterApiKeys[name];
+    const envStatus = getLlmApiKeyEnvStatus();
+    const next = { ...(current.llmApiKeys ?? {}) };
+    for (const name of LLM_API_KEY_NAMES) {
+      if (envStatus[name] || !(name in llmApiKeys)) continue;
+      const value = llmApiKeys[name];
       if (value === null || value === "") {
         next[name] = undefined;
       } else if (typeof value === "string") {
@@ -88,14 +88,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: `${name} must be a string or null` }, { status: 400 });
       }
     }
-    patch.mrouterApiKeys = next;
+    patch.llmApiKeys = next;
   }
 
   const updated = await updateAppSettings(patch);
-  const envStatus = getMRouterApiKeyEnvStatus();
+  const envStatus = getLlmApiKeyEnvStatus();
   const status = Object.fromEntries(
-    MROUTER_API_KEY_NAMES.map((name) => {
-      const saved = !!updated.mrouterApiKeys?.[name]?.trim();
+    LLM_API_KEY_NAMES.map((name) => {
+      const saved = !!updated.llmApiKeys?.[name]?.trim();
       const env = envStatus[name];
       return [name, {
         configured: env || saved,
@@ -104,5 +104,5 @@ export async function POST(request: NextRequest) {
       }];
     }),
   );
-  return NextResponse.json({ ...updated, mrouterApiKeys: status });
+  return NextResponse.json({ ...updated, llmApiKeys: status });
 }

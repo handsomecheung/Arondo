@@ -1,37 +1,37 @@
 import fs from "fs";
 import path from "path";
 import { getConfigDir } from "../config";
-import type { MRouterProvider } from "./types";
+import type { AutoModelProvider } from "./types";
 
-export type MRouterApiKeyName = "ANTHROPIC_API_KEY" | "OPENAI_API_KEY" | "GOOGLE_GENERATIVE_AI_API_KEY";
+export type LlmApiKeyName = "ANTHROPIC_API_KEY" | "OPENAI_API_KEY" | "GOOGLE_GENERATIVE_AI_API_KEY";
 
 const CONFIG_FILE = path.join(getConfigDir(), "arondo.json");
-const PROVIDER_PRIORITY: { provider: MRouterProvider; keyName: MRouterApiKeyName }[] = [
+const PROVIDER_PRIORITY: { provider: AutoModelProvider; keyName: LlmApiKeyName }[] = [
   { provider: "anthropic", keyName: "ANTHROPIC_API_KEY" },
   { provider: "openai", keyName: "OPENAI_API_KEY" },
   { provider: "google", keyName: "GOOGLE_GENERATIVE_AI_API_KEY" },
 ];
 const TIMEOUT_MS = 2000;
-const PROVIDER_MODELS: Record<MRouterProvider, string> = {
+const PROVIDER_MODELS: Record<AutoModelProvider, string> = {
   anthropic: "claude-haiku-4-5",
   openai: "gpt-5.4-mini",
   google: "gemini-3.5-flash-lite",
 };
 
-export interface MRouterConfig {
-  provider: MRouterProvider;
+export interface AutoModelConfig {
+  provider: AutoModelProvider;
   model: string;
   timeoutMs: number;
   apiKey: string;
 }
 
-interface MRouterSettingsFile {
+interface AutoModelSettingsFile {
   setitngs?: {
-    mrouterApiKeys?: Partial<Record<MRouterApiKeyName, string>>;
+    llmApiKeys?: Partial<Record<LlmApiKeyName, string>>;
   };
 }
 
-export function getMRouterApiKeyEnvStatus(): Record<MRouterApiKeyName, boolean> {
+export function getLlmApiKeyEnvStatus(): Record<LlmApiKeyName, boolean> {
   return {
     ANTHROPIC_API_KEY: !!process.env.ANTHROPIC_API_KEY?.trim(),
     OPENAI_API_KEY: !!process.env.OPENAI_API_KEY?.trim(),
@@ -39,23 +39,23 @@ export function getMRouterApiKeyEnvStatus(): Record<MRouterApiKeyName, boolean> 
   };
 }
 
-function readStoredApiKeys(): Partial<Record<MRouterApiKeyName, string>> {
+function readStoredApiKeys(): Partial<Record<LlmApiKeyName, string>> {
   try {
     const raw = fs.readFileSync(CONFIG_FILE, "utf-8");
-    const parsed = JSON.parse(raw) as MRouterSettingsFile;
-    return parsed.setitngs?.mrouterApiKeys ?? {};
+    const parsed = JSON.parse(raw) as AutoModelSettingsFile;
+    return parsed.setitngs?.llmApiKeys ?? {};
   } catch {
     return {};
   }
 }
 
-function readApiKey(keyName: MRouterApiKeyName, stored: Partial<Record<MRouterApiKeyName, string>>): string | undefined {
+function readApiKey(keyName: LlmApiKeyName, stored: Partial<Record<LlmApiKeyName, string>>): string | undefined {
   const envValue = process.env[keyName]?.trim();
   if (envValue) return envValue;
   return stored[keyName]?.trim();
 }
 
-export function getMRouterConfig(): MRouterConfig | null {
+export function getAutomodelConfig(): AutoModelConfig | null {
   const stored = readStoredApiKeys();
   for (const { provider, keyName } of PROVIDER_PRIORITY) {
     const apiKey = readApiKey(keyName, stored);

@@ -10,7 +10,7 @@ import {
   type TodoStatus,
 } from "./store";
 import { dispatchFollowupMessage } from "./session-actions";
-import { isQuotaAvailable } from "./autoselect";
+import { isQuotaAvailable } from "./autoagent";
 import { getProjectReadiness } from "./project-readiness";
 
 const TICK_MS = 30_000;

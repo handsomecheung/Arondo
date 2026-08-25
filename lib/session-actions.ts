@@ -12,7 +12,7 @@ import {
   type DetachedAgentKind,
 } from "./store";
 import { getAgent, resolveAgentType, PROMPT_ENV_VAR } from "./agents";
-import { buildCrossAgentContext } from "./autoselect";
+import { buildCrossAgentContext } from "./autoagent";
 import { eventBus } from "./event-bus";
 import { runnerManager } from "./runner-manager";
 import { readTokensConfig } from "./auth";

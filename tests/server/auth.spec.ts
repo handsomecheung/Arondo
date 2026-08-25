@@ -140,11 +140,11 @@ test.describe('Authentication API tests', () => {
     });
   });
 
-  test('mrouter API keys are saved but not returned by settings API', async ({ request }) => {
+  test('automodel API keys are saved but not returned by settings API', async ({ request }) => {
     const settingsRes = await request.post('/api/settings', {
       headers: { 'x-arondo-token': 'test-token-123456' },
       data: {
-        mrouterApiKeys: {
+        llmApiKeys: {
           ANTHROPIC_API_KEY: 'anthropic-test-key',
           OPENAI_API_KEY: 'openai-test-key',
           GOOGLE_GENERATIVE_AI_API_KEY: 'google-test-key',
@@ -153,7 +153,7 @@ test.describe('Authentication API tests', () => {
     });
     expect(settingsRes.status()).toBe(200);
     const settingsBody = await settingsRes.json();
-    expect(settingsBody.mrouterApiKeys.ANTHROPIC_API_KEY).toMatchObject({
+    expect(settingsBody.llmApiKeys.ANTHROPIC_API_KEY).toMatchObject({
       configured: true,
       source: 'settings',
       env: false,
@@ -163,7 +163,7 @@ test.describe('Authentication API tests', () => {
     const configDir = process.env.ARONDO_CONFIG_DIR || path.join(os.tmpdir(), 'arondo-test-config');
     const raw = await fs.readFile(path.join(configDir, 'arondo.json'), 'utf-8');
     const parsed = JSON.parse(raw);
-    expect(parsed.setitngs.mrouterApiKeys).toMatchObject({
+    expect(parsed.setitngs.llmApiKeys).toMatchObject({
       ANTHROPIC_API_KEY: 'anthropic-test-key',
       OPENAI_API_KEY: 'openai-test-key',
       GOOGLE_GENERATIVE_AI_API_KEY: 'google-test-key',
@@ -172,14 +172,14 @@ test.describe('Authentication API tests', () => {
     const clearRes = await request.post('/api/settings', {
       headers: { 'x-arondo-token': 'test-token-123456' },
       data: {
-        mrouterApiKeys: {
+        llmApiKeys: {
           ANTHROPIC_API_KEY: null,
         },
       },
     });
     expect(clearRes.status()).toBe(200);
     const clearBody = await clearRes.json();
-    expect(clearBody.mrouterApiKeys.ANTHROPIC_API_KEY).toMatchObject({
+    expect(clearBody.llmApiKeys.ANTHROPIC_API_KEY).toMatchObject({
       configured: false,
       source: 'none',
       env: false,

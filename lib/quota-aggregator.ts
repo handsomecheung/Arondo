@@ -6,7 +6,7 @@ import { getConfigDir } from "./config";
 const CONFIG_DIR = getConfigDir();
 
 const AGENTS_DIR = path.join(CONFIG_DIR, "agents");
-const OUTPUT_PATH = path.join(CONFIG_DIR, "autoselect", "agent", "quota.json");
+const OUTPUT_PATH = path.join(CONFIG_DIR, "autoagent", "agent", "quota.json");
 const STALE_THRESHOLD_S = 60 * 60; // 1 hour
 
 const AGENT_TYPES = ["claude", "antigravity", "codex"] as const;

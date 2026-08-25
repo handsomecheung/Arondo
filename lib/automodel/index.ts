@@ -3,8 +3,8 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogle } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
-import { getMRouterConfig } from "./config";
-import type { MRouterDecision, MRouterInput, MRouterModelOption } from "./types";
+import { getAutomodelConfig } from "./config";
+import type { AutoModelDecision, AutoModelInput, AutoModelOption } from "./types";
 
 const DecisionSchema = z.object({
   choiceId: z.string(),
@@ -25,7 +25,7 @@ function withTimeout<T>(run: (signal: AbortSignal) => Promise<T>, timeoutMs: num
     const controller = new AbortController();
     const timer = setTimeout(() => {
       controller.abort();
-      reject(new Error("mrouter timed out"));
+      reject(new Error("automodel timed out"));
     }, timeoutMs);
     run(controller.signal).then(
       (value) => {
@@ -40,9 +40,9 @@ function withTimeout<T>(run: (signal: AbortSignal) => Promise<T>, timeoutMs: num
   });
 }
 
-function buildPrompt(input: MRouterInput, choices: MRouterModelOption[]): string {
+function buildPrompt(input: AutoModelInput, choices: AutoModelOption[]): string {
   return [
-    "You are Arondo mrouter, a model router for coding agents.",
+    "You are Arondo automodel, a model and effort router for coding agents.",
     "The agent has already been selected. Choose only the best model/effort choice for that agent.",
     "Prefer cheaper choices for questions, explanations, summaries, tiny edits, and low-risk follow-ups.",
     "Prefer stronger choices for broad code changes, debugging, reviews, migrations, or ambiguous high-risk work.",
@@ -59,7 +59,7 @@ function buildPrompt(input: MRouterInput, choices: MRouterModelOption[]): string
   ].join("\n");
 }
 
-function normalizeDecision(choice: MRouterModelOption, object: z.infer<typeof DecisionSchema>): MRouterDecision {
+function normalizeDecision(choice: AutoModelOption, object: z.infer<typeof DecisionSchema>): AutoModelDecision {
   return {
     model: choice.model,
     effort: choice.effort,
@@ -70,8 +70,8 @@ function normalizeDecision(choice: MRouterModelOption, object: z.infer<typeof De
   };
 }
 
-export async function routeModel(input: MRouterInput): Promise<MRouterDecision | null> {
-  const config = getMRouterConfig();
+export async function routeModel(input: AutoModelInput): Promise<AutoModelDecision | null> {
+  const config = getAutomodelConfig();
   if (!config) return null;
 
   const choices = input.modelOptions;
@@ -93,9 +93,9 @@ export async function routeModel(input: MRouterInput): Promise<MRouterDecision |
     return normalizeDecision(selected, result.object);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.warn(`[mrouter] skipped: ${message}`);
+    console.warn(`[automodel] skipped: ${message}`);
     return null;
   }
 }
 
-export type { MRouterDecision, MRouterEffort, MRouterInput, MRouterModelOption, MRouterProvider } from "./types";
+export type { AutoModelDecision, AutoModelEffort, AutoModelInput, AutoModelOption, AutoModelProvider } from "./types";

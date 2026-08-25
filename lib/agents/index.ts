@@ -3,8 +3,8 @@ import { AntigravityAgent } from "./antigravity";
 import { ClaudeCodeAgent } from "./claude";
 import { CodexAgent } from "./codex";
 import { OpencodeAgent } from "./opencode";
-import { selectAgent } from "../autoselect";
-import { routeModel, type MRouterEffort, type MRouterModelOption } from "../mrouter";
+import { selectAgent } from "../autoagent";
+import { routeModel, type AutoModelEffort, type AutoModelOption } from "../automodel";
 
 export type ConcreteAgentType = "antigravity" | "claude" | "codex" | "opencode";
 export type AgentType = ConcreteAgentType | "auto";
@@ -45,8 +45,8 @@ export function getAvailableAgents(): ConcreteAgentType[] {
 export interface ResolvedAgent {
   agentType: ConcreteAgentType;
   model?: string;
-  effort?: MRouterEffort;
-  modelOptions?: MRouterModelOption[];
+  effort?: AutoModelEffort;
+  modelOptions?: AutoModelOption[];
 }
 
 interface ResolveAgentOptions {
