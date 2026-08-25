@@ -83,6 +83,8 @@ Auto Mode uses the following order of preference:
 3. Rank the remaining candidates by weekly quota remaining, adjusted for how much time is left before the weekly reset.
 4. If no subscription quota is known, use an agent with unknown quota before falling back to an API-key-billed agent.
 
+After Auto Mode has selected the agent, **mrouter** (Model Router) can optionally choose that agent's model and reasoning effort using a lightweight LLM call through the Vercel AI SDK. mrouter is only enabled when an Anthropic, OpenAI, or Google API key is configured in Settings or through the server environment. It receives the selected agent, the quota-filtered model options for that agent, and the user message, then must choose one of those provided options. If no key is configured, the request times out, the provider returns an error, or the model choice is invalid, Arondo falls back to the predefined model selected by the existing quota-based logic.
+
 <img src="public/readme/auto-mode-quota.png" alt="Runner page showing Claude, Antigravity, and Codex quota information used by Auto Mode" width="360">
 
 ## Access Control
@@ -128,7 +130,7 @@ All execution goes through a Runner — there is no local fallback on the server
 - **Terminal Session Persistence & Reattaching**: Terminal sessions persist across browser refreshes or close events. Re-opening a terminal automatically reattaches to the active PTY session on the runner and replays the output buffer.
 - **Quota & Session Limit Detection**: Automatically detects AI agent API limits (such as Claude's session limit hit, Codex limits, or `agy` quota errors including individual quota exhaustion and subscription upgrade warnings by scanning both stdout and stderr logs) and displays human-readable error messages.
 - **AI Agent Quota Monitoring**: Automatically collects quota usage data for Claude, Antigravity, and Codex via tmux on the runners, recognizes API-key billing accounts, and displays known remaining quota or an explicit unknown state in the Runners dashboard.
-- **AI Agent Auto-Selection (Auto Mode)**: Automatically selects the best agent and model from known subscription quotas, preferring available capacity over unknown data and using API-key billed choices only as a last fallback.
+- **AI Agent Auto-Selection (Auto Mode)**: Automatically selects the best agent from known subscription quotas, preferring available capacity over unknown data and using API-key billed choices only as a last fallback. When configured, mrouter makes a second-stage model/effort choice from only the quota-filtered options that Auto Mode passes to it.
 - **Manual Agent Switching**: Switch the active agent (Antigravity CLI, Claude Code, Codex, OpenCode, or Auto) on-the-fly within an existing session when the agent is idle.
 - **Agent Session Continuity (Resume)**: Conversations in the same session retain their agent-specific history. Claude Code uses native resume support, Codex CLI stores and reuses Codex session IDs, OpenCode CLI stores and reuses OpenCode session IDs, and Antigravity CLI (agy) stores detected conversation IDs for subsequent `--conversation` runs.
 - **Secure Prompt Passing**: Prompts are passed to agents using temporary files and environment variables (using the `ARONDO_PROMPT_FILE` environment variable), avoiding shell command-line length limits and exposing sensitive prompts in command arguments. Displays the real resolved prompt instead of original raw inputs in the "Show Prompt" panel.
@@ -195,6 +197,7 @@ Open [http://localhost:3251](http://localhost:3251) in your browser. Select the 
 - `PORT` – (Optional) Server port. Defaults to `3251` in development, `3250` in production.
 - `ARONDO_SESSION_ARCHIVE_DAYS_DEFAULT` – (Optional) Default number of idle days before active sessions are auto-archived, used when no override is set in Settings. Defaults to `7`.
 - `ARONDO_FILE_SHOW_HIDDEN_DEFAULT` – (Optional) Default for whether hidden files/directories (dotfiles) appear in the file browser and @ path selector, used when no override is set in Settings. Defaults to `true`; set to `false` to hide dotfiles by default.
+- `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY` – Provider API keys used by `mrouter`, checked in that order. These can also be configured from Settings and stored in `arondo.json`; environment variables take precedence and disable editing for that provider in the UI. If none are configured, Auto Mode keeps using the predefined model selected by the existing quota-based logic. The router provider, router model, and timeout are fixed in code.
 
 ### Configuration Files (in `ARONDO_CONFIG_DIR` or `~/.arondo/`)
 

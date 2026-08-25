@@ -5,6 +5,7 @@ import type { Message } from "./store";
 import { getSessionLog } from "./store";
 import { getConfigDir } from "./config";
 import { stripAnsi } from "./ansi";
+import type { MRouterModelOption } from "./mrouter";
 
 const CONFIG_DIR = getConfigDir();
 
@@ -13,6 +14,7 @@ const QUOTA_PATH = path.join(CONFIG_DIR, "autoselect", "agent", "quota.json");
 export interface ResolvedAgent {
   agentType: ConcreteAgentType;
   model?: string;
+  modelOptions?: MRouterModelOption[];
 }
 
 interface ClaudeQuota {
@@ -71,7 +73,38 @@ interface AgentChoice {
   id: "A" | "B" | "C" | "D";
   agentType: ConcreteAgentType;
   model?: string;
+  modelOptions: MRouterModelOption[];
 }
+
+const AGY_GEMINI_MODEL_OPTIONS: MRouterModelOption[] = [
+  { id: "gemini-3.7-flash-high", model: "Gemini 3.7 Flash (High)", costTier: "standard", description: "Gemini Flash 3.7 with high thinking for harder work." },
+  { id: "gemini-3.7-flash-medium", model: "Gemini 3.7 Flash (Medium)", costTier: "standard", description: "Gemini Flash 3.7 balanced option." },
+  { id: "gemini-3.7-flash-low", model: "Gemini 3.7 Flash (Low)", costTier: "cheap", description: "Gemini Flash 3.7 low thinking for small tasks." },
+  { id: "gemini-3.6-flash-high", model: "Gemini 3.6 Flash (High)", costTier: "standard", description: "Gemini Flash 3.6 with high thinking." },
+  { id: "gemini-3.6-flash-medium", model: "Gemini 3.6 Flash (Medium)", costTier: "standard", description: "Gemini Flash 3.6 balanced option." },
+  { id: "gemini-3.6-flash-low", model: "Gemini 3.6 Flash (Low)", costTier: "cheap", description: "Gemini Flash 3.6 low thinking for small tasks." },
+  { id: "gemini-3.5-flash-high", model: "Gemini 3.5 Flash (High)", costTier: "standard", description: "Gemini Flash 3.5 with high thinking." },
+  { id: "gemini-3.5-flash-medium", model: "Gemini 3.5 Flash (Medium)", costTier: "cheap", description: "Gemini Flash 3.5 balanced low-cost option." },
+  { id: "gemini-3.5-flash-low", model: "Gemini 3.5 Flash (Low)", costTier: "cheap", description: "Cheapest Gemini Flash option for simple requests." },
+  { id: "gemini-3.1-pro-high", model: "Gemini 3.1 Pro (High)", costTier: "strong", description: "Gemini Pro with high thinking for complex work." },
+  { id: "gemini-3.1-pro-low", model: "Gemini 3.1 Pro (Low)", costTier: "standard", description: "Gemini Pro with low thinking for moderate work." },
+];
+
+const AGY_OTHER_MODEL_OPTIONS: MRouterModelOption[] = [
+  { id: "claude-sonnet-4-6", model: "Claude Sonnet 4.6 (Thinking)", costTier: "strong", description: "Strong general coding model in Antigravity." },
+  { id: "claude-opus-4-6-thinking", model: "Claude Opus 4.6 (Thinking)", costTier: "strong", description: "Highest-cost Antigravity model for the hardest tasks." },
+  { id: "gpt-oss-120b-medium", model: "GPT-OSS 120B (Medium)", costTier: "standard", description: "Open-weight medium option for routine coding work." },
+];
+
+const CLAUDE_MODEL_OPTIONS: MRouterModelOption[] = [
+  { id: "claude-default", costTier: "standard", description: "Use Claude Code's configured default model." },
+];
+
+const CODEX_MODEL_OPTIONS: MRouterModelOption[] = [
+  { id: "codex-gpt-5.4-mini-low", model: "gpt-5.4-mini", effort: "low", costTier: "cheap", description: "Cheaper Codex option for small questions and low-risk changes." },
+  { id: "codex-gpt-5.5-medium", model: "gpt-5.5", effort: "medium", costTier: "standard", description: "Default Codex option for normal coding tasks." },
+  { id: "codex-gpt-5.5-high", model: "gpt-5.5", effort: "high", costTier: "strong", description: "Stronger Codex reasoning for hard debugging and broad changes." },
+];
 
 /**
  * Selects the best agent and model from the available binary names on a runner.
@@ -87,14 +120,29 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
   // D: codex + gpt-5.5 (medium)
   const choices: AgentChoice[] = [];
   if (hasAgy) {
-    choices.push({ id: "A", agentType: "antigravity", model: "Gemini 3.5 Flash (Medium)" });
-    choices.push({ id: "B", agentType: "antigravity", model: "Claude Sonnet 4.6 (Thinking)" });
+    choices.push({
+      id: "A",
+      agentType: "antigravity",
+      model: "Gemini 3.5 Flash (Medium)",
+      modelOptions: AGY_GEMINI_MODEL_OPTIONS,
+    });
+    choices.push({
+      id: "B",
+      agentType: "antigravity",
+      model: "Claude Sonnet 4.6 (Thinking)",
+      modelOptions: AGY_OTHER_MODEL_OPTIONS,
+    });
   }
   if (hasClaude) {
-    choices.push({ id: "C", agentType: "claude" });
+    choices.push({ id: "C", agentType: "claude", modelOptions: CLAUDE_MODEL_OPTIONS });
   }
   if (hasCodex) {
-    choices.push({ id: "D", agentType: "codex", model: "gpt-5.5 medium" });
+    choices.push({
+      id: "D",
+      agentType: "codex",
+      model: "gpt-5.5 medium",
+      modelOptions: CODEX_MODEL_OPTIONS,
+    });
   }
 
   console.log(`[autoselect] Available runner binaries: ${runnerAgentBinaries.join(", ")}`);
@@ -106,7 +154,7 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
   }
   if (choices.length === 1) {
     console.log(`[autoselect] Only one choice available: ${choices[0].id}. Selecting it directly.`);
-    return { agentType: choices[0].agentType, model: choices[0].model };
+    return { agentType: choices[0].agentType, model: choices[0].model, modelOptions: choices[0].modelOptions };
   }
 
   const quota = await readQuota();
@@ -185,7 +233,7 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
     const fallbackChoices = unknownQuotaChoices.length > 0 ? unknownQuotaChoices : apiKeyChoices;
     console.log(`[autoselect] No known quota scores. Falling back to ${unknownQuotaChoices.length > 0 ? "unknown" : "API Key"} choices: [${fallbackChoices.map((c) => c.id).join(", ")}]`);
     const fallback = fallbackChoices[0];
-    return { agentType: fallback.agentType, model: fallback.model };
+    return { agentType: fallback.agentType, model: fallback.model, modelOptions: fallback.modelOptions };
   }
 
   // Step 1: Filter known-quota choices where HourRemain < 0.15.
@@ -247,7 +295,7 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
 
   const best = candidateAgents[0];
   console.log(`[autoselect] Selection Result: Choice ${best.id} (Agent: ${best.agentType}, Model: ${best.model ?? "default"})`);
-  return { agentType: best.agentType, model: best.model };
+  return { agentType: best.agentType, model: best.model, modelOptions: best.modelOptions };
 }
 
 /**

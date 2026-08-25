@@ -49,6 +49,48 @@ interface RunnerTokenInfo {
   connected?: boolean;
 }
 
+type MRouterApiKeyName = "ANTHROPIC_API_KEY" | "OPENAI_API_KEY" | "GOOGLE_GENERATIVE_AI_API_KEY";
+
+interface MRouterApiKeyStatus {
+  configured: boolean;
+  source: "env" | "settings" | "none";
+  env: boolean;
+}
+
+const MROUTER_API_KEYS: {
+  name: MRouterApiKeyName;
+  label: string;
+  description: string;
+}[] = [
+  {
+    name: "ANTHROPIC_API_KEY",
+    label: "Anthropic",
+    description: "First priority provider for mrouter classification.",
+  },
+  {
+    name: "OPENAI_API_KEY",
+    label: "OpenAI",
+    description: "Second priority provider for mrouter classification.",
+  },
+  {
+    name: "GOOGLE_GENERATIVE_AI_API_KEY",
+    label: "Google",
+    description: "Third priority provider for mrouter classification.",
+  },
+];
+
+const EMPTY_MROUTER_KEYS: Record<MRouterApiKeyName, string> = {
+  ANTHROPIC_API_KEY: "",
+  OPENAI_API_KEY: "",
+  GOOGLE_GENERATIVE_AI_API_KEY: "",
+};
+
+const EMPTY_MROUTER_STATUS: Record<MRouterApiKeyName, MRouterApiKeyStatus> = {
+  ANTHROPIC_API_KEY: { configured: false, source: "none", env: false },
+  OPENAI_API_KEY: { configured: false, source: "none", env: false },
+  GOOGLE_GENERATIVE_AI_API_KEY: { configured: false, source: "none", env: false },
+};
+
 const EMPTY_COMMAND: AgentCommand = {
   command: "",
   menuLabel: "",
@@ -172,6 +214,10 @@ export default function SettingsPage() {
 
   const [showHiddenFiles, setShowHiddenFiles] = useState(true);
   const [savingShowHiddenFiles, setSavingShowHiddenFiles] = useState(false);
+  const [mrouterApiKeys, setMrouterApiKeys] = useState<Record<MRouterApiKeyName, string>>(EMPTY_MROUTER_KEYS);
+  const [mrouterApiKeyStatus, setMrouterApiKeyStatus] = useState<Record<MRouterApiKeyName, MRouterApiKeyStatus>>(EMPTY_MROUTER_STATUS);
+  const [savingMrouterApiKeys, setSavingMrouterApiKeys] = useState(false);
+  const [mrouterApiKeysSaved, setMrouterApiKeysSaved] = useState(false);
 
   const loadRunners = useCallback(() => {
     fetch("/api/runners")
@@ -199,13 +245,21 @@ export default function SettingsPage() {
   const loadSettings = useCallback(() => {
     fetch("/api/settings")
       .then((r) => r.json())
-      .then((data: { sessionArchiveDays: number; showHiddenFiles?: boolean; version?: string }) => {
+      .then((data: {
+        sessionArchiveDays: number;
+        showHiddenFiles?: boolean;
+        version?: string;
+        mrouterApiKeys?: Record<MRouterApiKeyName, MRouterApiKeyStatus>;
+      }) => {
         setSessionArchiveDays(data.sessionArchiveDays);
         if (data.showHiddenFiles !== undefined) {
           setShowHiddenFiles(data.showHiddenFiles);
         }
         if (data.version) {
           setServerVersion(data.version);
+        }
+        if (data.mrouterApiKeys) {
+          setMrouterApiKeyStatus({ ...EMPTY_MROUTER_STATUS, ...data.mrouterApiKeys });
         }
       })
       .catch(console.error);
@@ -422,6 +476,46 @@ export default function SettingsPage() {
       setSavingShowHiddenFiles(false);
     }
   }, []);
+
+  const saveMrouterApiKeys = useCallback(async (patch: Partial<Record<MRouterApiKeyName, string | null>>) => {
+    setSavingMrouterApiKeys(true);
+    setMrouterApiKeysSaved(false);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mrouterApiKeys: patch }),
+      });
+      if (!res.ok) {
+        alert("Failed to save mrouter API keys");
+        return;
+      }
+      const data = await res.json();
+      if (data.mrouterApiKeys) {
+        setMrouterApiKeyStatus({ ...EMPTY_MROUTER_STATUS, ...data.mrouterApiKeys });
+      }
+      setMrouterApiKeys(EMPTY_MROUTER_KEYS);
+      setMrouterApiKeysSaved(true);
+      setTimeout(() => setMrouterApiKeysSaved(false), 3000);
+    } catch (err) {
+      console.error("Failed to save mrouter API keys:", err);
+      alert("Failed to save mrouter API keys");
+    } finally {
+      setSavingMrouterApiKeys(false);
+    }
+  }, []);
+
+  const handleSaveMrouterApiKeys = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    const patch: Partial<Record<MRouterApiKeyName, string>> = {};
+    for (const { name } of MROUTER_API_KEYS) {
+      if (mrouterApiKeyStatus[name].env) continue;
+      const value = mrouterApiKeys[name].trim();
+      if (value) patch[name] = value;
+    }
+    if (Object.keys(patch).length === 0) return;
+    await saveMrouterApiKeys(patch);
+  }, [mrouterApiKeys, mrouterApiKeyStatus, saveMrouterApiKeys]);
 
   const saveRunnerUserTokenUuids = useCallback(async (runnerId: string, allowedUserTokenUuids: string[]) => {
     try {
@@ -785,6 +879,179 @@ export default function SettingsPage() {
                 <span>Show hidden files</span>
               </label>
             </div>
+          </section>
+
+          {/* Model Router Section */}
+          <section
+            aria-label="Model router API keys"
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-md)",
+              padding: 16,
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+            }}
+          >
+            <div>
+              <h2
+                style={{
+                  fontSize: 16,
+                  fontWeight: 600,
+                  color: "var(--text-primary)",
+                  marginBottom: 4,
+                }}
+              >
+                Model Router
+              </h2>
+              <p
+                style={{
+                  fontSize: 12,
+                  color: "var(--text-muted)",
+                  marginBottom: 0,
+                  lineHeight: 1.5,
+                }}
+              >
+                mrouter uses these API keys to classify an Auto Mode message after Arondo has selected the agent, then chooses that agent&apos;s model and reasoning effort. Keys are checked in priority order: Anthropic, OpenAI, then Google. Environment variables take precedence over values saved here.
+              </p>
+            </div>
+
+            <form
+              onSubmit={handleSaveMrouterApiKeys}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+              }}
+            >
+              {MROUTER_API_KEYS.map(({ name, label, description }) => {
+                const status = mrouterApiKeyStatus[name];
+                const disabled = status.env || savingMrouterApiKeys;
+                const placeholder = status.env
+                  ? "Configured by environment variable"
+                  : status.source === "settings"
+                    ? "Saved in arondo.json"
+                    : name;
+                return (
+                  <div
+                    key={name}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "minmax(0, 1fr) auto",
+                      gap: 8,
+                      alignItems: "end",
+                    }}
+                  >
+                    <label
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 4,
+                        minWidth: 0,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: "var(--text-secondary)",
+                        }}
+                      >
+                        {label}
+                      </span>
+                      <input
+                        type="password"
+                        value={mrouterApiKeys[name]}
+                        disabled={disabled}
+                        autoComplete="off"
+                        placeholder={placeholder}
+                        onChange={(e) =>
+                          setMrouterApiKeys((prev) => ({
+                            ...prev,
+                            [name]: e.target.value,
+                          }))
+                        }
+                        style={{
+                          width: "100%",
+                          boxSizing: "border-box",
+                          padding: "7px 10px",
+                          fontSize: 13,
+                          backgroundColor: disabled ? "var(--bg-base)" : "var(--bg-elevated)",
+                          border: "1px solid var(--border)",
+                          borderRadius: "var(--radius-sm)",
+                          color: "var(--text-primary)",
+                          outline: "none",
+                          opacity: disabled ? 0.65 : 1,
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: status.env ? "var(--text-secondary)" : "var(--text-muted)",
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {description} {status.env ? `${name} is set on the server, so this value cannot be edited here.` : status.source === "settings" ? "A saved key is active." : "No key configured."}
+                      </span>
+                    </label>
+                    <button
+                      type="button"
+                      disabled={disabled || !status.configured || status.source !== "settings"}
+                      onClick={() => saveMrouterApiKeys({ [name]: null })}
+                      style={{
+                        padding: "7px 12px",
+                        fontSize: 12,
+                        color: "var(--text-secondary)",
+                        background: "var(--bg-elevated)",
+                        border: "1px solid var(--border)",
+                        borderRadius: "var(--radius-sm)",
+                        cursor: disabled || !status.configured || status.source !== "settings" ? "not-allowed" : "pointer",
+                        opacity: disabled || !status.configured || status.source !== "settings" ? 0.5 : 1,
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                );
+              })}
+
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <button
+                  type="submit"
+                  disabled={
+                    savingMrouterApiKeys ||
+                    !MROUTER_API_KEYS.some(({ name }) => !mrouterApiKeyStatus[name].env && mrouterApiKeys[name].trim())
+                  }
+                  style={{
+                    padding: "7px 18px",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#fff",
+                    background: "var(--accent)",
+                    border: "none",
+                    borderRadius: "var(--radius-sm)",
+                    cursor:
+                      savingMrouterApiKeys ||
+                      !MROUTER_API_KEYS.some(({ name }) => !mrouterApiKeyStatus[name].env && mrouterApiKeys[name].trim())
+                        ? "not-allowed"
+                        : "pointer",
+                    opacity:
+                      savingMrouterApiKeys ||
+                      !MROUTER_API_KEYS.some(({ name }) => !mrouterApiKeyStatus[name].env && mrouterApiKeys[name].trim())
+                        ? 0.5
+                        : 1,
+                  }}
+                >
+                  {savingMrouterApiKeys ? "Saving…" : "Save API Keys"}
+                </button>
+                {mrouterApiKeysSaved && (
+                  <span style={{ fontSize: 13, color: "var(--accent)", fontWeight: 500 }}>
+                    Saved
+                  </span>
+                )}
+              </div>
+            </form>
           </section>
 
           {/* Agent Commands Section */}

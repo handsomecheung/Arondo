@@ -19,6 +19,11 @@ const FILE_SHOW_HIDDEN_DEFAULT = process.env.ARONDO_FILE_SHOW_HIDDEN_DEFAULT !==
 export interface AppSettings {
   sessionArchiveDays?: number;
   showHiddenFiles?: boolean;
+  mrouterApiKeys?: {
+    ANTHROPIC_API_KEY?: string;
+    OPENAI_API_KEY?: string;
+    GOOGLE_GENERATIVE_AI_API_KEY?: string;
+  };
 }
 
 interface ArondoConfigWithSettings {
@@ -82,6 +87,7 @@ export interface Session {
   // Most recent concrete agent/model selected when agentType is "auto".
   autoLockedAgentType?: string;
   autoLockedAgentModel?: string;
+  autoLockedAgentEffort?: string;
 }
 
 export type MessageType =

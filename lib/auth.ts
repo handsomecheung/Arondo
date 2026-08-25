@@ -121,6 +121,11 @@ export interface RunnerTokenInfo {
 export interface ArondoSettings {
   sessionArchiveDays?: number;
   showHiddenFiles?: boolean;
+  mrouterApiKeys?: {
+    ANTHROPIC_API_KEY?: string;
+    OPENAI_API_KEY?: string;
+    GOOGLE_GENERATIVE_AI_API_KEY?: string;
+  };
 }
 
 export interface TokensConfig {

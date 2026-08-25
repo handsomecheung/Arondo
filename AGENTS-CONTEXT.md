@@ -75,7 +75,7 @@ app/
     runners/
       route.ts          # GET: list all known runners (connected + disconnected, with lastSeenAt)
     settings/
-      route.ts          # GET/POST: retrieve and update global app settings (e.g., sessionArchiveDays)
+      route.ts          # GET/POST: retrieve and update global app settings (e.g., sessionArchiveDays, mrouter API keys)
     sessions/
       route.ts          # POST: create session & run agent via runner (supports "tempDir" to generate a runner-side temp dir via fs.mkdtemp, with random runner selection when omitted; default agentType is "auto"); GET: list active sessions
       archived/
@@ -169,6 +169,10 @@ lib/
   scheduler.ts          # Polls sessions' pending "user-todo" messages and dispatches them once their trigger (at, afterSession, quotaAvailable, codebaseReady) is satisfied
   project-actions.ts    # Extracted action helpers for executing project-scoped scripts
   session-actions.ts    # Extracted action helpers for session messages, normal agent runs, and detached review/side-question runs
+  mrouter/
+    config.ts           # Model Router provider/key lookup: env first, then arondo.json settings, fixed provider priority/model/timeout
+    index.ts            # Vercel AI SDK structured-output classifier that chooses model/effort from caller-provided options only
+    types.ts            # Shared mrouter provider, model option, and decision types
   agents/
     base.ts             # Abstract BaseAgent interface
     antigravity.ts      # Antigravity CLI (agy) adapter
@@ -382,16 +386,17 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **Quota & Session Limit Detection**: Automatically detects AI agent API limits (such as Claude's session limit hit, Codex limits, or `agy` quota errors including individual quota exhaustion and subscription upgrade warnings by scanning both stdout and stderr logs) and displays human-readable error messages.
 - **AI Agent Quota Monitoring**: Runners collect agent quota usage from Claude, Antigravity, and Codex via tmux pane capture, which is saved locally under `~/.arondo/agents/` on the server and displayed in the Runners dashboard. API-key billed accounts are identified so they are not presented as exhausted subscription quotas; unavailable readings are displayed as unknown rather than fabricated values.
 - **Secure Prompt Passing**: Instead of command line arguments, prompts are passed to agents using temporary files on the runner. The file path is stored in the `ARONDO_PROMPT_FILE` environment variable (and resolved using shell redirection `$(< "$ARONDO_PROMPT_FILE")`), which mitigates command length constraints and process command argument exposure. The UI "Show Prompt" panel displays the real resolved prompt instead of the original raw inputs.
-- **AI Agent Auto-Selection (Auto Mode)**: Automatically selects the best agent and model based on hourly and weekly quota availability retrieved from the runner. New chat sessions default to using the Auto agent mode.
+- **AI Agent Auto-Selection (Auto Mode)**: Automatically selects the best agent based on hourly and weekly quota availability retrieved from the runner, then optionally lets `mrouter` choose the model/effort from the selected choice's allowed model options. New chat sessions default to using the Auto agent mode.
   - **Choices**:
-    - **Choice A**: Antigravity (`agy`) + `Gemini 3.5 Flash (Medium)` (Quota: `GeminiHourRemain`, `GeminiWeeklyRemain`)
-    - **Choice B**: Antigravity (`agy`) + `Claude Sonnet 4.6 (Thinking)` (Quota: `OtherHourRemain`, `OtherWeeklyRemain`)
+    - **Choice A**: Antigravity (`agy`) Gemini model group (Quota: `GeminiHourRemain`, `GeminiWeeklyRemain`; default fallback model: `Gemini 3.5 Flash (Medium)`)
+    - **Choice B**: Antigravity (`agy`) non-Gemini model group (Quota: `OtherHourRemain`, `OtherWeeklyRemain`; default fallback model: `Claude Sonnet 4.6 (Thinking)`)
     - **Choice C**: Claude (`claude`) + default `Sonnet` (Quota: `HourRemain`, `WeekRemain`)
     - **Choice D**: Codex (`codex`) + default `gpt-5.5 medium` (Quota: `WeeklyRemain`, hourly is treated as always available)
   - **Selection Algorithm**:
     1. **Quota-source preference**: Consider choices with a known, non-API-key weekly quota first. If none are known, fall back to unknown subscription quotas; use API-key billed choices only when no subscription choice is available.
     2. **Hourly Quota Filtering**: For known quota choices, if the remaining hourly ratio (`HourRemain`, `GeminiHourRemain`, `OtherHourRemain`) is below `0.15`, append it to the end of the candidate list and exclude it from scoring. If all known choices are below `0.15`, score all of them instead.
-    3. **Weekly Time-Remaining Score**: For active choices, calculate `score = WeekRemain - WeekTimeRemain`, where `WeekTimeRemain = max(0, min(1, (ResetsAt - Now) / 604800))`. This compares the remaining quota ratio against the remaining time ratio of the quota week. Sort by score descending, followed by the low-hourly-quota choices; the first candidate is selected and spawned with the mapped `--model` parameter.
+    3. **Weekly Time-Remaining Score**: For active choices, calculate `score = WeekRemain - WeekTimeRemain`, where `WeekTimeRemain = max(0, min(1, (ResetsAt - Now) / 604800))`. This compares the remaining quota ratio against the remaining time ratio of the quota week. Sort by score descending, followed by the low-hourly-quota choices; the first candidate supplies the selected agent, fallback model, and quota-filtered model options.
+  - **mrouter Model Routing**: `lib/agents/index.ts` calls `routeModel()` only after `selectAgent()` has resolved Auto Mode to a concrete agent. mrouter receives three inputs: selected agent, model options from the selected autoselect choice, and the user message. It uses Vercel AI SDK `generateObject()` with a strict schema and accepts only a returned `choiceId` that exists in the supplied options. If no API key is configured, the provider call times out, the provider returns an error, or the returned choice is invalid, routing is skipped and the autoselect fallback model is used. Provider keys are checked in fixed order: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`; Settings can save these keys under `setitngs.mrouterApiKeys`, but environment variables take precedence and disable editing for that key in the Settings UI.
 - **Manual Agent Switching**: Allows switching the active agent (Antigravity CLI, Claude Code, Codex, OpenCode, or Auto) of an existing session via a dropdown selector in the session header when no command is currently running.
 - **Settings Session Controls**: The Settings page groups session archive and file browser controls together. `sessionArchiveDays` auto-saves after edits instead of requiring a Save button, and the hidden-files toggle persists immediately.
 - **Authentication UI**: The old Settings-page reset-token button moved into the app sidebar as a Log Out action with a confirmation dialog.

@@ -41,7 +41,7 @@ export async function POST(
   }
 
   const runnerConn = runnerManager.getRunner(runnerId);
-  const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? []);
+  const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? [], { prompt });
   const resolvedType = resolved.agentType;
   const agent = getAgent(resolvedType);
   const fullPrompt = agent.buildPrompt(prompt);
@@ -51,6 +51,7 @@ export async function POST(
     sessionId: session.id,
     isResume: false,
     model: resolved.model,
+    effort: resolved.effort,
   });
 
   const updatedSession = await updateSession(id, { status: "running", errorMessage: undefined });

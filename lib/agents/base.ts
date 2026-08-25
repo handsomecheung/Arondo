@@ -17,6 +17,8 @@ export interface AgentRunOptions {
   isResume?: boolean;
   /** Model to run the agent with */
   model?: string;
+  /** Reasoning effort to run the agent with, when supported */
+  effort?: "minimal" | "low" | "medium" | "high";
 }
 
 

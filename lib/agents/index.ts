@@ -4,6 +4,7 @@ import { ClaudeCodeAgent } from "./claude";
 import { CodexAgent } from "./codex";
 import { OpencodeAgent } from "./opencode";
 import { selectAgent } from "../autoselect";
+import { routeModel, type MRouterEffort, type MRouterModelOption } from "../mrouter";
 
 export type ConcreteAgentType = "antigravity" | "claude" | "codex" | "opencode";
 export type AgentType = ConcreteAgentType | "auto";
@@ -44,6 +45,12 @@ export function getAvailableAgents(): ConcreteAgentType[] {
 export interface ResolvedAgent {
   agentType: ConcreteAgentType;
   model?: string;
+  effort?: MRouterEffort;
+  modelOptions?: MRouterModelOption[];
+}
+
+interface ResolveAgentOptions {
+  prompt?: string;
 }
 
 /**
@@ -54,10 +61,25 @@ export interface ResolvedAgent {
 export async function resolveAgentType(
   agentType: string,
   runnerAgentBinaries: string[],
+  options: ResolveAgentOptions = {},
 ): Promise<ResolvedAgent> {
   if (agentType !== "auto") return { agentType: agentType as ConcreteAgentType };
   const resolved = await selectAgent(runnerAgentBinaries);
-  return resolved ?? { agentType: "antigravity" };
+  const selected = resolved ?? { agentType: "antigravity" as ConcreteAgentType };
+  const routed = options.prompt && selected.modelOptions
+    ? await routeModel({
+      agentType: selected.agentType,
+      message: options.prompt,
+      defaultModel: selected.model,
+      modelOptions: selected.modelOptions,
+    })
+    : null;
+  if (!routed) return selected;
+  return {
+    agentType: selected.agentType,
+    model: routed.model ?? selected.model,
+    effort: routed.effort,
+  };
 }
 
 /**

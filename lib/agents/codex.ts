@@ -54,11 +54,15 @@ function buildModelArgs(model: string): string {
 export class CodexAgent extends BaseAgent {
   readonly name = "codex";
 
-  getCommand({ sessionId, isResume, model }: Omit<AgentRunOptions, "onOutput">): string {
+  getCommand({ sessionId, isResume, model, effort }: Omit<AgentRunOptions, "onOutput">): string {
     // Flags for `exec` itself (sandbox/approval bypass, model) must precede the
     // `resume` subcommand — placed after it, they're parsed as `resume`'s own
     // args instead and silently fail to take effect.
-    const modelArg = model ? buildModelArgs(model) : "";
+    const modelArg = model
+      ? effort
+        ? ` --model "${model}" -c model_reasoning_effort="${effort}"`
+        : buildModelArgs(model)
+      : "";
     const codexId = isResume && sessionId ? getCodexSessionIdSync(sessionId) : undefined;
     const resumeArg = codexId ? `resume "${codexId}" ` : "";
     return `codex exec --dangerously-bypass-approvals-and-sandbox${modelArg} ${resumeArg}"$(< "$${PROMPT_ENV_VAR}")"`;

@@ -73,7 +73,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
       },
     }, null, 2), 'utf-8');
 
-    await expect(selectAgent(['agy', 'claude', 'codex'])).resolves.toEqual({
+    await expect(selectAgent(['agy', 'claude', 'codex'])).resolves.toMatchObject({
       agentType: 'codex',
       model: 'gpt-5.5 medium',
     });
@@ -120,7 +120,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
       },
     }, null, 2), 'utf-8');
 
-    await expect(selectAgent(['agy', 'claude', 'codex'])).resolves.toEqual({
+    await expect(selectAgent(['agy', 'claude', 'codex'])).resolves.toMatchObject({
       agentType: 'codex',
       model: 'gpt-5.5 medium',
     });
@@ -134,6 +134,35 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
 
     const selected = await selectAgent(['agy', 'claude']);
     expect(selected?.agentType).not.toBe('claude');
+  });
+
+  test('passes only the selected agy quota group model options to mrouter', async () => {
+    await fs.writeFile(quotaPath, JSON.stringify({
+      "antigravity_arondo@gmail.com_Google AI Pro": {
+        "Type": "antigravity",
+        "Account": "arondo@gmail.com",
+        "Plan": "Google AI Pro",
+        "DefaultModel": "",
+        "GeminiWeeklyRemain": 0,
+        "GeminiWeeklyResetsAt": null,
+        "GeminiHourRemain": 0,
+        "GeminiHourResetsAt": null,
+        "OtherWeeklyRemain": 0.8,
+        "OtherWeeklyResetsAt": null,
+        "OtherHourRemain": 0.8,
+        "OtherHourResetsAt": null,
+        "updatedAt": Math.floor(Date.now() / 1000),
+      },
+    }, null, 2), 'utf-8');
+
+    const selected = await selectAgent(['agy']);
+    expect(selected).toMatchObject({
+      agentType: 'antigravity',
+      model: 'Claude Sonnet 4.6 (Thinking)',
+    });
+    const optionIds = selected?.modelOptions?.map((option) => option.id) ?? [];
+    expect(optionIds).toContain('claude-sonnet-4-6');
+    expect(optionIds.some((id) => id.startsWith('gemini-'))).toBeFalsy();
   });
 
   test('C -> A: should successfully handoff context from claude to agy (Gemini Flash)', async ({ request }) => {

@@ -59,9 +59,6 @@ export async function dispatchDetachedAgent(
   const runnerId = runnerManager.resolveRunnerId(session.runnerId);
   if (!runnerId) return { ok: false, error: "No connected runner available", status: 503 };
 
-  const runner = runnerManager.getRunner(runnerId);
-  const selectedAgentType = agentType || session.agentType;
-  const resolved = await resolveAgentType(selectedAgentType, runner?.info.agents ?? []);
   const context = await buildDetachedAgentContext(sessionId);
   const trimmedMessage = message.trim();
   const instructions = kind === "review"
@@ -78,6 +75,10 @@ export async function dispatchDetachedAgent(
     trimmedMessage ? `\nUser request:\n${trimmedMessage}` : "",
   ].join("\n");
 
+  const runner = runnerManager.getRunner(runnerId);
+  const selectedAgentType = agentType || session.agentType;
+  const resolved = await resolveAgentType(selectedAgentType, runner?.info.agents ?? [], { prompt });
+
   const agentSessionKey = crypto.randomUUID();
   const agent = getAgent(resolved.agentType);
   const fullPrompt = agent.buildPrompt(prompt);
@@ -87,6 +88,7 @@ export async function dispatchDetachedAgent(
     sessionId: agentSessionKey,
     isResume: false,
     model: resolved.model,
+    effort: resolved.effort,
   });
 
   const runMessage = await addMessage({
@@ -199,7 +201,7 @@ export async function dispatchFollowupMessage(
     session.errorMessage != null &&
     isQuotaErrorMessage(session.errorMessage);
 
-  const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? []);
+  const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? [], { prompt: trimmedPrompt || trimmedMessage });
   const resolvedType = resolved.agentType;
 
   const lastAgentRun = [...messages].reverse().find((m) => m.type === "agent-run" && m.resolvedAgentType);
@@ -224,6 +226,7 @@ export async function dispatchFollowupMessage(
     sessionId,
     isResume,
     model: resolved.model,
+    effort: resolved.effort,
   });
 
   const patch: Record<string, any> = { status: "running" };
@@ -236,6 +239,7 @@ export async function dispatchFollowupMessage(
   if (session.agentType === "auto") {
     patch.autoLockedAgentType = resolvedType;
     patch.autoLockedAgentModel = resolved.model ?? undefined;
+    patch.autoLockedAgentEffort = resolved.effort ?? undefined;
     if (prevQuotaError) {
       patch.errorMessage = undefined;
     }
@@ -342,14 +346,25 @@ export async function dispatchCreateSession(
     runnerId,
   }, { tempDir: opts.tempDir });
 
-  const resolved = await resolveAgentType(agentType, run.info.agents);
+  const resolved = await resolveAgentType(agentType, run.info.agents, { prompt: trimmedPrompt });
   const resolvedType = resolved.agentType;
   const agent = getAgent(resolvedType);
   const fullPrompt = agent.buildPrompt(trimmedPrompt);
-  const command = agent.getCommand({ prompt: trimmedPrompt, repoPath, sessionId: session.id, isResume: false, model: resolved.model });
+  const command = agent.getCommand({
+    prompt: trimmedPrompt,
+    repoPath,
+    sessionId: session.id,
+    isResume: false,
+    model: resolved.model,
+    effort: resolved.effort,
+  });
 
   const autoLockPatch = agentType === "auto"
-    ? { autoLockedAgentType: resolvedType, autoLockedAgentModel: resolved.model ?? undefined }
+    ? {
+      autoLockedAgentType: resolvedType,
+      autoLockedAgentModel: resolved.model ?? undefined,
+      autoLockedAgentEffort: resolved.effort ?? undefined,
+    }
     : {};
   const updatedSession = await updateSession(session.id, autoLockPatch);
   eventBus.publish({ type: "session_updated", payload: updatedSession });
