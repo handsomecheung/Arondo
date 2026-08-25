@@ -65,17 +65,17 @@ const LLM_API_KEYS: {
   {
     name: "ANTHROPIC_API_KEY",
     label: "Anthropic",
-    description: "First priority provider for Automodel classification.",
+    description: "First priority provider for choosing model and effort.",
   },
   {
     name: "OPENAI_API_KEY",
     label: "OpenAI",
-    description: "Second priority provider for Automodel classification.",
+    description: "Second priority provider for choosing model and effort.",
   },
   {
     name: "GOOGLE_GENERATIVE_AI_API_KEY",
     label: "Google",
-    description: "Third priority provider for Automodel classification.",
+    description: "Third priority provider for choosing model and effort.",
   },
 ];
 
@@ -881,7 +881,7 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          {/* Automodel Section */}
+          {/* LLM API Keys Section */}
           <section
             aria-label="LLM API keys"
             style={{
@@ -903,7 +903,7 @@ export default function SettingsPage() {
                   marginBottom: 4,
                 }}
               >
-                Automodel
+                LLM API Keys
               </h2>
               <p
                 style={{
@@ -913,7 +913,7 @@ export default function SettingsPage() {
                   lineHeight: 1.5,
                 }}
               >
-                Automodel uses these API keys to classify an Auto Mode message after Arondo has selected the agent, then chooses that agent&apos;s model and reasoning effort. Keys are checked in priority order: Anthropic, OpenAI, then Google. Environment variables take precedence over values saved here.
+                These keys are currently used only to choose the model and reasoning effort after Auto Mode has selected an agent. They are optional; if no key is configured, Arondo uses the default model. Keys are checked in priority order: Anthropic, OpenAI, then Google. Environment variables take precedence over values saved here.
               </p>
             </div>
 
