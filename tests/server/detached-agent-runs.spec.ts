@@ -23,7 +23,7 @@ async function waitForDetachedAgent(request: any, sessionId: string, runMessageI
   throw new Error(`Detached agent run ${runMessageId} timed out`);
 }
 
-test.describe('Detached agent runs API', () => {
+test.describe('Detached agent command routing', () => {
   let runnerProcess: ChildProcess;
   let runnerId = '';
   let repoDir = '';
@@ -78,7 +78,7 @@ test.describe('Detached agent runs API', () => {
     }
   });
 
-  test('runs /btw in a separate context with the parent conversation', async ({ request }) => {
+  test('routes /btw from the shared messages API to a separate context with the parent conversation', async ({ request }) => {
     const createResponse = await request.post('/api/sessions', {
       headers,
       data: {
@@ -93,9 +93,9 @@ test.describe('Detached agent runs API', () => {
     sessionIds.push(session.id);
     await waitForSessionNotRunning(request, session.id);
 
-    const response = await request.post(`/api/sessions/${session.id}/detached-agent-runs`, {
+    const response = await request.post(`/api/sessions/${session.id}/messages`, {
       headers,
-      data: { kind: 'btw', message: 'What is the release target?', agentType: 'claude' },
+      data: { message: '/btw --agent claude "What is the release target?"' },
     });
     expect(response.status()).toBe(200);
     const { messageId } = await response.json();
@@ -122,11 +122,27 @@ test.describe('Detached agent runs API', () => {
     await expect(sessionResponse.json()).resolves.toMatchObject({ status: 'done' });
   });
 
-  test('allows /review without a message and rejects archived sessions', async ({ request }) => {
+  test('validates detached commands through the shared messages API', async ({ request }) => {
     const session = await createIdleSession(request);
-    const reviewResponse = await request.post(`/api/sessions/${session.id}/detached-agent-runs`, {
+
+    for (const [message, error] of [
+      ['/btw', 'message is required for btw'],
+      ['/btw --agent unknown hello', 'agentType is invalid'],
+    ]) {
+      const response = await request.post(`/api/sessions/${session.id}/messages`, {
+        headers,
+        data: { message },
+      });
+      expect(response.status()).toBe(400);
+      await expect(response.json()).resolves.toEqual({ error });
+    }
+  });
+
+  test('routes /review without a message and rejects archived sessions', async ({ request }) => {
+    const session = await createIdleSession(request);
+    const reviewResponse = await request.post(`/api/sessions/${session.id}/messages`, {
       headers,
-      data: { kind: 'review', agentType: 'claude' },
+      data: { message: '/review --agent claude' },
     });
     expect(reviewResponse.status()).toBe(200);
     const { messageId } = await reviewResponse.json();
@@ -139,13 +155,13 @@ test.describe('Detached agent runs API', () => {
 
     const archiveResponse = await request.post(`/api/sessions/${session.id}/archive`, { headers });
     expect(archiveResponse.status()).toBe(200);
-    const archivedResponse = await request.post(`/api/sessions/${session.id}/detached-agent-runs`, {
+    const archivedResponse = await request.post(`/api/sessions/${session.id}/messages`, {
       headers,
-      data: { kind: 'review' },
+      data: { message: '/review' },
     });
     expect(archivedResponse.status()).toBe(403);
     await expect(archivedResponse.json()).resolves.toEqual({
-      error: 'Session is archived. Unarchive it to run a separate agent.',
+      error: 'Session is archived. Unarchive it to send messages.',
     });
   });
 });

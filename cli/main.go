@@ -532,12 +532,17 @@ func (c *client) createSession(args arguments, force bool) (session, error) {
 	return session, c.request(http.MethodPost, "/api/sessions", payload, &session)
 }
 
-func (c *client) sendMessage(sessionID string, args arguments, force bool) error {
+type sendMessageResult struct {
+	MessageID string `json:"messageId"`
+}
+
+func (c *client) sendMessage(sessionID string, args arguments, force bool) (sendMessageResult, error) {
 	payload := map[string]any{"message": args.prompt}
 	if force {
 		payload["force"] = true
 	}
-	return c.request(http.MethodPost, "/api/sessions/"+url.PathEscape(sessionID)+"/messages", payload, &map[string]any{})
+	var result sendMessageResult
+	return result, c.request(http.MethodPost, "/api/sessions/"+url.PathEscape(sessionID)+"/messages", payload, &result)
 }
 
 func (c *client) rawOutput(sessionID string) (string, error) {
@@ -606,6 +611,7 @@ type runner struct {
 type message struct {
 	ID        string `json:"id"`
 	SessionID string `json:"sessionId"`
+	ParentID  string `json:"parentId"`
 	Role      string `json:"role"`
 	Type      string `json:"type"`
 	Content   string `json:"content"`
@@ -688,6 +694,34 @@ func pollUntilDone(c *client, sessionID string, interval, timeout time.Duration)
 		}
 		if !time.Now().Before(deadline) {
 			return session, fmt.Errorf("session %s did not finish within %s", sessionID, timeout)
+		}
+		time.Sleep(interval)
+	}
+}
+
+func pollDetachedAgentUntilDone(c *client, sessionID, runMessageID string, interval, timeout time.Duration) (message, message, error) {
+	deadline := time.Now().Add(timeout)
+	for {
+		messages, err := c.listMessages(sessionID)
+		if err != nil {
+			return message{}, message{}, err
+		}
+
+		var run message
+		for _, candidate := range messages {
+			if candidate.ID == runMessageID && candidate.Type == "detached-agent-run" {
+				run = candidate
+				break
+			}
+		}
+		for _, candidate := range messages {
+			if candidate.Type == "detached-agent-return" && candidate.ParentID == runMessageID {
+				return run, candidate, nil
+			}
+		}
+
+		if !time.Now().Before(deadline) {
+			return message{}, message{}, fmt.Errorf("detached agent run %s did not finish within %s", runMessageID, timeout)
 		}
 		time.Sleep(interval)
 	}
@@ -1156,13 +1190,17 @@ func run(argv []string) error {
 	sessionID := args.sessionID
 	queued := false
 	queuedTrigger := ""
+	messageID := ""
 	if sessionID != "" {
 		fmt.Fprintf(os.Stderr, "Sending message to session %s...\n", sessionID)
-		if err := c.sendMessage(sessionID, args, false); err != nil {
+		sent, err := c.sendMessage(sessionID, args, false)
+		if err != nil {
 			queued, queuedTrigger, err = c.resolveMessageConfirmation(sessionID, args, err)
 			if err != nil {
 				return err
 			}
+		} else {
+			messageID = sent.MessageID
 		}
 	} else {
 		if args.runnerID == "" && !args.tempDir {
@@ -1190,12 +1228,34 @@ func run(argv []string) error {
 	if queued {
 		return outputQueuedResult(c, sessionID, args, queuedTrigger)
 	}
-	fmt.Fprintf(os.Stderr, "Session ID: %s\nWaiting for the run to finish...\n", sessionID)
-	session, err := pollUntilDone(c, sessionID, time.Duration(args.pollInterval*float64(time.Second)), time.Duration(args.timeout*float64(time.Second)))
-	if err != nil {
-		return err
+	var session session
+	var rawOutput string
+	detachedFailed := false
+	interval := time.Duration(args.pollInterval * float64(time.Second))
+	timeout := time.Duration(args.timeout * float64(time.Second))
+	if messageID != "" {
+		fmt.Fprintf(os.Stderr, "Session ID: %s\nWaiting for detached agent run to finish...\n", sessionID)
+		run, returned, err := pollDetachedAgentUntilDone(c, sessionID, messageID, interval, timeout)
+		if err != nil {
+			return err
+		}
+		rawOutput, err = c.getSessionLog(sessionID, run.ID)
+		if err != nil {
+			return err
+		}
+		session, err = c.getSession(sessionID)
+		if err != nil {
+			return err
+		}
+		detachedFailed = (run.ExitCode != nil && *run.ExitCode != 0) || returned.Role != "agent"
+	} else {
+		fmt.Fprintf(os.Stderr, "Session ID: %s\nWaiting for the run to finish...\n", sessionID)
+		session, err = pollUntilDone(c, sessionID, interval, timeout)
+		if err != nil {
+			return err
+		}
+		rawOutput, err = c.rawOutput(sessionID)
 	}
-	rawOutput, err := c.rawOutput(sessionID)
 	if err != nil {
 		return err
 	}
@@ -1209,6 +1269,10 @@ func run(argv []string) error {
 		fmt.Println(string(pretty))
 	} else {
 		fmt.Print(rawOutput)
+	}
+	if detachedFailed {
+		fmt.Fprintln(os.Stderr, "\nDetached agent finished with an error.")
+		return errSession
 	}
 	if session.Status == "error" {
 		fmt.Fprintf(os.Stderr, "\nSession finished with an error: %s\n", session.ErrorMessage)

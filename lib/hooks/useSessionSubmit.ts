@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import type { Session, TaskItem, ProjectScript } from "@/types/home";
 import { resolveAgentCommand, getUniqueTriggers, getTriggerWord } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
+import { parseDetachedAgentCommand } from "@/lib/detached-agent-command";
 import { autoResizeTextarea } from "@/lib/homeUtils";
 
 interface UseSessionSubmitParams {
@@ -241,16 +242,9 @@ export function useSessionSubmit({
 
   // Called from SessionView with the raw prompt text (e.g. "/commit foo")
   const handleAgentCommand = useCallback(async (promptText: string) => {
-    const detached = promptText.trim().match(/^\/(review|btw)(?:\s+--agent\s+(agy|antigravity|claude|codex|opencode|auto))?(?:\s+([\s\S]*))?$/);
+    const detached = parseDetachedAgentCommand(promptText);
     if (detached && selectedSessionId) {
-      const kind = detached[1] as "review" | "btw";
-      const requestedAgent = detached[2] === "agy" ? "antigravity" : detached[2];
-      const rawMessage = detached[3]?.trim() || "";
-      const message = (rawMessage.startsWith('"') && rawMessage.endsWith('"')) ||
-        (rawMessage.startsWith("'") && rawMessage.endsWith("'"))
-        ? rawMessage.slice(1, -1)
-        : rawMessage;
-      if (kind === "btw" && !message) {
+      if (detached.kind === "btw" && !detached.message) {
         setApiError({ title: "Command Error", message: "/btw requires a message" });
         return;
       }
@@ -258,10 +252,10 @@ export function useSessionSubmit({
       setShowCommandMenu(false);
       if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
       try {
-        const res = await fetch(`/api/sessions/${selectedSessionId}/detached-agent-runs`, {
+        const res = await fetch(`/api/sessions/${selectedSessionId}/messages`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ kind, message, agentType: requestedAgent || selectedSession?.agentType }),
+          body: JSON.stringify({ message: promptText }),
         });
         if (!res.ok) {
           const data = await res.json();
@@ -276,7 +270,7 @@ export function useSessionSubmit({
     const agentMessage = resolveAgentCommand(promptText, agentCommands);
     if (agentMessage === null) return;
     await sendAgentMessage(promptText, agentMessage);
-  }, [sendAgentMessage, agentCommands, selectedSessionId, selectedSession, setApiError, setPrompt, setShowCommandMenu, textareaRef]);
+  }, [sendAgentMessage, agentCommands, selectedSessionId, setApiError, setPrompt, setShowCommandMenu, textareaRef]);
 
   // Shared post-creation bookkeeping for a freshly created session, whether
   // it was sent immediately, forced past a confirmation, or created as a draft.
@@ -507,7 +501,7 @@ export function useSessionSubmit({
       }
     }
 
-    if (/^\/(review|btw)(?:\s|$)/.test(trimmed)) {
+    if (parseDetachedAgentCommand(trimmed)) {
       await handleAgentCommand(trimmed);
       return;
     }

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dispatchFollowupMessage } from "@/lib/session-actions";
+import { dispatchDetachedAgent, dispatchFollowupMessage } from "@/lib/session-actions";
 import { getSession, getMessages, isSessionArchived } from "@/lib/store";
 import { getArondoToken, verifySessionPermission, getUuidByToken } from "@/lib/auth";
 import { getProjectReadiness } from "@/lib/project-readiness";
+import { isDetachedAgentType, parseDetachedAgentCommand } from "@/lib/detached-agent-command";
 
 export async function POST(
   req: NextRequest,
@@ -21,6 +22,20 @@ export async function POST(
   const { message, type, prompt, force } = await req.json();
   if (!message || !message.trim()) {
     return NextResponse.json({ error: "message is required" }, { status: 400 });
+  }
+
+  const detachedCommand = parseDetachedAgentCommand(message);
+  if (detachedCommand) {
+    if (detachedCommand.agentType && !isDetachedAgentType(detachedCommand.agentType)) {
+      return NextResponse.json({ error: "agentType is invalid" }, { status: 400 });
+    }
+    if (detachedCommand.kind === "btw" && !detachedCommand.message) {
+      return NextResponse.json({ error: "message is required for btw" }, { status: 400 });
+    }
+
+    const result = await dispatchDetachedAgent(id, detachedCommand.kind, detachedCommand.message, detachedCommand.agentType);
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+    return NextResponse.json({ success: true, messageId: result.messageId });
   }
 
   if (!force) {

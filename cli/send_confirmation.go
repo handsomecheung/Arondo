@@ -69,7 +69,8 @@ func (c *client) resolveMessageConfirmation(sessionID string, args arguments, er
 	}
 	switch args.confirmation {
 	case "force":
-		return false, "", c.sendMessage(sessionID, args, true)
+		_, retryErr := c.sendMessage(sessionID, args, true)
+		return false, "", retryErr
 	case "auto":
 		trigger := confirmationAutoTrigger(apiErr)
 		return true, trigger, c.queueMessage(sessionID, args, trigger)

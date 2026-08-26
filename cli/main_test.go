@@ -1,12 +1,39 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 )
+
+func TestPollDetachedAgentUntilDoneReturnsDetachedRunAndResult(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/messages" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if r.URL.Query().Get("sessionId") != "session-1" {
+			t.Fatalf("unexpected session ID: %s", r.URL.Query().Get("sessionId"))
+		}
+		_ = json.NewEncoder(w).Encode([]message{
+			{ID: "run-1", Type: "detached-agent-run"},
+			{ID: "return-1", Type: "detached-agent-return", ParentID: "run-1", Role: "agent"},
+		})
+	}))
+	defer server.Close()
+
+	run, returned, err := pollDetachedAgentUntilDone(&client{server: server.URL, http: server.Client()}, "session-1", "run-1", time.Millisecond, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.ID != "run-1" || returned.ID != "return-1" {
+		t.Fatalf("unexpected result: run=%#v returned=%#v", run, returned)
+	}
+}
 
 func TestParseArgs(t *testing.T) {
 	args, err := parseArgs([]string{"--server=https://arondo.example/", "--token", "secret", "--temp-dir", "--agent", "codex", "--confirmation", "auto", "--poll-interval=0.5", "--timeout", "12", "Do work"}, cliConfig{})
