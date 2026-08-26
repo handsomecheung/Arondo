@@ -165,68 +165,68 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
     expect(optionIds.some((id) => id.startsWith('gemini-'))).toBeFalsy();
   });
 
-  test('C -> A: should successfully handoff context from claude to agy (Gemini Flash)', async ({ request }) => {
+  test('C -> A: keeps Claude when quota ranking changes to agy', async ({ request }) => {
     await runTransitionTest(
       request,
       'C', 'A',
-      'claude', 'antigravity',
-      undefined, 'Gemini 3.5 Flash (Medium)',
-      true,
+      'claude', 'claude',
+      undefined, undefined,
+      false,
       quotaPath
     );
   });
 
-  test('A -> B: should successfully resume within agy from Gemini Flash to Claude Sonnet 4.6', async ({ request }) => {
+  test('A -> B: keeps the selected agy model without an automodel decision', async ({ request }) => {
     await runTransitionTest(
       request,
       'A', 'B',
       'antigravity', 'antigravity',
-      'Gemini 3.5 Flash (Medium)', 'Claude Sonnet 4.6 (Thinking)',
+      'Gemini 3.5 Flash (Medium)', 'Gemini 3.5 Flash (Medium)',
       false,
       quotaPath
     );
   });
 
-  test('A -> C: should successfully handoff context from agy (Gemini Flash) to claude', async ({ request }) => {
+  test('A -> C: keeps agy when quota ranking changes to Claude', async ({ request }) => {
     await runTransitionTest(
       request,
       'A', 'C',
-      'antigravity', 'claude',
-      'Gemini 3.5 Flash (Medium)', undefined,
-      true,
+      'antigravity', 'antigravity',
+      'Gemini 3.5 Flash (Medium)', 'Gemini 3.5 Flash (Medium)',
+      false,
       quotaPath
     );
   });
 
-  test('B -> C: should successfully handoff context from agy (Claude Sonnet 4.6) to claude', async ({ request }) => {
+  test('B -> C: keeps agy when quota ranking changes to Claude', async ({ request }) => {
     await runTransitionTest(
       request,
       'B', 'C',
-      'antigravity', 'claude',
-      'Claude Sonnet 4.6 (Thinking)', undefined,
-      true,
+      'antigravity', 'antigravity',
+      'Claude Sonnet 4.6 (Thinking)', 'Claude Sonnet 4.6 (Thinking)',
+      false,
       quotaPath
     );
   });
 
-  test('B -> A: should successfully resume within agy from Claude Sonnet 4.6 to Gemini Flash', async ({ request }) => {
+  test('B -> A: keeps the selected agy model without an automodel decision', async ({ request }) => {
     await runTransitionTest(
       request,
       'B', 'A',
       'antigravity', 'antigravity',
-      'Claude Sonnet 4.6 (Thinking)', 'Gemini 3.5 Flash (Medium)',
+      'Claude Sonnet 4.6 (Thinking)', 'Claude Sonnet 4.6 (Thinking)',
       false,
       quotaPath
     );
   });
 
-  test('C -> B: should successfully handoff context from claude to agy (Claude Sonnet 4.6)', async ({ request }) => {
+  test('C -> B: keeps Claude when quota ranking changes to agy', async ({ request }) => {
     await runTransitionTest(
       request,
       'C', 'B',
-      'claude', 'antigravity',
-      undefined, 'Claude Sonnet 4.6 (Thinking)',
-      true,
+      'claude', 'claude',
+      undefined, undefined,
+      false,
       quotaPath
     );
   });
@@ -243,15 +243,30 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
     await runSameChoiceResumeTest(request, 'C', quotaPath);
   });
 
-  test('A -> A -> B -> A: should carry conversation ID and context between model changes of the same agent', async ({ request }) => {
+  test('keeps the initially selected agent on follow-up messages while it still has quota', async ({ request }) => {
+    // Choice C becomes the highest-ranked option for the follow-up, but choice A
+    // still has usable hourly quota. Auto mode must retain the agent selected for
+    // the first message rather than switch solely because the ranking changed.
+    await runTransitionTest(
+      request,
+      'A', 'C',
+      'antigravity', 'antigravity',
+      'Gemini 3.5 Flash (Medium)', undefined,
+      false,
+      quotaPath,
+      '-locked'
+    );
+  });
+
+  test('A -> A -> B -> A: keeps the initial agent through later quota ranking changes', async ({ request }) => {
     await runXXYXTest(request, 'A', 'B', quotaPath);
   });
 
-  test('B -> B -> C -> B: should carry conversation ID/session ID and context when switching back and forth', async ({ request }) => {
+  test('B -> B -> C -> B: keeps the initial agent through later quota ranking changes', async ({ request }) => {
     await runXXYXTest(request, 'B', 'C', quotaPath);
   });
 
-  test('C -> C -> A -> C: should carry session ID/conversation ID and context when switching back and forth', async ({ request }) => {
+  test('C -> C -> A -> C: keeps the initial agent through later quota ranking changes', async ({ request }) => {
     await runXXYXTest(request, 'C', 'A', quotaPath);
   });
 });
@@ -308,7 +323,8 @@ async function runTransitionTest(
   expectedFromModel: string | undefined,
   expectedToModel: string | undefined,
   isAgentSwitch: boolean,
-  quotaPath: string
+  quotaPath: string,
+  runnerNameSuffix = ''
 ) {
   const mockBinDir = `${path.resolve(__dirname, '../../../mocks/bin/agy')}:${path.resolve(__dirname, '../../../mocks/bin/claude')}`;
 
@@ -322,7 +338,7 @@ async function runTransitionTest(
   // Write initial quota
   await fs.writeFile(quotaPath, JSON.stringify(getQuotaForChoice(fromChoice), null, 2), 'utf-8');
 
-  const name = `runner-${fromChoice}-to-${toChoice}`;
+  const name = `runner-${fromChoice}-to-${toChoice}${runnerNameSuffix}`;
   console.log(`[automode-test] Spawning runner for ${fromChoice} -> ${toChoice}...`);
   const result = await setupRunner(request, name, mockBinDir, {
     AGY_DIR_LOG: agyLogDir,
@@ -557,7 +573,6 @@ async function runXXYXTest(
   };
 
   const xInfo = getAgentInfo(X);
-  const yInfo = getAgentInfo(Y);
 
   // Setup runner with choice X first
   await fs.writeFile(quotaPath, JSON.stringify(getQuotaForChoice(X), null, 2), 'utf-8');
@@ -624,7 +639,7 @@ async function runXXYXTest(
       expect(runMsgs2[1].content).toContain(`--resume "${sessionId}"`);
     }
 
-    // 3. Third call: Y ("Hello Y")
+    // 3. Third call: quota ranking changes to Y, but X remains locked.
     // Write choice Y quota
     await fs.writeFile(quotaPath, JSON.stringify(getQuotaForChoice(Y), null, 2), 'utf-8');
 
@@ -635,19 +650,19 @@ async function runXXYXTest(
     expect(msgRes3.status()).toBe(200);
     await waitForSessionNotRunning(request, sessionId);
 
-    // Verify Call 3 ran Y with its corresponding model
+    // Verify Call 3 retained X.
     const msgsRes3 = await request.get(`/api/messages?sessionId=${sessionId}`, {
       headers: { 'x-arondo-token': 'test-token-123456' }
     });
     const messages3 = await msgsRes3.json();
     const runMsgs3 = messages3.filter((m: any) => m.type === 'agent-run');
     expect(runMsgs3.length).toBe(3);
-    expect(runMsgs3[2].resolvedAgentType).toBe(yInfo.agent);
-    if (yInfo.model) {
-      expect(runMsgs3[2].content).toContain(`--model "${yInfo.model}"`);
+    expect(runMsgs3[2].resolvedAgentType).toBe(xInfo.agent);
+    if (xInfo.model) {
+      expect(runMsgs3[2].content).toContain(`--model "${xInfo.model}"`);
     }
 
-    // 4. Fourth call: X ("what do I said before?")
+    // 4. Fourth call: restore X's quota ranking.
     // Write choice X quota back
     await fs.writeFile(quotaPath, JSON.stringify(getQuotaForChoice(X), null, 2), 'utf-8');
 
@@ -658,7 +673,7 @@ async function runXXYXTest(
     expect(msgRes4.status()).toBe(200);
     await waitForSessionNotRunning(request, sessionId);
 
-    // Verify Call 4 ran X with X's resume properties and recalled Y's context
+    // Verify Call 4 continues X's conversation.
     const msgsRes4 = await request.get(`/api/messages?sessionId=${sessionId}`, {
       headers: { 'x-arondo-token': 'test-token-123456' }
     });

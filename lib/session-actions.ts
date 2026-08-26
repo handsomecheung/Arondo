@@ -12,8 +12,9 @@ import {
   getSessionLog,
   type DetachedAgentKind,
 } from "./store";
-import { getAgent, resolveAgentType, PROMPT_ENV_VAR } from "./agents";
+import { getAgent, resolveAgentType, PROMPT_ENV_VAR, type ConcreteAgentType } from "./agents";
 import { buildCrossAgentContext } from "./autoagent";
+import type { AutoModelEffort } from "./automodel";
 import { eventBus } from "./event-bus";
 import { runnerManager } from "./runner-manager";
 import { readTokensConfig } from "./auth";
@@ -211,6 +212,13 @@ export async function dispatchFollowupMessage(
   const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? [], {
     prompt: trimmedPrompt || trimmedMessage,
     automodelLog: (text) => appendAutomodelLog(sessionId, systemMessageId, text),
+    lockedAgent: session.agentType === "auto" && session.autoLockedAgentType && !prevQuotaError
+      ? {
+        agentType: session.autoLockedAgentType as ConcreteAgentType,
+        model: session.autoLockedAgentModel,
+        effort: session.autoLockedAgentEffort as AutoModelEffort | undefined,
+      }
+      : undefined,
   });
   const resolvedType = resolved.agentType;
 

@@ -5,7 +5,7 @@ import type { Message } from "./store";
 import { getSessionLog } from "./store";
 import { getConfigDir } from "./config";
 import { stripAnsi } from "./ansi";
-import type { AutoModelOption } from "./automodel";
+import type { AutoModelEffort, AutoModelOption } from "./automodel";
 
 const CONFIG_DIR = getConfigDir();
 
@@ -14,6 +14,7 @@ const QUOTA_PATH = path.join(CONFIG_DIR, "autoagent", "agent", "quota.json");
 export interface ResolvedAgent {
   agentType: ConcreteAgentType;
   model?: string;
+  effort?: AutoModelEffort;
   modelOptions?: AutoModelOption[];
 }
 
@@ -105,6 +106,13 @@ const CODEX_MODEL_OPTIONS: AutoModelOption[] = [
   { id: "codex-gpt-5.5-medium", model: "gpt-5.5", effort: "medium", costTier: "standard", description: "Default Codex option for normal coding tasks." },
   { id: "codex-gpt-5.5-high", model: "gpt-5.5", effort: "high", costTier: "strong", description: "Stronger Codex reasoning for hard debugging and broad changes." },
 ];
+
+export function getModelOptionsForAgent(agentType: ConcreteAgentType): AutoModelOption[] {
+  if (agentType === "antigravity") return [...AGY_GEMINI_MODEL_OPTIONS, ...AGY_OTHER_MODEL_OPTIONS];
+  if (agentType === "claude") return CLAUDE_MODEL_OPTIONS;
+  if (agentType === "codex") return CODEX_MODEL_OPTIONS;
+  return [];
+}
 
 /**
  * Selects the best agent and model from the available binary names on a runner.

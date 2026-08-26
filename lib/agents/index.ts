@@ -3,7 +3,7 @@ import { AntigravityAgent } from "./antigravity";
 import { ClaudeCodeAgent } from "./claude";
 import { CodexAgent } from "./codex";
 import { OpencodeAgent } from "./opencode";
-import { selectAgent } from "../autoagent";
+import { getModelOptionsForAgent, selectAgent } from "../autoagent";
 import { routeModel, type AutoModelEffort, type AutoModelOption } from "../automodel";
 
 export type ConcreteAgentType = "antigravity" | "claude" | "codex" | "opencode";
@@ -52,6 +52,7 @@ export interface ResolvedAgent {
 interface ResolveAgentOptions {
   prompt?: string;
   automodelLog?: (text: string) => void | Promise<void>;
+  lockedAgent?: Pick<ResolvedAgent, "agentType" | "model" | "effort">;
 }
 
 /**
@@ -66,7 +67,9 @@ export async function resolveAgentType(
 ): Promise<ResolvedAgent> {
   if (agentType !== "auto") return { agentType: agentType as ConcreteAgentType };
   const resolved = await selectAgent(runnerAgentBinaries);
-  const selected = resolved ?? { agentType: "antigravity" as ConcreteAgentType };
+  const selected = options.lockedAgent
+    ? { ...options.lockedAgent, modelOptions: getModelOptionsForAgent(options.lockedAgent.agentType) }
+    : resolved ?? { agentType: "antigravity" as ConcreteAgentType };
   const routed = options.prompt && selected.modelOptions
     ? await routeModel({
       agentType: selected.agentType,
@@ -81,7 +84,7 @@ export async function resolveAgentType(
   return {
     agentType: selected.agentType,
     model: routed.model ?? selected.model,
-    effort: routed.effort,
+    effort: routed.effort ?? selected.effort,
   };
 }
 
