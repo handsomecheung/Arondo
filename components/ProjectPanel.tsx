@@ -1,12 +1,15 @@
 "use client";
 
 import type { Project, Session, ProjectScript, Runner } from "@/types/home";
+import type { AgentCommand } from "@/lib/agentCommands";
+import AgentCommandsManager from "@/components/AgentCommandsManager";
 import { IconPlus, IconTrash, IconMoreVertical, IconFileSearch, IconTerminal, IconCommit } from "@/components/Icons";
 
 interface ProjectPanelProps {
   project: Project;
   projectSessions: Session[];
   projectScripts: ProjectScript[];
+  projectAgentCommands: AgentCommand[];
   draggedIndex: number | null;
   runners: Runner[];
   isAutoAnalyzing: boolean;
@@ -20,6 +23,9 @@ interface ProjectPanelProps {
   onOpenScriptModal: (editingName?: string, editingCommand?: string) => void;
   onAddScriptModal: () => void;
   onDeleteScript: (name: string) => void;
+  onSaveAgentCommand: (command: AgentCommand) => Promise<void>;
+  onDeleteAgentCommand: (command: string) => Promise<void>;
+  onConfirmDeleteAgentCommand: (command: string, onConfirm: () => Promise<void>) => void;
   onPointerDown: (e: React.PointerEvent, index: number) => void;
   onPointerMove: (e: React.PointerEvent) => void;
   onPointerUp: (e: React.PointerEvent) => void;
@@ -37,6 +43,7 @@ export default function ProjectPanel({
   project,
   projectSessions,
   projectScripts,
+  projectAgentCommands,
   draggedIndex,
   runners,
   isAutoAnalyzing,
@@ -50,6 +57,9 @@ export default function ProjectPanel({
   onOpenScriptModal,
   onAddScriptModal,
   onDeleteScript,
+  onSaveAgentCommand,
+  onDeleteAgentCommand,
+  onConfirmDeleteAgentCommand,
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -360,6 +370,18 @@ export default function ProjectPanel({
           </div>
         </div>
 
+      </div>
+
+      <div className="project-section-block">
+        <AgentCommandsManager
+          title="Project Agent Commands"
+          description="Project-specific slash commands saved to agent-commands.json in this project."
+          commands={projectAgentCommands}
+          canEdit={true}
+          onSave={onSaveAgentCommand}
+          onDelete={onDeleteAgentCommand}
+          onRequestDeleteConfirm={onConfirmDeleteAgentCommand}
+        />
       </div>
 
       <div className="project-section-block">

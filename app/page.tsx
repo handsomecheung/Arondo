@@ -163,6 +163,7 @@ export default function HomePage() {
   } | null>(null);
 
   const [agentCommands, setAgentCommands] = useState<AgentCommand[]>(AGENT_COMMANDS);
+  const [projectAgentCommands, setProjectAgentCommands] = useState<AgentCommand[]>([]);
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [scriptSubMenuOpen, setScriptSubMenuOpen] = useState(false);
@@ -284,6 +285,48 @@ export default function HomePage() {
     setMenuOpen,
     setScriptSubMenuOpen,
   });
+
+  const currentAgentCommandProjectId = useMemo(() => {
+    if (selectedProjectId) return selectedProjectId;
+    if (selectedSession?.projectId) return selectedSession.projectId;
+    if (isNewSession || isNewDraft) {
+      return projects.find((p) => p.runnerId === runnerId && p.repoPath === repoPath)?.id ?? null;
+    }
+    return null;
+  }, [isNewDraft, isNewSession, projects, repoPath, runnerId, selectedProjectId, selectedSession?.projectId]);
+
+  const loadAgentCommands = useCallback(() => {
+    const url = currentAgentCommandProjectId
+      ? `/api/projects/${currentAgentCommandProjectId}/agent-commands`
+      : "/api/agent-commands";
+    fetch(url)
+      .then((r) => r.json())
+      .then((data: AgentCommand[]) => {
+        if (Array.isArray(data)) setAgentCommands(data);
+      })
+      .catch(console.error);
+  }, [currentAgentCommandProjectId]);
+
+  const loadProjectAgentCommands = useCallback(() => {
+    if (!selectedProjectId) {
+      setProjectAgentCommands([]);
+      return;
+    }
+    fetch(`/api/projects/${selectedProjectId}/agent-commands?source=custom`)
+      .then((r) => r.json())
+      .then((data: AgentCommand[]) => {
+        if (Array.isArray(data)) setProjectAgentCommands(data);
+      })
+      .catch(console.error);
+  }, [selectedProjectId]);
+
+  useEffect(() => {
+    loadAgentCommands();
+  }, [loadAgentCommands]);
+
+  useEffect(() => {
+    loadProjectAgentCommands();
+  }, [loadProjectAgentCommands]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.visualViewport) return;
@@ -1324,6 +1367,7 @@ export default function HomePage() {
                 project={project}
                 projectSessions={projectSessions}
                 projectScripts={projectScripts}
+                projectAgentCommands={projectAgentCommands}
                 draggedIndex={draggedIndex}
                 runners={runners}
                 isAutoAnalyzing={taskQueue.some((t) => (t.name === "Agent: Auto Scripts Analysis" || t.scriptName === "Auto Scripts Analysis") && t.status === "running" && t.projectId === project.id)}
@@ -1388,6 +1432,48 @@ export default function HomePage() {
                 }}
                 onAddScriptModal={() => setScriptModalOpen(true)}
                 onDeleteScript={handleDeleteScript}
+                onSaveAgentCommand={async (command) => {
+                  const res = await fetch(`/api/projects/${project.id}/agent-commands`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(command),
+                  });
+                  if (!res.ok) {
+                    const err = await res.json();
+                    setApiError({
+                      title: "Project Agent Command Error",
+                      message: err.error || "Failed to save project agent command",
+                    });
+                    throw new Error(err.error || "Failed to save project agent command");
+                  }
+                  loadProjectAgentCommands();
+                  loadAgentCommands();
+                }}
+                onDeleteAgentCommand={async (command) => {
+                  const res = await fetch(
+                    `/api/projects/${project.id}/agent-commands?command=${encodeURIComponent(command)}`,
+                    { method: "DELETE" },
+                  );
+                  if (!res.ok) {
+                    const err = await res.json();
+                    setApiError({
+                      title: "Project Agent Command Error",
+                      message: err.error || "Failed to delete project agent command",
+                    });
+                    throw new Error(err.error || "Failed to delete project agent command");
+                  }
+                  loadProjectAgentCommands();
+                  loadAgentCommands();
+                }}
+                onConfirmDeleteAgentCommand={(command, onConfirm) => {
+                  setConfirmDialog({
+                    message: `Are you sure you want to delete the project agent command "/${command}"?`,
+                    onConfirm: async () => {
+                      setConfirmDialog(null);
+                      await onConfirm();
+                    },
+                  });
+                }}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}

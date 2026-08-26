@@ -37,11 +37,18 @@ export const AGENT_COMMANDS: AgentCommand[] = [
   },
 ];
 
-// Custom entries (matched by command) override built-in ones; new commands are appended.
+// Override entries (matched by command) take priority; new commands are prepended.
+export function mergeAgentCommandLists(
+  base: AgentCommand[],
+  overrides: AgentCommand[],
+): AgentCommand[] {
+  const overridden = new Set(overrides.map((c) => c.command));
+  const remaining = base.filter((c) => !overridden.has(c.command));
+  return [...overrides, ...remaining];
+}
+
 export function mergeAgentCommands(custom: AgentCommand[]): AgentCommand[] {
-  const overridden = new Set(custom.map((c) => c.command));
-  const remaining = AGENT_COMMANDS.filter((c) => !overridden.has(c.command));
-  return [...custom, ...remaining];
+  return mergeAgentCommandLists(AGENT_COMMANDS, custom);
 }
 
 export function getTriggerWord(cmd: AgentCommand): string {

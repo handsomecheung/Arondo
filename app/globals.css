@@ -2548,6 +2548,24 @@ body {
   padding: 16px 18px;
 }
 
+/* Keep command headings and actions within narrow project panels in Firefox. */
+.agent-commands-manager {
+  padding: 16px 18px;
+  min-width: 0;
+}
+
+.agent-commands-manager-header {
+  min-width: 0;
+}
+
+.agent-commands-manager-copy {
+  min-width: 0;
+}
+
+.agent-commands-manager-title {
+  overflow-wrap: anywhere;
+}
+
 /* ── Info / Action dialog ─────────────────────────────────────────────────── */
 .info-dialog {
   max-width: 480px;

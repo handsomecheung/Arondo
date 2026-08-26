@@ -1054,7 +1054,7 @@ export default function SettingsPage() {
             </form>
           </section>
 
-          {/* Agent Commands Section */}
+          {/* Default Agent Commands Section */}
           <div>
             <div
               style={{
@@ -1072,7 +1072,7 @@ export default function SettingsPage() {
                     color: "var(--text-primary)",
                   }}
                 >
-                  Agent Commands
+                  Default Agent Commands
                 </h2>
                 <p
                   style={{
@@ -1081,7 +1081,7 @@ export default function SettingsPage() {
                     marginTop: 2,
                   }}
                 >
-                  Custom slash commands that expand into agent instructions.
+                  Default slash commands that expand into agent instructions.
                 </p>
               </div>
               {userRole === "admin" && (
