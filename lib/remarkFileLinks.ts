@@ -14,13 +14,14 @@ export const FILE_EXTENSIONS = [
 ];
 
 export const FILE_PATH_RE = new RegExp(
-  `^(?:\\.{0,2}/)?[\\w.\\-]+(?:/[\\w.\\-]+)*\\.(?:${FILE_EXTENSIONS.join("|")})(?::\\d+(?::\\d+)?)?$`
+  `^(?:/|\\.{0,2}/)?[\\w.\\-\\[\\]]+(?:/[\\w.\\-\\[\\]]+)*\\.(?:${FILE_EXTENSIONS.join("|")})(?::\\d+(?::\\d+)?)?$`
 );
 
 export const FILE_URL_PREFIX = "file://";
 
 const BACKTICK_RE = /`([^`\n]+)`/g;
 const FILE_URL_RE = /file:\/\/[^\s`]+/g;
+const MARKDOWN_ABSOLUTE_PATH_LINK_RE = /\[[^\]]*\]\((\/[^\s)`]+)\)/g;
 
 // Strips a trailing line-reference from a path so existence checks and the
 // eventual file-open hit a real filesystem path — e.g. GitHub-style
@@ -48,13 +49,15 @@ function truncateAtUrlDelimiters(url: string): string {
 }
 
 // A candidate is "path-like" if it's a file:// URL, or matches FILE_PATH_RE
-// once any trailing line-reference is stripped.
+// once any trailing line-reference is stripped. Decode URI-escaped paths first
+// so Markdown links such as `%5Bid%5D` are recognized as filesystem paths.
 function isPathCandidate(value: string): boolean {
-  return isFileUrl(value) || FILE_PATH_RE.test(stripLocationSuffix(value));
+  return isFileUrl(value) || FILE_PATH_RE.test(stripLocationSuffix(decodeURIComponent(value)));
 }
 
 // Scans raw (unparsed) markdown text for tokens that *might* be file paths —
-// backtick spans (plain paths or file:// URLs), and bare file:// URLs —
+// backtick spans (plain paths or file:// URLs), bare file:// URLs, and absolute
+// paths in Markdown links —
 // without yet confirming they exist on disk. Callers should verify existence
 // before passing the results into remarkFileLinks' `verified` set.
 export function extractCandidatePaths(text: string): string[] {
@@ -67,6 +70,9 @@ export function extractCandidatePaths(text: string): string[] {
     // The greedy \S+ match swallows the closing `)` of markdown link syntax
     // (and anything after, e.g. surrounding **bold**) — cut it off there.
     candidates.add(match[0].split(")")[0]);
+  }
+  for (const match of text.matchAll(MARKDOWN_ABSOLUTE_PATH_LINK_RE)) {
+    if (isPathCandidate(match[1])) candidates.add(match[1]);
   }
 
   return [...candidates];
@@ -82,14 +88,15 @@ export function candidateToPath(candidate: string): string {
 }
 
 interface RemarkFileLinksOptions {
-  // Raw tokens (inline-code text, or full file:// URLs) confirmed to exist on disk.
+  // Raw tokens (inline-code text, file:// URLs, or absolute Markdown link paths)
+  // confirmed to exist on disk.
   // Nothing is linkified unless its raw form is a member of this set.
   verified: Set<string>;
 }
 
 // Detects file-path-looking inline code spans (e.g. `app/page.tsx` or
-// `file:///abs/path#L5-L16`) and file:// links (e.g.
-// [text](file:///abs/path#L5-L16)) that have been confirmed to exist on
+// `file:///abs/path#L5-L16`) and file/absolute-path links (e.g.
+// [text](file:///abs/path#L5-L16) or [text](/abs/path)) that have been confirmed to exist on
 // disk, and rewrites them into links carrying a filelink: URL, which
 // AgentExecCard's custom `a` renderer intercepts to open the built-in File
 // Browser instead of navigating. Backtick-wrapped http(s):// URLs (which
@@ -140,7 +147,7 @@ export default function remarkFileLinks(options: RemarkFileLinksOptions) {
 
     visit(tree, "link", (node: any) => {
       const url: string = node.url || "";
-      if (!isFileUrl(url) || !verified.has(url)) return;
+      if (!isPathCandidate(url) || !verified.has(url)) return;
 
       const path = candidateToPath(url);
       node.data = {
