@@ -69,6 +69,7 @@ interface Project {
   runnerId: string;
   createdAt: string;
   updatedAt: string;
+  tempDir?: boolean;
 }
 
 interface Session {
@@ -438,7 +439,9 @@ export default function RunnersPage() {
                   ];
                   const hasAgentInfo = Array.isArray(r.agents);
                   const isSelected = selectedRunnerId === r.id;
-                  const rProjects = projects.filter((p) => p.runnerId === r.id);
+                  const rProjects = projects.filter(
+                    (p) => p.runnerId === r.id && !p.tempDir,
+                  );
                   return (
                     <div key={r.id} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                       <div
