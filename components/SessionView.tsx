@@ -20,6 +20,9 @@ import {
 } from "@/components/Icons";
 import { getTriggerWord } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
+import { CHAT_INPUT_TIPS } from "@/lib/chatInputTips";
+
+const CHAT_INPUT_TIP_INTERVAL_MS = 30000;
 
 interface SessionViewProps {
   selectedSession: Session | null;
@@ -298,6 +301,26 @@ export default function SessionView({
   }, []);
 
   const showComposer = !!selectedSession || isNewSession || isNewDraft;
+  const [chatInputTipIndex, setChatInputTipIndex] = useState(0);
+  const visibleChatInputTips = CHAT_INPUT_TIPS.filter(
+    (tip) => !tip.existingSessionOnly || (!isNewSession && !!selectedSessionId),
+  );
+
+  useEffect(() => {
+    setChatInputTipIndex(0);
+  }, [isNewSession, selectedSessionId]);
+
+  useEffect(() => {
+    if (visibleChatInputTips.length < 2) return;
+    const intervalId = window.setInterval(() => {
+      setChatInputTipIndex((index) => (index + 1) % visibleChatInputTips.length);
+    }, CHAT_INPUT_TIP_INTERVAL_MS);
+    return () => window.clearInterval(intervalId);
+  }, [visibleChatInputTips.length]);
+
+  const rotatingChatInputTip = visibleChatInputTips[
+    chatInputTipIndex % visibleChatInputTips.length
+  ]?.text ?? "Describe what you want the agent to build or fix in this project…";
 
   const chatInputPlaceholder = isArchived
     ? "This session is archived. Unarchive it to send messages."
@@ -309,9 +332,7 @@ export default function SessionView({
         ? "Describe the TODO message to send later."
         : isAgentRunning
           ? "Agent is working… your message will be queued until it finishes"
-          : isNewSession
-            ? "Describe what you want the agent to build or fix in this project…"
-            : "Send a message or follow-up feedback to the agent…";
+          : rotatingChatInputTip;
 
   const chatInputValue = prompt;
   const [collapseViewedAt, setCollapseViewedAt] = useState<string | false | null>(null);
