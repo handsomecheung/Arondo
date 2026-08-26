@@ -3010,9 +3010,10 @@ body {
 }
 
 .new-session-dropdown-container .new-session-dropdown-menu {
-  right: 0;
-  left: auto;
+  left: 0;
+  right: auto;
   width: min(240px, calc(100vw - 32px));
+  transform-origin: bottom left;
 }
 
 .new-session-dropdown-container .custom-dropdown-trigger {
