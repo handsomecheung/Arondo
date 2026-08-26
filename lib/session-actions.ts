@@ -212,11 +212,13 @@ export async function dispatchFollowupMessage(
   const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? [], {
     prompt: trimmedPrompt || trimmedMessage,
     automodelLog: (text) => appendAutomodelLog(sessionId, systemMessageId, text),
-    lockedAgent: session.agentType === "auto" && session.autoLockedAgentType && !prevQuotaError
+    lockedAgent: session.agentType === "auto" && session.autoLockedAgentType &&
+      (!prevQuotaError || session.autoLockedAgentType === "antigravity")
       ? {
         agentType: session.autoLockedAgentType as ConcreteAgentType,
         model: session.autoLockedAgentModel,
         effort: session.autoLockedAgentEffort as AutoModelEffort | undefined,
+        agyQuotaGroup: session.autoLockedAgyQuotaGroup,
       }
       : undefined,
   });
@@ -258,6 +260,7 @@ export async function dispatchFollowupMessage(
     patch.autoLockedAgentType = resolvedType;
     patch.autoLockedAgentModel = resolved.model ?? undefined;
     patch.autoLockedAgentEffort = resolved.effort ?? undefined;
+    patch.autoLockedAgyQuotaGroup = resolved.agyQuotaGroup;
     if (prevQuotaError) {
       patch.errorMessage = undefined;
     }
@@ -272,6 +275,7 @@ export async function dispatchFollowupMessage(
     content: `⚙️ Executing command:\n\`\`\`bash\n${command}\n\`\`\``,
     type: "agent-run",
     resolvedAgentType: resolvedType,
+    resolvedAgyQuotaGroup: resolved.agyQuotaGroup,
     prompt: fullPrompt,
   });
   eventBus.publish({ type: "message_added", payload: systemMsg });
@@ -290,6 +294,7 @@ export async function dispatchFollowupMessage(
     type: "agent",
     createdAt: Date.now(),
     agentType: resolvedType,
+    agyQuotaGroup: resolved.agyQuotaGroup,
     command,
   });
 
@@ -387,6 +392,7 @@ export async function dispatchCreateSession(
       autoLockedAgentType: resolvedType,
       autoLockedAgentModel: resolved.model ?? undefined,
       autoLockedAgentEffort: resolved.effort ?? undefined,
+      autoLockedAgyQuotaGroup: resolved.agyQuotaGroup,
     }
     : {};
   const updatedSession = await updateSession(session.id, autoLockPatch);
@@ -409,6 +415,7 @@ export async function dispatchCreateSession(
     content: `⚙️ Executing command:\n\`\`\`bash\n${command}\n\`\`\``,
     type: "agent-run",
     resolvedAgentType: resolvedType,
+    resolvedAgyQuotaGroup: resolved.agyQuotaGroup,
     prompt: fullPrompt,
   });
   eventBus.publish({ type: "message_added", payload: systemMsg });
@@ -422,6 +429,7 @@ export async function dispatchCreateSession(
     type: "agent",
     createdAt: Date.now(),
     agentType: resolvedType,
+    agyQuotaGroup: resolved.agyQuotaGroup,
     command,
   });
 

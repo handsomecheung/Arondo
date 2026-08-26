@@ -76,6 +76,7 @@ export async function PATCH(
       patch.autoLockedAgentType = undefined;
       patch.autoLockedAgentModel = undefined;
       patch.autoLockedAgentEffort = undefined;
+      patch.autoLockedAgyQuotaGroup = undefined;
     }
     if (pinned !== undefined) patch.pinnedAt = pinned ? new Date().toISOString() : undefined;
     const updated = await updateSession(id, patch);

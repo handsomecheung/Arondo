@@ -76,6 +76,7 @@ export interface TaskContext {
   projectId?: string;
   prompt?: string;
   agentType?: string;
+  agyQuotaGroup?: "gemini" | "other";
   detachedKind?: "review" | "btw";
 }
 
@@ -1255,7 +1256,13 @@ class RunnerManager {
           const todoMessage = await addTodoMessage(ctx.sessionId, {
             content: lastUserMsg.content,
             prompt: lastUserMsg.prompt,
-            trigger: { kind: "quotaAvailable", agentType: quotaRetryAgentType },
+            trigger: {
+              kind: "quotaAvailable",
+              agentType: quotaRetryAgentType,
+              agyQuotaGroup: resolvedAgentType === "antigravity"
+                ? ctx.agyQuotaGroup ?? systemMsg?.resolvedAgyQuotaGroup
+                : undefined,
+            },
           });
           eventBus.publish({ type: "message_added", payload: todoMessage });
           const withTodo = await getSession(ctx.sessionId);

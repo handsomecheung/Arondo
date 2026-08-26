@@ -6,6 +6,7 @@ export interface TodoTrigger {
   kind: TodoTriggerKind;
   timestamp?: number;
   agentType?: string;
+  agyQuotaGroup?: "gemini" | "other";
 }
 
 export interface Session {

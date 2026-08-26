@@ -16,7 +16,10 @@ export interface ResolvedAgent {
   model?: string;
   effort?: AutoModelEffort;
   modelOptions?: AutoModelOption[];
+  agyQuotaGroup?: AgyQuotaGroup;
 }
+
+export type AgyQuotaGroup = "gemini" | "other";
 
 interface ClaudeQuota {
   Type: "claude";
@@ -75,6 +78,7 @@ interface AgentChoice {
   agentType: ConcreteAgentType;
   model?: string;
   modelOptions: AutoModelOption[];
+  agyQuotaGroup?: AgyQuotaGroup;
 }
 
 const AGY_GEMINI_MODEL_OPTIONS: AutoModelOption[] = [
@@ -107,11 +111,25 @@ const CODEX_MODEL_OPTIONS: AutoModelOption[] = [
   { id: "codex-gpt-5.5-high", model: "gpt-5.5", effort: "high", costTier: "strong", description: "Stronger Codex reasoning for hard debugging and broad changes." },
 ];
 
-export function getModelOptionsForAgent(agentType: ConcreteAgentType): AutoModelOption[] {
-  if (agentType === "antigravity") return [...AGY_GEMINI_MODEL_OPTIONS, ...AGY_OTHER_MODEL_OPTIONS];
+export function getModelOptionsForAgent(
+  agentType: ConcreteAgentType,
+  agyQuotaGroup?: AgyQuotaGroup,
+): AutoModelOption[] {
+  if (agentType === "antigravity") {
+    if (agyQuotaGroup === "gemini") return AGY_GEMINI_MODEL_OPTIONS;
+    if (agyQuotaGroup === "other") return AGY_OTHER_MODEL_OPTIONS;
+    return [...AGY_GEMINI_MODEL_OPTIONS, ...AGY_OTHER_MODEL_OPTIONS];
+  }
   if (agentType === "claude") return CLAUDE_MODEL_OPTIONS;
   if (agentType === "codex") return CODEX_MODEL_OPTIONS;
   return [];
+}
+
+export function getAgyQuotaGroupForModel(model?: string): AgyQuotaGroup | undefined {
+  if (!model) return undefined;
+  if (AGY_GEMINI_MODEL_OPTIONS.some((option) => option.model === model)) return "gemini";
+  if (AGY_OTHER_MODEL_OPTIONS.some((option) => option.model === model)) return "other";
+  return undefined;
 }
 
 /**
@@ -133,12 +151,14 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
       agentType: "antigravity",
       model: "Gemini 3.5 Flash (Medium)",
       modelOptions: AGY_GEMINI_MODEL_OPTIONS,
+      agyQuotaGroup: "gemini",
     });
     choices.push({
       id: "B",
       agentType: "antigravity",
       model: "Claude Sonnet 4.6 (Thinking)",
       modelOptions: AGY_OTHER_MODEL_OPTIONS,
+      agyQuotaGroup: "other",
     });
   }
   if (hasClaude) {
@@ -162,7 +182,12 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
   }
   if (choices.length === 1) {
     console.log(`[autoagent] Only one choice available: ${choices[0].id}. Selecting it directly.`);
-    return { agentType: choices[0].agentType, model: choices[0].model, modelOptions: choices[0].modelOptions };
+    return {
+      agentType: choices[0].agentType,
+      model: choices[0].model,
+      modelOptions: choices[0].modelOptions,
+      agyQuotaGroup: choices[0].agyQuotaGroup,
+    };
   }
 
   const quota = await readQuota();
@@ -241,7 +266,12 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
     const fallbackChoices = unknownQuotaChoices.length > 0 ? unknownQuotaChoices : apiKeyChoices;
     console.log(`[autoagent] No known quota scores. Falling back to ${unknownQuotaChoices.length > 0 ? "unknown" : "API Key"} choices: [${fallbackChoices.map((c) => c.id).join(", ")}]`);
     const fallback = fallbackChoices[0];
-    return { agentType: fallback.agentType, model: fallback.model, modelOptions: fallback.modelOptions };
+    return {
+      agentType: fallback.agentType,
+      model: fallback.model,
+      modelOptions: fallback.modelOptions,
+      agyQuotaGroup: fallback.agyQuotaGroup,
+    };
   }
 
   // Step 1: Filter known-quota choices where HourRemain < 0.15.
@@ -303,7 +333,12 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
 
   const best = candidateAgents[0];
   console.log(`[autoagent] Selection Result: Choice ${best.id} (Agent: ${best.agentType}, Model: ${best.model ?? "default"})`);
-  return { agentType: best.agentType, model: best.model, modelOptions: best.modelOptions };
+  return {
+    agentType: best.agentType,
+    model: best.model,
+    modelOptions: best.modelOptions,
+    agyQuotaGroup: best.agyQuotaGroup,
+  };
 }
 
 /**
@@ -311,7 +346,10 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
  * quota left to be worth trying. Mirrors the 0.15 threshold used by selectAgent.
  * No quota data at all is treated as "available" so we never block forever.
  */
-export async function isQuotaAvailable(agentType?: ConcreteAgentType): Promise<boolean> {
+export async function isQuotaAvailable(
+  agentType?: ConcreteAgentType,
+  agyQuotaGroup?: AgyQuotaGroup,
+): Promise<boolean> {
   const quota = await readQuota();
   const entries = Object.values(quota);
   if (entries.length === 0) return true;
@@ -323,7 +361,9 @@ export async function isQuotaAvailable(agentType?: ConcreteAgentType): Promise<b
     if (e.Type === "claude") {
       if ((e.HourRemain ?? 1) >= 0.15) return true;
     } else if (e.Type === "antigravity") {
-      if ((e.GeminiHourRemain ?? 1) >= 0.15 || (e.OtherHourRemain ?? 1) >= 0.15) return true;
+      if (agyQuotaGroup === "gemini" && (e.GeminiHourRemain ?? 1) >= 0.15) return true;
+      if (agyQuotaGroup === "other" && (e.OtherHourRemain ?? 1) >= 0.15) return true;
+      if (!agyQuotaGroup && ((e.GeminiHourRemain ?? 1) >= 0.15 || (e.OtherHourRemain ?? 1) >= 0.15)) return true;
     } else if (e.Type === "codex") {
       // No hourly figure reported for codex — treat as always available.
       return true;

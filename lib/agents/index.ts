@@ -3,7 +3,7 @@ import { AntigravityAgent } from "./antigravity";
 import { ClaudeCodeAgent } from "./claude";
 import { CodexAgent } from "./codex";
 import { OpencodeAgent } from "./opencode";
-import { getModelOptionsForAgent, selectAgent } from "../autoagent";
+import { getAgyQuotaGroupForModel, getModelOptionsForAgent, selectAgent, type AgyQuotaGroup } from "../autoagent";
 import { routeModel, type AutoModelEffort, type AutoModelOption } from "../automodel";
 
 export type ConcreteAgentType = "antigravity" | "claude" | "codex" | "opencode";
@@ -47,12 +47,13 @@ export interface ResolvedAgent {
   model?: string;
   effort?: AutoModelEffort;
   modelOptions?: AutoModelOption[];
+  agyQuotaGroup?: AgyQuotaGroup;
 }
 
 interface ResolveAgentOptions {
   prompt?: string;
   automodelLog?: (text: string) => void | Promise<void>;
-  lockedAgent?: Pick<ResolvedAgent, "agentType" | "model" | "effort">;
+  lockedAgent?: Pick<ResolvedAgent, "agentType" | "model" | "effort" | "agyQuotaGroup">;
 }
 
 /**
@@ -68,7 +69,15 @@ export async function resolveAgentType(
   if (agentType !== "auto") return { agentType: agentType as ConcreteAgentType };
   const resolved = await selectAgent(runnerAgentBinaries);
   const selected = options.lockedAgent
-    ? { ...options.lockedAgent, modelOptions: getModelOptionsForAgent(options.lockedAgent.agentType) }
+    ? {
+      ...options.lockedAgent,
+      agyQuotaGroup: options.lockedAgent.agyQuotaGroup
+        ?? getAgyQuotaGroupForModel(options.lockedAgent.model),
+      modelOptions: getModelOptionsForAgent(
+        options.lockedAgent.agentType,
+        options.lockedAgent.agyQuotaGroup ?? getAgyQuotaGroupForModel(options.lockedAgent.model),
+      ),
+    }
     : resolved ?? { agentType: "antigravity" as ConcreteAgentType };
   const routed = options.prompt && selected.modelOptions
     ? await routeModel({
@@ -85,6 +94,7 @@ export async function resolveAgentType(
     agentType: selected.agentType,
     model: routed.model ?? selected.model,
     effort: routed.effort ?? selected.effort,
+    agyQuotaGroup: selected.agyQuotaGroup,
   };
 }
 

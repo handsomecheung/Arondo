@@ -3,7 +3,8 @@ import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
 import { setupRunner, teardownRunner, waitForSessionNotRunning } from '../resume.helper';
-import { selectAgent } from '../../../../lib/autoagent';
+import { getModelOptionsForAgent, isQuotaAvailable, selectAgent } from '../../../../lib/autoagent';
+import { resolveAgentType } from '../../../../lib/agents';
 
 const CONFIG_DIR_RUNTIME = process.env.ARONDO_CONFIG_DIR || path.join(os.tmpdir(), 'arondo-test-config');
 const AGENTS_SESSION_MAP_FILE = path.join(CONFIG_DIR_RUNTIME, 'agent-sessions.json');
@@ -163,6 +164,46 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
     const optionIds = selected?.modelOptions?.map((option) => option.id) ?? [];
     expect(optionIds).toContain('claude-sonnet-4-6');
     expect(optionIds.some((id) => id.startsWith('gemini-'))).toBeFalsy();
+  });
+
+  test('keeps a locked GPT-OSS session within agy other models', async () => {
+    const resolved = await resolveAgentType('auto', [], {
+      lockedAgent: {
+        agentType: 'antigravity',
+        model: 'GPT-OSS 120B (Medium)',
+      },
+    });
+
+    expect(resolved.agyQuotaGroup).toBe('other');
+    expect(resolved.modelOptions?.map((option) => option.id)).toEqual([
+      'claude-sonnet-4-6',
+      'claude-opus-4-6-thinking',
+      'gpt-oss-120b-medium',
+    ]);
+    expect(getModelOptionsForAgent('antigravity', 'gemini').some((option) => option.id === 'gpt-oss-120b-medium')).toBeFalsy();
+  });
+
+  test('checks agy quota availability for the failed model group only', async () => {
+    await fs.writeFile(quotaPath, JSON.stringify({
+      "antigravity_arondo@gmail.com_Google AI Pro": {
+        "Type": "antigravity",
+        "Account": "arondo@gmail.com",
+        "Plan": "Google AI Pro",
+        "DefaultModel": "",
+        "GeminiWeeklyRemain": 0,
+        "GeminiWeeklyResetsAt": null,
+        "GeminiHourRemain": 0,
+        "GeminiHourResetsAt": null,
+        "OtherWeeklyRemain": 0.8,
+        "OtherWeeklyResetsAt": null,
+        "OtherHourRemain": 0.8,
+        "OtherHourResetsAt": null,
+        "updatedAt": Math.floor(Date.now() / 1000),
+      },
+    }), 'utf-8');
+
+    await expect(isQuotaAvailable('antigravity', 'gemini')).resolves.toBeFalsy();
+    await expect(isQuotaAvailable('antigravity', 'other')).resolves.toBeTruthy();
   });
 
   test('C -> A: keeps Claude when quota ranking changes to agy', async ({ request }) => {

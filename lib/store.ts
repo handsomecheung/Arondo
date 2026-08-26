@@ -39,6 +39,7 @@ export interface TodoTrigger {
   kind: TodoTriggerKind;
   timestamp?: number; // "at" only
   agentType?: string; // "quotaAvailable" only
+  agyQuotaGroup?: "gemini" | "other"; // agy "quotaAvailable" only
 }
 
 export interface Project {
@@ -88,6 +89,7 @@ export interface Session {
   autoLockedAgentType?: string;
   autoLockedAgentModel?: string;
   autoLockedAgentEffort?: string;
+  autoLockedAgyQuotaGroup?: "gemini" | "other";
 }
 
 export type MessageType =
@@ -124,6 +126,7 @@ export interface Message {
   taskId?: string;
   taskDeleted?: boolean;
   resolvedAgentType?: string;
+  resolvedAgyQuotaGroup?: "gemini" | "other";
   prompt?: string;
   tokenUuid?: string;
   userName?: string;

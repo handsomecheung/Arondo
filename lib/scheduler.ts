@@ -81,7 +81,7 @@ async function evaluateTodo(session: Session, todo: Message): Promise<void> {
     // status leaves the todo pending so the user can decide manually.
     if (canDispatchAfterSessionTodo(session)) await executeAction(session, todo);
   } else if (trigger.kind === "quotaAvailable") {
-    if (await isQuotaAvailable(trigger.agentType as any)) await executeAction(session, todo);
+    if (await isQuotaAvailable(trigger.agentType as any, trigger.agyQuotaGroup)) await executeAction(session, todo);
   } else if (trigger.kind === "codebaseReady") {
     if (await isCodebaseReady(session.runnerId, session.repoPath)) await executeAction(session, todo);
   }
