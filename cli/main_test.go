@@ -35,6 +35,20 @@ func TestPollDetachedAgentUntilDoneReturnsDetachedRunAndResult(t *testing.T) {
 	}
 }
 
+func TestConversationMessagesExcludesDetachedAgentMessages(t *testing.T) {
+	messages, err := (&client{}).conversationMessages("session-1", []message{
+		{ID: "user-1", Type: "chat-user", Role: "user"},
+		{ID: "run-1", Type: "detached-agent-run", Role: "system"},
+		{ID: "return-1", Type: "detached-agent-return", Role: "agent"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(messages) != 1 || messages[0].ID != "user-1" {
+		t.Fatalf("unexpected conversation messages: %#v", messages)
+	}
+}
+
 func TestParseArgs(t *testing.T) {
 	args, err := parseArgs([]string{"--server=https://arondo.example/", "--token", "secret", "--temp-dir", "--agent", "codex", "--confirmation", "auto", "--poll-interval=0.5", "--timeout", "12", "Do work"}, cliConfig{})
 	if err != nil {

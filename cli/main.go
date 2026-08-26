@@ -580,7 +580,7 @@ func (c *client) conversationMessages(sessionID string, messages []message) ([]m
 	filtered := messages[:0]
 	for _, msg := range messages {
 		switch msg.Type {
-		case "script-run", "script-return", "agent-return":
+		case "script-run", "script-return", "agent-return", "detached-agent-run", "detached-agent-return":
 			continue
 		case "agent-run":
 			log, err := c.getSessionLog(sessionID, msg.ID)
