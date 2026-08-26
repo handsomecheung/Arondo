@@ -305,8 +305,8 @@ cli/arondo-cli send \
 创建不带 `--temp-dir` 或 `--path` 的会话时，Script 使用其当前工作目录作为仓库路径。
 当省略 `--runner-id` 时，它会选择当前主机名连接的 Runner；当没有 Runner 或多个 Runner 共享该主机名时，使用 `--runner-id`。
 使用 `--resume` 将消息发送到所选 Runner 和仓库路径的最近更新的会话。它不能与 `--session-id` 或 `--temp-dir` 结合使用。
-使用 `--force` 发送 `force: true` 并绕过 Server 的脏工作树确认。
-当 Server 返回 `needsConfirmation: true` 时，CLI 会打印一条提示，要求使用 `--force` 重试。
+使用 `--confirmation auto`、`--confirmation draft` 或 `--confirmation force` 来处理 Server 的 `needsConfirmation` 响应，对应 Web UI 的三个按钮：自动排队发送、保存为手动草稿、或立即发送。
+当 Server 返回 `needsConfirmation: true` 时，CLI 会打印一条提示，列出这些重试选项。
 最终 JSON 结果使用 `sessionId` 并包含 Agent 的标准输出作为 `rawOutput`。
 最终的JSON结果被写入stdout；进度消息和错误将写入 stderr。
 

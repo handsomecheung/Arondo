@@ -38,7 +38,7 @@ Options:
   --temp-dir                   Create the session in a fresh temporary directory on the runner
   --session-id <id>            Send the message to an existing session
   --resume                     Resume the most recently updated session for the runner and repository path
-  --force                      Bypass the dirty-working-tree confirmation
+  --confirmation <value>       Resolve a needs-confirmation response: auto, draft, or force
   --agent <type>               auto, antigravity, claude, codex, or opencode (default: auto)
   --poll-interval <seconds>    Seconds between status polls (default: 3)
   --timeout <seconds>          Maximum seconds to wait for completion (default: 600)
@@ -123,9 +123,9 @@ Options:
   --help                Show this help message`
 
 type arguments struct {
-	server, token, runnerID, repoPath, sessionID, agentType, prompt, output string
-	pollInterval, timeout                                                   float64
-	tempDir, force, resume                                                  bool
+	server, token, runnerID, repoPath, sessionID, agentType, prompt, output, confirmation string
+	pollInterval, timeout                                                                 float64
+	tempDir, resume                                                                       bool
 }
 
 type listAgentsArguments struct {
@@ -201,6 +201,7 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 	valueOptions := map[string]*string{
 		"--server": &args.server, "--token": &args.token, "--runner-id": &args.runnerID, "--path": &args.repoPath,
 		"--session-id": &args.sessionID, "--agent": &args.agentType, "--output": &args.output,
+		"--confirmation": &args.confirmation,
 	}
 
 	for index := 0; index < len(argv); index++ {
@@ -219,8 +220,7 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 			args.tempDir = true
 			continue
 		case "--force":
-			args.force = true
-			continue
+			return arguments{}, errors.New("--force has been replaced by --confirmation force")
 		case "--resume":
 			args.resume = true
 			continue
@@ -297,6 +297,9 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 	}
 	if args.output != "plain" && args.output != "json" {
 		return arguments{}, errors.New("--output must be plain or json")
+	}
+	if args.confirmation != "" && !map[string]bool{"auto": true, "draft": true, "force": true}[args.confirmation] {
+		return arguments{}, errors.New("--confirmation must be auto, draft, or force")
 	}
 	return args, nil
 }
@@ -512,7 +515,7 @@ func (c *client) getSession(sessionID string) (session, error) {
 	return session, c.request(http.MethodGet, "/api/sessions/"+url.PathEscape(sessionID), nil, &session)
 }
 
-func (c *client) createSession(args arguments) (session, error) {
+func (c *client) createSession(args arguments, force bool) (session, error) {
 	payload := map[string]any{"prompt": args.prompt, "agentType": args.agentType}
 	if args.tempDir {
 		payload["tempDir"] = true
@@ -522,16 +525,16 @@ func (c *client) createSession(args arguments) (session, error) {
 	if args.runnerID != "" {
 		payload["runnerId"] = args.runnerID
 	}
-	if args.force {
+	if force {
 		payload["force"] = true
 	}
 	var session session
 	return session, c.request(http.MethodPost, "/api/sessions", payload, &session)
 }
 
-func (c *client) sendMessage(sessionID string, args arguments) error {
+func (c *client) sendMessage(sessionID string, args arguments, force bool) error {
 	payload := map[string]any{"message": args.prompt}
-	if args.force {
+	if force {
 		payload["force"] = true
 	}
 	return c.request(http.MethodPost, "/api/sessions/"+url.PathEscape(sessionID)+"/messages", payload, &map[string]any{})
@@ -1151,10 +1154,15 @@ func run(argv []string) error {
 		fmt.Fprintf(os.Stderr, "Resuming most recent session %s...\n", args.sessionID)
 	}
 	sessionID := args.sessionID
+	queued := false
+	queuedTrigger := ""
 	if sessionID != "" {
 		fmt.Fprintf(os.Stderr, "Sending message to session %s...\n", sessionID)
-		if err := c.sendMessage(sessionID, args); err != nil {
-			return err
+		if err := c.sendMessage(sessionID, args, false); err != nil {
+			queued, queuedTrigger, err = c.resolveMessageConfirmation(sessionID, args, err)
+			if err != nil {
+				return err
+			}
 		}
 	} else {
 		if args.runnerID == "" && !args.tempDir {
@@ -1169,12 +1177,18 @@ func run(argv []string) error {
 			}
 		}
 		fmt.Fprintln(os.Stderr, "Creating session...")
-		created, err := c.createSession(args)
+		created, err := c.createSession(args, false)
 		if err != nil {
-			return err
+			created, queued, queuedTrigger, err = c.resolveCreateConfirmation(args, err)
+			if err != nil {
+				return err
+			}
 		}
 		sessionID = created.ID
 		fmt.Fprintf(os.Stderr, "Created session %s (repoPath=%s, runnerId=%s)\n", sessionID, created.RepoPath, created.RunnerID)
+	}
+	if queued {
+		return outputQueuedResult(c, sessionID, args, queuedTrigger)
 	}
 	fmt.Fprintf(os.Stderr, "Session ID: %s\nWaiting for the run to finish...\n", sessionID)
 	session, err := pollUntilDone(c, sessionID, time.Duration(args.pollInterval*float64(time.Second)), time.Duration(args.timeout*float64(time.Second)))
@@ -1213,7 +1227,7 @@ func main() {
 	}
 	var apiErr *apiError
 	if errors.As(err, &apiErr) && apiErr.body["needsConfirmation"] == true {
-		apiErr.body["hint"] = "Retry this command with --force to bypass the confirmation."
+		apiErr.body["hint"] = "Retry this command with --confirmation auto, --confirmation draft, or --confirmation force."
 		pretty, _ := json.MarshalIndent(apiErr.body, "", "  ")
 		fmt.Fprintln(os.Stderr, string(pretty))
 	} else if !errors.Is(err, errSession) {

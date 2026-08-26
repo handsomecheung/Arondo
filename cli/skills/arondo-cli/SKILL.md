@@ -59,4 +59,4 @@ Use `--resume` only to continue the most recently updated session for the chosen
 
 Parse the stdout JSON. `sessionId` identifies the session for follow-ups; `rawOutput` contains the agent output. A non-zero exit means the session ended in an error or the CLI could not complete the request.
 
-If the CLI returns `needsConfirmation: true`, inspect why the project is dirty or busy. Retry with `--force` only when the user has authorized bypassing that readiness check. Do not automatically retry failed commands or use `--force` merely to make a delegation proceed.
+If the CLI returns `needsConfirmation: true`, inspect why the project is dirty or busy. Retry with `--confirmation auto`, `--confirmation draft`, or `--confirmation force` according to the user's intent: queue for automatic send, save as a manual draft, or send now anyway. Do not automatically retry failed commands or use `--confirmation force` merely to make a delegation proceed.

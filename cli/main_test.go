@@ -9,11 +9,11 @@ import (
 )
 
 func TestParseArgs(t *testing.T) {
-	args, err := parseArgs([]string{"--server=https://arondo.example/", "--token", "secret", "--temp-dir", "--agent", "codex", "--poll-interval=0.5", "--timeout", "12", "Do work"}, cliConfig{})
+	args, err := parseArgs([]string{"--server=https://arondo.example/", "--token", "secret", "--temp-dir", "--agent", "codex", "--confirmation", "auto", "--poll-interval=0.5", "--timeout", "12", "Do work"}, cliConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if args.server != "https://arondo.example/" || args.token != "secret" || !args.tempDir || args.agentType != "codex" || args.pollInterval != 0.5 || args.timeout != 12 || args.prompt != "Do work" {
+	if args.server != "https://arondo.example/" || args.token != "secret" || !args.tempDir || args.agentType != "codex" || args.confirmation != "auto" || args.pollInterval != 0.5 || args.timeout != 12 || args.prompt != "Do work" {
 		t.Fatalf("unexpected arguments: %#v", args)
 	}
 }
@@ -28,6 +28,20 @@ func TestParseArgsRejectsInvalidCombinations(t *testing.T) {
 func TestParseArgsRejectsNonFiniteDurations(t *testing.T) {
 	_, err := parseArgs([]string{"--server", "http://localhost", "--token", "secret", "--timeout", "NaN", "message"}, cliConfig{})
 	if err == nil || err.Error() != "--timeout must be a non-negative number" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseArgsRejectsInvalidConfirmation(t *testing.T) {
+	_, err := parseArgs([]string{"--server", "http://localhost", "--token", "secret", "--confirmation", "later", "message"}, cliConfig{})
+	if err == nil || err.Error() != "--confirmation must be auto, draft, or force" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseArgsRejectsDeprecatedForce(t *testing.T) {
+	_, err := parseArgs([]string{"--server", "http://localhost", "--token", "secret", "--force", "message"}, cliConfig{})
+	if err == nil || err.Error() != "--force has been replaced by --confirmation force" {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

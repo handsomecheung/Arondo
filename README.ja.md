@@ -305,8 +305,8 @@ cli/arondo-cli send \
 `--temp-dir` または `--path` を使用せずにセッションを作成する場合、スクリプトは現在の作業ディレクトリをリポジトリ パスとして使用します。
 `--runner-id` を省略すると、現在のホスト名で接続されたランナーが選択されます。ランナーが存在しない場合、または複数のランナーがそのホスト名を共有する場合は、`--runner-id` を使用します。
 `--resume` を使用して、選択したランナーとリポジトリ パスの最近更新されたセッションにメッセージを送信します。 `--session-id`、`--temp-dir`との併用はできません。
-`--force` を使用して `force: true` を送信し、サーバーのダーティ ワーキング ツリー確認をバイパスします。
-サーバーが `needsConfirmation: true` を返すと、CLI は `--force` を再試行するためのヒントを出力します。
+`--confirmation auto`、`--confirmation draft`、または `--confirmation force` を使用して、サーバーの `needsConfirmation` 応答を Web UI の 3 つのボタンと同じように処理します。自動送信のキュー、手動下書きとして保存、または今すぐ送信、のいずれかです。
+サーバーが `needsConfirmation: true` を返すと、CLI はこれらの再試行オプションを含むヒントを出力します。
 最終的な JSON 結果は `sessionId` を使用し、エージェントの標準出力を `rawOutput` として含めます。
 最終的な JSON 結果は stdout に書き込まれます。進行状況メッセージとエラーは stderr に書き込まれます。
 

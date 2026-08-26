@@ -329,8 +329,8 @@ cli/arondo-cli send \
 When creating a session without `--temp-dir` or `--path`, the script uses its current working directory as the repository path.
 When `--runner-id` is omitted, it selects the connected runner with the current hostname; use `--runner-id` when no runner or multiple runners share that hostname.
 Use `--resume` to send the message to the most recently updated session for the selected runner and repository path. It cannot be combined with `--session-id` or `--temp-dir`.
-Use `--force` to send `force: true` and bypass the server's dirty-working-tree confirmation.
-When the server returns `needsConfirmation: true`, the CLI prints a hint to retry with `--force`.
+Use `--confirmation auto`, `--confirmation draft`, or `--confirmation force` to resolve a server `needsConfirmation` response the same way as the Web UI buttons: queue for automatic send, save as a manual draft, or send now anyway.
+When the server returns `needsConfirmation: true`, the CLI prints a hint with those retry choices.
 The final JSON result uses `sessionId` and includes the agent's stdout as `rawOutput`.
 The final JSON result is written to stdout; progress messages and errors are written to stderr.
 
