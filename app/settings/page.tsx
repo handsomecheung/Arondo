@@ -1055,7 +1055,14 @@ export default function SettingsPage() {
           </section>
 
           {/* Default Agent Commands Section */}
-          <div>
+          <div
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-md)",
+              padding: 16,
+            }}
+          >
             <div
               style={{
                 display: "flex",
@@ -2218,7 +2225,14 @@ export default function SettingsPage() {
           )}
 
           {/* Runner Access Control Section */}
-          <div>
+          <div
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-md)",
+              padding: 16,
+            }}
+          >
             <h2
               style={{
                 fontSize: 16,
