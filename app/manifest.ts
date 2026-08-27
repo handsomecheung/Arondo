@@ -1,12 +1,11 @@
 import { MetadataRoute } from 'next'
 
-// This manifest configuration allows the web application to be recognized as an installable PWA
-// (Progressive Web App) by mobile browsers like Android Chrome.
 export default function manifest(): MetadataRoute.Manifest {
+  const title = process.env.ARONDO_TITLE ?? "Arondo";
   return {
-    name: 'Arondo',
-    short_name: 'Arondo',
-    description: 'Arondo Web Application',
+    name: title,
+    short_name: title,
+    description: title + ' Web Application',
     start_url: '/',
     display: 'standalone', // Makes the app run in a standalone window, not as a shortcut
     background_color: '#ffffff',

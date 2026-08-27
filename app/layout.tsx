@@ -3,7 +3,7 @@ import "./globals.css";
 import { ClientInit } from "@/components/ClientInit";
 
 export const metadata: Metadata = {
-  title: "Arondo",
+  title: process.env.ARONDO_TITLE ?? "Arondo",
   description:
     "Delegate software development tasks to AI agents, review PRs on your phone, and ship from anywhere.",
 };
