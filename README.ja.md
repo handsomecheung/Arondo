@@ -287,7 +287,7 @@ x-arondo-token: <token>
 ```bash
 cli/arondo-cli send \
   --server http://localhost:3251 \
-  --token <client_access_token> \
+  --client-token <client_access_token> \
   --temp-dir \
   "Print the current date"
 ```
@@ -297,7 +297,7 @@ cli/arondo-cli send \
 ```bash
 cli/arondo-cli send \
   --server http://localhost:3251 \
-  --token <client_access_token> \
+  --client-token <client_access_token> \
   --resume \
   "Now also print the current directory"
 ```

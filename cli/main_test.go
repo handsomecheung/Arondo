@@ -50,7 +50,7 @@ func TestConversationMessagesExcludesDetachedAgentMessages(t *testing.T) {
 }
 
 func TestParseArgs(t *testing.T) {
-	args, err := parseArgs([]string{"--server=https://arondo.example/", "--token", "secret", "--temp-dir", "--agent", "codex", "--confirmation", "auto", "--poll-interval=0.5", "--timeout", "12", "Do work"}, cliConfig{})
+	args, err := parseArgs([]string{"--server=https://arondo.example/", "--client-token", "secret", "--temp-dir", "--agent", "codex", "--confirmation", "auto", "--poll-interval=0.5", "--timeout", "12", "Do work"}, cliConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,28 +60,28 @@ func TestParseArgs(t *testing.T) {
 }
 
 func TestParseArgsRejectsInvalidCombinations(t *testing.T) {
-	_, err := parseArgs([]string{"--server", "http://localhost", "--token", "secret", "--resume", "--temp-dir", "message"}, cliConfig{})
+	_, err := parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--resume", "--temp-dir", "message"}, cliConfig{})
 	if err == nil || err.Error() != "--resume cannot be used with --temp-dir" {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestParseArgsRejectsNonFiniteDurations(t *testing.T) {
-	_, err := parseArgs([]string{"--server", "http://localhost", "--token", "secret", "--timeout", "NaN", "message"}, cliConfig{})
+	_, err := parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--timeout", "NaN", "message"}, cliConfig{})
 	if err == nil || err.Error() != "--timeout must be a non-negative number" {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestParseArgsRejectsInvalidConfirmation(t *testing.T) {
-	_, err := parseArgs([]string{"--server", "http://localhost", "--token", "secret", "--confirmation", "later", "message"}, cliConfig{})
+	_, err := parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--confirmation", "later", "message"}, cliConfig{})
 	if err == nil || err.Error() != "--confirmation must be auto, draft, or force" {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestParseArgsRejectsDeprecatedForce(t *testing.T) {
-	_, err := parseArgs([]string{"--server", "http://localhost", "--token", "secret", "--force", "message"}, cliConfig{})
+	_, err := parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--force", "message"}, cliConfig{})
 	if err == nil || err.Error() != "--force has been replaced by --confirmation force" {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestParseArgsReturnsHelp(t *testing.T) {
 }
 
 func TestParseListAgentsArgs(t *testing.T) {
-	args, err := parseListAgentsArgs([]string{"--server=https://arondo.example/", "--token", "secret", "--runner-id", "runner-1"}, cliConfig{})
+	args, err := parseListAgentsArgs([]string{"--server=https://arondo.example/", "--client-token", "secret", "--runner-id", "runner-1"}, cliConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestParseListAgentsArgs(t *testing.T) {
 }
 
 func TestParseListAgentsArgsRejectsMessage(t *testing.T) {
-	_, err := parseListAgentsArgs([]string{"--server", "http://localhost", "--token", "secret", "message"}, cliConfig{})
+	_, err := parseListAgentsArgs([]string{"--server", "http://localhost", "--client-token", "secret", "message"}, cliConfig{})
 	if err == nil || err.Error() != "unexpected argument: message" {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestParseListAgentsArgsReturnsHelp(t *testing.T) {
 }
 
 func TestParseQuotaArgs(t *testing.T) {
-	args, err := parseQuotaArgs([]string{"--server=https://arondo.example/", "--token", "secret"}, cliConfig{})
+	args, err := parseQuotaArgs([]string{"--server=https://arondo.example/", "--client-token", "secret"}, cliConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestParseQuotaArgs(t *testing.T) {
 }
 
 func TestParseQuotaArgsRejectsUnexpectedArgument(t *testing.T) {
-	_, err := parseQuotaArgs([]string{"--server", "http://localhost", "--token", "secret", "message"}, cliConfig{})
+	_, err := parseQuotaArgs([]string{"--server", "http://localhost", "--client-token", "secret", "message"}, cliConfig{})
 	if err == nil || err.Error() != "unexpected argument: message" {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -205,17 +205,17 @@ func TestLoadConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if config.CLI.URL != "https://arondo.example" || config.CLI.Token != "token value" {
+	if config.CLI.Server != "https://arondo.example" || config.CLI.ClientToken != "token value" {
 		t.Fatalf("unexpected config: %#v", config)
 	}
 }
 
 func TestParseArgsUsesConfigAndArgumentsOverrideIt(t *testing.T) {
-	t.Setenv("ARONDO_URL", "")
-	t.Setenv("ARONDO_TOKEN", "")
+	t.Setenv("ARONDO_SERVER", "")
+	t.Setenv("ARONDO_CLIENT_TOKEN", "")
 	config := cliConfig{}
-	config.CLI.URL = "https://configured.example"
-	config.CLI.Token = "configured-token"
+	config.CLI.Server = "https://configured.example"
+	config.CLI.ClientToken = "configured-token"
 
 	args, err := parseArgs([]string{"--server", "https://argument.example", "message"}, config)
 	if err != nil {
@@ -227,18 +227,25 @@ func TestParseArgsUsesConfigAndArgumentsOverrideIt(t *testing.T) {
 }
 
 func TestParseArgsUsesEnvironmentVariablesAndArgumentsOverrideThem(t *testing.T) {
-	t.Setenv("ARONDO_URL", "https://environment.example")
-	t.Setenv("ARONDO_TOKEN", "environment-token")
+	t.Setenv("ARONDO_SERVER", "https://environment.example")
+	t.Setenv("ARONDO_CLIENT_TOKEN", "environment-token")
 	config := cliConfig{}
-	config.CLI.URL = "https://configured.example"
-	config.CLI.Token = "configured-token"
+	config.CLI.Server = "https://configured.example"
+	config.CLI.ClientToken = "configured-token"
 
-	args, err := parseArgs([]string{"--token", "argument-token", "message"}, config)
+	args, err := parseArgs([]string{"--client-token", "argument-token", "message"}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if args.server != "https://environment.example" || args.token != "argument-token" {
 		t.Fatalf("unexpected arguments: %#v", args)
+	}
+}
+
+func TestParseArgsRejectsLegacyTokenFlag(t *testing.T) {
+	_, err := parseArgs([]string{"--server", "http://localhost", "--token", "secret", "message"}, cliConfig{})
+	if err == nil || err.Error() != "unknown option: --token" {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

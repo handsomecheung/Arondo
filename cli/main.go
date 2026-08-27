@@ -20,19 +20,19 @@ const usage = `Create a session, send a message, poll until it finishes, and pri
 Usage:
   cli/arondo-cli send \
     --server http://localhost:3251 \
-    --token <client_access_token> \
+    --client-token <client_access_token> \
     --temp-dir \
     "Print the current date"
 
   cli/arondo-cli send \
     --server http://localhost:3251 \
-    --token <client_access_token> \
+    --client-token <client_access_token> \
     --resume \
     "Now also print the current directory"
 
 Options:
-  --server <url>               Arondo server base URL (overrides ARONDO_URL and cli.url in arondo.json)
-  --token <token>              Client access token (overrides ARONDO_TOKEN and cli.token in arondo.json)
+  --server <url>               Arondo server base URL (overrides ARONDO_SERVER and cli.server in arondo.json)
+  --client-token <token>       Client access token (overrides ARONDO_CLIENT_TOKEN and cli.clientToken in arondo.json)
   --runner-id <id>             Target runner ID (default: connected runner with the current hostname)
   --path <path>                Repository path on the runner (default: current working directory)
   --temp-dir                   Create the session in a fresh temporary directory on the runner
@@ -61,11 +61,11 @@ const listAgentsUsage = `List agent availability for all accessible runners.
 Usage:
   cli/arondo-cli list-agents \
     --server http://localhost:3251 \
-    --token <client_access_token>
+    --client-token <client_access_token>
 
 Options:
-  --server <url>      Arondo server base URL (overrides ARONDO_URL and cli.url in arondo.json)
-  --token <token>     Client access token (overrides ARONDO_TOKEN and cli.token in arondo.json)
+  --server <url>      Arondo server base URL (overrides ARONDO_SERVER and cli.server in arondo.json)
+  --client-token <token> Client access token (overrides ARONDO_CLIENT_TOKEN and cli.clientToken in arondo.json)
   --runner-id <id>    Only show one runner
   --output <format>   Output format: plain or json (default: plain)
   --help              Show this help message`
@@ -75,11 +75,11 @@ const getQuotaUsage = `List the recorded quota usage for all accessible runners.
 Usage:
   cli/arondo-cli get-quota \
     --server http://localhost:3251 \
-    --token <client_access_token>
+    --client-token <client_access_token>
 
 Options:
-  --server <url>      Arondo server base URL (overrides ARONDO_URL and cli.url in arondo.json)
-  --token <token>     Client access token (overrides ARONDO_TOKEN and cli.token in arondo.json)
+  --server <url>      Arondo server base URL (overrides ARONDO_SERVER and cli.server in arondo.json)
+  --client-token <token> Client access token (overrides ARONDO_CLIENT_TOKEN and cli.clientToken in arondo.json)
   --output <format>   Output format: plain or json (default: plain)
   --help              Show this help message`
 
@@ -88,13 +88,13 @@ const updateQuotaUsage = `Force an asynchronous quota refresh for all accessible
 Usage:
   cli/arondo-cli update-quota \
     --server http://localhost:3251 \
-    --token <client_access_token>
+    --client-token <client_access_token>
 
 The command returns after refresh requests have been queued. Use get-quota to read the updated values.
 
 Options:
-  --server <url>      Arondo server base URL (overrides ARONDO_URL and cli.url in arondo.json)
-  --token <token>     Client access token (overrides ARONDO_TOKEN and cli.token in arondo.json)
+  --server <url>      Arondo server base URL (overrides ARONDO_SERVER and cli.server in arondo.json)
+  --client-token <token> Client access token (overrides ARONDO_CLIENT_TOKEN and cli.clientToken in arondo.json)
   --output <format>   Output format: plain or json (default: plain)
   --help              Show this help message`
 
@@ -103,17 +103,17 @@ const getMessagesUsage = `Print the full conversation history of a session.
 Usage:
   cli/arondo-cli get-messages \
     --server http://localhost:3251 \
-    --token <client_access_token> \
+    --client-token <client_access_token> \
     --session-id <session_id>
 
   cli/arondo-cli get-messages \
     --server http://localhost:3251 \
-    --token <client_access_token> \
+    --client-token <client_access_token> \
     --latest
 
 Options:
-  --server <url>        Arondo server base URL (overrides ARONDO_URL and cli.url in arondo.json)
-  --token <token>       Client access token (overrides ARONDO_TOKEN and cli.token in arondo.json)
+  --server <url>        Arondo server base URL (overrides ARONDO_SERVER and cli.server in arondo.json)
+  --client-token <token> Client access token (overrides ARONDO_CLIENT_TOKEN and cli.clientToken in arondo.json)
   --session-id <id>     Session ID to display
   --latest              Use the most recently updated session for the runner and repository path
   --runner-id <id>      Target runner ID (default: connected runner with the current hostname)
@@ -158,8 +158,8 @@ type client struct {
 
 type cliConfig struct {
 	CLI struct {
-		URL   string `json:"url"`
-		Token string `json:"token"`
+		Server      string `json:"server"`
+		ClientToken string `json:"clientToken"`
 	} `json:"cli"`
 }
 
@@ -191,15 +191,15 @@ func loadConfig(filePath string) (cliConfig, error) {
 }
 
 func parseArgs(argv []string, config cliConfig) (arguments, error) {
-	args := arguments{server: config.CLI.URL, token: config.CLI.Token, agentType: "auto", pollInterval: 3, timeout: 600, output: "plain"}
-	if server := os.Getenv("ARONDO_URL"); server != "" {
+	args := arguments{server: config.CLI.Server, token: config.CLI.ClientToken, agentType: "auto", pollInterval: 3, timeout: 600, output: "plain"}
+	if server := os.Getenv("ARONDO_SERVER"); server != "" {
 		args.server = server
 	}
-	if token := os.Getenv("ARONDO_TOKEN"); token != "" {
+	if token := os.Getenv("ARONDO_CLIENT_TOKEN"); token != "" {
 		args.token = token
 	}
 	valueOptions := map[string]*string{
-		"--server": &args.server, "--token": &args.token, "--runner-id": &args.runnerID, "--path": &args.repoPath,
+		"--server": &args.server, "--client-token": &args.token, "--runner-id": &args.runnerID, "--path": &args.repoPath,
 		"--session-id": &args.sessionID, "--agent": &args.agentType, "--output": &args.output,
 		"--confirmation": &args.confirmation,
 	}
@@ -268,10 +268,10 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 
 	var missing []string
 	if args.server == "" {
-		missing = append(missing, "server: specify --server <url>, set ARONDO_URL, or set cli.url in ~/.arondo/arondo.json")
+		missing = append(missing, "server: specify --server <url>, set ARONDO_SERVER, or set cli.server in ~/.arondo/arondo.json")
 	}
 	if args.token == "" {
-		missing = append(missing, "token: specify --token <token>, set ARONDO_TOKEN, or set cli.token in ~/.arondo/arondo.json")
+		missing = append(missing, "client token: specify --client-token <token>, set ARONDO_CLIENT_TOKEN, or set cli.clientToken in ~/.arondo/arondo.json")
 	}
 	if len(missing) > 0 {
 		return arguments{}, fmt.Errorf("missing configuration:\n%s", strings.Join(missing, "\n"))
@@ -307,11 +307,11 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 var errHelp = errors.New("help requested")
 
 func configuredServerAndToken(config cliConfig) (string, string) {
-	server, token := config.CLI.URL, config.CLI.Token
-	if value := os.Getenv("ARONDO_URL"); value != "" {
+	server, token := config.CLI.Server, config.CLI.ClientToken
+	if value := os.Getenv("ARONDO_SERVER"); value != "" {
 		server = value
 	}
-	if value := os.Getenv("ARONDO_TOKEN"); value != "" {
+	if value := os.Getenv("ARONDO_CLIENT_TOKEN"); value != "" {
 		token = value
 	}
 	return server, token
@@ -320,10 +320,10 @@ func configuredServerAndToken(config cliConfig) (string, string) {
 func validateServerAndToken(server, token string) error {
 	var missing []string
 	if server == "" {
-		missing = append(missing, "server: specify --server <url>, set ARONDO_URL, or set cli.url in ~/.arondo/arondo.json")
+		missing = append(missing, "server: specify --server <url>, set ARONDO_SERVER, or set cli.server in ~/.arondo/arondo.json")
 	}
 	if token == "" {
-		missing = append(missing, "token: specify --token <token>, set ARONDO_TOKEN, or set cli.token in ~/.arondo/arondo.json")
+		missing = append(missing, "client token: specify --client-token <token>, set ARONDO_CLIENT_TOKEN, or set cli.clientToken in ~/.arondo/arondo.json")
 	}
 	if len(missing) > 0 {
 		return fmt.Errorf("missing configuration:\n%s", strings.Join(missing, "\n"))
@@ -334,7 +334,7 @@ func validateServerAndToken(server, token string) error {
 func parseListAgentsArgs(argv []string, config cliConfig) (listAgentsArguments, error) {
 	server, token := configuredServerAndToken(config)
 	args := listAgentsArguments{server: server, token: token, output: "plain"}
-	valueOptions := map[string]*string{"--server": &args.server, "--token": &args.token, "--runner-id": &args.runnerID, "--output": &args.output}
+	valueOptions := map[string]*string{"--server": &args.server, "--client-token": &args.token, "--runner-id": &args.runnerID, "--output": &args.output}
 
 	for index := 0; index < len(argv); index++ {
 		option := argv[index]
@@ -370,7 +370,7 @@ func parseListAgentsArgs(argv []string, config cliConfig) (listAgentsArguments, 
 func parseQuotaArgs(argv []string, config cliConfig) (quotaArguments, error) {
 	server, token := configuredServerAndToken(config)
 	args := quotaArguments{server: server, token: token, output: "plain"}
-	valueOptions := map[string]*string{"--server": &args.server, "--token": &args.token, "--output": &args.output}
+	valueOptions := map[string]*string{"--server": &args.server, "--client-token": &args.token, "--output": &args.output}
 
 	for index := 0; index < len(argv); index++ {
 		option := argv[index]
@@ -407,7 +407,7 @@ func parseGetMessagesArgs(argv []string, config cliConfig) (getMessagesArguments
 	server, token := configuredServerAndToken(config)
 	args := getMessagesArguments{server: server, token: token, output: "plain"}
 	valueOptions := map[string]*string{
-		"--server": &args.server, "--token": &args.token, "--session-id": &args.sessionID,
+		"--server": &args.server, "--client-token": &args.token, "--session-id": &args.sessionID,
 		"--runner-id": &args.runnerID, "--path": &args.repoPath, "--output": &args.output,
 	}
 

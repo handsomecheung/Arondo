@@ -290,7 +290,7 @@ Uses the `process` singleton pattern (shared across tsx and Turbopack contexts).
 cd cli && go build -o arondo-cli . && cd ..  # Build the Go CLI
 ```
 
-The CLI reads connection settings in this order: command flags (`--server`, `--token`), then `ARONDO_URL` / `ARONDO_TOKEN`, then `cli.url` / `cli.token` in `~/.arondo/arondo.json`. `send` creates or resumes sessions and waits for completion. `list-agents` reports Antigravity, Claude, Codex, and OpenCode availability per runner. `get-quota` prints recorded quota data, and `update-quota` queues an asynchronous quota refresh via `/api/agents/quota`.
+The CLI reads connection settings in this order: command flags (`--server`, `--client-token`), then `ARONDO_SERVER` / `ARONDO_CLIENT_TOKEN`, then `cli.server` / `cli.clientToken` in `~/.arondo/arondo.json`. `send` creates or resumes sessions and waits for completion. `list-agents` reports Antigravity, Claude, Codex, and OpenCode availability per runner. `get-quota` prints recorded quota data, and `update-quota` queues an asynchronous quota refresh via `/api/agents/quota`.
 
 ## Real-time Communication
 
