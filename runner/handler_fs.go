@@ -285,9 +285,28 @@ type fsMkdtempResponse struct {
 }
 
 func (h *Handler) handleFsMkdtemp(msg *Message) {
-	dir, err := os.MkdirTemp("", "arondo-session-*")
-	if err != nil {
-		h.sendError(msg.ID, "INTERNAL", "failed to create temp dir: "+err.Error())
+	// Reuse a temp directory with a fixed prefix if possible.
+	baseTmp := os.TempDir()
+	prefix := "arondo-tempdir-"
+	var dir string
+	for i := 0; ; i++ {
+		candidate := fmt.Sprintf("%s%04d", prefix, i)
+		candidatePath := filepath.Join(baseTmp, candidate)
+		// Try to create the directory.
+		if err := os.Mkdir(candidatePath, 0o755); err == nil {
+			// Successfully created a new empty directory.
+			dir = candidatePath
+			break
+		}
+		// If the directory already exists, check if it's empty.
+		if entries, err := os.ReadDir(candidatePath); err == nil && len(entries) == 0 {
+			dir = candidatePath
+			break
+		}
+		// Otherwise, continue to the next suffix.
+	}
+	if dir == "" {
+		h.sendError(msg.ID, "INTERNAL", "failed to find or create temp dir")
 		return
 	}
 
