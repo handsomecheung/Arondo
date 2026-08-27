@@ -3,7 +3,10 @@ import path from 'path';
 import os from 'os';
 
 const testConfigDir = path.join(os.tmpdir(), 'arondo-test-config');
+const testHomeDir = path.join(testConfigDir, 'home');
 process.env.ARONDO_CONFIG_DIR = testConfigDir;
+process.env.HOME = testHomeDir;
+process.env.USERPROFILE = testHomeDir;
 
 export default defineConfig({
   testDir: './tests',
@@ -24,6 +27,8 @@ export default defineConfig({
       ARONDO_CONFIG_DIR: testConfigDir,
       ARONDO_DIST_DIR: '.next-test',
       NODE_ENV: 'development',
+      HOME: testHomeDir,
+      USERPROFILE: testHomeDir,
     },
     stdout: 'pipe',
     stderr: 'pipe',
