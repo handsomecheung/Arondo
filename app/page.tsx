@@ -116,9 +116,6 @@ export default function HomePage() {
   const projectMenuRef = useRef<HTMLDivElement>(null);
 
   // Project states
-  const [sidebarMode, setSidebarMode] = useState<"sessions" | "projects">(
-    initUrl.project ? "projects" : "sessions",
-  );
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     initUrl.project,
@@ -386,10 +383,9 @@ export default function HomePage() {
       lastPushedUrlRef.current = window.location.pathname;
       const { session, project } = readUrlState();
       if (project) {
-        setSidebarMode("projects");
         setSelectedProjectId(project);
+        setSelectedSessionId(null);
       } else {
-        setSidebarMode("sessions");
         setSelectedProjectId(null);
         setSelectedSessionId(session);
       }
@@ -613,7 +609,6 @@ export default function HomePage() {
         setArchivedSessions((prev) => prev.filter((s) => s.id !== id));
         setSessions((prev) => [...prev.filter((s) => s.id !== id), updated]);
         setArchivedView(false);
-        setSidebarMode("sessions");
         checkArchivedSessions();
       } else {
         const data = await res.json();
@@ -1315,15 +1310,11 @@ export default function HomePage() {
       <AppSidebar
         sidebarOpen={sidebarOpen}
         onCloseSidebar={() => setSidebarOpen(false)}
-        sidebarMode={sidebarMode}
-        onSetSidebarMode={setSidebarMode}
         sortedSessions={sortedSessions}
         projects={projects}
         runners={runners}
         selectedSessionId={selectedSessionId}
-        selectedProjectId={selectedProjectId}
         onSelectSession={handleSelectSession}
-        onSelectProject={handleSelectProject}
         onNewSession={handleNewSession}
         onDeleteSession={handleDeleteSession}
         onArchiveSession={handleArchiveSession}
@@ -1383,7 +1374,6 @@ export default function HomePage() {
                   setRepoPath(project.repoPath);
                   setRunnerId(project.runnerId);
                   handleNewSession();
-                  setSidebarMode("sessions");
                 }}
                 onDeleteProject={async () => {
                   const folderName = project.repoPath.split("/").pop() || project.repoPath;

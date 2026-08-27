@@ -10,15 +10,11 @@ const SWIPE_THRESHOLD = 72;
 interface Props {
   sidebarOpen: boolean;
   onCloseSidebar: () => void;
-  sidebarMode: "sessions" | "projects";
-  onSetSidebarMode: (mode: "sessions" | "projects") => void;
   sortedSessions: Session[];
   projects: Project[];
   runners: Runner[];
   selectedSessionId: string | null;
-  selectedProjectId: string | null;
   onSelectSession: (id: string) => void;
-  onSelectProject: (id: string) => void;
   onNewSession: () => void;
   onDeleteSession: (id: string) => void;
   onArchiveSession: (id: string) => void;
@@ -36,15 +32,11 @@ interface Props {
 export default function AppSidebar({
   sidebarOpen,
   onCloseSidebar,
-  sidebarMode,
-  onSetSidebarMode,
   sortedSessions,
   projects,
   runners,
   selectedSessionId,
-  selectedProjectId,
   onSelectSession,
-  onSelectProject,
   onNewSession,
   onDeleteSession,
   onArchiveSession,
@@ -68,7 +60,6 @@ export default function AppSidebar({
   const sessionMenuTriggerRef = useRef<HTMLDivElement>(null);
   const sessionMenuPortalRef = useRef<HTMLDivElement>(null);
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string | null>(null);
-  const [selectedRunnerFilter, setSelectedRunnerFilter] = useState<string | null>(null);
 
   const handleSwipeTouchStart = (id: string) => (e: React.TouchEvent) => {
     setSwipe({ id, startX: e.touches[0].clientX, dx: 0 });
@@ -216,7 +207,6 @@ export default function AppSidebar({
               className="sidebar-settings-link"
               onClick={() => {
                 setSelectedProjectFilter(null);
-                setSelectedRunnerFilter(null);
                 onCloseArchivedSessions();
               }}
               id="close-archived-sessions-btn"
@@ -229,19 +219,17 @@ export default function AppSidebar({
             <div className="sidebar-mode-toggle" role="tablist" aria-label="View mode">
               <button
                 role="tab"
-                aria-selected={sidebarMode === "sessions"}
-                className={`sidebar-mode-tab${sidebarMode === "sessions" ? " active" : ""}`}
+                aria-selected={true}
+                className="sidebar-mode-tab active"
                 onClick={() => {
                   setSelectedProjectFilter(null);
-                  setSelectedRunnerFilter(null);
-                  onSetSidebarMode("sessions");
                 }}
               >
                 Recent Sessions
               </button>
             </div>
           )}
-          {(archivedView || sidebarMode === "sessions") && (() => {
+          {(() => {
             const targetSessions = archivedView ? archivedSessions : sortedSessions;
             const sessionProjectIds = new Set(targetSessions.map((s) => s.projectId).filter(Boolean));
             const visibleProjects = projects.filter((p) => sessionProjectIds.has(p.id));
@@ -301,70 +289,6 @@ export default function AppSidebar({
                       }}
                     >
                       {name}
-                    </button>
-                  );
-                })}
-              </div>
-            );
-          })()}
-          {sidebarMode === "projects" && (() => {
-            const projectRunnerIds = new Set(projects.map((p) => p.runnerId).filter(Boolean));
-            const visibleRunners = runners.filter((r) => projectRunnerIds.has(r.id));
-            if (visibleRunners.length < 2) return null;
-            return (
-              <div
-                style={{
-                  display: "flex",
-                  gap: 6,
-                  overflowX: "auto",
-                  scrollbarWidth: "none",
-                  WebkitOverflowScrolling: "touch",
-                  paddingBottom: 2,
-                } as React.CSSProperties}
-              >
-                <button
-                  onClick={() => setSelectedRunnerFilter(null)}
-                  style={{
-                    flexShrink: 0,
-                    padding: "3px 10px",
-                    borderRadius: 20,
-                    border: `1px solid ${selectedRunnerFilter === null ? "var(--accent)" : "var(--border)"}`,
-                    background: selectedRunnerFilter === null ? "var(--accent-muted, rgba(99,102,241,0.15))" : "transparent",
-                    color: selectedRunnerFilter === null ? "var(--accent)" : "var(--text-muted)",
-                    fontSize: 11,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  All
-                </button>
-                {visibleRunners.map((r) => {
-                  const active = selectedRunnerFilter === r.id;
-                  return (
-                    <button
-                      key={r.id}
-                      onClick={() => setSelectedRunnerFilter(active ? null : r.id)}
-                      title={r.name}
-                      style={{
-                        flexShrink: 0,
-                        maxWidth: 100,
-                        padding: "3px 10px",
-                        borderRadius: 20,
-                        border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
-                        background: active ? "var(--accent-muted, rgba(99,102,241,0.15))" : "transparent",
-                        color: active ? "var(--accent)" : "var(--text-muted)",
-                        fontSize: 11,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        transition: "all 0.15s ease",
-                      }}
-                    >
-                      {r.name}
                     </button>
                   );
                 })}
@@ -433,8 +357,7 @@ export default function AppSidebar({
                 );
               })
             )
-          ) : sidebarMode === "sessions" ? (
-            sortedSessions.length === 0 ? (
+          ) : sortedSessions.length === 0 ? (
               <div className="empty-state">
                 <IconInbox />
                 <p>No sessions yet.<br />Start by creating a new session.</p>
@@ -649,81 +572,8 @@ export default function AppSidebar({
                   </span>
                 </div>
               ] : [])
-              ]
-            )
-          ) : (() => {
-            const filteredProjects = projects.filter((p) => !selectedRunnerFilter || p.runnerId === selectedRunnerFilter);
-            if (projects.length === 0) {
-              return (
-                <div className="empty-state">
-                  <IconInbox />
-                  <p>No projects yet.<br />Create a session to initialize a project.</p>
-                </div>
-              );
-            }
-            if (filteredProjects.length === 0) {
-              return (
-                <div className="empty-state">
-                  <IconInbox />
-                  <p>No projects match the selected runner.</p>
-                </div>
-              );
-            }
-            return [...filteredProjects]
-              .sort((a, b) => {
-                const lastActivity = (p: typeof a) => {
-                  const sessionUpdatedAt = sortedSessions
-                    .filter((s) => s.projectId === p.id)
-                    .map((s) => s.updatedAt)
-                    .sort()
-                    .at(-1);
-                  return Math.max(
-                    new Date(p.updatedAt).getTime(),
-                    sessionUpdatedAt ? new Date(sessionUpdatedAt).getTime() : 0,
-                  );
-                };
-                return lastActivity(b) - lastActivity(a);
-              })
-              .map((project, index) => {
-                const projectSessions = sortedSessions.filter((s) => s.projectId === project.id);
-                const folderName = project.repoPath.split("/").pop() || project.repoPath;
-                const projectRunner = runners.find((r) => r.id === project.runnerId);
-                return (
-                  <div
-                    key={project.id ? `project-${project.id}` : `project-idx-${index}`}
-                    className={`task-item ${selectedProjectId === project.id ? "active" : ""}`}
-                    onClick={() => onSelectProject(project.id)}
-                    id={`project-item-${project.id}`}
-                  >
-                    <div className="task-item-header">
-                      <span style={{ fontSize: 10, color: "var(--text-muted)" }}>
-                        {projectSessions.length} session{projectSessions.length !== 1 && "s"}
-                      </span>
-                      {projectRunner && (
-                        <span
-                          className="task-item-runner-badge"
-                          title={`Runner: ${projectRunner.name} (${projectRunner.hostname})`}
-                          style={{
-                            fontSize: 10, fontWeight: 500, color: "var(--text-secondary)",
-                            backgroundColor: "rgba(255, 255, 255, 0.06)", border: "1px solid var(--border)",
-                            padding: "1px 6px", borderRadius: "4px", maxWidth: "120px",
-                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                            marginLeft: "auto",
-                          }}
-                        >
-                          {projectRunner.name}
-                        </span>
-                      )}
-                    </div>
-                    <div className="task-item-prompt" style={{ fontWeight: 600 }}>{folderName}</div>
-                    <div className="task-item-prompt" style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {project.repoPath}
-                    </div>
-                    <div className="task-item-time">{formatRelative(project.createdAt)}</div>
-                  </div>
-                );
-              });
-          })()}
+            ]
+          )}
         </div>
       </aside>
     </>
