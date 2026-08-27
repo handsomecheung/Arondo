@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ConfirmDialog from "@/components/modals/ConfirmDialog";
 import { IconLogo, IconRefresh } from "@/components/Icons";
+import { requestNotificationPermission, sendNotification } from "@/lib/notification";
 
 interface Runner {
   id: string;
@@ -220,6 +221,8 @@ export default function SettingsPage() {
   const [llmApiKeyStatus, setLlmApiKeyStatus] = useState<Record<LlmApiKeyName, AutoModelApiKeyStatus>>(EMPTY_LLM_STATUS);
   const [savingLlmApiKeys, setSavingLlmApiKeys] = useState(false);
   const [llmApiKeysSaved, setLlmApiKeysSaved] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">("unsupported");
+  const [notificationMessage, setNotificationMessage] = useState("");
 
   const loadRunners = useCallback(() => {
     fetch("/api/runners")
@@ -229,6 +232,27 @@ export default function SettingsPage() {
       })
       .catch(console.error);
   }, []);
+
+  const handleNotificationSetup = async () => {
+    const permission = await requestNotificationPermission();
+    setNotificationPermission(permission);
+
+    if (permission !== "granted") {
+      setNotificationMessage(
+        permission === "denied"
+          ? "Notifications are blocked. Allow them in Chrome or macOS notification settings."
+          : "Notification permission was not granted.",
+      );
+      return;
+    }
+
+    await sendNotification(
+      "Notifications enabled",
+      "Arondo will notify you when a task completes.",
+      "/tasks",
+    );
+    setNotificationMessage("Test notification sent.");
+  };
 
   const loadCustomCommands = useCallback(() => {
     fetch("/api/agent-commands?source=custom")
@@ -601,6 +625,10 @@ export default function SettingsPage() {
   }, [sessionArchiveDays, saveSessionArchiveDays]);
 
   useEffect(() => {
+    if ("Notification" in window) {
+      setNotificationPermission(Notification.permission);
+    }
+
     fetch("/api/auth/verify")
       .then((r) => r.json())
       .then((data) => {
@@ -926,6 +954,46 @@ export default function SettingsPage() {
               </label>
             </div>
           </section>
+
+          {notificationPermission !== "unsupported" && (
+            <section
+              aria-label="Notification settings"
+              style={{
+                background: "var(--bg-surface)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-md)",
+                padding: 16,
+              }}
+            >
+              <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)", marginBottom: 4 }}>
+                Notifications
+              </h2>
+              <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12, lineHeight: 1.5 }}>
+                Enable task completion notifications or send a test notification.
+              </p>
+              <button
+                type="button"
+                onClick={handleNotificationSetup}
+                style={{
+                  padding: "7px 12px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: notificationPermission === "granted" ? "var(--success)" : "var(--text-primary)",
+                  background: "var(--bg-elevated)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-sm)",
+                  cursor: "pointer",
+                }}
+              >
+                {notificationPermission === "granted" ? "Test notifications" : "Enable notifications"}
+              </button>
+              {notificationMessage && (
+                <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
+                  {notificationMessage}
+                </p>
+              )}
+            </section>
+          )}
 
           {/* LLM API Keys Section */}
           <section

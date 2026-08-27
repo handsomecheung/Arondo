@@ -57,9 +57,7 @@ export async function sendNotification(
       icon: "/icon-192.png",
       badge: "/icon-192.png",
       data: { url: url || "/" },
-      tag: "arondo-task-notification",
-      renotify: true,
-    } as any);
+    });
   } catch (error) {
     console.error("Failed to send notification via Service Worker:", error);
     // Fallback to standard Notification API if Service Worker is not ready or fails
