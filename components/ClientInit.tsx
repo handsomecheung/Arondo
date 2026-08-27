@@ -41,6 +41,20 @@ export function ClientInit() {
       });
     }
 
+    // 3. Request notification permission on first launch and store in localStorage
+    if (typeof window !== "undefined" && "Notification" in window) {
+      const requested = localStorage.getItem("arondo_notification_requested");
+      if (!requested) {
+        Notification.requestPermission()
+          .catch((err) => {
+            console.error("Failed to request notification permission:", err);
+          })
+          .finally(() => {
+            localStorage.setItem("arondo_notification_requested", "true");
+          });
+      }
+    }
+
     // 3. Perform authentication check
     if (pathname === "/login") {
       return; // Do not check auth on the login page itself

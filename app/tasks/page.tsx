@@ -351,7 +351,27 @@ export default function TasksPage() {
           if (event.type === "session:updated") {
             const updated = event.payload as Session;
             sessionProjectIdsRef.current.set(updated.id, updated.projectId);
-            setSessions((prev) => {
+             setSessions((prev) => {
+              const oldSession = prev.find((s) => s.id === updated.id);
+              if (oldSession && (oldSession.status === "running" || oldSession.status === "script-running")) {
+                if (updated.status === "done") {
+                  import("@/lib/notification").then(({ sendNotification }) => {
+                    sendNotification(
+                      "Task Completed",
+                      `Task "${updated.name || "Agent Session"}" completed successfully.`,
+                      `/tasks`
+                    );
+                  });
+                } else if (updated.status === "error") {
+                  import("@/lib/notification").then(({ sendNotification }) => {
+                    sendNotification(
+                      "Task Failed",
+                      `Task "${updated.name || "Agent Session"}" failed.`,
+                      `/tasks`
+                    );
+                  });
+                }
+              }
               const idx = prev.findIndex((s) => s.id === updated.id);
               if (idx === -1) return [...prev, updated];
               const next = [...prev];
