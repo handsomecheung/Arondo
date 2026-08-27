@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProjects, deleteProject, isTempDirProject } from "@/lib/store";
+import { getProjects, deleteProject, isTempDirProject, getShowTempDirSessions } from "@/lib/store";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken } from "@/lib/auth";
 
@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
   const projects = await getProjects();
   const knownRunners = await runnerManager.getAllKnownRunners();
   const runnerIds = new Set(knownRunners.map((r) => r.id));
+  const showTempDirSessions = await getShowTempDirSessions();
 
   const valid: typeof projects = [];
   for (const project of projects) {
@@ -33,8 +34,11 @@ export async function GET(request: NextRequest) {
       if (age > TEMP_DIR_PROJECT_MAX_AGE_MS) {
         console.log(`[projects] temp dir project ${project.id} older than 3 days, deleting`);
         await deleteProject(project.id);
+        continue;
       }
-      continue;
+      if (!showTempDirSessions) {
+        continue;
+      }
     }
 
     valid.push(project);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getArchivedSessionPaths, getProjects, isTempDirProject } from "@/lib/store";
+import { getArchivedSessionPaths, getProjects, isTempDirProject, getShowTempDirSessions } from "@/lib/store";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken } from "@/lib/auth";
 import fs from "fs/promises";
@@ -22,12 +22,13 @@ export async function GET(request: NextRequest) {
 
   const [filePaths, projects] = await Promise.all([getArchivedSessionPaths(), getProjects()]);
   const projectsById = new Map(projects.map((project) => [project.id, project]));
+  const showTempDirSessions = await getShowTempDirSessions();
 
   for (const filePath of filePaths) {
     const session = await readSessionMetadata(filePath);
     if (session && session.runnerId) {
       const project = projectsById.get(session.projectId);
-      if (!project || isTempDirProject(project)) continue;
+      if (!project || (!showTempDirSessions && isTempDirProject(project))) continue;
 
       const isAllowed = await runnerManager.isTokenAllowedForRunnerId(session.runnerId, token);
       if (isAllowed) {

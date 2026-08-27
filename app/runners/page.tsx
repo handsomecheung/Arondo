@@ -219,6 +219,7 @@ export default function RunnersPage() {
   const [selectedRunnerId, setSelectedRunnerId] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<"admin" | "user" | null>(null);
   const [agentsQuota, setAgentsQuota] = useState<AgentsQuota | null>(null);
+  const [showTempDirSessions, setShowTempDirSessions] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     message: string;
     onConfirm: () => void;
@@ -238,6 +239,15 @@ export default function RunnersPage() {
       .then((r) => r.json())
       .then((data) => {
         if (data.valid) setUserRole(data.role);
+      })
+      .catch(console.error);
+
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.showTempDirSessions !== undefined) {
+          setShowTempDirSessions(data.showTempDirSessions);
+        }
       })
       .catch(console.error);
 
@@ -440,7 +450,7 @@ export default function RunnersPage() {
                   const hasAgentInfo = Array.isArray(r.agents);
                   const isSelected = selectedRunnerId === r.id;
                   const rProjects = projects.filter(
-                    (p) => p.runnerId === r.id && !p.tempDir,
+                    (p) => p.runnerId === r.id && (showTempDirSessions || !p.tempDir),
                   );
                   return (
                     <div key={r.id} style={{ display: "flex", flexDirection: "column", gap: 0 }}>

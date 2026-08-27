@@ -19,6 +19,7 @@ const FILE_SHOW_HIDDEN_DEFAULT = process.env.ARONDO_FILE_SHOW_HIDDEN_DEFAULT !==
 export interface AppSettings {
   sessionArchiveDays?: number;
   showHiddenFiles?: boolean;
+  showTempDirSessions?: boolean;
   llmApiKeys?: {
     ANTHROPIC_API_KEY?: string;
     OPENAI_API_KEY?: string;
@@ -759,6 +760,11 @@ export async function getSessionArchiveDays(): Promise<number> {
 export async function getShowHiddenFiles(): Promise<boolean> {
   const settings = await getAppSettings();
   return settings.showHiddenFiles !== undefined ? settings.showHiddenFiles : FILE_SHOW_HIDDEN_DEFAULT;
+}
+
+export async function getShowTempDirSessions(): Promise<boolean> {
+  const settings = await getAppSettings();
+  return settings.showTempDirSessions !== undefined ? settings.showTempDirSessions : false;
 }
 
 export async function getSessionArchiveAgeMs(): Promise<number> {

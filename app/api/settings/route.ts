@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getArondoToken, getRoleByToken, isValidToken } from "@/lib/auth";
-import { updateAppSettings, getAppSettings, getSessionArchiveDays, getShowHiddenFiles } from "@/lib/store";
+import { updateAppSettings, getAppSettings, getSessionArchiveDays, getShowHiddenFiles, getShowTempDirSessions } from "@/lib/store";
 import { getLlmApiKeyEnvStatus, type LlmApiKeyName } from "@/lib/automodel/config";
 import fs from "fs/promises";
 import path from "path";
@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
 
   const sessionArchiveDays = await getSessionArchiveDays();
   const showHiddenFiles = await getShowHiddenFiles();
+  const showTempDirSessions = await getShowTempDirSessions();
   const appSettings = await getAppSettings();
   const envStatus = getLlmApiKeyEnvStatus();
   const llmApiKeys = Object.fromEntries(
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
     console.error("Failed to read package.json version:", err);
   }
 
-  return NextResponse.json({ sessionArchiveDays, showHiddenFiles, version, llmApiKeys });
+  return NextResponse.json({ sessionArchiveDays, showHiddenFiles, showTempDirSessions, version, llmApiKeys });
 }
 
 export async function POST(request: NextRequest) {
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Admin role required" }, { status: 403 });
   }
 
-  const { sessionArchiveDays, showHiddenFiles, llmApiKeys } = await request.json();
+  const { sessionArchiveDays, showHiddenFiles, showTempDirSessions, llmApiKeys } = await request.json();
   if (sessionArchiveDays !== undefined) {
     if (typeof sessionArchiveDays !== "number" || !Number.isFinite(sessionArchiveDays) || sessionArchiveDays < 1) {
       return NextResponse.json({ error: "sessionArchiveDays must be a positive number" }, { status: 400 });
@@ -62,6 +63,9 @@ export async function POST(request: NextRequest) {
   if (showHiddenFiles !== undefined && typeof showHiddenFiles !== "boolean") {
     return NextResponse.json({ error: "showHiddenFiles must be a boolean" }, { status: 400 });
   }
+  if (showTempDirSessions !== undefined && typeof showTempDirSessions !== "boolean") {
+    return NextResponse.json({ error: "showTempDirSessions must be a boolean" }, { status: 400 });
+  }
   if (llmApiKeys !== undefined && (typeof llmApiKeys !== "object" || llmApiKeys === null || Array.isArray(llmApiKeys))) {
     return NextResponse.json({ error: "llmApiKeys must be an object" }, { status: 400 });
   }
@@ -69,10 +73,12 @@ export async function POST(request: NextRequest) {
   const patch: {
     sessionArchiveDays?: number;
     showHiddenFiles?: boolean;
+    showTempDirSessions?: boolean;
     llmApiKeys?: Partial<Record<LlmApiKeyName, string | undefined>>;
   } = {};
   if (sessionArchiveDays !== undefined) patch.sessionArchiveDays = sessionArchiveDays;
   if (showHiddenFiles !== undefined) patch.showHiddenFiles = showHiddenFiles;
+  if (showTempDirSessions !== undefined) patch.showTempDirSessions = showTempDirSessions;
   if (llmApiKeys !== undefined) {
     const current = await getAppSettings();
     const envStatus = getLlmApiKeyEnvStatus();

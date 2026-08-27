@@ -214,6 +214,8 @@ export default function SettingsPage() {
 
   const [showHiddenFiles, setShowHiddenFiles] = useState(true);
   const [savingShowHiddenFiles, setSavingShowHiddenFiles] = useState(false);
+  const [showTempDirSessions, setShowTempDirSessions] = useState(false);
+  const [savingShowTempDirSessions, setSavingShowTempDirSessions] = useState(false);
   const [llmApiKeys, setLlmApiKeys] = useState<Record<LlmApiKeyName, string>>(EMPTY_LLM_KEYS);
   const [llmApiKeyStatus, setLlmApiKeyStatus] = useState<Record<LlmApiKeyName, AutoModelApiKeyStatus>>(EMPTY_LLM_STATUS);
   const [savingLlmApiKeys, setSavingLlmApiKeys] = useState(false);
@@ -248,12 +250,16 @@ export default function SettingsPage() {
       .then((data: {
         sessionArchiveDays: number;
         showHiddenFiles?: boolean;
+        showTempDirSessions?: boolean;
         version?: string;
         llmApiKeys?: Record<LlmApiKeyName, AutoModelApiKeyStatus>;
       }) => {
         setSessionArchiveDays(data.sessionArchiveDays);
         if (data.showHiddenFiles !== undefined) {
           setShowHiddenFiles(data.showHiddenFiles);
+        }
+        if (data.showTempDirSessions !== undefined) {
+          setShowTempDirSessions(data.showTempDirSessions);
         }
         if (data.version) {
           setServerVersion(data.version);
@@ -474,6 +480,27 @@ export default function SettingsPage() {
       setShowHiddenFiles(!checked);
     } finally {
       setSavingShowHiddenFiles(false);
+    }
+  }, []);
+
+  const handleToggleShowTempDirSessions = useCallback(async (checked: boolean) => {
+    setShowTempDirSessions(checked);
+    setSavingShowTempDirSessions(true);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ showTempDirSessions: checked }),
+      });
+      if (!res.ok) {
+        setShowTempDirSessions(!checked);
+        alert("Failed to save temporary sessions and projects setting");
+      }
+    } catch (err) {
+      console.error("Failed to save temporary sessions and projects setting:", err);
+      setShowTempDirSessions(!checked);
+    } finally {
+      setSavingShowTempDirSessions(false);
     }
   }, []);
 
@@ -810,7 +837,7 @@ export default function SettingsPage() {
               >
                 Number of idle days before an active session is automatically archived.
               </p>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
                 <input
                   type="number"
                   min={1}
@@ -830,6 +857,25 @@ export default function SettingsPage() {
                   }}
                 />
               </div>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 13,
+                  color: "var(--text-primary)",
+                  cursor: savingShowTempDirSessions ? "default" : "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={showTempDirSessions}
+                  disabled={savingShowTempDirSessions}
+                  onChange={(e) => handleToggleShowTempDirSessions(e.target.checked)}
+                  style={{ cursor: savingShowTempDirSessions ? "default" : "pointer" }}
+                />
+                <span>Show temporary sessions and projects</span>
+              </label>
             </div>
 
             <div

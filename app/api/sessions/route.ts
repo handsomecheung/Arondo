@@ -1,6 +1,6 @@
 import path from "path";
 import { NextRequest, NextResponse } from "next/server";
-import { getSessions, getProjects, deleteSession, archiveSession, createSession, addTodoMessage, getSession, getSessionArchiveAgeMs, isTempDirProject } from "@/lib/store";
+import { getSessions, getProjects, deleteSession, archiveSession, createSession, addTodoMessage, getSession, getSessionArchiveAgeMs, isTempDirProject, getShowTempDirSessions } from "@/lib/store";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken, getUuidByToken } from "@/lib/auth";
@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
   const projects = await getProjects();
   const projectsById = new Map(projects.map((p) => [p.id, p]));
   const sessionArchiveAgeMs = await getSessionArchiveAgeMs();
+  const showTempDirSessions = await getShowTempDirSessions();
 
   const valid: typeof sessions = [];
   for (const session of sessions) {
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
       continue;
     }
 
-    if (project && isTempDirProject(project)) {
+    if (!showTempDirSessions && project && isTempDirProject(project)) {
       continue;
     }
 
