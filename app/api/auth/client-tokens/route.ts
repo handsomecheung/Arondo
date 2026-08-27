@@ -53,12 +53,13 @@ export async function POST(request: NextRequest) {
 
     // Generate a secure user token
     const generatedUserToken = generateToken();
+    const generatedUuid = generateUUID();
     await updateTokensConfig((config) => {
       const existingColors = config.clients.map((t) => t.color).filter((c): c is string => !!c);
       const generatedColor = generateUniqueColor(existingColors);
       config.clients.push({
         token: generatedUserToken,
-        uuid: generateUUID(),
+        uuid: generatedUuid,
         name: name.trim(),
         type: "user",
         color: generatedColor
@@ -68,6 +69,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       token: generatedUserToken,
+      uuid: generatedUuid,
     });
   } catch {
     return NextResponse.json({ error: "Failed to generate token" }, { status: 500 });

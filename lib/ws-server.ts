@@ -63,10 +63,10 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
     }
 
     // Resolve runnerId for authorization checks
-    let runnerId: string | undefined = event.payload.runnerId;
+    let runnerId: string | undefined = event.payload?.runnerId;
 
     const resolveAndBroadcast = async () => {
-      if (!runnerId) {
+      if (!runnerId && event.payload) {
         const sid = event.payload.sessionId || event.payload.id;
         if (sid) {
           const { getSession } = await import("./store");
