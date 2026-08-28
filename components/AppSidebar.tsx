@@ -26,7 +26,7 @@ interface Props {
   onOpenArchivedSessions: () => void;
   onCloseArchivedSessions: () => void;
   onSelectArchivedSession: (id: string) => void;
-  onLogout: () => void;
+  onLogout?: () => void;
 }
 
 export default function AppSidebar({
@@ -170,29 +170,30 @@ export default function AppSidebar({
                   >
                     <IconArchive /> Archived Sessions
                   </button>
+                  <Link
+                    href="/settings"
+                    className="menu-item"
+                    onClick={() => {
+                      setMoreMenuOpen(false);
+                      onCloseSidebar();
+                    }}
+                    id="menu-settings"
+                  >
+                    <IconSettings /> Settings
+                  </Link>
                   {userRole === "admin" && (
                     <Link
-                      href="/settings"
+                      href="/admin/settings"
                       className="menu-item"
                       onClick={() => {
                         setMoreMenuOpen(false);
                         onCloseSidebar();
                       }}
-                      id="menu-settings"
+                      id="menu-admin-settings"
                     >
-                      <IconSettings /> Settings
+                      <IconSettings /> Admin Settings
                     </Link>
                   )}
-                  <button
-                    className="menu-item"
-                    onClick={() => {
-                      setMoreMenuOpen(false);
-                      onLogout();
-                    }}
-                    id="menu-logout"
-                  >
-                    <IconLogout /> Log Out
-                  </button>
                 </div>
               )}
             </div>

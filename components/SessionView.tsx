@@ -755,7 +755,7 @@ export default function SessionView({
                         );
                       })}
                       <Link
-                        href="/settings"
+                        href="/admin/settings"
                         className="menu-item command-submenu-manage"
                         id="menu-manage-commands"
                         onClick={() => {
@@ -1395,7 +1395,7 @@ export default function SessionView({
           return (
             <div className="command-menu">
               <Link
-                href="/settings"
+                href="/admin/settings"
                 className="command-menu-item"
                 onMouseDown={(e) => e.preventDefault()}
               >

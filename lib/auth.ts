@@ -236,6 +236,11 @@ export async function reloadTokens(): Promise<void> {
 export function getArondoToken(req: NextRequest): string | null {
   const header = req.headers.get("x-arondo-token");
   if (header) return header;
+  const authHeader = req.headers.get("authorization");
+  if (authHeader) {
+    const match = authHeader.match(/^Bearer\s+(.+)$/i);
+    if (match) return match[1];
+  }
   return req.nextUrl.searchParams.get("token");
 }
 
