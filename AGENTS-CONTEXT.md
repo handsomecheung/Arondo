@@ -390,7 +390,7 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **autoagent (Auto Mode)**: Automatically selects the best agent based on hourly and weekly quota availability retrieved from the runner, then optionally lets `automodel` choose the model/effort from the selected choice's allowed model options. New chat sessions default to using the Auto agent mode.
   - **Choices**:
     - **Choice A**: Antigravity (`agy`) Gemini model group (Quota: `GeminiHourRemain`, `GeminiWeeklyRemain`; default fallback model: `Gemini 3.5 Flash (Medium)`)
-    - **Choice B**: Antigravity (`agy`) non-Gemini model group (Quota: `OtherHourRemain`, `OtherWeeklyRemain`; default fallback model: `Claude Sonnet 4.6 (Thinking)`)
+    - **Choice B**: Antigravity (`agy`) non-Gemini model group (Quota: `OtherHourRemain`, `OtherWeeklyRemain`; default fallback model: `Claude Sonnet 4.6 (Thinking)`; model options are restricted to Claude models (`Claude Sonnet 4.6 (Thinking)`, `Claude Opus 4.6 (Thinking)`), excluding `GPT-OSS` to ensure high coding and reasoning quality)
     - **Choice C**: Claude (`claude`) + default `Sonnet` (Quota: `HourRemain`, `WeekRemain`)
     - **Choice D**: Codex (`codex`) + default `gpt-5.5 medium` (Quota: `WeeklyRemain`, hourly is treated as always available)
   - **Selection Algorithm**:

@@ -98,7 +98,6 @@ const AGY_GEMINI_MODEL_OPTIONS: AutoModelOption[] = [
 const AGY_OTHER_MODEL_OPTIONS: AutoModelOption[] = [
   { id: "claude-sonnet-4-6", model: "Claude Sonnet 4.6 (Thinking)", costTier: "strong", description: "Strong general coding model in Antigravity." },
   { id: "claude-opus-4-6-thinking", model: "Claude Opus 4.6 (Thinking)", costTier: "strong", description: "Highest-cost Antigravity model for the hardest tasks." },
-  { id: "gpt-oss-120b-medium", model: "GPT-OSS 120B (Medium)", costTier: "standard", description: "Open-weight medium option for routine coding work." },
 ];
 
 const CLAUDE_MODEL_OPTIONS: AutoModelOption[] = [
@@ -129,6 +128,7 @@ export function getAgyQuotaGroupForModel(model?: string): AgyQuotaGroup | undefi
   if (!model) return undefined;
   if (AGY_GEMINI_MODEL_OPTIONS.some((option) => option.model === model)) return "gemini";
   if (AGY_OTHER_MODEL_OPTIONS.some((option) => option.model === model)) return "other";
+  if (model.toLowerCase().includes("gpt-oss") || model.toLowerCase().includes("claude")) return "other";
   return undefined;
 }
 
