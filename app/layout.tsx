@@ -6,6 +6,9 @@ export const metadata: Metadata = {
   title: process.env.ARONDO_TITLE ?? "Arondo",
   description:
     "Delegate software development tasks to AI agents, review PRs on your phone, and ship from anywhere.",
+  icons: {
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
 };
 
 export const viewport: Viewport = {
