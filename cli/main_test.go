@@ -36,11 +36,12 @@ func TestPollDetachedAgentUntilDoneReturnsDetachedRunAndResult(t *testing.T) {
 	}
 }
 
-func TestConversationMessagesExcludesDetachedAgentMessages(t *testing.T) {
+func TestConversationMessagesExcludesDetachedAgentAndTodoMessages(t *testing.T) {
 	messages, err := (&client{}).conversationMessages("session-1", []message{
 		{ID: "user-1", Type: "chat-user", Role: "user"},
 		{ID: "run-1", Type: "detached-agent-run", Role: "system"},
 		{ID: "return-1", Type: "detached-agent-return", Role: "agent"},
+		{ID: "todo-1", Type: "user-todo", Role: "user"},
 	})
 	if err != nil {
 		t.Fatal(err)
