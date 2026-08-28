@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-const usage = `Create a session, send a message, poll until it finishes, and print the result.
+const usage = `Create a session, send a message, stream the result in real-time, and print the final status.
 
 Usage:
   cli/arondo-cli send \
@@ -1169,6 +1169,11 @@ func run(argv []string) error {
 		return err
 	}
 	c := &client{server: args.server, token: args.token, http: http.DefaultClient}
+	ws, _ := dialWebSocket(args.server, args.token, 5*time.Second)
+	if ws != nil {
+		defer ws.Close()
+	}
+
 	if args.resume {
 		if args.runnerID == "" {
 			hostname, err := os.Hostname()
@@ -1228,37 +1233,20 @@ func run(argv []string) error {
 	if queued {
 		return outputQueuedResult(c, sessionID, args, queuedTrigger)
 	}
-	var session session
-	var rawOutput string
-	detachedFailed := false
+
 	interval := time.Duration(args.pollInterval * float64(time.Second))
 	timeout := time.Duration(args.timeout * float64(time.Second))
 	if messageID != "" {
 		fmt.Fprintf(os.Stderr, "Session ID: %s\nWaiting for detached agent run to finish...\n", sessionID)
-		run, returned, err := pollDetachedAgentUntilDone(c, sessionID, messageID, interval, timeout)
-		if err != nil {
-			return err
-		}
-		rawOutput, err = c.getSessionLog(sessionID, run.ID)
-		if err != nil {
-			return err
-		}
-		session, err = c.getSession(sessionID)
-		if err != nil {
-			return err
-		}
-		detachedFailed = (run.ExitCode != nil && *run.ExitCode != 0) || returned.Role != "agent"
 	} else {
 		fmt.Fprintf(os.Stderr, "Session ID: %s\nWaiting for the run to finish...\n", sessionID)
-		session, err = pollUntilDone(c, sessionID, interval, timeout)
-		if err != nil {
-			return err
-		}
-		rawOutput, err = c.rawOutput(sessionID)
 	}
+
+	session, rawOutput, detachedFailed, err := streamSessionUntilDone(c, args, sessionID, messageID, ws, interval, timeout)
 	if err != nil {
 		return err
 	}
+
 	if args.output == "json" {
 		result := session.Raw
 		delete(result, "id")
@@ -1267,8 +1255,6 @@ func run(argv []string) error {
 		fmt.Fprintln(os.Stderr, "\n=== Result ===")
 		pretty, _ := json.MarshalIndent(result, "", "  ")
 		fmt.Println(string(pretty))
-	} else {
-		fmt.Print(rawOutput)
 	}
 	if detachedFailed {
 		fmt.Fprintln(os.Stderr, "\nDetached agent finished with an error.")

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -269,5 +270,177 @@ func TestLoadConfigRejectsInvalidJSON(t *testing.T) {
 	}
 	if _, err := loadConfig(filePath); err == nil {
 		t.Fatal("expected invalid JSON error")
+	}
+}
+
+func TestWebsocketURL(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"http://localhost:3251", "ws://localhost:3251/ws"},
+		{"https://arondo.example.com", "wss://arondo.example.com/ws"},
+		{"http://localhost:3251/", "ws://localhost:3251/ws"},
+		{"http://localhost:3251/ws", "ws://localhost:3251/ws"},
+		{"https://arondo.example.com/subpath", "wss://arondo.example.com/subpath/ws"},
+		{"ws://localhost:3251", "ws://localhost:3251/ws"},
+		{"wss://localhost:3251", "wss://localhost:3251/ws"},
+	}
+	for _, tt := range tests {
+		got, err := websocketURL(tt.input)
+		if err != nil {
+			t.Fatalf("websocketURL(%q) error: %v", tt.input, err)
+		}
+		if got != tt.want {
+			t.Errorf("websocketURL(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func writeServerWSFrame(w io.Writer, opcode byte, payload []byte) error {
+	var header []byte
+	length := len(payload)
+	header = append(header, 0x80|opcode)
+	if length <= 125 {
+		header = append(header, byte(length))
+	} else if length <= 65535 {
+		header = append(header, 126, byte(length>>8), byte(length&0xFF))
+	} else {
+		header = append(header, 127, 0, 0, 0, 0, byte(length>>24), byte(length>>16), byte(length>>8), byte(length&0xFF))
+	}
+	if _, err := w.Write(header); err != nil {
+		return err
+	}
+	_, err := w.Write(payload)
+	return err
+}
+
+func TestStreamSessionUntilDoneWS(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/ws" {
+			hj, ok := w.(http.Hijacker)
+			if !ok {
+				http.Error(w, "hijack not supported", http.StatusInternalServerError)
+				return
+			}
+			conn, bufrw, err := hj.Hijack()
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			defer conn.Close()
+
+			bufrw.WriteString("HTTP/1.1 101 Switching Protocols\r\n")
+			bufrw.WriteString("Upgrade: websocket\r\n")
+			bufrw.WriteString("Connection: Upgrade\r\n")
+			bufrw.WriteString("Sec-WebSocket-Protocol: arondo-token\r\n\r\n")
+			bufrw.Flush()
+
+			// Send chunk 1
+			c1, _ := json.Marshal(map[string]any{
+				"type":      "terminal:output",
+				"sessionId": "sess-ws-1",
+				"data":      "Hello ",
+			})
+			_ = writeServerWSFrame(bufrw, 0x1, c1)
+			bufrw.Flush()
+
+			// Send chunk 2
+			c2, _ := json.Marshal(map[string]any{
+				"type":      "terminal:output",
+				"sessionId": "sess-ws-1",
+				"data":      "Streamed World!\n",
+			})
+			_ = writeServerWSFrame(bufrw, 0x1, c2)
+			bufrw.Flush()
+
+			// Send session:updated done
+			doneMsg, _ := json.Marshal(map[string]any{
+				"type": "session:updated",
+				"payload": map[string]any{
+					"id":     "sess-ws-1",
+					"status": "done",
+				},
+			})
+			_ = writeServerWSFrame(bufrw, 0x1, doneMsg)
+			bufrw.Flush()
+			return
+		}
+		if r.URL.Path == "/api/sessions/sess-ws-1" {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":     "sess-ws-1",
+				"status": "done",
+			})
+			return
+		}
+	}))
+	defer server.Close()
+
+	ws, err := dialWebSocket(server.URL, "token123", time.Second)
+	if err != nil {
+		t.Fatalf("dialWebSocket error: %v", err)
+	}
+
+	c := &client{server: server.URL, token: "token123", http: server.Client()}
+	args := arguments{output: "plain"}
+	sess, output, failed, err := streamSessionUntilDone(c, args, "sess-ws-1", "", ws, 100*time.Millisecond, 2*time.Second)
+	if err != nil {
+		t.Fatalf("streamSessionUntilDone error: %v", err)
+	}
+	if sess.Status != "done" {
+		t.Errorf("unexpected status: %s", sess.Status)
+	}
+	if output != "Hello Streamed World!\n" {
+		t.Errorf("unexpected output: %q", output)
+	}
+	if failed {
+		t.Errorf("expected failed == false")
+	}
+}
+
+func TestStreamSessionUntilDoneFallbackPolling(t *testing.T) {
+	pollCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/sessions/sess-poll-1" {
+			pollCount++
+			status := "running"
+			if pollCount >= 2 {
+				status = "done"
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":     "sess-poll-1",
+				"status": status,
+			})
+			return
+		}
+		if r.URL.Path == "/api/messages" {
+			_ = json.NewEncoder(w).Encode([]map[string]any{
+				{"id": "msg-1", "type": "agent-run"},
+			})
+			return
+		}
+		if r.URL.Path == "/api/sessions/sess-poll-1/log" {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"log": "Polled output result\n",
+			})
+			return
+		}
+	}))
+	defer server.Close()
+
+	c := &client{server: server.URL, token: "token123", http: server.Client()}
+	args := arguments{output: "plain"}
+	sess, output, failed, err := streamSessionUntilDone(c, args, "sess-poll-1", "", nil, 10*time.Millisecond, 2*time.Second)
+	if err != nil {
+		t.Fatalf("streamSessionUntilDone error: %v", err)
+	}
+	if sess.Status != "done" {
+		t.Errorf("unexpected status: %s", sess.Status)
+	}
+	if output != "Polled output result\n" {
+		t.Errorf("unexpected output: %q", output)
+	}
+	if failed {
+		t.Errorf("expected failed == false")
 	}
 }
