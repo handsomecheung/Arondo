@@ -56,89 +56,10 @@ Commands:
 
 Run cli/arondo-cli <command> --help for command options.`
 
-const listAgentsUsage = `List agent availability for all accessible runners.
-
-Usage:
-  cli/arondo-cli list-agents \
-    --server http://localhost:3251 \
-    --client-token <client_access_token>
-
-Options:
-  --server <url>      Arondo server base URL (overrides ARONDO_SERVER and cli.server in arondo.json)
-  --client-token <token> Client access token (overrides ARONDO_CLIENT_TOKEN and cli.clientToken in arondo.json)
-  --runner-id <id>    Only show one runner
-  --output <format>   Output format: plain or json (default: plain)
-  --help              Show this help message`
-
-const getQuotaUsage = `List the recorded quota usage for all accessible runners.
-
-Usage:
-  cli/arondo-cli get-quota \
-    --server http://localhost:3251 \
-    --client-token <client_access_token>
-
-Options:
-  --server <url>      Arondo server base URL (overrides ARONDO_SERVER and cli.server in arondo.json)
-  --client-token <token> Client access token (overrides ARONDO_CLIENT_TOKEN and cli.clientToken in arondo.json)
-  --output <format>   Output format: plain or json (default: plain)
-  --help              Show this help message`
-
-const updateQuotaUsage = `Force an asynchronous quota refresh for all accessible runners.
-
-Usage:
-  cli/arondo-cli update-quota \
-    --server http://localhost:3251 \
-    --client-token <client_access_token>
-
-The command returns after refresh requests have been queued. Use get-quota to read the updated values.
-
-Options:
-  --server <url>      Arondo server base URL (overrides ARONDO_SERVER and cli.server in arondo.json)
-  --client-token <token> Client access token (overrides ARONDO_CLIENT_TOKEN and cli.clientToken in arondo.json)
-  --output <format>   Output format: plain or json (default: plain)
-  --help              Show this help message`
-
-const getMessagesUsage = `Print the full conversation history of a session.
-
-Usage:
-  cli/arondo-cli get-messages \
-    --server http://localhost:3251 \
-    --client-token <client_access_token> \
-    --session-id <session_id>
-
-  cli/arondo-cli get-messages \
-    --server http://localhost:3251 \
-    --client-token <client_access_token> \
-    --latest
-
-Options:
-  --server <url>        Arondo server base URL (overrides ARONDO_SERVER and cli.server in arondo.json)
-  --client-token <token> Client access token (overrides ARONDO_CLIENT_TOKEN and cli.clientToken in arondo.json)
-  --session-id <id>     Session ID to display
-  --latest              Use the most recently updated session for the runner and repository path
-  --runner-id <id>      Target runner ID (default: connected runner with the current hostname)
-  --path <path>         Repository path on the runner (default: current working directory)
-  --with-logs           Include agent stdout in a log field for json output (default: false)
-  --output <format>     Output format: plain or json (default: plain)
-  --help                Show this help message`
-
 type arguments struct {
 	server, token, runnerID, repoPath, sessionID, agentType, prompt, output, confirmation string
 	pollInterval, timeout                                                                 float64
 	tempDir, resume                                                                       bool
-}
-
-type listAgentsArguments struct {
-	server, token, runnerID, output string
-}
-
-type quotaArguments struct {
-	server, token, output string
-}
-
-type getMessagesArguments struct {
-	server, token, sessionID, runnerID, repoPath, output string
-	withLogs, latest                                     bool
 }
 
 type apiError struct {
@@ -331,131 +252,6 @@ func validateServerAndToken(server, token string) error {
 	return nil
 }
 
-func parseListAgentsArgs(argv []string, config cliConfig) (listAgentsArguments, error) {
-	server, token := configuredServerAndToken(config)
-	args := listAgentsArguments{server: server, token: token, output: "plain"}
-	valueOptions := map[string]*string{"--server": &args.server, "--client-token": &args.token, "--runner-id": &args.runnerID, "--output": &args.output}
-
-	for index := 0; index < len(argv); index++ {
-		option := argv[index]
-		if option == "--help" {
-			return listAgentsArguments{}, errHelp
-		}
-		if !strings.HasPrefix(option, "--") {
-			return listAgentsArguments{}, fmt.Errorf("unexpected argument: %s", option)
-		}
-		name, value, inline := strings.Cut(option, "=")
-		destination, ok := valueOptions[name]
-		if !ok {
-			return listAgentsArguments{}, fmt.Errorf("unknown option: %s", option)
-		}
-		if !inline {
-			index++
-			if index >= len(argv) {
-				return listAgentsArguments{}, fmt.Errorf("option %s requires a value", name)
-			}
-			value = argv[index]
-		}
-		if value == "" || strings.HasPrefix(value, "--") {
-			return listAgentsArguments{}, fmt.Errorf("option %s requires a value", name)
-		}
-		*destination = value
-	}
-	if args.output != "plain" && args.output != "json" {
-		return listAgentsArguments{}, errors.New("--output must be plain or json")
-	}
-	return args, validateServerAndToken(args.server, args.token)
-}
-
-func parseQuotaArgs(argv []string, config cliConfig) (quotaArguments, error) {
-	server, token := configuredServerAndToken(config)
-	args := quotaArguments{server: server, token: token, output: "plain"}
-	valueOptions := map[string]*string{"--server": &args.server, "--client-token": &args.token, "--output": &args.output}
-
-	for index := 0; index < len(argv); index++ {
-		option := argv[index]
-		if option == "--help" {
-			return quotaArguments{}, errHelp
-		}
-		if !strings.HasPrefix(option, "--") {
-			return quotaArguments{}, fmt.Errorf("unexpected argument: %s", option)
-		}
-		name, value, inline := strings.Cut(option, "=")
-		destination, ok := valueOptions[name]
-		if !ok {
-			return quotaArguments{}, fmt.Errorf("unknown option: %s", option)
-		}
-		if !inline {
-			index++
-			if index >= len(argv) {
-				return quotaArguments{}, fmt.Errorf("option %s requires a value", name)
-			}
-			value = argv[index]
-		}
-		if value == "" || strings.HasPrefix(value, "--") {
-			return quotaArguments{}, fmt.Errorf("option %s requires a value", name)
-		}
-		*destination = value
-	}
-	if args.output != "plain" && args.output != "json" {
-		return quotaArguments{}, errors.New("--output must be plain or json")
-	}
-	return args, validateServerAndToken(args.server, args.token)
-}
-
-func parseGetMessagesArgs(argv []string, config cliConfig) (getMessagesArguments, error) {
-	server, token := configuredServerAndToken(config)
-	args := getMessagesArguments{server: server, token: token, output: "plain"}
-	valueOptions := map[string]*string{
-		"--server": &args.server, "--client-token": &args.token, "--session-id": &args.sessionID,
-		"--runner-id": &args.runnerID, "--path": &args.repoPath, "--output": &args.output,
-	}
-
-	for index := 0; index < len(argv); index++ {
-		option := argv[index]
-		if option == "--help" {
-			return getMessagesArguments{}, errHelp
-		}
-		if option == "--with-logs" {
-			args.withLogs = true
-			continue
-		}
-		if option == "--latest" {
-			args.latest = true
-			continue
-		}
-		if !strings.HasPrefix(option, "--") {
-			return getMessagesArguments{}, fmt.Errorf("unexpected argument: %s", option)
-		}
-		name, value, inline := strings.Cut(option, "=")
-		destination, ok := valueOptions[name]
-		if !ok {
-			return getMessagesArguments{}, fmt.Errorf("unknown option: %s", option)
-		}
-		if !inline {
-			index++
-			if index >= len(argv) {
-				return getMessagesArguments{}, fmt.Errorf("option %s requires a value", name)
-			}
-			value = argv[index]
-		}
-		if value == "" || strings.HasPrefix(value, "--") {
-			return getMessagesArguments{}, fmt.Errorf("option %s requires a value", name)
-		}
-		*destination = value
-	}
-	if args.sessionID == "" && !args.latest {
-		return getMessagesArguments{}, errors.New("either --session-id or --latest is required")
-	}
-	if args.sessionID != "" && args.latest {
-		return getMessagesArguments{}, errors.New("--session-id and --latest cannot be used together")
-	}
-	if args.output != "plain" && args.output != "json" {
-		return getMessagesArguments{}, errors.New("--output must be plain or json")
-	}
-	return args, validateServerAndToken(args.server, args.token)
-}
-
 func (c *client) request(method, path string, payload any, result any) error {
 	var body io.Reader
 	if payload != nil {
@@ -503,11 +299,6 @@ func (c *client) listSessions() ([]session, error) {
 func (c *client) getAgentInfo(runnerID string) (map[string]map[string]any, error) {
 	info := map[string]map[string]any{}
 	return info, c.request(http.MethodGet, "/api/agents/info?runnerId="+url.QueryEscape(runnerID), nil, &info)
-}
-
-func (c *client) updateQuota() (map[string]any, error) {
-	result := map[string]any{}
-	return result, c.request(http.MethodPost, "/api/agents/quota", map[string]any{}, &result)
 }
 
 func (c *client) getSession(sessionID string) (session, error) {
@@ -576,38 +367,13 @@ func (c *client) getSessionLog(sessionID, messageID string) (string, error) {
 	return result.Log, err
 }
 
-func (c *client) conversationMessages(sessionID string, messages []message) ([]message, error) {
-	filtered := messages[:0]
-	for _, msg := range messages {
-		switch msg.Type {
-		case "script-run", "script-return", "agent-return", "detached-agent-run", "detached-agent-return":
-			continue
-		case "agent-run":
-			log, err := c.getSessionLog(sessionID, msg.ID)
-			if err != nil {
-				return nil, err
-			}
-			msg.Content = log
-		}
-		filtered = append(filtered, msg)
-	}
-	return filtered, nil
-}
-
-func agentLabel(command string) string {
-	label := "Agent"
-	if fields := strings.Fields(command); len(fields) > 0 {
-		label += ": " + fields[0]
-	}
-	return label
-}
-
 type runner struct {
 	ID        string   `json:"id"`
 	Hostname  string   `json:"hostname"`
 	Connected bool     `json:"connected"`
 	Agents    []string `json:"agents"`
 }
+
 type message struct {
 	ID        string `json:"id"`
 	SessionID string `json:"sessionId"`
@@ -620,6 +386,7 @@ type message struct {
 	Command   string `json:"command"`
 	UserName  string `json:"userName"`
 }
+
 type session struct {
 	ID, RunnerID, RepoPath, Status, ErrorMessage string
 	UpdatedAt                                    time.Time
@@ -681,24 +448,6 @@ func resolveRecentSessionID(c *client, runnerID, repoPath string) (string, error
 	return selected.ID, nil
 }
 
-func pollUntilDone(c *client, sessionID string, interval, timeout time.Duration) (session, error) {
-	deadline := time.Now().Add(timeout)
-	for {
-		session, err := c.getSession(sessionID)
-		if err != nil {
-			return session, err
-		}
-		fmt.Fprintf(os.Stderr, "[poll] status=%s\n", session.Status)
-		if session.Status == "done" || session.Status == "error" {
-			return session, nil
-		}
-		if !time.Now().Before(deadline) {
-			return session, fmt.Errorf("session %s did not finish within %s", sessionID, timeout)
-		}
-		time.Sleep(interval)
-	}
-}
-
 func pollDetachedAgentUntilDone(c *client, sessionID, runMessageID string, interval, timeout time.Duration) (message, message, error) {
 	deadline := time.Now().Add(timeout)
 	for {
@@ -728,376 +477,6 @@ func pollDetachedAgentUntilDone(c *client, sessionID, runMessageID string, inter
 }
 
 func formatJSON(value any) string { encoded, _ := json.Marshal(value); return string(encoded) }
-
-func humanReadableQuotaValue(key string, value any) any {
-	if !strings.HasSuffix(key, "At") || value == nil {
-		return value
-	}
-	var t time.Time
-	switch v := value.(type) {
-	case float64:
-		t = timeFromQuotaTimestamp(int64(v))
-	case int64:
-		t = timeFromQuotaTimestamp(v)
-	case int:
-		t = timeFromQuotaTimestamp(int64(v))
-	case json.Number:
-		parsed, err := v.Int64()
-		if err != nil {
-			return value
-		}
-		t = timeFromQuotaTimestamp(parsed)
-	case string:
-		parsed, err := time.Parse(time.RFC3339, v)
-		if err != nil {
-			return value
-		}
-		t = parsed
-	default:
-		return value
-	}
-	return t.Local().Format("2006-01-02 15:04:05 MST")
-}
-
-func timeFromQuotaTimestamp(value int64) time.Time {
-	if absInt64(value) >= 1e12 {
-		return time.UnixMilli(value)
-	}
-	return time.Unix(value, 0)
-}
-
-func absInt64(value int64) int64 {
-	if value < 0 {
-		return -value
-	}
-	return value
-}
-
-func humanReadableQuotaTimes(quota map[string]any) map[string]any {
-	formatted := make(map[string]any, len(quota))
-	for key, value := range quota {
-		if nested, ok := value.(map[string]any); ok {
-			formatted[key] = humanReadableQuotaTimes(nested)
-			continue
-		}
-		formatted[key] = humanReadableQuotaValue(key, value)
-	}
-	return formatted
-}
-
-type agentStatus struct {
-	Type      string         `json:"type"`
-	Binary    string         `json:"binary"`
-	Available bool           `json:"available"`
-	Reason    string         `json:"reason,omitempty"`
-	Quota     map[string]any `json:"quota,omitempty"`
-}
-
-type runnerAgentStatus struct {
-	RunnerID  string        `json:"runnerId"`
-	Hostname  string        `json:"hostname"`
-	Connected bool          `json:"connected"`
-	Agents    []agentStatus `json:"agents"`
-}
-
-var knownAgents = []struct {
-	agentType string
-	binary    string
-}{
-	{"antigravity", "agy"},
-	{"claude", "claude"},
-	{"codex", "codex"},
-	{"opencode", "opencode"},
-}
-
-func analyzeAgentStatus(runner runner, agentType, binary string, quota map[string]any) agentStatus {
-	status := agentStatus{Type: agentType, Binary: binary, Available: true, Quota: quota}
-	if !runner.Connected {
-		status.Available = false
-		status.Reason = "runner disconnected"
-		return status
-	}
-	if !containsString(runner.Agents, binary) {
-		status.Available = false
-		status.Reason = fmt.Sprintf("binary %q not found on runner PATH", binary)
-		return status
-	}
-	if reason := quotaUnavailableReason(agentType, quota); reason != "" {
-		status.Available = false
-		status.Reason = reason
-	}
-	return status
-}
-
-func quotaUnavailableReason(agentType string, quota map[string]any) string {
-	if quota == nil {
-		return ""
-	}
-	switch agentType {
-	case "claude":
-		return quotaBelowThreshold(quota, "HourRemain", "hourly quota below 15%")
-	case "antigravity":
-		geminiLow := quotaNumberBelow(quota, "GeminiHourRemain", 0.15)
-		otherLow := quotaNumberBelow(quota, "OtherHourRemain", 0.15)
-		if geminiLow && otherLow {
-			return "all hourly quotas below 15%"
-		}
-	case "codex":
-		if quotaNumberBelow(quota, "WeeklyRemain", 0.000001) {
-			return "weekly quota exhausted"
-		}
-	}
-	return ""
-}
-
-func quotaBelowThreshold(quota map[string]any, key, reason string) string {
-	if quotaNumberBelow(quota, key, 0.15) {
-		return reason
-	}
-	return ""
-}
-
-func quotaNumberBelow(quota map[string]any, key string, threshold float64) bool {
-	value, ok := quota[key]
-	if !ok || value == nil {
-		return false
-	}
-	number, ok := value.(float64)
-	return ok && number < threshold
-}
-
-func containsString(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
-}
-
-func listAgents(c *client, args listAgentsArguments) error {
-	runners, err := c.listRunners()
-	if err != nil {
-		return err
-	}
-	var reports []runnerAgentStatus
-	for _, runner := range runners {
-		if args.runnerID != "" && runner.ID != args.runnerID {
-			continue
-		}
-		agentInfo := map[string]map[string]any{}
-		if runner.Connected {
-			agentInfo, err = c.getAgentInfo(runner.ID)
-			if err != nil {
-				return err
-			}
-		}
-		report := runnerAgentStatus{RunnerID: runner.ID, Hostname: runner.Hostname, Connected: runner.Connected}
-		for _, known := range knownAgents {
-			report.Agents = append(report.Agents, analyzeAgentStatus(runner, known.agentType, known.binary, agentInfo[known.agentType]))
-		}
-		reports = append(reports, report)
-	}
-	if args.runnerID != "" && len(reports) == 0 {
-		return fmt.Errorf("runner %q not found or not accessible", args.runnerID)
-	}
-	if args.output == "json" {
-		pretty, _ := json.MarshalIndent(reports, "", "  ")
-		fmt.Println(string(pretty))
-		return nil
-	}
-	for _, report := range reports {
-		connectedStr := "disconnected"
-		if report.Connected {
-			connectedStr = "connected"
-		}
-		fmt.Printf("runner: %s (%s) [%s]\n", report.Hostname, report.RunnerID, connectedStr)
-		for _, agent := range report.Agents {
-			status := "available"
-			if !agent.Available {
-				status = "unavailable"
-				if agent.Reason != "" {
-					status += ": " + agent.Reason
-				}
-			}
-			fmt.Printf("  %-14s %s\n", agent.Type, status)
-		}
-	}
-	return nil
-}
-
-func getQuota(c *client, args quotaArguments) error {
-	runners, err := c.listRunners()
-	if err != nil {
-		return err
-	}
-	type quotaReport struct {
-		RunnerID  string                    `json:"runnerId"`
-		Hostname  string                    `json:"hostname"`
-		Connected bool                      `json:"connected"`
-		Quotas    map[string]map[string]any `json:"quotas"`
-	}
-	reports := make([]quotaReport, 0, len(runners))
-	for _, runner := range runners {
-		quotas, err := c.getAgentInfo(runner.ID)
-		if err != nil {
-			return err
-		}
-		for agentType, quota := range quotas {
-			quotas[agentType] = humanReadableQuotaTimes(quota)
-		}
-		reports = append(reports, quotaReport{RunnerID: runner.ID, Hostname: runner.Hostname, Connected: runner.Connected, Quotas: quotas})
-	}
-	if args.output == "json" {
-		pretty, _ := json.MarshalIndent(reports, "", "  ")
-		fmt.Println(string(pretty))
-		return nil
-	}
-	for _, report := range reports {
-		connectedStr := "disconnected"
-		if report.Connected {
-			connectedStr = "connected"
-		}
-		fmt.Printf("runner: %s (%s) [%s]\n", report.Hostname, report.RunnerID, connectedStr)
-		if len(report.Quotas) == 0 {
-			fmt.Println("  no quota data")
-			continue
-		}
-		for agentType, quota := range report.Quotas {
-			fmt.Printf("  %s:\n", agentType)
-			for key, val := range quota {
-				fmt.Printf("    %s: %v\n", key, val)
-			}
-		}
-	}
-	return nil
-}
-
-func updateQuota(c *client, args quotaArguments) error {
-	result, err := c.updateQuota()
-	if err != nil {
-		return err
-	}
-	if args.output == "json" {
-		pretty, _ := json.MarshalIndent(result, "", "  ")
-		fmt.Println(string(pretty))
-		return nil
-	}
-	queued, _ := result["queued"].(float64)
-	fmt.Printf("Quota refresh queued for %d runner(s).\n", int(queued))
-	return nil
-}
-
-func getMessages(c *client, args getMessagesArguments) error {
-	if args.latest {
-		if args.runnerID == "" {
-			hostname, err := os.Hostname()
-			if err != nil {
-				return err
-			}
-			args.runnerID, err = resolveRunnerID(c, hostname)
-			if err != nil {
-				return err
-			}
-		}
-		if args.repoPath == "" {
-			wd, err := os.Getwd()
-			if err != nil {
-				return err
-			}
-			args.repoPath = wd
-		}
-		sessionID, err := resolveRecentSessionID(c, args.runnerID, args.repoPath)
-		if err != nil {
-			return err
-		}
-		args.sessionID = sessionID
-		fmt.Fprintf(os.Stderr, "Using most recent session %s...\n", args.sessionID)
-	}
-
-	sess, err := c.getSession(args.sessionID)
-	if err != nil {
-		return err
-	}
-
-	messages, err := c.listMessages(args.sessionID)
-	if err != nil {
-		return err
-	}
-
-	messages, err = c.conversationMessages(args.sessionID, messages)
-	if err != nil {
-		return err
-	}
-
-	if args.output == "json" {
-		if !args.withLogs {
-			pretty, _ := json.MarshalIndent(messages, "", "  ")
-			fmt.Println(string(pretty))
-			return nil
-		}
-		type messageWithLog struct {
-			message
-			Log string `json:"log,omitempty"`
-		}
-		enriched := make([]messageWithLog, 0, len(messages))
-		for _, msg := range messages {
-			entry := messageWithLog{message: msg}
-			if msg.Type == "agent-run" {
-				entry.Log = msg.Content
-			}
-			enriched = append(enriched, entry)
-		}
-		pretty, _ := json.MarshalIndent(enriched, "", "  ")
-		fmt.Println(string(pretty))
-		return nil
-	}
-
-	isSessionRunning := sess.Status == "running"
-
-	separator := strings.Repeat("─", 60)
-	for _, msg := range messages {
-		ts := msg.CreatedAt
-		if t, err := time.Parse(time.RFC3339, msg.CreatedAt); err == nil {
-			ts = t.Local().Format("2006-01-02 15:04:05")
-		}
-
-		switch msg.Role {
-		case "user":
-			sender := "User"
-			if msg.UserName != "" {
-				sender = msg.UserName
-			}
-			fmt.Printf("\n%s\n[%s] %s\n%s\n", separator, ts, sender, separator)
-			fmt.Println(msg.Content)
-		case "agent":
-			fmt.Printf("\n%s\n[%s] Agent\n%s\n", separator, ts, separator)
-			fmt.Println(msg.Content)
-		case "system":
-			label := "System"
-			if msg.Type == "agent-run" {
-				label = agentLabel(msg.Command)
-				if msg.ExitCode != nil {
-					label += fmt.Sprintf(" (exit %d)", *msg.ExitCode)
-				} else if isSessionRunning {
-					label += " (Running)"
-				}
-			}
-			fmt.Printf("\n%s\n[%s] %s\n%s\n", separator, ts, label, separator)
-			if msg.Content != "" {
-				if msg.Type == "agent-run" {
-					fmt.Print(msg.Content)
-					if !strings.HasSuffix(msg.Content, "\n") {
-						fmt.Println()
-					}
-				} else {
-					fmt.Println(msg.Content)
-				}
-			}
-		}
-	}
-	return nil
-}
 
 func run(argv []string) error {
 	if len(argv) == 1 && (argv[0] == "--help" || argv[0] == "-h") {
@@ -1242,16 +621,22 @@ func run(argv []string) error {
 		fmt.Fprintf(os.Stderr, "Session ID: %s\nWaiting for the run to finish...\n", sessionID)
 	}
 
-	session, rawOutput, detachedFailed, err := streamSessionUntilDone(c, args, sessionID, messageID, ws, interval, timeout)
+	session, rawOutput, agentCommand, detachedFailed, err := streamSessionUntilDone(c, args, sessionID, messageID, ws, interval, timeout)
 	if err != nil {
 		return err
 	}
 
 	if args.output == "json" {
 		result := session.Raw
+		if result == nil {
+			result = map[string]any{}
+		}
 		delete(result, "id")
 		result["sessionId"] = sessionID
 		result["rawOutput"] = rawOutput
+		if agentCommand != "" {
+			result["command"] = agentCommand
+		}
 		fmt.Fprintln(os.Stderr, "\n=== Result ===")
 		pretty, _ := json.MarshalIndent(result, "", "  ")
 		fmt.Println(string(pretty))

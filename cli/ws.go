@@ -241,12 +241,29 @@ func (ws *wsClient) Close() error {
 	return ws.conn.Close()
 }
 
-func streamSessionUntilDone(c *client, args arguments, sessionID, messageID string, ws *wsClient, interval, timeout time.Duration) (session, string, bool, error) {
+func extractCommand(m message) string {
+	if m.Command != "" {
+		return m.Command
+	}
+	if m.Content != "" {
+		if start := strings.Index(m.Content, "```bash\n"); start != -1 {
+			start += len("```bash\n")
+			if end := strings.Index(m.Content[start:], "```"); end != -1 {
+				return strings.TrimSpace(m.Content[start : start+end])
+			}
+		}
+	}
+	return ""
+}
+
+func streamSessionUntilDone(c *client, args arguments, sessionID, messageID string, ws *wsClient, interval, timeout time.Duration) (session, string, string, bool, error) {
 	var rawOutput strings.Builder
 	var finalSession session
 	var detachedRun message
 	var detachedReturn message
 	var detachedFailed bool
+	var agentCommand string
+	commandPrinted := false
 	streamed := false
 
 	var eventsChan <-chan wsEvent
@@ -287,9 +304,16 @@ func streamSessionUntilDone(c *client, args arguments, sessionID, messageID stri
 					}
 				}
 			case "message:added":
-				if messageID != "" {
-					var m message
-					if err := json.Unmarshal(ev.Payload, &m); err == nil && m.ParentID == messageID && m.Type == "detached-agent-return" {
+				var m message
+				if err := json.Unmarshal(ev.Payload, &m); err == nil {
+					if (messageID == "" && m.Type == "agent-run") || (messageID != "" && m.ID == messageID && m.Type == "detached-agent-run") || (messageID == "" && m.Type == "detached-agent-run") {
+						if cmd := extractCommand(m); cmd != "" && !commandPrinted {
+							commandPrinted = true
+							agentCommand = cmd
+							fmt.Fprintf(os.Stderr, "Agent command: %s\n", cmd)
+						}
+					}
+					if messageID != "" && m.ParentID == messageID && m.Type == "detached-agent-return" {
 						detachedReturn = m
 						done = true
 					}
@@ -302,6 +326,11 @@ func streamSessionUntilDone(c *client, args arguments, sessionID, messageID stri
 					for _, candidate := range messages {
 						if candidate.ID == messageID && candidate.Type == "detached-agent-run" {
 							detachedRun = candidate
+							if cmd := extractCommand(candidate); cmd != "" && !commandPrinted {
+								commandPrinted = true
+								agentCommand = cmd
+								fmt.Fprintf(os.Stderr, "Agent command: %s\n", cmd)
+							}
 						}
 						if candidate.Type == "detached-agent-return" && candidate.ParentID == messageID {
 							detachedReturn = candidate
@@ -311,6 +340,21 @@ func streamSessionUntilDone(c *client, args arguments, sessionID, messageID stri
 					}
 				}
 			} else {
+				if !commandPrinted {
+					messages, err := c.listMessages(sessionID)
+					if err == nil {
+						for index := len(messages) - 1; index >= 0; index-- {
+							if messages[index].Type == "agent-run" || messages[index].Type == "detached-agent-run" {
+								if cmd := extractCommand(messages[index]); cmd != "" {
+									commandPrinted = true
+									agentCommand = cmd
+									fmt.Fprintf(os.Stderr, "Agent command: %s\n", cmd)
+									break
+								}
+							}
+						}
+					}
+				}
 				s, err := c.getSession(sessionID)
 				if err == nil {
 					if ws == nil {
@@ -324,9 +368,9 @@ func streamSessionUntilDone(c *client, args arguments, sessionID, messageID stri
 			}
 		case <-deadline.C:
 			if messageID != "" {
-				return finalSession, rawOutput.String(), false, fmt.Errorf("detached agent run %s did not finish within %s", messageID, timeout)
+				return finalSession, rawOutput.String(), agentCommand, false, fmt.Errorf("detached agent run %s did not finish within %s", messageID, timeout)
 			}
-			return finalSession, rawOutput.String(), false, fmt.Errorf("session %s did not finish within %s", sessionID, timeout)
+			return finalSession, rawOutput.String(), agentCommand, false, fmt.Errorf("session %s did not finish within %s", sessionID, timeout)
 		}
 	}
 
@@ -346,6 +390,13 @@ func streamSessionUntilDone(c *client, args arguments, sessionID, messageID stri
 				}
 			}
 		}
+		if cmd := extractCommand(detachedRun); cmd != "" {
+			agentCommand = cmd
+			if !commandPrinted {
+				commandPrinted = true
+				fmt.Fprintf(os.Stderr, "Agent command: %s\n", cmd)
+			}
+		}
 		detachedFailed = (detachedRun.ExitCode != nil && *detachedRun.ExitCode != 0) || detachedReturn.Role != "agent"
 		if finalSession.ID == "" {
 			finalSession, _ = c.getSession(sessionID)
@@ -361,6 +412,23 @@ func streamSessionUntilDone(c *client, args arguments, sessionID, messageID stri
 		if finalSession.ID == "" {
 			finalSession, _ = c.getSession(sessionID)
 		}
+		if !commandPrinted || agentCommand == "" {
+			messages, err := c.listMessages(sessionID)
+			if err == nil {
+				for index := len(messages) - 1; index >= 0; index-- {
+					if messages[index].Type == "agent-run" || messages[index].Type == "detached-agent-run" {
+						if cmd := extractCommand(messages[index]); cmd != "" {
+							agentCommand = cmd
+							if !commandPrinted {
+								commandPrinted = true
+								fmt.Fprintf(os.Stderr, "Agent command: %s\n", cmd)
+							}
+							break
+						}
+					}
+				}
+			}
+		}
 		if rawOutput.Len() == 0 || !streamed || args.output == "json" {
 			log, err := c.rawOutput(sessionID)
 			if err == nil && log != "" {
@@ -374,5 +442,5 @@ func streamSessionUntilDone(c *client, args arguments, sessionID, messageID stri
 		fmt.Print(rawOutput.String())
 	}
 
-	return finalSession, rawOutput.String(), detachedFailed, nil
+	return finalSession, rawOutput.String(), agentCommand, detachedFailed, nil
 }

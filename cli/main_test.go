@@ -383,7 +383,7 @@ func TestStreamSessionUntilDoneWS(t *testing.T) {
 
 	c := &client{server: server.URL, token: "token123", http: server.Client()}
 	args := arguments{output: "plain"}
-	sess, output, failed, err := streamSessionUntilDone(c, args, "sess-ws-1", "", ws, 100*time.Millisecond, 2*time.Second)
+	sess, output, agentCmd, failed, err := streamSessionUntilDone(c, args, "sess-ws-1", "", ws, 100*time.Millisecond, 2*time.Second)
 	if err != nil {
 		t.Fatalf("streamSessionUntilDone error: %v", err)
 	}
@@ -396,6 +396,7 @@ func TestStreamSessionUntilDoneWS(t *testing.T) {
 	if failed {
 		t.Errorf("expected failed == false")
 	}
+	_ = agentCmd
 }
 
 func TestStreamSessionUntilDoneFallbackPolling(t *testing.T) {
@@ -415,7 +416,7 @@ func TestStreamSessionUntilDoneFallbackPolling(t *testing.T) {
 		}
 		if r.URL.Path == "/api/messages" {
 			_ = json.NewEncoder(w).Encode([]map[string]any{
-				{"id": "msg-1", "type": "agent-run"},
+				{"id": "msg-1", "type": "agent-run", "command": "echo test"},
 			})
 			return
 		}
@@ -430,7 +431,7 @@ func TestStreamSessionUntilDoneFallbackPolling(t *testing.T) {
 
 	c := &client{server: server.URL, token: "token123", http: server.Client()}
 	args := arguments{output: "plain"}
-	sess, output, failed, err := streamSessionUntilDone(c, args, "sess-poll-1", "", nil, 10*time.Millisecond, 2*time.Second)
+	sess, output, agentCmd, failed, err := streamSessionUntilDone(c, args, "sess-poll-1", "", nil, 10*time.Millisecond, 2*time.Second)
 	if err != nil {
 		t.Fatalf("streamSessionUntilDone error: %v", err)
 	}
@@ -440,7 +441,27 @@ func TestStreamSessionUntilDoneFallbackPolling(t *testing.T) {
 	if output != "Polled output result\n" {
 		t.Errorf("unexpected output: %q", output)
 	}
+	if agentCmd != "echo test" {
+		t.Errorf("unexpected agentCmd: %q", agentCmd)
+	}
 	if failed {
 		t.Errorf("expected failed == false")
+	}
+}
+
+func TestExtractCommand(t *testing.T) {
+	m1 := message{Command: "agy --prompt-file /tmp/prompt.txt"}
+	if got := extractCommand(m1); got != "agy --prompt-file /tmp/prompt.txt" {
+		t.Fatalf("unexpected command: %q", got)
+	}
+
+	m2 := message{Content: "⚙️ Executing command:\n```bash\nclaude --session-id 123\n```"}
+	if got := extractCommand(m2); got != "claude --session-id 123" {
+		t.Fatalf("unexpected command: %q", got)
+	}
+
+	m3 := message{Content: "⚙️ Review · Executing command:\n```bash\n/bin/bash -c 'codex exec'\n```\n"}
+	if got := extractCommand(m3); got != "/bin/bash -c 'codex exec'" {
+		t.Fatalf("unexpected command: %q", got)
 	}
 }
