@@ -33,6 +33,12 @@ export default function manifest(): MetadataRoute.Manifest {
         type: 'image/png',
         purpose: 'maskable',
       },
+      {
+        src: '/icon-transparent-192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'monochrome',
+      },
     ],
   }
 }

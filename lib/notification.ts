@@ -55,7 +55,7 @@ export async function sendNotification(
     await registration.showNotification(title, {
       body,
       icon: "/icon-192.png",
-      badge: "/icon-192.png",
+      badge: "/badge-96.png",
       data: { url: url || "/" },
     });
   } catch (error) {
@@ -65,6 +65,7 @@ export async function sendNotification(
       new Notification(title, {
         body,
         icon: "/icon-192.png",
+        badge: "/badge-96.png",
         data: { url: url || "/" },
       });
     } catch (fallbackError) {
