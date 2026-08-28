@@ -15,7 +15,16 @@ const CODEX_STATUS_PATH = mocksDir
 const args = process.argv.slice(2);
 
 if (args[0] === 'exec') {
-  // Non-interactive `codex exec ...` mode is not exercised by the quota test.
+  console.error('session id: 019f9883-1234-5678-9abc-def012345678');
+  const promptFile = process.env.ARONDO_PROMPT_FILE;
+  let promptContent = '';
+  if (promptFile && fs.existsSync(promptFile)) {
+    promptContent = fs.readFileSync(promptFile, 'utf8');
+  }
+  if (promptContent.includes('FAIL_MOCK') || process.env.MOCK_CODEX_FAIL === '1') {
+    console.error('Mock codex execution failed!');
+    process.exit(1);
+  }
   console.log('Mock codex exec');
   process.exit(0);
 }

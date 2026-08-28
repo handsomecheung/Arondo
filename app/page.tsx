@@ -1057,6 +1057,7 @@ export default function HomePage() {
         await fetch(`/api/sessions/${selectedSessionId}/rerun-agent`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messageId: cardInfo.runMsg.id }),
         });
       } catch (err) {
         console.error("Failed to retry agent:", err);

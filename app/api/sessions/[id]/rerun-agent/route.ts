@@ -26,12 +26,47 @@ export async function POST(
     return NextResponse.json({ error: "Agent is already running" }, { status: 400 });
   }
 
+  const body = await req.json().catch(() => ({}));
+  const { messageId } = body;
+  if (!messageId || typeof messageId !== "string" || !messageId.trim()) {
+    return NextResponse.json({ error: "messageId is required" }, { status: 400 });
+  }
+
   const messages = await getMessages(id);
-  const initialUserMessage = messages.find((message) =>
-    message.role === "user" && message.type !== "user-todo"
+  const targetMsgIndex = messages.findIndex((m) => m.id === messageId);
+  if (targetMsgIndex === -1) {
+    return NextResponse.json({ error: "Message not found" }, { status: 404 });
+  }
+
+  const targetMsg = messages[targetMsgIndex];
+  if (targetMsg.type !== "agent-run") {
+    return NextResponse.json({ error: "Message is not an agent run" }, { status: 400 });
+  }
+
+  const returnMsg = messages.find(
+    (m) => m.parentId === targetMsg.id && (m.type === "agent-return" || m.type === "detached-agent-return")
   );
-  const prompt = initialUserMessage?.prompt || initialUserMessage?.content;
-  if (!prompt) {
+  if (!returnMsg) {
+    return NextResponse.json({ error: "Agent is still running or has not completed" }, { status: 400 });
+  }
+
+  const isSuccess = returnMsg.content.startsWith("✅");
+  const isStopped = returnMsg.content.startsWith("🛑");
+  if (isSuccess) {
+    return NextResponse.json({ error: "Only failed agent runs can be retried" }, { status: 400 });
+  }
+  if (isStopped) {
+    return NextResponse.json({ error: "Stopped agent runs cannot be retried" }, { status: 400 });
+  }
+
+  let prompt = targetMsg.prompt;
+  if (!prompt || !prompt.trim()) {
+    const priorUserMessage = [...messages.slice(0, targetMsgIndex)].reverse().find(
+      (m) => m.role === "user" && m.type !== "user-todo"
+    );
+    prompt = priorUserMessage?.prompt || priorUserMessage?.content;
+  }
+  if (!prompt || !prompt.trim()) {
     return NextResponse.json({ error: "Session has no prompt to re-run" }, { status: 400 });
   }
 
@@ -47,13 +82,23 @@ export async function POST(
     automodelLog: (text) => appendAutomodelLog(id, systemMessageId, text),
   });
   const resolvedType = resolved.agentType;
+
+  const priorRuns = messages.slice(0, targetMsgIndex).filter((m) => m.type === "agent-run" && m.resolvedAgentType);
+  const lastPriorRun = priorRuns[priorRuns.length - 1];
+  const prevResolvedType = lastPriorRun?.resolvedAgentType;
+  const isAgentSwitch = !!prevResolvedType && prevResolvedType !== resolvedType;
+
+  const isResume = isAgentSwitch
+    ? priorRuns.some((m) => m.resolvedAgentType === resolvedType)
+    : priorRuns.length > 0;
+
   const agent = getAgent(resolvedType);
   const fullPrompt = agent.buildPrompt(prompt);
   const command = agent.getCommand({
     prompt,
     repoPath: session.repoPath,
     sessionId: session.id,
-    isResume: false,
+    isResume,
     model: resolved.model,
     effort: resolved.effort,
   });
@@ -67,6 +112,7 @@ export async function POST(
     content: `⚙️ Executing command:\n\`\`\`bash\n${command}\n\`\`\``,
     type: "agent-run",
     resolvedAgentType: resolvedType,
+    resolvedAgyQuotaGroup: resolved.agyQuotaGroup,
     prompt: fullPrompt,
   });
   eventBus.publish({ type: "message_added", payload: systemMsg });

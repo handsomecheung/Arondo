@@ -650,6 +650,7 @@ export default function TasksPage() {
         res = await fetch(`/api/sessions/${task.sessionId}/rerun-agent`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messageId: task.messageId }),
         });
       } else {
         return;
