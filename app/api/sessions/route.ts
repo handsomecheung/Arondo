@@ -148,6 +148,7 @@ export async function POST(req: NextRequest) {
       agentType,
       repoPath,
       runnerId,
+      tokenUuid: getUuidByToken(token) || undefined,
     }, { tempDir });
     eventBus.publish({ type: "session_updated", payload: session });
     return NextResponse.json(session, { status: 201 });
@@ -162,6 +163,7 @@ export async function POST(req: NextRequest) {
       agentType,
       repoPath,
       runnerId,
+      tokenUuid: getUuidByToken(token) || undefined,
     }, { tempDir });
     const todoMessage = await addTodoMessage(session.id, {
       content: trimmedMessage,

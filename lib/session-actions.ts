@@ -370,6 +370,7 @@ export async function dispatchCreateSession(
     agentType,
     repoPath,
     runnerId,
+    tokenUuid: opts.tokenUuid,
   }, { tempDir: opts.tempDir });
 
   const systemMessageId = crypto.randomUUID();

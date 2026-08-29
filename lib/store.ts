@@ -91,6 +91,7 @@ export interface Session {
   autoLockedAgentModel?: string;
   autoLockedAgentEffort?: string;
   autoLockedAgyQuotaGroup?: "gemini" | "other";
+  tokenUuid?: string;
 }
 
 export type MessageType =

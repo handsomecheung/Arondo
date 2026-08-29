@@ -62,26 +62,34 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
       }
     }
 
-    // Resolve runnerId for authorization checks
+    // Resolve runnerId and tokenUuid for authorization checks
     let runnerId: string | undefined = event.payload?.runnerId;
+    let sessionTokenUuid: string | undefined = event.payload?.tokenUuid;
 
     const resolveAndBroadcast = async () => {
-      if (!runnerId && event.payload) {
+      if ((!runnerId || !sessionTokenUuid) && event.payload) {
         const sid = event.payload.sessionId || event.payload.id;
         if (sid) {
           const { getSession } = await import("./store");
           const session = await getSession(sid);
-          if (session) runnerId = session.runnerId;
+          if (session) {
+            if (!runnerId) runnerId = session.runnerId;
+            if (!sessionTokenUuid) sessionTokenUuid = session.tokenUuid;
+          }
         } else if (event.payload.projectId) {
           const { getProject } = await import("./store");
           const project = await getProject(event.payload.projectId);
-          if (project) runnerId = project.runnerId;
+          if (project && !runnerId) runnerId = project.runnerId;
         }
       }
 
       for (const [ws, clientToken] of openClients) {
         let allowed = true;
-        if (runnerId) {
+        if (sessionTokenUuid) {
+          const { getUuidByToken } = await import("./auth");
+          const clientUuid = getUuidByToken(clientToken);
+          allowed = clientUuid === sessionTokenUuid;
+        } else if (runnerId) {
           allowed = await runnerManager.isTokenAllowedForRunnerId(runnerId, clientToken);
         } else {
           allowed = !runnerManager.isTokenRequired();
