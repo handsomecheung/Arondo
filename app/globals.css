@@ -1917,6 +1917,19 @@ body {
   background-color: #fff;
 }
 
+.agent-filelink-missing {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.agent-filelink-missing code {
+  color: var(--text-muted);
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+}
+
 .agent-filelink-diff-btn {
   display: inline-block;
   width: 18px;

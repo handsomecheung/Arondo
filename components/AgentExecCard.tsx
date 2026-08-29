@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import remarkFileLinks, { extractCandidatePaths, candidateToPath } from "@/lib/remarkFileLinks";
+import remarkFileLinks, { extractCandidatePaths, candidateToPath, isPathCandidate } from "@/lib/remarkFileLinks";
 import remarkSoftLineBreaks from "@/lib/remarkSoftLineBreaks";
 import { resolveRepoFilePath } from "@/lib/homeUtils";
 import ExecCard, { ExecCardProps } from "@/components/ExecCard";
@@ -12,7 +12,7 @@ import { IconTerminal, IconFileText, IconCopy, IconCode } from "@/components/Ico
 import DiffModal from "@/components/modals/DiffModal";
 import CommandModal from "@/components/modals/CommandModal";
 
-const RENDERED_HTML_CACHE_MARKER = "<!--arondo-agent-output-html-v3-->";
+const RENDERED_HTML_CACHE_MARKER = "<!--arondo-agent-output-html-v4-->";
 
 // Terminal mode-control sequences (cursor visibility, mouse tracking, bracketed paste, etc.)
 // leak into agent PTY output but carry no visual meaning outside a real terminal emulator.
@@ -372,6 +372,13 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
                       >
                         {children}
                       </button>
+                    );
+                  }
+                  if (href && isPathCandidate(href)) {
+                    return (
+                      <span className="agent-filelink-missing" title="File not found on runner">
+                        {children}
+                      </span>
                     );
                   }
                   return (

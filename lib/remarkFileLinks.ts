@@ -51,7 +51,7 @@ function truncateAtUrlDelimiters(url: string): string {
 // A candidate is "path-like" if it's a file:// URL, or matches FILE_PATH_RE
 // once any trailing line-reference is stripped. Decode URI-escaped paths first
 // so Markdown links such as `%5Bid%5D` are recognized as filesystem paths.
-function isPathCandidate(value: string): boolean {
+export function isPathCandidate(value: string): boolean {
   return isFileUrl(value) || FILE_PATH_RE.test(stripLocationSuffix(decodeURIComponent(value)));
 }
 

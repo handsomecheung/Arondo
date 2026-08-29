@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import remarkFileLinks, { candidateToPath, extractCandidatePaths } from "../lib/remarkFileLinks";
+import remarkFileLinks, { candidateToPath, extractCandidatePaths, isPathCandidate } from "../lib/remarkFileLinks";
 
 test("renders a verified file URL in agent markdown as a File Browser link", () => {
   const fileUrl = "file:///mnt/coder-workspaces/private-workspace/repos/github/Arondo/app/api/sessions/%5Bid%5D/detached-agent-runs/route.ts";
@@ -49,4 +49,12 @@ test("renders a verified absolute path link in agent markdown as a File Browser 
     hName: "a",
     hProperties: { href: `filelink:${candidateToPath(path)}` },
   });
+});
+
+test("recognizes the Vision Doc absolute path link as a file candidate", () => {
+  const path = "/Users/example/Documents/repo/project/README.txt";
+  const markdown = `[Vision Doc](${path})`;
+
+  expect(extractCandidatePaths(markdown)).toEqual([path]);
+  expect(isPathCandidate(path)).toBe(true);
 });
