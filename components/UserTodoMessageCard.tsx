@@ -5,6 +5,7 @@ import { IconMoreVertical, IconSend, IconX, IconClock } from "@/components/Icons
 import { ScheduleDateTimeInputs, defaultScheduleTime } from "@/components/ScheduleDateTimeInputs";
 import { useTaskMenuPlacement } from "@/components/useTaskMenuPlacement";
 import type { TodoTrigger, TodoTriggerKind } from "@/types/home";
+import { handleCardDoubleClick } from "@/components/ExecCard";
 
 export interface UserTodoMessageCardProps {
   content: string;
@@ -116,7 +117,10 @@ export default function UserTodoMessageCard({
   const displayColor = userColor || "#6b7280";
 
   return (
-    <div className="exec-card user-message-card user-todo-message-card">
+    <div
+      className="exec-card user-message-card user-todo-message-card"
+      onDoubleClick={handleCardDoubleClick}
+    >
       <div className="exec-card-header">
         <div
           title={displayName}

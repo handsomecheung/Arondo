@@ -1,6 +1,7 @@
 "use client";
 
 import { IconTerminal } from "@/components/Icons";
+import { handleCardDoubleClick } from "@/components/ExecCard";
 
 export interface UserAgentCommandCardProps {
   title: string;
@@ -26,7 +27,10 @@ export default function UserAgentCommandCard({
   const displayColor = userColor || "#6b7280";
 
   return (
-    <div className="exec-card user-agent-command-card exec-card-success">
+    <div
+      className="exec-card user-agent-command-card exec-card-success"
+      onDoubleClick={handleCardDoubleClick}
+    >
       <div className="exec-card-header">
         <div
           title={displayName}

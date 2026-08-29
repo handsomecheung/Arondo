@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { IconMoreVertical, IconCopy } from "@/components/Icons";
 import { useTaskMenuPlacement } from "@/components/useTaskMenuPlacement";
+import { handleCardDoubleClick } from "@/components/ExecCard";
 
 export interface UserMessageCardProps {
   content: string;
@@ -44,7 +45,10 @@ export default function UserMessageCard({
   const displayColor = userColor || "#6b7280";
 
   return (
-    <div className="exec-card user-message-card">
+    <div
+      className="exec-card user-message-card"
+      onDoubleClick={handleCardDoubleClick}
+    >
       <div className="exec-card-header">
         <div
           title={displayName}

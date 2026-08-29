@@ -1587,6 +1587,17 @@ body {
   flex-shrink: 0;
   animation: fadeInUp 0.25s ease;
   margin: 2px 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Allow text selection in messages and log outputs */
+.user-message-card-content,
+.agent-exec-output,
+.exec-card pre,
+.exec-card code {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .exec-card.user-agent-command-card,

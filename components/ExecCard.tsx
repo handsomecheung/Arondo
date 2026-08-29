@@ -93,6 +93,27 @@ function IconShell() {
   );
 }
 
+export const handleCardDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const selection = window.getSelection()?.toString();
+  if (selection && selection.trim().length > 0) {
+    return;
+  }
+
+  const target = e.target as HTMLElement;
+  const isInteractive = target.closest(
+    'button, a, input, select, textarea, [role="button"], ' +
+    '.exec-card-actions, .task-menu-dropdown, ' +
+    '.agent-exec-output, .user-message-card-content, ' +
+    'pre, code'
+  );
+
+  if (isInteractive) {
+    return;
+  }
+
+  e.currentTarget.scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
 export default function ExecCard({
   item,
   className,
@@ -153,7 +174,10 @@ export default function ExecCard({
     (!isRunning && !!onDeleteTask);
 
   return (
-    <div className={`exec-card ${statusClass} ${collapsed ? "exec-card-collapsed" : ""} ${className || ""}`}>
+    <div
+      className={`exec-card ${statusClass} ${collapsed ? "exec-card-collapsed" : ""} ${className || ""}`}
+      onDoubleClick={handleCardDoubleClick}
+    >
       <div className="exec-card-header">
         <div className="exec-card-icon">
           {isRunning ? (
@@ -192,7 +216,16 @@ export default function ExecCard({
                 onClick={(e) => {
                   e.stopPropagation();
                   userChangedCollapseRef.current = true;
+                  const willExpand = collapsed;
                   setCollapsed((v) => !v);
+                  if (willExpand) {
+                    const cardEl = e.currentTarget.closest(".exec-card");
+                    if (cardEl) {
+                      requestAnimationFrame(() => {
+                        cardEl.scrollIntoView({ behavior: "smooth", block: "start" });
+                      });
+                    }
+                  }
                 }}
                 title={collapsed ? "Expand card" : "Collapse card"}
               >
