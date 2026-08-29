@@ -3,7 +3,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogle } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
-import { getAutomodelConfig } from "./config";
+import { getAutomodelConfig, isAutomodelEnabled } from "./config";
 import type { AutoModelDecision, AutoModelInput, AutoModelOption } from "./types";
 
 const DecisionSchema = z.object({
@@ -96,6 +96,12 @@ export async function routeModel(input: AutoModelInput, options: RouteModelOptio
     logParts.push(formatLogSection("Elapsed", `${Date.now() - startedAt}ms`));
     await options.writeLog(logParts.join("\n"));
   };
+
+  if (!isAutomodelEnabled()) {
+    logParts.push(formatLogSection("Result", "skipped: automodel is disabled"));
+    await flushLog();
+    return null;
+  }
 
   const config = getAutomodelConfig();
   if (!config) {

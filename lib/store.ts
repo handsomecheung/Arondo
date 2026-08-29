@@ -20,6 +20,7 @@ export interface AppSettings {
   sessionArchiveDays?: number;
   showHiddenFiles?: boolean;
   showTempDirSessions?: boolean;
+  enableAutomodel?: boolean;
   llmApiKeys?: {
     ANTHROPIC_API_KEY?: string;
     OPENAI_API_KEY?: string;
@@ -766,6 +767,11 @@ export async function getShowHiddenFiles(): Promise<boolean> {
 export async function getShowTempDirSessions(): Promise<boolean> {
   const settings = await getAppSettings();
   return settings.showTempDirSessions !== undefined ? settings.showTempDirSessions : false;
+}
+
+export async function getEnableAutomodel(): Promise<boolean> {
+  const settings = await getAppSettings();
+  return settings.enableAutomodel !== undefined ? settings.enableAutomodel : false;
 }
 
 export async function getSessionArchiveAgeMs(): Promise<number> {

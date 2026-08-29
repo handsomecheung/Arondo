@@ -185,4 +185,59 @@ test.describe('Authentication API tests', () => {
       env: false,
     });
   });
+
+  test('enableAutomodel defaults to false and can be toggled via settings API', async ({ request }) => {
+    const getInitialRes = await request.get('/api/settings', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+    });
+    expect(getInitialRes.status()).toBe(200);
+    const initialBody = await getInitialRes.json();
+    expect(typeof initialBody.enableAutomodel).toBe('boolean');
+
+    // Toggle on
+    const enableRes = await request.post('/api/settings', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: { enableAutomodel: true },
+    });
+    expect(enableRes.status()).toBe(200);
+    const enabledBody = await enableRes.json();
+    expect(enabledBody.enableAutomodel).toBe(true);
+
+    const getEnabledRes = await request.get('/api/settings', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+    });
+    expect(getEnabledRes.status()).toBe(200);
+    expect((await getEnabledRes.json()).enableAutomodel).toBe(true);
+
+    // Toggle off
+    const disableRes = await request.post('/api/settings', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: { enableAutomodel: false },
+    });
+    expect(disableRes.status()).toBe(200);
+    expect((await disableRes.json()).enableAutomodel).toBe(false);
+
+    const getDisabledRes = await request.get('/api/settings', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+    });
+    expect(getDisabledRes.status()).toBe(200);
+    expect((await getDisabledRes.json()).enableAutomodel).toBe(false);
+  });
+
+  test('when enableAutomodel is false, automodel remains disabled even if API keys are configured', async ({ request }) => {
+    await request.post('/api/settings', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        enableAutomodel: false,
+        llmApiKeys: {
+          ANTHROPIC_API_KEY: 'test-anthropic-key',
+        },
+      },
+    });
+
+    const { getAutomodelConfig, isAutomodelEnabled } = await import('../../lib/automodel/config');
+
+    expect(isAutomodelEnabled()).toBe(false);
+    expect(getAutomodelConfig()).toBeNull();
+  });
 });

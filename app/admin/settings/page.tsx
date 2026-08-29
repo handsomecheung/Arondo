@@ -216,6 +216,8 @@ export default function AdminSettingsPage() {
   const [savingShowHiddenFiles, setSavingShowHiddenFiles] = useState(false);
   const [showTempDirSessions, setShowTempDirSessions] = useState(false);
   const [savingShowTempDirSessions, setSavingShowTempDirSessions] = useState(false);
+  const [enableAutomodel, setEnableAutomodel] = useState(false);
+  const [savingEnableAutomodel, setSavingEnableAutomodel] = useState(false);
   const [llmApiKeys, setLlmApiKeys] = useState<Record<LlmApiKeyName, string>>(EMPTY_LLM_KEYS);
   const [llmApiKeyStatus, setLlmApiKeyStatus] = useState<Record<LlmApiKeyName, AutoModelApiKeyStatus>>(EMPTY_LLM_STATUS);
   const [savingLlmApiKeys, setSavingLlmApiKeys] = useState(false);
@@ -251,6 +253,7 @@ export default function AdminSettingsPage() {
         sessionArchiveDays: number;
         showHiddenFiles?: boolean;
         showTempDirSessions?: boolean;
+        enableAutomodel?: boolean;
         version?: string;
         llmApiKeys?: Record<LlmApiKeyName, AutoModelApiKeyStatus>;
       }) => {
@@ -260,6 +263,9 @@ export default function AdminSettingsPage() {
         }
         if (data.showTempDirSessions !== undefined) {
           setShowTempDirSessions(data.showTempDirSessions);
+        }
+        if (data.enableAutomodel !== undefined) {
+          setEnableAutomodel(data.enableAutomodel);
         }
         if (data.version) {
           setServerVersion(data.version);
@@ -501,6 +507,27 @@ export default function AdminSettingsPage() {
       setShowTempDirSessions(!checked);
     } finally {
       setSavingShowTempDirSessions(false);
+    }
+  }, []);
+
+  const handleToggleEnableAutomodel = useCallback(async (checked: boolean) => {
+    setEnableAutomodel(checked);
+    setSavingEnableAutomodel(true);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enableAutomodel: checked }),
+      });
+      if (!res.ok) {
+        setEnableAutomodel(!checked);
+        alert("Failed to save automodel setting");
+      }
+    } catch (err) {
+      console.error("Failed to save automodel setting:", err);
+      setEnableAutomodel(!checked);
+    } finally {
+      setSavingEnableAutomodel(false);
     }
   }, []);
 
@@ -929,7 +956,7 @@ export default function AdminSettingsPage() {
 
           {/* LLM API Keys Section */}
           <section
-            aria-label="LLM API keys"
+            aria-label="Automodel and LLM API keys"
             style={{
               background: "var(--bg-surface)",
               border: "1px solid var(--border)",
@@ -949,18 +976,37 @@ export default function AdminSettingsPage() {
                   marginBottom: 4,
                 }}
               >
-                LLM API Keys
+                Automodel &amp; LLM API Keys
               </h2>
               <p
                 style={{
                   fontSize: 12,
                   color: "var(--text-muted)",
-                  marginBottom: 0,
+                  marginBottom: 12,
                   lineHeight: 1.5,
                 }}
               >
-                These keys are currently used only to choose the model and reasoning effort after Auto Mode has selected an agent. They are optional; if no key is configured, Arondo uses the default model. Keys are checked in priority order: Anthropic, OpenAI, then Google. Environment variables take precedence over values saved here.
+                Automodel dynamically chooses the model and reasoning effort after Auto Mode has selected an agent. These keys are optional; if automodel is disabled or no key is configured, Arondo uses the default model. Keys are checked in priority order: Anthropic, OpenAI, then Google. Environment variables take precedence over values saved here.
               </p>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 13,
+                  color: "var(--text-primary)",
+                  cursor: savingEnableAutomodel ? "default" : "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={enableAutomodel}
+                  disabled={savingEnableAutomodel}
+                  onChange={(e) => handleToggleEnableAutomodel(e.target.checked)}
+                  style={{ cursor: savingEnableAutomodel ? "default" : "pointer" }}
+                />
+                <span>Enable automodel</span>
+              </label>
             </div>
 
             <form

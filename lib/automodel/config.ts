@@ -27,8 +27,21 @@ export interface AutoModelConfig {
 
 interface AutoModelSettingsFile {
   setitngs?: {
+    enableAutomodel?: boolean;
     llmApiKeys?: Partial<Record<LlmApiKeyName, string>>;
   };
+}
+
+export function isAutomodelEnabled(): boolean {
+  if (process.env.ARONDO_ENABLE_AUTOMODEL === "true") return true;
+  if (process.env.ARONDO_ENABLE_AUTOMODEL === "false") return false;
+  try {
+    const raw = fs.readFileSync(CONFIG_FILE, "utf-8");
+    const parsed = JSON.parse(raw) as AutoModelSettingsFile;
+    return parsed.setitngs?.enableAutomodel === true;
+  } catch {
+    return false;
+  }
 }
 
 export function getLlmApiKeyEnvStatus(): Record<LlmApiKeyName, boolean> {
@@ -56,6 +69,9 @@ function readApiKey(keyName: LlmApiKeyName, stored: Partial<Record<LlmApiKeyName
 }
 
 export function getAutomodelConfig(): AutoModelConfig | null {
+  if (!isAutomodelEnabled()) {
+    return null;
+  }
   const stored = readStoredApiKeys();
   for (const { provider, keyName } of PROVIDER_PRIORITY) {
     const apiKey = readApiKey(keyName, stored);
