@@ -3037,6 +3037,7 @@ body {
   left: 0;
   right: auto;
   width: min(240px, calc(100vw - 32px));
+  max-height: 300px;
   transform-origin: bottom left;
 }
 
