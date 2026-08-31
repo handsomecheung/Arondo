@@ -24,6 +24,9 @@ export function useInitialLoad({
   loadRunners,
 }: UseInitialLoadParams) {
   useEffect(() => {
+    let timerId: NodeJS.Timeout | null = null;
+    let cleanupInteractionListeners: (() => void) | null = null;
+
     fetch("/api/sessions")
       .then((r) => r.json())
       .then((data: Session[]) => {
@@ -37,7 +40,56 @@ export function useInitialLoad({
           // URL points at a session that no longer exists — show the new-session prompt
           setSelectedSessionId(null);
         } else if (!urlProject && data.length > 0) {
-          setSelectedSessionId(data[0].id);
+          // Sort sessions matching page.tsx sorting behavior to find the latest session
+          const sortedData = [...data].sort((a, b) => {
+            const aPinned = a.pinnedAt ? new Date(a.pinnedAt).getTime() : 0;
+            const bPinned = b.pinnedAt ? new Date(b.pinnedAt).getTime() : 0;
+            if (aPinned !== bPinned) return bPinned - aPinned;
+            const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
+            const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
+            return bTime - aTime;
+          });
+
+          const latestSession = sortedData[0];
+          const lastUpdatedTime = new Date(latestSession.updatedAt || latestSession.createdAt || 0).getTime();
+          const twoDaysInMs = 2 * 24 * 60 * 60 * 1000;
+          const isWithinTwoDays = (Date.now() - lastUpdatedTime) <= twoDaysInMs;
+
+          if (isWithinTwoDays) {
+            let hasInteracted = false;
+
+            const handleInteraction = () => {
+              hasInteracted = true;
+              if (timerId) {
+                clearTimeout(timerId);
+                timerId = null;
+              }
+              cleanup();
+            };
+
+            const cleanup = () => {
+              window.removeEventListener("mousemove", handleInteraction);
+              window.removeEventListener("keydown", handleInteraction);
+              window.removeEventListener("mousedown", handleInteraction);
+              window.removeEventListener("touchstart", handleInteraction);
+              window.removeEventListener("wheel", handleInteraction);
+              cleanupInteractionListeners = null;
+            };
+
+            window.addEventListener("mousemove", handleInteraction);
+            window.addEventListener("keydown", handleInteraction);
+            window.addEventListener("mousedown", handleInteraction);
+            window.addEventListener("touchstart", handleInteraction);
+            window.addEventListener("wheel", handleInteraction);
+            cleanupInteractionListeners = cleanup;
+
+            timerId = setTimeout(() => {
+              cleanup();
+              if (!hasInteracted) {
+                setSelectedSessionId(latestSession.id);
+              }
+            }, 3000);
+          }
         }
       })
       .catch(console.error);
@@ -78,6 +130,14 @@ export function useInitialLoad({
       })
       .catch(console.error);
 
-    return () => clearInterval(runnerPoll);
+    return () => {
+      clearInterval(runnerPoll);
+      if (timerId) {
+        clearTimeout(timerId);
+      }
+      if (cleanupInteractionListeners) {
+        cleanupInteractionListeners();
+      }
+    };
   }, [loadProjects, loadRunners]);
 }
