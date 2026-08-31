@@ -48,11 +48,19 @@ function truncateAtUrlDelimiters(url: string): string {
   return idx === -1 ? url : url.slice(0, idx);
 }
 
+export function safeDecodeURIComponent(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 // A candidate is "path-like" if it's a file:// URL, or matches FILE_PATH_RE
 // once any trailing line-reference is stripped. Decode URI-escaped paths first
 // so Markdown links such as `%5Bid%5D` are recognized as filesystem paths.
 export function isPathCandidate(value: string): boolean {
-  return isFileUrl(value) || FILE_PATH_RE.test(stripLocationSuffix(decodeURIComponent(value)));
+  return isFileUrl(value) || FILE_PATH_RE.test(stripLocationSuffix(safeDecodeURIComponent(value)));
 }
 
 // Scans raw (unparsed) markdown text for tokens that *might* be file paths —

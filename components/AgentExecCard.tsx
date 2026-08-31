@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import remarkFileLinks, { extractCandidatePaths, candidateToPath, isPathCandidate } from "@/lib/remarkFileLinks";
+import remarkFileLinks, { extractCandidatePaths, candidateToPath, isPathCandidate, safeDecodeURIComponent } from "@/lib/remarkFileLinks";
 import remarkSoftLineBreaks from "@/lib/remarkSoftLineBreaks";
 import { resolveRepoFilePath } from "@/lib/homeUtils";
 import ExecCard, { ExecCardProps } from "@/components/ExecCard";
@@ -139,7 +139,7 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
 
     const absPaths = candidates.map((c) => {
       const path = candidateToPath(c);
-      const decoded = decodeURIComponent(path);
+      const decoded = safeDecodeURIComponent(path);
       return decoded.startsWith("/") ? decoded : resolveRepoFilePath(repoPath, decoded);
     });
 
@@ -216,7 +216,7 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
     if (fileBtn) {
       const path = fileBtn.getAttribute("data-path");
       if (path && onOpenFilePath) {
-        onOpenFilePath(decodeURIComponent(path));
+        onOpenFilePath(safeDecodeURIComponent(path));
       }
       return;
     }
@@ -226,7 +226,7 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
       const path = diffBtn.getAttribute("data-path");
       if (path) {
         const absPath = path.startsWith("/") ? path : (repoPath ? resolveRepoFilePath(repoPath, path) : path);
-        setSelectedDiffPath(decodeURIComponent(absPath));
+        setSelectedDiffPath(safeDecodeURIComponent(absPath));
         setDiffModalOpen(true);
       }
     }

@@ -28,6 +28,7 @@ import {
   readUrlState,
   parseExecCommand, resolveRepoFilePath, isUnviewedCompletion,
 } from "@/lib/homeUtils";
+import { safeDecodeURIComponent } from "@/lib/remarkFileLinks";
 import type { ExecCardInfo } from "@/lib/homeUtils";
 import { useFileSystem } from "@/lib/hooks/useFileSystem";
 import { useGitHub } from "@/lib/hooks/useGitHub";
@@ -1564,7 +1565,7 @@ export default function HomePage() {
             onShowCommits={() => setCommitsModalOpen(true)}
             onOpenFilePath={(path) => {
               const base = selectedSession?.repoPath ?? repoPath;
-              const decoded = decodeURIComponent(path);
+              const decoded = safeDecodeURIComponent(path);
               setFileBrowserTargetPath(resolveRepoFilePath(base, decoded));
               setFileBrowserOpen(true);
             }}

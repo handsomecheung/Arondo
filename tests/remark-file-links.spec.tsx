@@ -58,3 +58,11 @@ test("recognizes the Vision Doc absolute path link as a file candidate", () => {
   expect(extractCandidatePaths(markdown)).toEqual([path]);
   expect(isPathCandidate(path)).toBe(true);
 });
+
+test("handles malformed URI sequences like batch variables without throwing", () => {
+  const malformedCode = "`%~n0` and `%BASE_DATE%` and `set LOG_PATH=%LOG_DIR%\\%~n0_%BASE_DATE%.log`";
+  expect(() => extractCandidatePaths(malformedCode)).not.toThrow();
+  expect(isPathCandidate("%~n0")).toBe(false);
+  expect(isPathCandidate("%BASE_DATE%")).toBe(false);
+});
+
