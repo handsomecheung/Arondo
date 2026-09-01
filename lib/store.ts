@@ -780,7 +780,7 @@ export function getDefaultAgentModels(): AgentModelsConfig {
   return {
     antigravity: {
       gemini: {
-        defaultModel: "Gemini 3.5 Flash (Medium)",
+        defaultModel: "Gemini 3.7 Flash (Medium)",
         availableModels: [
           "Gemini 3.7 Flash (High)",
           "Gemini 3.7 Flash (Medium)",
@@ -788,9 +788,6 @@ export function getDefaultAgentModels(): AgentModelsConfig {
           "Gemini 3.6 Flash (High)",
           "Gemini 3.6 Flash (Medium)",
           "Gemini 3.6 Flash (Low)",
-          "Gemini 3.5 Flash (High)",
-          "Gemini 3.5 Flash (Medium)",
-          "Gemini 3.5 Flash (Low)",
           "Gemini 3.1 Pro (High)",
           "Gemini 3.1 Pro (Low)",
         ],

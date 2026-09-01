@@ -222,7 +222,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
       request,
       'A', 'B',
       'antigravity', 'antigravity',
-      'Gemini 3.5 Flash (Medium)', 'Gemini 3.5 Flash (Medium)',
+      'Gemini 3.7 Flash (Medium)', 'Gemini 3.7 Flash (Medium)',
       false,
       quotaPath
     );
@@ -233,7 +233,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
       request,
       'A', 'C',
       'antigravity', 'antigravity',
-      'Gemini 3.5 Flash (Medium)', 'Gemini 3.5 Flash (Medium)',
+      'Gemini 3.7 Flash (Medium)', 'Gemini 3.7 Flash (Medium)',
       false,
       quotaPath
     );
@@ -292,7 +292,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
       request,
       'A', 'C',
       'antigravity', 'antigravity',
-      'Gemini 3.5 Flash (Medium)', undefined,
+      'Gemini 3.7 Flash (Medium)', undefined,
       false,
       quotaPath,
       '-locked'
@@ -318,7 +318,7 @@ function getQuotaForChoice(choiceId: 'A' | 'B' | 'C') {
       "Type": "antigravity",
       "Account": "arondo@gmail.com",
       "Plan": "Google AI Pro",
-      "DefaultModel": "Gemini 3.5 Flash (Medium)",
+      "DefaultModel": "Gemini 3.7 Flash (Medium)",
       "GeminiWeeklyRemain": choiceId === 'A' ? 0.9 : 0.1,
       "GeminiWeeklyResetsAt": null,
       "GeminiHourRemain": 1.0,
@@ -609,7 +609,7 @@ async function runXXYXTest(
 
   const getAgentInfo = (choice: 'A' | 'B' | 'C') => {
     if (choice === 'C') return { agent: 'claude', model: undefined };
-    if (choice === 'A') return { agent: 'antigravity', model: 'Gemini 3.5 Flash (Medium)' };
+    if (choice === 'A') return { agent: 'antigravity', model: 'Gemini 3.7 Flash (Medium)' };
     return { agent: 'antigravity', model: 'Claude Sonnet 4.6 (Thinking)' };
   };
 

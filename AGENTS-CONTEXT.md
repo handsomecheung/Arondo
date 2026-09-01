@@ -349,7 +349,7 @@ The application enforces token-based authentication on all API routes and WebSoc
       "agentModels": {
         "antigravity": {
           "gemini": {
-            "defaultModel": "Gemini 3.5 Flash (Medium)",
+            "defaultModel": "Gemini 3.7 Flash (Medium)",
             "availableModels": ["Gemini 3.7 Flash (High)", "Gemini 3.7 Flash (Medium)", "..."]
           },
           "other": {
@@ -418,7 +418,7 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **Secure Prompt Passing**: Instead of command line arguments, prompts are passed to agents using temporary files on the runner. The file path is stored in the `ARONDO_PROMPT_FILE` environment variable (and resolved using shell redirection `$(< "$ARONDO_PROMPT_FILE")`), which mitigates command length constraints and process command argument exposure. The UI "Show Prompt" panel displays the real resolved prompt instead of the original raw inputs.
 - **autoagent (Auto Mode)**: Automatically selects the best agent based on hourly and weekly quota availability retrieved from the runner, then optionally lets `automodel` choose the model/effort from the selected choice's allowed model options. New chat sessions default to using the Auto agent mode.
   - **Choices**:
-    - **Choice A**: Antigravity (`agy`) Gemini model group (Quota: `GeminiHourRemain`, `GeminiWeeklyRemain`; default fallback model configured in `agentModels.antigravity.gemini.defaultModel`, e.g. `Gemini 3.5 Flash (Medium)`)
+    - **Choice A**: Antigravity (`agy`) Gemini model group (Quota: `GeminiHourRemain`, `GeminiWeeklyRemain`; default fallback model configured in `agentModels.antigravity.gemini.defaultModel`, e.g. `Gemini 3.7 Flash (Medium)`)
     - **Choice B**: Antigravity (`agy`) non-Gemini model group (Quota: `OtherHourRemain`, `OtherWeeklyRemain`; default fallback model configured in `agentModels.antigravity.other.defaultModel`, e.g. `Claude Sonnet 4.6 (Thinking)`; model options are drawn from `agentModels.antigravity.other.availableModels`)
     - **Choice C**: Claude (`claude`) (Quota: `HourRemain`, `WeekRemain`; default fallback model configured in `agentModels.claude.defaultModel`, e.g. `claude-3-7-sonnet-20250219`)
     - **Choice D**: Codex (`codex`) (Quota: `WeeklyRemain`, hourly is treated as always available; default fallback model configured in `agentModels.codex.defaultModel`, e.g. `gpt-5.5 medium`)

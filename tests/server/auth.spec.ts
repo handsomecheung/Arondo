@@ -248,8 +248,9 @@ test.describe('Authentication API tests', () => {
     expect(getRes.status()).toBe(200);
     const body = await getRes.json();
     expect(body.agentModels).toBeDefined();
-    expect(body.agentModels.antigravity.gemini.defaultModel).toBe('Gemini 3.5 Flash (Medium)');
+    expect(body.agentModels.antigravity.gemini.defaultModel).toBe('Gemini 3.7 Flash (Medium)');
     expect(body.agentModels.antigravity.gemini.availableModels).toContain('Gemini 3.7 Flash (High)');
+    expect(body.agentModels.antigravity.gemini.availableModels).not.toContain('Gemini 3.5 Flash (Medium)');
     expect(body.agentModels.antigravity.other.defaultModel).toBe('Claude Sonnet 4.6 (Thinking)');
     expect(body.agentModels.claude.defaultModel).toBe('claude-3-7-sonnet-20250219');
     expect(body.agentModels.claude.availableModels).toContain('claude-3-7-sonnet-20250219');

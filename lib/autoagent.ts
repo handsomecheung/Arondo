@@ -209,7 +209,7 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
   if (hasAgy) {
     const geminiOptions = getModelOptionsForAgent("antigravity", "gemini", agentModels);
     const otherOptions = getModelOptionsForAgent("antigravity", "other", agentModels);
-    const agyDefault = parseModelLine(agentModels.antigravity?.gemini?.defaultModel) || geminiOptions[0]?.model || "Gemini 3.5 Flash (Medium)";
+    const agyDefault = parseModelLine(agentModels.antigravity?.gemini?.defaultModel) || geminiOptions[0]?.model || "Gemini 3.7 Flash (Medium)";
     const otherDefault = parseModelLine(agentModels.antigravity?.other?.defaultModel) || otherOptions[0]?.model || "Claude Sonnet 4.6 (Thinking)";
 
     choices.push({
