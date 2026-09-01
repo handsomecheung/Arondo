@@ -118,6 +118,8 @@ export interface RunnerTokenInfo {
   boundRunnerId?: string | null;
 }
 
+import { type AgentModelsConfig, getDefaultAgentModels } from "./store";
+
 export interface ArondoSettings {
   sessionArchiveDays?: number;
   showHiddenFiles?: boolean;
@@ -126,6 +128,7 @@ export interface ArondoSettings {
     OPENAI_API_KEY?: string;
     GOOGLE_GENERATIVE_AI_API_KEY?: string;
   };
+  agentModels?: AgentModelsConfig;
 }
 
 export interface TokensConfig {
@@ -218,6 +221,25 @@ export async function initializeAuth(): Promise<void> {
         console.log(`🔑 GENERATED ADMIN ACCESS TOKEN:\n\n   ${generatedAdminToken}\n`);
         console.log("   Please save this token. It has been written to arondo.json");
         console.log("========================================================\n");
+      }
+
+      if (!config.setitngs) {
+        config.setitngs = {};
+      }
+      const defaults = getDefaultAgentModels();
+      if (!config.setitngs.agentModels) {
+        config.setitngs.agentModels = defaults;
+      } else {
+        const current = config.setitngs.agentModels;
+        if (!current.antigravity || !current.antigravity.gemini || !current.antigravity.other) {
+          current.antigravity = defaults.antigravity;
+        }
+        if (!current.claude) {
+          current.claude = defaults.claude;
+        }
+        if (!current.codex) {
+          current.codex = defaults.codex;
+        }
       }
     });
 

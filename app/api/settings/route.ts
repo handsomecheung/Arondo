@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getArondoToken, getRoleByToken, isValidToken } from "@/lib/auth";
-import { updateAppSettings, getAppSettings, getSessionArchiveDays, getShowHiddenFiles, getShowTempDirSessions, getEnableAutomodel } from "@/lib/store";
+import { updateAppSettings, getAppSettings, getSessionArchiveDays, getShowHiddenFiles, getShowTempDirSessions, getEnableAutomodel, getAgentModelsConfig, type AgentModelsConfig } from "@/lib/store";
 import { getLlmApiKeyEnvStatus, type LlmApiKeyName } from "@/lib/automodel/config";
 import fs from "fs/promises";
 import path from "path";
@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
   const showHiddenFiles = await getShowHiddenFiles();
   const showTempDirSessions = await getShowTempDirSessions();
   const enableAutomodel = await getEnableAutomodel();
+  const agentModels = await getAgentModelsConfig();
   const appSettings = await getAppSettings();
   const envStatus = getLlmApiKeyEnvStatus();
   const llmApiKeys = Object.fromEntries(
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
     console.error("Failed to read package.json version:", err);
   }
 
-  return NextResponse.json({ sessionArchiveDays, showHiddenFiles, showTempDirSessions, enableAutomodel, version, llmApiKeys });
+  return NextResponse.json({ sessionArchiveDays, showHiddenFiles, showTempDirSessions, enableAutomodel, version, llmApiKeys, agentModels });
 }
 
 export async function POST(request: NextRequest) {
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Admin role required" }, { status: 403 });
   }
 
-  const { sessionArchiveDays, showHiddenFiles, showTempDirSessions, enableAutomodel, llmApiKeys } = await request.json();
+  const { sessionArchiveDays, showHiddenFiles, showTempDirSessions, enableAutomodel, llmApiKeys, agentModels } = await request.json();
   if (sessionArchiveDays !== undefined) {
     if (typeof sessionArchiveDays !== "number" || !Number.isFinite(sessionArchiveDays) || sessionArchiveDays < 1) {
       return NextResponse.json({ error: "sessionArchiveDays must be a positive number" }, { status: 400 });
@@ -73,6 +74,45 @@ export async function POST(request: NextRequest) {
   if (llmApiKeys !== undefined && (typeof llmApiKeys !== "object" || llmApiKeys === null || Array.isArray(llmApiKeys))) {
     return NextResponse.json({ error: "llmApiKeys must be an object" }, { status: 400 });
   }
+  if (agentModels !== undefined) {
+    if (typeof agentModels !== "object" || agentModels === null || Array.isArray(agentModels)) {
+      return NextResponse.json({ error: "agentModels must be an object" }, { status: 400 });
+    }
+    if ("antigravity" in agentModels) {
+      const agy = agentModels.antigravity;
+      if (typeof agy !== "object" || agy === null || Array.isArray(agy)) {
+        return NextResponse.json({ error: "agentModels.antigravity must be an object" }, { status: 400 });
+      }
+      for (const grp of ["gemini", "other"] as const) {
+        if (grp in agy) {
+          const cfg = agy[grp];
+          if (typeof cfg !== "object" || cfg === null || Array.isArray(cfg)) {
+            return NextResponse.json({ error: `agentModels.antigravity.${grp} must be an object` }, { status: 400 });
+          }
+          if (cfg.defaultModel !== undefined && typeof cfg.defaultModel !== "string") {
+            return NextResponse.json({ error: `agentModels.antigravity.${grp}.defaultModel must be a string` }, { status: 400 });
+          }
+          if (cfg.availableModels !== undefined && (!Array.isArray(cfg.availableModels) || !cfg.availableModels.every((m: unknown) => typeof m === "string"))) {
+            return NextResponse.json({ error: `agentModels.antigravity.${grp}.availableModels must be an array of strings` }, { status: 400 });
+          }
+        }
+      }
+    }
+    for (const agent of ["claude", "codex"] as const) {
+      if (agent in agentModels) {
+        const cfg = agentModels[agent];
+        if (typeof cfg !== "object" || cfg === null || Array.isArray(cfg)) {
+          return NextResponse.json({ error: `agentModels.${agent} must be an object` }, { status: 400 });
+        }
+        if (cfg.defaultModel !== undefined && typeof cfg.defaultModel !== "string") {
+          return NextResponse.json({ error: `agentModels.${agent}.defaultModel must be a string` }, { status: 400 });
+        }
+        if (cfg.availableModels !== undefined && (!Array.isArray(cfg.availableModels) || !cfg.availableModels.every((m: unknown) => typeof m === "string"))) {
+          return NextResponse.json({ error: `agentModels.${agent}.availableModels must be an array of strings` }, { status: 400 });
+        }
+      }
+    }
+  }
 
   const patch: {
     sessionArchiveDays?: number;
@@ -80,6 +120,7 @@ export async function POST(request: NextRequest) {
     showTempDirSessions?: boolean;
     enableAutomodel?: boolean;
     llmApiKeys?: Partial<Record<LlmApiKeyName, string | undefined>>;
+    agentModels?: AgentModelsConfig;
   } = {};
   if (sessionArchiveDays !== undefined) patch.sessionArchiveDays = sessionArchiveDays;
   if (showHiddenFiles !== undefined) patch.showHiddenFiles = showHiddenFiles;
@@ -102,6 +143,47 @@ export async function POST(request: NextRequest) {
     }
     patch.llmApiKeys = next;
   }
+  if (agentModels !== undefined) {
+    const current = await getAgentModelsConfig();
+    const agyInput = agentModels.antigravity;
+    const next: AgentModelsConfig = {
+      antigravity: {
+        gemini: {
+          defaultModel: agyInput?.gemini?.defaultModel !== undefined
+            ? agyInput.gemini.defaultModel.trim()
+            : current.antigravity.gemini.defaultModel,
+          availableModels: Array.isArray(agyInput?.gemini?.availableModels)
+            ? agyInput.gemini.availableModels.map((m: string) => m.trim()).filter(Boolean)
+            : current.antigravity.gemini.availableModels,
+        },
+        other: {
+          defaultModel: agyInput?.other?.defaultModel !== undefined
+            ? agyInput.other.defaultModel.trim()
+            : current.antigravity.other.defaultModel,
+          availableModels: Array.isArray(agyInput?.other?.availableModels)
+            ? agyInput.other.availableModels.map((m: string) => m.trim()).filter(Boolean)
+            : current.antigravity.other.availableModels,
+        },
+      },
+      claude: {
+        defaultModel: agentModels.claude?.defaultModel !== undefined
+          ? agentModels.claude.defaultModel.trim()
+          : current.claude.defaultModel,
+        availableModels: Array.isArray(agentModels.claude?.availableModels)
+          ? agentModels.claude.availableModels.map((m: string) => m.trim()).filter(Boolean)
+          : current.claude.availableModels,
+      },
+      codex: {
+        defaultModel: agentModels.codex?.defaultModel !== undefined
+          ? agentModels.codex.defaultModel.trim()
+          : current.codex.defaultModel,
+        availableModels: Array.isArray(agentModels.codex?.availableModels)
+          ? agentModels.codex.availableModels.map((m: string) => m.trim()).filter(Boolean)
+          : current.codex.availableModels,
+      },
+    };
+    patch.agentModels = next;
+  }
 
   const updated = await updateAppSettings(patch);
   const envStatus = getLlmApiKeyEnvStatus();
@@ -116,5 +198,10 @@ export async function POST(request: NextRequest) {
       }];
     }),
   );
-  return NextResponse.json({ ...updated, enableAutomodel: updated.enableAutomodel !== undefined ? updated.enableAutomodel : false, llmApiKeys: status });
+  return NextResponse.json({
+    ...updated,
+    enableAutomodel: updated.enableAutomodel !== undefined ? updated.enableAutomodel : false,
+    llmApiKeys: status,
+    agentModels: updated.agentModels || (await getAgentModelsConfig()),
+  });
 }

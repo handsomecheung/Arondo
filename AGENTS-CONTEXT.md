@@ -338,7 +338,34 @@ The application enforces token-based authentication on all API routes and WebSoc
     ],
     "setitngs": {
       "sessionArchiveDays": 7,
-      "showHiddenFiles": true
+      "showHiddenFiles": true,
+      "showTempDirSessions": false,
+      "enableAutomodel": false,
+      "llmApiKeys": {
+        "ANTHROPIC_API_KEY": "...",
+        "OPENAI_API_KEY": "...",
+        "GOOGLE_GENERATIVE_AI_API_KEY": "..."
+      },
+      "agentModels": {
+        "antigravity": {
+          "gemini": {
+            "defaultModel": "Gemini 3.5 Flash (Medium)",
+            "availableModels": ["Gemini 3.7 Flash (High)", "Gemini 3.7 Flash (Medium)", "..."]
+          },
+          "other": {
+            "defaultModel": "Claude Sonnet 4.6 (Thinking)",
+            "availableModels": ["Claude Sonnet 4.6 (Thinking)", "Claude Opus 4.6 (Thinking)"]
+          }
+        },
+        "claude": {
+          "defaultModel": "claude-3-7-sonnet-20250219",
+          "availableModels": ["claude-3-7-sonnet-20250219", "claude-3-5-sonnet-20241022", "..."]
+        },
+        "codex": {
+          "defaultModel": "gpt-5.5 medium",
+          "availableModels": ["gpt-5.4-mini low", "gpt-5.5 medium", "gpt-5.5 high"]
+        }
+      }
     }
   }
   ```
@@ -385,14 +412,16 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **Session Archive Day Override**: The Settings screen allows users to customize the number of idle days before active sessions are auto-archived. This overrides the default value defined by the `ARONDO_SESSION_ARCHIVE_DAYS_DEFAULT` environment variable and is persisted as `sessionArchiveDays` under `~/.arondo/arondo.json`'s top-level `setitngs` field. Pinned sessions are exempted from auto-archiving. Unarchiving is disabled for sessions whose projects have been deleted. Deleting a project warns the user in the confirmation dialog if it has archived sessions that would become unusable.
 - **Hidden Files Visibility Setting**: The runner's `fs.list` handler (`runner/handler_fs.go`) unconditionally skipped dotfiles/dot-directories until a `showHidden` flag was added to the request. The Settings screen exposes a "Show hidden files" toggle (persisted as `showHiddenFiles` under `~/.arondo/arondo.json`'s top-level `setitngs` field, admin-only) that controls whether the Remote File Browser and the `@` path selector modal show entries starting with `.`. When unset, it falls back to the `ARONDO_FILE_SHOW_HIDDEN_DEFAULT` environment variable (defaults to `true`). `GET /api/fs` reads this setting server-side and passes it through to the runner on every `fs.list` request.
 - **Quota & Session Limit Detection**: Automatically detects AI agent API limits (such as Claude's session limit hit, Codex limits, or `agy` quota errors including individual quota exhaustion and subscription upgrade warnings by scanning both stdout and stderr logs) and displays human-readable error messages.
+- **Invalid Model Selection Error Detection**: Scans Antigravity execution logs for `invalid model selection` errors (such as when an unsupported or renamed model is passed to `agy`). When detected, the session status is set to `error` and users are presented with a clear, actionable message: `⚠️ Invalid model selection for Antigravity — please update the model in Settings, or temporarily switch away from Auto mode.`
+- **Agent Models & Defaults Configuration**: In **Settings → Agent Models & Defaults**, admins can customize the default model and available model choices for Antigravity (split into **Gemini Group** and **Others Group**), Claude Code, and Codex CLI. Stored in `~/.arondo/arondo.json` (`setitngs.agentModels`). If unconfigured, Arondo populates the default models automatically. Auto Mode choices (Choice A: Gemini, Choice B: Others, Choice C: Claude, Choice D: Codex) dynamically draw their default models and available model lists from this configuration.
 - **AI Agent Quota Monitoring**: Runners collect agent quota usage from Claude, Antigravity, and Codex via tmux pane capture, which is saved locally under `~/.arondo/agents/` on the server and displayed in the Runners dashboard. API-key billed accounts are identified so they are not presented as exhausted subscription quotas; unavailable readings are displayed as unknown rather than fabricated values.
 - **Secure Prompt Passing**: Instead of command line arguments, prompts are passed to agents using temporary files on the runner. The file path is stored in the `ARONDO_PROMPT_FILE` environment variable (and resolved using shell redirection `$(< "$ARONDO_PROMPT_FILE")`), which mitigates command length constraints and process command argument exposure. The UI "Show Prompt" panel displays the real resolved prompt instead of the original raw inputs.
 - **autoagent (Auto Mode)**: Automatically selects the best agent based on hourly and weekly quota availability retrieved from the runner, then optionally lets `automodel` choose the model/effort from the selected choice's allowed model options. New chat sessions default to using the Auto agent mode.
   - **Choices**:
-    - **Choice A**: Antigravity (`agy`) Gemini model group (Quota: `GeminiHourRemain`, `GeminiWeeklyRemain`; default fallback model: `Gemini 3.5 Flash (Medium)`)
-    - **Choice B**: Antigravity (`agy`) non-Gemini model group (Quota: `OtherHourRemain`, `OtherWeeklyRemain`; default fallback model: `Claude Sonnet 4.6 (Thinking)`; model options are restricted to Claude models (`Claude Sonnet 4.6 (Thinking)`, `Claude Opus 4.6 (Thinking)`), excluding `GPT-OSS` to ensure high coding and reasoning quality)
-    - **Choice C**: Claude (`claude`) + default `Sonnet` (Quota: `HourRemain`, `WeekRemain`)
-    - **Choice D**: Codex (`codex`) + default `gpt-5.5 medium` (Quota: `WeeklyRemain`, hourly is treated as always available)
+    - **Choice A**: Antigravity (`agy`) Gemini model group (Quota: `GeminiHourRemain`, `GeminiWeeklyRemain`; default fallback model configured in `agentModels.antigravity.gemini.defaultModel`, e.g. `Gemini 3.5 Flash (Medium)`)
+    - **Choice B**: Antigravity (`agy`) non-Gemini model group (Quota: `OtherHourRemain`, `OtherWeeklyRemain`; default fallback model configured in `agentModels.antigravity.other.defaultModel`, e.g. `Claude Sonnet 4.6 (Thinking)`; model options are drawn from `agentModels.antigravity.other.availableModels`)
+    - **Choice C**: Claude (`claude`) (Quota: `HourRemain`, `WeekRemain`; default fallback model configured in `agentModels.claude.defaultModel`, e.g. `claude-3-7-sonnet-20250219`)
+    - **Choice D**: Codex (`codex`) (Quota: `WeeklyRemain`, hourly is treated as always available; default fallback model configured in `agentModels.codex.defaultModel`, e.g. `gpt-5.5 medium`)
   - **Selection Algorithm**:
     1. **Quota-source preference**: Consider choices with a known, non-API-key weekly quota first. If none are known, fall back to unknown subscription quotas; use API-key billed choices only when no subscription choice is available.
     2. **Hourly Quota Filtering**: For known quota choices, if the remaining hourly ratio (`HourRemain`, `GeminiHourRemain`, `OtherHourRemain`) is below `0.15`, append it to the end of the candidate list and exclude it from scoring. If all known choices are below `0.15`, score all of them instead.

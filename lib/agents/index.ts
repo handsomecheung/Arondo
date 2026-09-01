@@ -5,6 +5,7 @@ import { CodexAgent } from "./codex";
 import { OpencodeAgent } from "./opencode";
 import { getAgyQuotaGroupForModel, getModelOptionsForAgent, selectAgent, type AgyQuotaGroup } from "../autoagent";
 import { routeModel, type AutoModelEffort, type AutoModelOption } from "../automodel";
+import { getAgentModelsConfig, type AgentModelsConfig } from "../store";
 
 export type ConcreteAgentType = "antigravity" | "claude" | "codex" | "opencode";
 export type AgentType = ConcreteAgentType | "auto";
@@ -66,7 +67,21 @@ export async function resolveAgentType(
   runnerAgentBinaries: string[],
   options: ResolveAgentOptions = {},
 ): Promise<ResolvedAgent> {
-  if (agentType !== "auto") return { agentType: agentType as ConcreteAgentType };
+  const agentModels = await getAgentModelsConfig();
+  if (agentType !== "auto") {
+    let defaultModel: string | undefined;
+    if (agentType === "antigravity") {
+      defaultModel = agentModels.antigravity?.gemini?.defaultModel?.trim() || undefined;
+    } else if (agentType === "claude") {
+      defaultModel = agentModels.claude?.defaultModel?.trim() || undefined;
+    } else if (agentType === "codex") {
+      defaultModel = agentModels.codex?.defaultModel?.trim() || undefined;
+    }
+    return {
+      agentType: agentType as ConcreteAgentType,
+      model: defaultModel,
+    };
+  }
   const resolved = await selectAgent(runnerAgentBinaries);
   const selected = options.lockedAgent
     ? {
@@ -76,6 +91,7 @@ export async function resolveAgentType(
       modelOptions: getModelOptionsForAgent(
         options.lockedAgent.agentType,
         options.lockedAgent.agyQuotaGroup ?? getAgyQuotaGroupForModel(options.lockedAgent.model),
+        agentModels,
       ),
     }
     : resolved ?? { agentType: "antigravity" as ConcreteAgentType };

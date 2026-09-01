@@ -51,3 +51,11 @@ export function getQuotaRetryAgentType(agentType: string | undefined): QuotaRetr
   if (agentType === "antigravity" || agentType === "claude") return agentType;
   return undefined;
 }
+
+export function isAgyInvalidModelError(log: string): boolean {
+  return log.toLowerCase().includes("invalid model selection");
+}
+
+export function getAgyInvalidModelErrorMessage(): string {
+  return "Invalid model selection for Antigravity — please update the model in Settings, or temporarily avoid using Auto mode.";
+}

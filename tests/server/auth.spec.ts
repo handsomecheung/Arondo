@@ -240,4 +240,101 @@ test.describe('Authentication API tests', () => {
     expect(isAutomodelEnabled()).toBe(false);
     expect(getAutomodelConfig()).toBeNull();
   });
+
+  test('agentModels default configuration is provided and can be updated via settings API', async ({ request }) => {
+    const getRes = await request.get('/api/settings', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+    });
+    expect(getRes.status()).toBe(200);
+    const body = await getRes.json();
+    expect(body.agentModels).toBeDefined();
+    expect(body.agentModels.antigravity.gemini.defaultModel).toBe('Gemini 3.5 Flash (Medium)');
+    expect(body.agentModels.antigravity.gemini.availableModels).toContain('Gemini 3.7 Flash (High)');
+    expect(body.agentModels.antigravity.other.defaultModel).toBe('Claude Sonnet 4.6 (Thinking)');
+    expect(body.agentModels.claude.defaultModel).toBe('claude-3-7-sonnet-20250219');
+    expect(body.agentModels.claude.availableModels).toContain('claude-3-7-sonnet-20250219');
+    expect(body.agentModels.codex.defaultModel).toBe('gpt-5.5 medium');
+
+    // Update agentModels
+    const postRes = await request.post('/api/settings', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        agentModels: {
+          antigravity: {
+            gemini: {
+              defaultModel: 'Gemini 3.7 Flash (Medium)',
+              availableModels: ['Gemini 3.7 Flash (High)', 'Gemini 3.7 Flash (Medium)'],
+            },
+            other: {
+              defaultModel: 'Claude Opus 4.6 (Thinking)',
+              availableModels: ['Claude Opus 4.6 (Thinking)'],
+            },
+          },
+          claude: {
+            defaultModel: 'claude-3-5-sonnet-20241022',
+            availableModels: ['claude-3-5-sonnet-20241022'],
+          },
+          codex: {
+            defaultModel: 'gpt-5.5 high',
+            availableModels: ['gpt-5.5 medium', 'gpt-5.5 high'],
+          },
+        },
+      },
+    });
+    expect(postRes.status()).toBe(200);
+    const updatedBody = await postRes.json();
+    expect(updatedBody.agentModels.antigravity.gemini.defaultModel).toBe('Gemini 3.7 Flash (Medium)');
+    expect(updatedBody.agentModels.antigravity.gemini.availableModels).toEqual([
+      'Gemini 3.7 Flash (High)',
+      'Gemini 3.7 Flash (Medium)',
+    ]);
+    expect(updatedBody.agentModels.antigravity.other.defaultModel).toBe('Claude Opus 4.6 (Thinking)');
+    expect(updatedBody.agentModels.claude.defaultModel).toBe('claude-3-5-sonnet-20241022');
+    expect(updatedBody.agentModels.codex.defaultModel).toBe('gpt-5.5 high');
+
+    // Verify persistence with GET
+    const verifyRes = await request.get('/api/settings', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+    });
+    expect(verifyRes.status()).toBe(200);
+    const persisted = await verifyRes.json();
+    expect(persisted.agentModels.antigravity.gemini.defaultModel).toBe('Gemini 3.7 Flash (Medium)');
+    expect(persisted.agentModels.antigravity.other.defaultModel).toBe('Claude Opus 4.6 (Thinking)');
+    expect(persisted.agentModels.claude.defaultModel).toBe('claude-3-5-sonnet-20241022');
+    expect(persisted.agentModels.codex.defaultModel).toBe('gpt-5.5 high');
+
+    // Restore original agentModels to prevent polluting subsequent tests
+    const restoreRes = await request.post('/api/settings', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        agentModels: body.agentModels,
+      },
+    });
+    expect(restoreRes.status()).toBe(200);
+  });
+
+  test('rejects invalid agentModels payload with 400 Bad Request', async ({ request }) => {
+    const invalidRes = await request.post('/api/settings', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        agentModels: 'not-an-object',
+      },
+    });
+    expect(invalidRes.status()).toBe(400);
+
+    const invalidAgentRes = await request.post('/api/settings', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        agentModels: {
+          antigravity: {
+            gemini: {
+              defaultModel: 123, // must be string
+            },
+          },
+        },
+      },
+    });
+    expect(invalidAgentRes.status()).toBe(400);
+  });
 });
+

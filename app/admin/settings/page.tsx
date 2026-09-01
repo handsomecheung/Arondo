@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ConfirmDialog from "@/components/modals/ConfirmDialog";
 import { IconLogo, IconRefresh } from "@/components/Icons";
+import AgentModelsManager from "@/components/AgentModelsManager";
+import type { AgentModelsConfig } from "@/lib/store";
 
 interface Runner {
   id: string;
@@ -222,6 +224,7 @@ export default function AdminSettingsPage() {
   const [llmApiKeyStatus, setLlmApiKeyStatus] = useState<Record<LlmApiKeyName, AutoModelApiKeyStatus>>(EMPTY_LLM_STATUS);
   const [savingLlmApiKeys, setSavingLlmApiKeys] = useState(false);
   const [llmApiKeysSaved, setLlmApiKeysSaved] = useState(false);
+  const [agentModels, setAgentModels] = useState<AgentModelsConfig | undefined>(undefined);
 
   const loadRunners = useCallback(() => {
     fetch("/api/runners")
@@ -256,6 +259,7 @@ export default function AdminSettingsPage() {
         enableAutomodel?: boolean;
         version?: string;
         llmApiKeys?: Record<LlmApiKeyName, AutoModelApiKeyStatus>;
+        agentModels?: AgentModelsConfig;
       }) => {
         setSessionArchiveDays(data.sessionArchiveDays);
         if (data.showHiddenFiles !== undefined) {
@@ -272,6 +276,9 @@ export default function AdminSettingsPage() {
         }
         if (data.llmApiKeys) {
           setLlmApiKeyStatus({ ...EMPTY_LLM_STATUS, ...data.llmApiKeys });
+        }
+        if (data.agentModels) {
+          setAgentModels(data.agentModels);
         }
       })
       .catch(console.error);
@@ -953,6 +960,12 @@ export default function AdminSettingsPage() {
               </label>
             </div>
           </section>
+
+          {/* Agent Models Section */}
+          <AgentModelsManager
+            initialConfig={agentModels}
+            onSaved={(updated) => setAgentModels(updated)}
+          />
 
           {/* LLM API Keys Section */}
           <section

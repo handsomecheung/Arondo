@@ -26,8 +26,10 @@ import path from "path";
 import { getConfigDir } from "./config";
 import {
   getAgentQuotaErrorMessage,
+  getAgyInvalidModelErrorMessage,
   getQuotaRetryAgentType,
   isAgentQuotaExhausted,
+  isAgyInvalidModelError,
 } from "./agent-quota-errors";
 
 const CONFIG_DIR = getConfigDir();
@@ -1197,13 +1199,18 @@ class RunnerManager {
     }
 
     let quotaExhausted = false;
+    let invalidModelSelection = false;
     if (resolvedAgentType === "antigravity" || resolvedAgentType === "claude") {
       const [stdoutLog, stderrLog] = await Promise.all([
         getSessionLog(ctx.sessionId, ctx.messageId, ctx.projectId),
         getSessionLog(ctx.sessionId, ctx.messageId, ctx.projectId, "stderr"),
       ]);
       const log = `${stdoutLog}\n${stderrLog}`;
-      quotaExhausted = isAgentQuotaExhausted(resolvedAgentType, log, success);
+      if (resolvedAgentType === "antigravity" && isAgyInvalidModelError(log)) {
+        invalidModelSelection = true;
+      } else {
+        quotaExhausted = isAgentQuotaExhausted(resolvedAgentType, log, success);
+      }
     }
 
     const hasRunningScripts = (session?.runningScripts?.length ?? 0) > 0;
@@ -1211,32 +1218,36 @@ class RunnerManager {
     if (hasRunningScripts) {
       nextStatus = "script-running";
     } else {
-      nextStatus = success && !quotaExhausted ? "done" : "error";
+      nextStatus = success && !quotaExhausted && !invalidModelSelection ? "done" : "error";
     }
 
     const stoppedByUser = !!ctx.stoppedByUser;
 
     const updated = await updateSession(ctx.sessionId, {
       status: nextStatus as any,
-      errorMessage: quotaExhausted
-        ? getAgentQuotaErrorMessage(resolvedAgentType)
-        : success
-          ? undefined
-          : stoppedByUser
-            ? "Stopped by user"
-            : `Agent exited with code ${exitCode}`,
+      errorMessage: invalidModelSelection
+        ? getAgyInvalidModelErrorMessage()
+        : quotaExhausted
+          ? getAgentQuotaErrorMessage(resolvedAgentType)
+          : success
+            ? undefined
+            : stoppedByUser
+              ? "Stopped by user"
+              : `Agent exited with code ${exitCode}`,
     });
 
-    const content = quotaExhausted
-      ? "⚠️ Your quota may be exhausted — please check your usage and try again later."
-      : success
-        ? "✅ Done!"
-        : stoppedByUser
-          ? "🛑 Stopped by user"
-          : `❌ Error: Agent exited with code ${exitCode}`;
+    const content = invalidModelSelection
+      ? "⚠️ Invalid model selection for Antigravity — please update the model in Settings, or temporarily switch away from Auto mode."
+      : quotaExhausted
+        ? "⚠️ Your quota may be exhausted — please check your usage and try again later."
+        : success
+          ? "✅ Done!"
+          : stoppedByUser
+            ? "🛑 Stopped by user"
+            : `❌ Error: Agent exited with code ${exitCode}`;
     const agentMsg = await addMessage({
       sessionId: ctx.sessionId,
-      role: success && !quotaExhausted ? "agent" : "system",
+      role: success && !quotaExhausted && !invalidModelSelection ? "agent" : "system",
       content,
       type: "agent-return",
       parentId: ctx.messageId,

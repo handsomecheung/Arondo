@@ -2,10 +2,10 @@ import fs from "fs/promises";
 import path from "path";
 import type { ConcreteAgentType } from "./agents/index";
 import type { Message } from "./store";
-import { getSessionLog } from "./store";
+import { getSessionLog, getAgentModelsConfig, getDefaultAgentModels, type AgentModelsConfig } from "./store";
 import { getConfigDir } from "./config";
 import { stripAnsi } from "./ansi";
-import type { AutoModelEffort, AutoModelOption } from "./automodel";
+import type { AutoModelCostTier, AutoModelEffort, AutoModelOption } from "./automodel";
 
 const CONFIG_DIR = getConfigDir();
 
@@ -81,95 +81,166 @@ interface AgentChoice {
   agyQuotaGroup?: AgyQuotaGroup;
 }
 
-const AGY_GEMINI_MODEL_OPTIONS: AutoModelOption[] = [
-  { id: "gemini-3.7-flash-high", model: "Gemini 3.7 Flash (High)", costTier: "standard", description: "Gemini Flash 3.7 with high thinking for harder work." },
-  { id: "gemini-3.7-flash-medium", model: "Gemini 3.7 Flash (Medium)", costTier: "standard", description: "Gemini Flash 3.7 balanced option." },
-  { id: "gemini-3.7-flash-low", model: "Gemini 3.7 Flash (Low)", costTier: "cheap", description: "Gemini Flash 3.7 low thinking for small tasks." },
-  { id: "gemini-3.6-flash-high", model: "Gemini 3.6 Flash (High)", costTier: "standard", description: "Gemini Flash 3.6 with high thinking." },
-  { id: "gemini-3.6-flash-medium", model: "Gemini 3.6 Flash (Medium)", costTier: "standard", description: "Gemini Flash 3.6 balanced option." },
-  { id: "gemini-3.6-flash-low", model: "Gemini 3.6 Flash (Low)", costTier: "cheap", description: "Gemini Flash 3.6 low thinking for small tasks." },
-  { id: "gemini-3.5-flash-high", model: "Gemini 3.5 Flash (High)", costTier: "standard", description: "Gemini Flash 3.5 with high thinking." },
-  { id: "gemini-3.5-flash-medium", model: "Gemini 3.5 Flash (Medium)", costTier: "cheap", description: "Gemini Flash 3.5 balanced low-cost option." },
-  { id: "gemini-3.5-flash-low", model: "Gemini 3.5 Flash (Low)", costTier: "cheap", description: "Cheapest Gemini Flash option for simple requests." },
-  { id: "gemini-3.1-pro-high", model: "Gemini 3.1 Pro (High)", costTier: "strong", description: "Gemini Pro with high thinking for complex work." },
-  { id: "gemini-3.1-pro-low", model: "Gemini 3.1 Pro (Low)", costTier: "standard", description: "Gemini Pro with low thinking for moderate work." },
-];
+const PREDEFINED_MODEL_OPTIONS: Record<string, Omit<AutoModelOption, "model">> = {
+  "Gemini 3.7 Flash (High)": { id: "gemini-3.7-flash-high", costTier: "standard", description: "Gemini Flash 3.7 with high thinking for harder work." },
+  "Gemini 3.7 Flash (Medium)": { id: "gemini-3.7-flash-medium", costTier: "standard", description: "Gemini Flash 3.7 balanced option." },
+  "Gemini 3.7 Flash (Low)": { id: "gemini-3.7-flash-low", costTier: "cheap", description: "Gemini Flash 3.7 low thinking for small tasks." },
+  "Gemini 3.6 Flash (High)": { id: "gemini-3.6-flash-high", costTier: "standard", description: "Gemini Flash 3.6 with high thinking." },
+  "Gemini 3.6 Flash (Medium)": { id: "gemini-3.6-flash-medium", costTier: "standard", description: "Gemini Flash 3.6 balanced option." },
+  "Gemini 3.6 Flash (Low)": { id: "gemini-3.6-flash-low", costTier: "cheap", description: "Gemini Flash 3.6 low thinking for small tasks." },
+  "Gemini 3.5 Flash (High)": { id: "gemini-3.5-flash-high", costTier: "standard", description: "Gemini Flash 3.5 with high thinking." },
+  "Gemini 3.5 Flash (Medium)": { id: "gemini-3.5-flash-medium", costTier: "cheap", description: "Gemini Flash 3.5 balanced low-cost option." },
+  "Gemini 3.5 Flash (Low)": { id: "gemini-3.5-flash-low", costTier: "cheap", description: "Cheapest Gemini Flash option for simple requests." },
+  "Gemini 3.1 Pro (High)": { id: "gemini-3.1-pro-high", costTier: "strong", description: "Gemini Pro with high thinking for complex work." },
+  "Gemini 3.1 Pro (Low)": { id: "gemini-3.1-pro-low", costTier: "standard", description: "Gemini Pro with low thinking for moderate work." },
+  "Claude Sonnet 4.6 (Thinking)": { id: "claude-sonnet-4-6", costTier: "strong", description: "Strong general coding model in Antigravity." },
+  "Claude Opus 4.6 (Thinking)": { id: "claude-opus-4-6-thinking", costTier: "strong", description: "Highest-cost Antigravity model for the hardest tasks." },
+  "gpt-5.4-mini low": { id: "codex-gpt-5.4-mini-low", effort: "low", costTier: "cheap", description: "Cheaper Codex option for small questions and low-risk changes." },
+  "gpt-5.5 medium": { id: "codex-gpt-5.5-medium", effort: "medium", costTier: "standard", description: "Default Codex option for normal coding tasks." },
+  "gpt-5.5 high": { id: "codex-gpt-5.5-high", effort: "high", costTier: "strong", description: "Stronger Codex reasoning for hard debugging and broad changes." },
+};
 
-const AGY_OTHER_MODEL_OPTIONS: AutoModelOption[] = [
-  { id: "claude-sonnet-4-6", model: "Claude Sonnet 4.6 (Thinking)", costTier: "strong", description: "Strong general coding model in Antigravity." },
-  { id: "claude-opus-4-6-thinking", model: "Claude Opus 4.6 (Thinking)", costTier: "strong", description: "Highest-cost Antigravity model for the hardest tasks." },
-];
+const CLAUDE_DEFAULT_OPTION: AutoModelOption = {
+  id: "claude-default",
+  costTier: "standard",
+  description: "Use Claude Code's configured default model.",
+};
 
-const CLAUDE_MODEL_OPTIONS: AutoModelOption[] = [
-  { id: "claude-default", costTier: "standard", description: "Use Claude Code's configured default model." },
-];
+export function buildModelOption(modelStr: string, agentType: ConcreteAgentType): AutoModelOption {
+  const predefined = PREDEFINED_MODEL_OPTIONS[modelStr];
+  if (predefined) {
+    if (agentType === "codex" && predefined.effort) {
+      const modelName = modelStr.replace(/\s+(low|medium|high|minimal)$/i, "");
+      return { ...predefined, model: modelName };
+    }
+    return { ...predefined, model: modelStr };
+  }
+  const slug = modelStr.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  let effort: AutoModelEffort | undefined;
+  let modelName = modelStr;
+  if (agentType === "codex") {
+    const parts = modelStr.trim().split(/\s+/);
+    const last = parts[parts.length - 1]?.toLowerCase();
+    if (["minimal", "low", "medium", "high"].includes(last)) {
+      effort = last as AutoModelEffort;
+      modelName = parts.slice(0, -1).join(" ");
+    }
+  }
+  const lower = modelStr.toLowerCase();
+  const costTier: AutoModelCostTier = (lower.includes("pro") || lower.includes("opus") || lower.includes("high") || lower.includes("max"))
+    ? "strong"
+    : (lower.includes("flash") || lower.includes("mini") || lower.includes("low") || lower.includes("haiku") || lower.includes("cheap"))
+      ? "cheap"
+      : "standard";
 
-const CODEX_MODEL_OPTIONS: AutoModelOption[] = [
-  { id: "codex-gpt-5.4-mini-low", model: "gpt-5.4-mini", effort: "low", costTier: "cheap", description: "Cheaper Codex option for small questions and low-risk changes." },
-  { id: "codex-gpt-5.5-medium", model: "gpt-5.5", effort: "medium", costTier: "standard", description: "Default Codex option for normal coding tasks." },
-  { id: "codex-gpt-5.5-high", model: "gpt-5.5", effort: "high", costTier: "strong", description: "Stronger Codex reasoning for hard debugging and broad changes." },
-];
+  return {
+    id: `${agentType}-${slug || "model"}`,
+    model: modelName,
+    effort,
+    costTier,
+    description: modelStr,
+  };
+}
 
 export function getModelOptionsForAgent(
   agentType: ConcreteAgentType,
   agyQuotaGroup?: AgyQuotaGroup,
+  agentModels?: AgentModelsConfig,
 ): AutoModelOption[] {
+  const configs = agentModels || getDefaultAgentModels();
   if (agentType === "antigravity") {
-    if (agyQuotaGroup === "gemini") return AGY_GEMINI_MODEL_OPTIONS;
-    if (agyQuotaGroup === "other") return AGY_OTHER_MODEL_OPTIONS;
-    return [...AGY_GEMINI_MODEL_OPTIONS, ...AGY_OTHER_MODEL_OPTIONS];
+    const geminiModels = configs.antigravity?.gemini?.availableModels ?? [];
+    const otherModels = configs.antigravity?.other?.availableModels ?? [];
+    if (agyQuotaGroup === "gemini") {
+      return geminiModels.map((m) => buildModelOption(m, "antigravity"));
+    }
+    if (agyQuotaGroup === "other") {
+      return otherModels.map((m) => buildModelOption(m, "antigravity"));
+    }
+    return [
+      ...geminiModels.map((m) => buildModelOption(m, "antigravity")),
+      ...otherModels.map((m) => buildModelOption(m, "antigravity")),
+    ];
   }
-  if (agentType === "claude") return CLAUDE_MODEL_OPTIONS;
-  if (agentType === "codex") return CODEX_MODEL_OPTIONS;
+  if (agentType === "claude") {
+    const models = configs.claude?.availableModels ?? [];
+    if (models.length > 0) {
+      return models.map((m) => buildModelOption(m, "claude"));
+    }
+    return [CLAUDE_DEFAULT_OPTION];
+  }
+  if (agentType === "codex") {
+    const models = configs.codex?.availableModels ?? [];
+    if (models.length > 0) {
+      return models.map((m) => buildModelOption(m, "codex"));
+    }
+    return [
+      buildModelOption("gpt-5.4-mini low", "codex"),
+      buildModelOption("gpt-5.5 medium", "codex"),
+      buildModelOption("gpt-5.5 high", "codex"),
+    ];
+  }
   return [];
 }
 
 export function getAgyQuotaGroupForModel(model?: string): AgyQuotaGroup | undefined {
   if (!model) return undefined;
-  if (AGY_GEMINI_MODEL_OPTIONS.some((option) => option.model === model)) return "gemini";
-  if (AGY_OTHER_MODEL_OPTIONS.some((option) => option.model === model)) return "other";
-  if (model.toLowerCase().includes("gpt-oss") || model.toLowerCase().includes("claude")) return "other";
-  return undefined;
+  if (model.toLowerCase().includes("gemini")) return "gemini";
+  if (model.toLowerCase().includes("gpt-oss") || model.toLowerCase().includes("claude") || model.toLowerCase().includes("opus") || model.toLowerCase().includes("sonnet")) return "other";
+  return "gemini";
 }
 
 /**
  * Selects the best agent and model from the available binary names on a runner.
  */
 export async function selectAgent(runnerAgentBinaries: string[]): Promise<ResolvedAgent | null> {
+  const agentModels = await getAgentModelsConfig();
   const hasAgy = runnerAgentBinaries.includes("agy");
   const hasClaude = runnerAgentBinaries.includes("claude");
   const hasCodex = runnerAgentBinaries.includes("codex");
 
-  // A: agy + Gemini 3.5 Flash
-  // B: agy + Claude Sonnet 4.6
-  // C: claude + Sonnet
+  // A: agy + Gemini models
+  // B: agy + Other (Claude) models
+  // C: claude
   // D: codex + gpt-5.5 (medium)
   const choices: AgentChoice[] = [];
   if (hasAgy) {
+    const geminiOptions = getModelOptionsForAgent("antigravity", "gemini", agentModels);
+    const otherOptions = getModelOptionsForAgent("antigravity", "other", agentModels);
+    const agyDefault = agentModels.antigravity?.gemini?.defaultModel || geminiOptions[0]?.model || "Gemini 3.5 Flash (Medium)";
+    const otherDefault = agentModels.antigravity?.other?.defaultModel || otherOptions[0]?.model || "Claude Sonnet 4.6 (Thinking)";
+
     choices.push({
       id: "A",
       agentType: "antigravity",
-      model: "Gemini 3.5 Flash (Medium)",
-      modelOptions: AGY_GEMINI_MODEL_OPTIONS,
+      model: agyDefault,
+      modelOptions: geminiOptions,
       agyQuotaGroup: "gemini",
     });
     choices.push({
       id: "B",
       agentType: "antigravity",
-      model: "Claude Sonnet 4.6 (Thinking)",
-      modelOptions: AGY_OTHER_MODEL_OPTIONS,
+      model: otherDefault,
+      modelOptions: otherOptions,
       agyQuotaGroup: "other",
     });
   }
   if (hasClaude) {
-    choices.push({ id: "C", agentType: "claude", modelOptions: CLAUDE_MODEL_OPTIONS });
+    const claudeOptions = getModelOptionsForAgent("claude", undefined, agentModels);
+    choices.push({
+      id: "C",
+      agentType: "claude",
+      model: agentModels.claude?.defaultModel || undefined,
+      modelOptions: claudeOptions,
+    });
   }
   if (hasCodex) {
+    const codexOptions = getModelOptionsForAgent("codex", undefined, agentModels);
     choices.push({
       id: "D",
       agentType: "codex",
-      model: "gpt-5.5 medium",
-      modelOptions: CODEX_MODEL_OPTIONS,
+      model: agentModels.codex?.defaultModel || "gpt-5.5 medium",
+      modelOptions: codexOptions,
     });
   }
 

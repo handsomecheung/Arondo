@@ -78,6 +78,16 @@ Arondo を使用すると、モバイル対応のワークスペースから AI 
 
 <img src="public/readme/auto-mode-quota.png" alt="Runner page showing Claude, Antigravity, and Codex quota information used by Auto Mode" width="360">
 
+## エージェントモデルとデフォルト設定
+
+**設定 → Agent Models & Defaults** で各エージェントのデフォルトモデルおよび利用可能なモデル一覧を設定できます。
+
+- **Antigravity CLI (agy)**: クオータ系統に合わせて **Gemini Group** と **Others Group** (Claude/その他のモデル) に分けて個別に設定できます。
+- **Claude Code (claude)**: `--model` で渡されるデフォルトモデルと認識モデルのリストをカスタマイズできます。
+- **Codex CLI (codex)**: OpenAI Codex に渡されるデフォルトモデルと推論強度（effort）の選択肢をカスタマイズできます。
+
+CLI 出力から `invalid model selection` エラー（モデル名の廃止や誤入力など）を自動検出し、設定画面でのモデル更新を案内します。
+
 ## アクセス制御
 
 **設定**から 3 つの関連コントロールを使用して認証を構成します。

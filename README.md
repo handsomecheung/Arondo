@@ -87,6 +87,16 @@ After Auto Mode has selected the agent, **automodel** can optionally choose that
 
 <img src="public/readme/auto-mode-quota.png" alt="Runner page showing Claude, Antigravity, and Codex quota information used by Auto Mode" width="360">
 
+## Agent Models & Defaults
+
+Configure default models and available model lists in **Settings → Agent Models & Defaults**:
+
+- **Antigravity CLI (agy)**: Configured separately for **Gemini Group** and **Others Group** (Claude/other models), aligning with Antigravity quota tiers.
+- **Claude Code (claude)**: Customize default models and recognized model options passed via `--model`.
+- **Codex CLI (codex)**: Customize default model and reasoning effort options passed to OpenAI Codex.
+
+Arondo automatically detects `invalid model selection` errors from CLI outputs (such as when a model is deprecated or misspelled) and guides you to update the model in Settings.
+
 ## Access Control
 
 Configure authentication from **Settings** with three related controls:

@@ -78,6 +78,16 @@ Auto Mode 使用以下優先順序：
 
 <img src="public/readme/auto-mode-quota.png" alt="Runner page showing Claude, Antigravity, and Codex quota information used by Auto Mode" width="360">
 
+## Agent 模型與預設設定
+
+在 **設定 → Agent Models & Defaults** 中自訂各個 Agent 的預設模型與可選模型清單：
+
+- **Antigravity CLI (agy)**：針對 Antigravity 的配額層級，分別設定 **Gemini Group** 與 **Others Group**（Claude 等其他模型）。
+- **Claude Code (claude)**：自訂透過 `--model` 傳遞的預設模型與可選模型清單。
+- **Codex CLI (codex)**：自訂傳遞給 OpenAI Codex 的預設模型與推理強度（effort）選項。
+
+Arondo 會自動偵測 CLI 輸出中的 `invalid model selection` 錯誤（如模型被廢棄或名稱變更），並引導使用者在設定頁面更新模型。
+
 ## 存取控制
 
 使用三個相關控制項從 **設定** 配置身份驗證：

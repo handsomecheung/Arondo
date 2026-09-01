@@ -16,6 +16,22 @@ const SESSION_ARCHIVE_DAYS_DEFAULT =
 
 const FILE_SHOW_HIDDEN_DEFAULT = process.env.ARONDO_FILE_SHOW_HIDDEN_DEFAULT !== "false";
 
+export interface AgentModelConfig {
+  defaultModel?: string;
+  availableModels?: string[];
+}
+
+export interface AntigravityModelsConfig {
+  gemini: AgentModelConfig;
+  other: AgentModelConfig;
+}
+
+export interface AgentModelsConfig {
+  antigravity: AntigravityModelsConfig;
+  claude: AgentModelConfig;
+  codex: AgentModelConfig;
+}
+
 export interface AppSettings {
   sessionArchiveDays?: number;
   showHiddenFiles?: boolean;
@@ -26,6 +42,7 @@ export interface AppSettings {
     OPENAI_API_KEY?: string;
     GOOGLE_GENERATIVE_AI_API_KEY?: string;
   };
+  agentModels?: AgentModelsConfig;
 }
 
 interface ArondoConfigWithSettings {
@@ -739,9 +756,124 @@ export async function deleteProject(id: string): Promise<void> {
 
 // ─── App Settings ─────────────────────────────────────────────────────────────
 
+export function getDefaultAgentModels(): AgentModelsConfig {
+  return {
+    antigravity: {
+      gemini: {
+        defaultModel: "Gemini 3.5 Flash (Medium)",
+        availableModels: [
+          "Gemini 3.7 Flash (High)",
+          "Gemini 3.7 Flash (Medium)",
+          "Gemini 3.7 Flash (Low)",
+          "Gemini 3.6 Flash (High)",
+          "Gemini 3.6 Flash (Medium)",
+          "Gemini 3.6 Flash (Low)",
+          "Gemini 3.5 Flash (High)",
+          "Gemini 3.5 Flash (Medium)",
+          "Gemini 3.5 Flash (Low)",
+          "Gemini 3.1 Pro (High)",
+          "Gemini 3.1 Pro (Low)",
+        ],
+      },
+      other: {
+        defaultModel: "Claude Sonnet 4.6 (Thinking)",
+        availableModels: [
+          "Claude Sonnet 4.6 (Thinking)",
+          "Claude Opus 4.6 (Thinking)",
+        ],
+      },
+    },
+    claude: {
+      defaultModel: "claude-3-7-sonnet-20250219",
+      availableModels: [
+        "claude-3-7-sonnet-20250219",
+        "claude-3-5-sonnet-20241022",
+        "claude-3-5-haiku-20241022",
+        "claude-3-opus-20240229",
+      ],
+    },
+    codex: {
+      defaultModel: "gpt-5.5 medium",
+      availableModels: [
+        "gpt-5.4-mini low",
+        "gpt-5.5 medium",
+        "gpt-5.5 high",
+      ],
+    },
+  };
+}
+
 export async function getAppSettings(): Promise<AppSettings> {
   const config = await readJson<ArondoConfigWithSettings>(ARONDO_CONFIG_FILE, {});
-  return config.setitngs || {};
+  const settings = config.setitngs || {};
+  const defaults = getDefaultAgentModels();
+  const rawAgentModels = settings.agentModels as any;
+
+  // Handle migration if antigravity was stored in flat format
+  let rawAgyGemini = rawAgentModels?.antigravity?.gemini;
+  let rawAgyOther = rawAgentModels?.antigravity?.other;
+  if (!rawAgyGemini && !rawAgyOther && rawAgentModels?.antigravity) {
+    const flatModels: string[] = Array.isArray(rawAgentModels.antigravity.availableModels)
+      ? rawAgentModels.antigravity.availableModels
+      : [];
+    const flatDefault: string = typeof rawAgentModels.antigravity.defaultModel === "string"
+      ? rawAgentModels.antigravity.defaultModel
+      : "";
+    rawAgyGemini = {
+      defaultModel: flatDefault || defaults.antigravity.gemini.defaultModel,
+      availableModels: flatModels.filter((m) => m.toLowerCase().includes("gemini")),
+    };
+    rawAgyOther = {
+      defaultModel: defaults.antigravity.other.defaultModel,
+      availableModels: flatModels.filter((m) => !m.toLowerCase().includes("gemini")),
+    };
+  }
+
+  const mergedAgentModels: AgentModelsConfig = {
+    antigravity: {
+      gemini: {
+        defaultModel: rawAgyGemini?.defaultModel !== undefined
+          ? rawAgyGemini.defaultModel
+          : defaults.antigravity.gemini.defaultModel,
+        availableModels: Array.isArray(rawAgyGemini?.availableModels)
+          ? rawAgyGemini.availableModels
+          : defaults.antigravity.gemini.availableModels,
+      },
+      other: {
+        defaultModel: rawAgyOther?.defaultModel !== undefined
+          ? rawAgyOther.defaultModel
+          : defaults.antigravity.other.defaultModel,
+        availableModels: Array.isArray(rawAgyOther?.availableModels)
+          ? rawAgyOther.availableModels
+          : defaults.antigravity.other.availableModels,
+      },
+    },
+    claude: {
+      defaultModel: rawAgentModels?.claude?.defaultModel !== undefined
+        ? rawAgentModels.claude.defaultModel
+        : defaults.claude.defaultModel,
+      availableModels: Array.isArray(rawAgentModels?.claude?.availableModels)
+        ? rawAgentModels.claude.availableModels
+        : defaults.claude.availableModels,
+    },
+    codex: {
+      defaultModel: rawAgentModels?.codex?.defaultModel !== undefined
+        ? rawAgentModels.codex.defaultModel
+        : defaults.codex.defaultModel,
+      availableModels: Array.isArray(rawAgentModels?.codex?.availableModels)
+        ? rawAgentModels.codex.availableModels
+        : defaults.codex.availableModels,
+    },
+  };
+  return {
+    ...settings,
+    agentModels: mergedAgentModels,
+  };
+}
+
+export async function getAgentModelsConfig(): Promise<AgentModelsConfig> {
+  const settings = await getAppSettings();
+  return settings.agentModels || getDefaultAgentModels();
 }
 
 export async function updateAppSettings(patch: Partial<AppSettings>): Promise<AppSettings> {
