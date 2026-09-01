@@ -358,8 +358,8 @@ The application enforces token-based authentication on all API routes and WebSoc
           }
         },
         "claude": {
-          "defaultModel": "claude-3-7-sonnet-20250219",
-          "availableModels": ["claude-3-7-sonnet-20250219", "claude-3-5-sonnet-20241022", "..."]
+          "defaultModel": "opus",
+          "availableModels": ["opus", "fable", "sonnet", "haiku"]
         },
         "codex": {
           "defaultModel": "gpt-5.6-terra",
@@ -420,7 +420,7 @@ The application enforces token-based authentication on all API routes and WebSoc
   - **Choices**:
     - **Choice A**: Antigravity (`agy`) Gemini model group (Quota: `GeminiHourRemain`, `GeminiWeeklyRemain`; default fallback model configured in `agentModels.antigravity.gemini.defaultModel`, e.g. `Gemini 3.7 Flash (Medium)`)
     - **Choice B**: Antigravity (`agy`) non-Gemini model group (Quota: `OtherHourRemain`, `OtherWeeklyRemain`; default fallback model configured in `agentModels.antigravity.other.defaultModel`, e.g. `Claude Sonnet 4.6 (Thinking)`; model options are drawn from `agentModels.antigravity.other.availableModels`)
-    - **Choice C**: Claude (`claude`) (Quota: `HourRemain`, `WeekRemain`; default fallback model configured in `agentModels.claude.defaultModel`, e.g. `claude-3-7-sonnet-20250219`)
+    - **Choice C**: Claude (`claude`) (Quota: `HourRemain`, `WeekRemain`; default fallback model configured in `agentModels.claude.defaultModel`, e.g. `opus`)
     - **Choice D**: Codex (`codex`) (Quota: `WeeklyRemain`, hourly is treated as always available; default fallback model configured in `agentModels.codex.defaultModel`, e.g. `gpt-5.6-terra`)
   - **Selection Algorithm**:
     1. **Quota-source preference**: Consider choices with a known, non-API-key weekly quota first. If none are known, fall back to unknown subscription quotas; use API-key billed choices only when no subscription choice is available.

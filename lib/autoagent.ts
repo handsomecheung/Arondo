@@ -95,6 +95,10 @@ const PREDEFINED_MODEL_OPTIONS: Record<string, Omit<AutoModelOption, "model">> =
   "Claude Sonnet 4.6 (Thinking)": { id: "claude-sonnet-4-6", costTier: "strong", description: "Strong general coding model in Antigravity." },
   "Claude Opus 4.6 (Thinking)": { id: "claude-opus-4-6-thinking", costTier: "strong", description: "Highest-cost Antigravity model for the hardest tasks." },
   "GPT-OSS 120B (Medium)": { id: "gpt-oss-120b-medium", costTier: "cheap", description: "Open-source model in Antigravity. May have suboptimal coding performance." },
+  "opus": { id: "claude-opus", costTier: "strong", description: "Opus 5 with 1M context · Best for everyday, complex tasks · $5/$25 per Mtok" },
+  "fable": { id: "claude-fable", costTier: "strong", description: "Fable 5 · Most capable for your hardest and longest-running tasks · $10/$50 per Mtok" },
+  "sonnet": { id: "claude-sonnet", costTier: "standard", description: "Sonnet 5 · Efficient for routine tasks · $2/$10 per Mtok" },
+  "haiku": { id: "claude-haiku", costTier: "cheap", description: "Haiku 4.5 · Fastest for quick answers · $1/$5 per Mtok" },
   "gpt-5.6-sol": { id: "codex-gpt-5.6-sol", costTier: "strong", description: "Flagship high-performance reasoning model in OpenAI Codex." },
   "gpt-5.6-terra": { id: "codex-gpt-5.6-terra", costTier: "standard", description: "Balanced default performance model in OpenAI Codex." },
   "gpt-5.6-luna": { id: "codex-gpt-5.6-luna", costTier: "cheap", description: "Fast and lightweight model in OpenAI Codex." },
@@ -238,7 +242,7 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
   }
   if (hasClaude) {
     const claudeOptions = getModelOptionsForAgent("claude", undefined, agentModels);
-    const claudeDefault = parseModelLine(agentModels.claude?.defaultModel) || claudeOptions[0]?.model || "claude-3-7-sonnet-20250219";
+    const claudeDefault = parseModelLine(agentModels.claude?.defaultModel) || claudeOptions[0]?.model || "opus";
     choices.push({
       id: "C",
       agentType: "claude",

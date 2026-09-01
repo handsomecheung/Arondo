@@ -45,12 +45,12 @@ const DEFAULT_CONFIGS: AgentModelsConfig = {
     },
   },
   claude: {
-    defaultModel: "claude-3-7-sonnet-20250219",
+    defaultModel: "opus",
     availableModels: [
-      "claude-3-7-sonnet-20250219",
-      "claude-3-5-sonnet-20241022",
-      "claude-3-5-haiku-20241022",
-      "claude-3-opus-20240229",
+      "opus # Opus 5 with 1M context · Best for everyday, complex tasks · $5/$25 per Mtok",
+      "fable # Fable 5 · Most capable for your hardest and longest-running tasks · $10/$50 per Mtok",
+      "sonnet # Sonnet 5 · Efficient for routine tasks · $2/$10 per Mtok",
+      "haiku # Haiku 4.5 · Fastest for quick answers · $1/$5 per Mtok",
     ],
   },
   codex: {
@@ -385,8 +385,8 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
             form.claude,
             (k, v) => handleChange("claude", k, v),
             () => handleResetAgent("claude"),
-            "e.g. claude-3-7-sonnet-20250219",
-            "claude-3-7-sonnet-20250219 # Hybrid reasoning\nclaude-3-5-sonnet-20241022\n# claude-3-5-haiku-20241022",
+            "e.g. opus",
+            "opus # Opus 5 with 1M context · $5/$25 per Mtok\nfable # Fable 5 · $10/$50 per Mtok\nsonnet # Sonnet 5 · $2/$10 per Mtok\nhaiku # Haiku 4.5 · $1/$5 per Mtok",
             "claude",
           )}
         </div>

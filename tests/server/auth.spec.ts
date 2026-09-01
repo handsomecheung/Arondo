@@ -252,8 +252,8 @@ test.describe('Authentication API tests', () => {
     expect(body.agentModels.antigravity.gemini.availableModels).toContain('Gemini 3.7 Flash (High)');
     expect(body.agentModels.antigravity.gemini.availableModels).not.toContain('Gemini 3.5 Flash (Medium)');
     expect(body.agentModels.antigravity.other.defaultModel).toBe('Claude Sonnet 4.6 (Thinking)');
-    expect(body.agentModels.claude.defaultModel).toBe('claude-3-7-sonnet-20250219');
-    expect(body.agentModels.claude.availableModels).toContain('claude-3-7-sonnet-20250219');
+    expect(body.agentModels.claude.defaultModel).toBe('opus');
+    expect(body.agentModels.claude.availableModels.some((m: string) => m.startsWith('opus'))).toBe(true);
     expect(body.agentModels.codex.defaultModel).toBe('gpt-5.6-terra');
     expect(body.agentModels.codex.availableModels).toContain('gpt-5.6-sol');
 
