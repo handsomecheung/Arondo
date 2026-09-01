@@ -157,4 +157,4 @@ export async function routeModel(input: AutoModelInput, options: RouteModelOptio
   }
 }
 
-export type { AutoModelDecision, AutoModelEffort, AutoModelInput, AutoModelOption, AutoModelProvider } from "./types";
+export type { AutoModelCostTier, AutoModelDecision, AutoModelEffort, AutoModelInput, AutoModelOption, AutoModelProvider } from "./types";

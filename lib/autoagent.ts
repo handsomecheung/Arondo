@@ -1,7 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import type { ConcreteAgentType } from "./agents/index";
-import { getSessionLog, getAgentModelsConfig, getDefaultAgentModels, parseModelLine, parseModelList, type AgentModelsConfig } from "./store";
+import { getSessionLog, getAgentModelsConfig, getDefaultAgentModels, parseModelLine, parseModelList, type AgentModelsConfig, type Message } from "./store";
 import { getConfigDir } from "./config";
 import { stripAnsi } from "./ansi";
 import type { AutoModelCostTier, AutoModelEffort, AutoModelOption } from "./automodel";
