@@ -16,7 +16,7 @@ interface UseSessionSubmitParams {
   isNewDraft: boolean;
   pendingFiles: File[];
   setPendingFiles: (v: File[] | ((prev: File[]) => File[])) => void;
-  uploadPendingFile: (file: File, runnerId: string) => Promise<string>;
+  uploadPendingFile: (file: File, runnerId: string, sessionId?: string) => Promise<string>;
   draftTrigger: "manual" | "codebaseReady" | "at";
   draftAt: number | null;
   sendScheduledAt: number | null;
@@ -92,6 +92,7 @@ export function useSessionSubmit({
 }: UseSessionSubmitParams) {
   const [commandMenuIndex, setCommandMenuIndex] = useState(-1);
   const [pendingConfirmation, setPendingConfirmation] = useState<{
+    id?: string;
     rawText: string;
     displayMessage: string;
     agentPrompt: string;
@@ -437,7 +438,14 @@ export function useSessionSubmit({
       return;
     }
 
-    const body: Record<string, unknown> = { prompt: agentPrompt, message: displayMessage, repoPath: pendingRepoPath, agentType: pendingAgentType, runnerId: pendingRunnerId };
+    const body: Record<string, unknown> = {
+      ...(pendingConfirmation.id ? { id: pendingConfirmation.id } : {}),
+      prompt: agentPrompt,
+      message: displayMessage,
+      repoPath: pendingRepoPath,
+      agentType: pendingAgentType,
+      runnerId: pendingRunnerId,
+    };
     if (choice === "force") body.force = true;
     else if (choice === "pendingAuto") { body.isDraft = true; body.draftTrigger = "codebaseReady"; }
     else { body.isDraft = true; body.draftTrigger = "manual"; }
@@ -514,7 +522,9 @@ export function useSessionSubmit({
 
     if (!trimmed && !isBlankSession) return;
 
-    const targetRunnerId = (isNewSession || isNewDraft || !selectedSessionId) ? runnerId : (selectedSession?.runnerId ?? runnerId);
+    const isNew = isNewSession || isNewDraft || !selectedSessionId;
+    const targetRunnerId = isNew ? runnerId : (selectedSession?.runnerId ?? runnerId);
+    const targetSessionId = selectedSessionId || (isNew ? crypto.randomUUID() : undefined);
 
     // displayMessage is what's shown in the chat timeline (never reveals the
     // runner-local upload path); agentPrompt is the real instruction sent to
@@ -526,7 +536,7 @@ export function useSessionSubmit({
         const uploadedPaths: string[] = [];
         const fileNames: string[] = [];
         for (const file of pendingFiles) {
-          const path = await uploadPendingFile(file, targetRunnerId);
+          const path = await uploadPendingFile(file, targetRunnerId, targetSessionId);
           uploadedPaths.push(path);
           fileNames.push(file.name);
         }
@@ -568,6 +578,7 @@ export function useSessionSubmit({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            ...(targetSessionId ? { id: targetSessionId } : {}),
             prompt: agentPrompt,
             message: displayMessage,
             repoPath: trimmedRepoPath,
@@ -584,7 +595,7 @@ export function useSessionSubmit({
         });
         if (res.status === 409) {
           const data = await res.json();
-          setPendingConfirmation({ rawText: trimmed, displayMessage, agentPrompt, repoPath: trimmedRepoPath, agentType, runnerId, reason: data.reason });
+          setPendingConfirmation({ id: targetSessionId, rawText: trimmed, displayMessage, agentPrompt, repoPath: trimmedRepoPath, agentType, runnerId, reason: data.reason });
           return;
         }
         const newSession: Session = await res.json();

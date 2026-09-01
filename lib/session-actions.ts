@@ -351,7 +351,7 @@ export async function dispatchCreateSession(
   repoPath: string,
   agentType: string,
   prompt: string,
-  opts: { name?: string; tokenUuid?: string; displayMessage?: string; tempDir?: boolean } = {},
+  opts: { id?: string; name?: string; tokenUuid?: string; displayMessage?: string; tempDir?: boolean } = {},
 ): Promise<ActionResult> {
   const trimmedPrompt = prompt.trim();
   if (!trimmedPrompt) {
@@ -365,6 +365,7 @@ export async function dispatchCreateSession(
   }
 
   const session = await createSession({
+    id: opts.id,
     status: "running",
     name: opts.name?.trim() || deriveSessionName(displayMessage, repoPath),
     agentType,

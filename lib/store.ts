@@ -450,10 +450,10 @@ export async function recordScriptHistory(projectId: string, command: string): P
 }
 
 export async function createSession(
-  data: Omit<Session, "id" | "projectId" | "createdAt" | "updatedAt">,
+  data: Omit<Session, "id" | "projectId" | "createdAt" | "updatedAt"> & { id?: string },
   opts: { tempDir?: boolean } = {}
 ): Promise<Session> {
-  const id = crypto.randomUUID();
+  const id = data.id || crypto.randomUUID();
   const project = await getOrCreateProject(data.repoPath, data.runnerId, { tempDir: opts.tempDir });
   const session: Session = {
     ...data,

@@ -1,6 +1,9 @@
+import path from "path";
+import fs from "fs/promises";
 import { NextRequest, NextResponse } from "next/server";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, verifyRunnerPermission } from "@/lib/auth";
+import { getConfigDir } from "@/lib/config";
 
 const MAX_UPLOAD_SIZE = 50 * 1024 * 1024; // 50MB
 
@@ -8,6 +11,7 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const file = formData.get("file");
   const runnerId = formData.get("runner");
+  const sessionId = formData.get("sessionId");
 
   if (!(file instanceof File) || typeof runnerId !== "string" || !runnerId) {
     return NextResponse.json(
@@ -40,6 +44,19 @@ export async function POST(request: NextRequest) {
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const content = buffer.toString("base64");
+  const validSessionId = typeof sessionId === "string" && sessionId.trim() ? path.basename(sessionId.trim()) : undefined;
+
+  // Save a copy in the session's directory on the server
+  if (validSessionId) {
+    try {
+      const sessionFilesDir = path.join(getConfigDir(), "sessions", validSessionId, "files");
+      await fs.mkdir(sessionFilesDir, { recursive: true });
+      const prefixedFilename = `${Date.now()}_${path.basename(file.name)}`;
+      await fs.writeFile(path.join(sessionFilesDir, prefixedFilename), buffer);
+    } catch {
+      // Best-effort local copy
+    }
+  }
 
   try {
     const result = await runnerManager.sendRequest(

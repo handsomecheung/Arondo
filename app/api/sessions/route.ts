@@ -83,7 +83,8 @@ async function pickRandomAllowedRunnerId(token: string | null): Promise<string |
 export async function POST(req: NextRequest) {
   const token = getArondoToken(req);
   const body = await req.json();
-  const { prompt, message, repoPath: repoPathInput, tempDir, agentType = "auto", runnerId: runnerIdInput, name, isDraft, draftTrigger = "codebaseReady", draftAt, force } = body as {
+  const { id: idInput, prompt, message, repoPath: repoPathInput, tempDir, agentType = "auto", runnerId: runnerIdInput, name, isDraft, draftTrigger = "codebaseReady", draftAt, force } = body as {
+    id?: string;
     prompt: string;
     message?: string;
     repoPath?: string;
@@ -143,6 +144,7 @@ export async function POST(req: NextRequest) {
 
   if (isBlank) {
     const session = await createSession({
+      id: typeof idInput === "string" && idInput.trim() ? idInput.trim() : undefined,
       status: "idle",
       name: name?.trim() || deriveSessionName("", repoPath),
       agentType,
@@ -158,6 +160,7 @@ export async function POST(req: NextRequest) {
     const trimmedPrompt = prompt.trim();
     const trimmedMessage = message?.trim() || trimmedPrompt;
     const session = await createSession({
+      id: typeof idInput === "string" && idInput.trim() ? idInput.trim() : undefined,
       status: "idle",
       name: name?.trim() || deriveSessionName(trimmedMessage, repoPath),
       agentType,
@@ -188,6 +191,7 @@ export async function POST(req: NextRequest) {
   }
 
   const result = await dispatchCreateSession(runnerId, repoPath, agentType, prompt, {
+    id: typeof idInput === "string" && idInput.trim() ? idInput.trim() : undefined,
     name,
     tokenUuid: getUuidByToken(token) || undefined,
     displayMessage: message,

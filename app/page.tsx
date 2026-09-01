@@ -848,13 +848,16 @@ export default function HomePage() {
   const handleSelectFile = (files: File[]) => setPendingFiles((prev) => [...prev, ...files]);
   const handleRemovePendingFile = (index: number) => setPendingFiles((prev) => prev.filter((_, i) => i !== index));
 
-  const uploadPendingFile = async (file: File, targetRunnerId: string): Promise<string> => {
+  const uploadPendingFile = async (file: File, targetRunnerId: string, targetSessionId?: string): Promise<string> => {
     if (!targetRunnerId) {
       throw new Error("Select a runner before uploading a file");
     }
     const formData = new FormData();
     formData.append("file", file);
     formData.append("runner", targetRunnerId);
+    if (targetSessionId) {
+      formData.append("sessionId", targetSessionId);
+    }
 
     const res = await fetch("/api/upload", { method: "POST", body: formData });
     const data = await res.json();
