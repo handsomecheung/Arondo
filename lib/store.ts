@@ -754,7 +754,27 @@ export async function deleteProject(id: string): Promise<void> {
   await fs.rm(projectDir, { recursive: true, force: true });
 }
 
-// ─── App Settings ─────────────────────────────────────────────────────────────
+/**
+ * Parses a single model name string, stripping comments starting with `#`,
+ * trimming whitespace, and returning null if the result is empty.
+ */
+export function parseModelLine(line?: string | null): string | null {
+  if (!line) return null;
+  const hashIdx = line.indexOf("#");
+  const cleaned = (hashIdx >= 0 ? line.slice(0, hashIdx) : line).trim();
+  return cleaned || null;
+}
+
+/**
+ * Parses an array of model lines, removing comment lines, inline comments,
+ * and empty entries.
+ */
+export function parseModelList(models?: string[] | null): string[] {
+  if (!Array.isArray(models)) return [];
+  return models
+    .map((m) => parseModelLine(m))
+    .filter((m): m is string => m !== null);
+}
 
 export function getDefaultAgentModels(): AgentModelsConfig {
   return {

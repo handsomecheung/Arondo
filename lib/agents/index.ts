@@ -5,7 +5,7 @@ import { CodexAgent } from "./codex";
 import { OpencodeAgent } from "./opencode";
 import { getAgyQuotaGroupForModel, getModelOptionsForAgent, selectAgent, type AgyQuotaGroup } from "../autoagent";
 import { routeModel, type AutoModelEffort, type AutoModelOption } from "../automodel";
-import { getAgentModelsConfig, type AgentModelsConfig } from "../store";
+import { getAgentModelsConfig, parseModelLine, type AgentModelsConfig } from "../store";
 
 export type ConcreteAgentType = "antigravity" | "claude" | "codex" | "opencode";
 export type AgentType = ConcreteAgentType | "auto";
@@ -71,11 +71,11 @@ export async function resolveAgentType(
   if (agentType !== "auto") {
     let defaultModel: string | undefined;
     if (agentType === "antigravity") {
-      defaultModel = agentModels.antigravity?.gemini?.defaultModel?.trim() || undefined;
+      defaultModel = parseModelLine(agentModels.antigravity?.gemini?.defaultModel) || undefined;
     } else if (agentType === "claude") {
-      defaultModel = agentModels.claude?.defaultModel?.trim() || undefined;
+      defaultModel = parseModelLine(agentModels.claude?.defaultModel) || undefined;
     } else if (agentType === "codex") {
-      defaultModel = agentModels.codex?.defaultModel?.trim() || undefined;
+      defaultModel = parseModelLine(agentModels.codex?.defaultModel) || undefined;
     }
     return {
       agentType: agentType as ConcreteAgentType,

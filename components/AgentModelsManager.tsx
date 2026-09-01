@@ -202,7 +202,10 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
   ) => {
     const modelCount = state.availableModelsText
       .split("\n")
-      .map((m) => m.trim())
+      .map((m) => {
+        const hashIdx = m.indexOf("#");
+        return (hashIdx >= 0 ? m.slice(0, hashIdx) : m).trim();
+      })
       .filter(Boolean).length;
 
     return (
@@ -287,7 +290,7 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
                 color: "var(--text-secondary)",
               }}
             >
-              Available Models (one per line)
+              Available Models (one per line, # comments supported)
             </label>
             <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
               {modelCount} {modelCount === 1 ? "model" : "models"}
@@ -336,7 +339,7 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
           Agent Models & Defaults
         </h2>
         <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 0, lineHeight: 1.5 }}>
-          Configure default models and available models for Antigravity (Gemini &amp; Others), Claude Code, and Codex. Saved in arondo.json.
+          Configure default models and available models for Antigravity (Gemini &amp; Others), Claude Code, and Codex. Model names support comments starting with <code>#</code> (e.g. <code>Model Name # notes</code> or full-line comments), and empty/comment lines will be automatically ignored. Saved in arondo.json.
         </p>
       </div>
 
@@ -354,7 +357,7 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
               (k, v) => handleChange("antigravityGemini", k, v),
               () => handleResetAgyGroup("gemini"),
               "e.g. Gemini 3.7 Flash (Medium)",
-              "Gemini 3.7 Flash (High)\nGemini 3.7 Flash (Medium)",
+              "Gemini 3.7 Flash (High) # Fast reasoning\nGemini 3.7 Flash (Medium)\n# Gemini 3.5 Flash (Low)",
               "agy-gemini",
             )}
             {renderGroupCard(
@@ -364,7 +367,7 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
               (k, v) => handleChange("antigravityOther", k, v),
               () => handleResetAgyGroup("other"),
               "e.g. Claude Sonnet 4.6 (Thinking)",
-              "Claude Sonnet 4.6 (Thinking)\nClaude Opus 4.6 (Thinking)",
+              "Claude Sonnet 4.6 (Thinking) # Default thinking model\nClaude Opus 4.6 (Thinking)",
               "agy-other",
             )}
           </div>
@@ -382,7 +385,7 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
             (k, v) => handleChange("claude", k, v),
             () => handleResetAgent("claude"),
             "e.g. claude-3-7-sonnet-20250219",
-            "claude-3-7-sonnet-20250219\nclaude-3-5-sonnet-20241022\nclaude-3-5-haiku-20241022",
+            "claude-3-7-sonnet-20250219 # Hybrid reasoning\nclaude-3-5-sonnet-20241022\n# claude-3-5-haiku-20241022",
             "claude",
           )}
         </div>
@@ -399,7 +402,7 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
             (k, v) => handleChange("codex", k, v),
             () => handleResetAgent("codex"),
             "e.g. gpt-5.5 medium",
-            "gpt-5.4-mini low\ngpt-5.5 medium\ngpt-5.5 high",
+            "gpt-5.4-mini low\ngpt-5.5 medium # Standard\ngpt-5.5 high # Heavy reasoning",
             "codex",
           )}
         </div>

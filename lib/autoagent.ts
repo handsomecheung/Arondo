@@ -1,8 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import type { ConcreteAgentType } from "./agents/index";
-import type { Message } from "./store";
-import { getSessionLog, getAgentModelsConfig, getDefaultAgentModels, type AgentModelsConfig } from "./store";
+import { getSessionLog, getAgentModelsConfig, getDefaultAgentModels, parseModelLine, parseModelList, type AgentModelsConfig } from "./store";
 import { getConfigDir } from "./config";
 import { stripAnsi } from "./ansi";
 import type { AutoModelCostTier, AutoModelEffort, AutoModelOption } from "./automodel";
@@ -149,8 +148,8 @@ export function getModelOptionsForAgent(
 ): AutoModelOption[] {
   const configs = agentModels || getDefaultAgentModels();
   if (agentType === "antigravity") {
-    const geminiModels = configs.antigravity?.gemini?.availableModels ?? [];
-    const otherModels = configs.antigravity?.other?.availableModels ?? [];
+    const geminiModels = parseModelList(configs.antigravity?.gemini?.availableModels);
+    const otherModels = parseModelList(configs.antigravity?.other?.availableModels);
     if (agyQuotaGroup === "gemini") {
       return geminiModels.map((m) => buildModelOption(m, "antigravity"));
     }
@@ -163,14 +162,14 @@ export function getModelOptionsForAgent(
     ];
   }
   if (agentType === "claude") {
-    const models = configs.claude?.availableModels ?? [];
+    const models = parseModelList(configs.claude?.availableModels);
     if (models.length > 0) {
       return models.map((m) => buildModelOption(m, "claude"));
     }
     return [CLAUDE_DEFAULT_OPTION];
   }
   if (agentType === "codex") {
-    const models = configs.codex?.availableModels ?? [];
+    const models = parseModelList(configs.codex?.availableModels);
     if (models.length > 0) {
       return models.map((m) => buildModelOption(m, "codex"));
     }
@@ -184,9 +183,11 @@ export function getModelOptionsForAgent(
 }
 
 export function getAgyQuotaGroupForModel(model?: string): AgyQuotaGroup | undefined {
-  if (!model) return undefined;
-  if (model.toLowerCase().includes("gemini")) return "gemini";
-  if (model.toLowerCase().includes("gpt-oss") || model.toLowerCase().includes("claude") || model.toLowerCase().includes("opus") || model.toLowerCase().includes("sonnet")) return "other";
+  const cleaned = parseModelLine(model);
+  if (!cleaned) return undefined;
+  const lower = cleaned.toLowerCase();
+  if (lower.includes("gemini")) return "gemini";
+  if (lower.includes("gpt-oss") || lower.includes("claude") || lower.includes("opus") || lower.includes("sonnet")) return "other";
   return "gemini";
 }
 
@@ -207,8 +208,8 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
   if (hasAgy) {
     const geminiOptions = getModelOptionsForAgent("antigravity", "gemini", agentModels);
     const otherOptions = getModelOptionsForAgent("antigravity", "other", agentModels);
-    const agyDefault = agentModels.antigravity?.gemini?.defaultModel || geminiOptions[0]?.model || "Gemini 3.5 Flash (Medium)";
-    const otherDefault = agentModels.antigravity?.other?.defaultModel || otherOptions[0]?.model || "Claude Sonnet 4.6 (Thinking)";
+    const agyDefault = parseModelLine(agentModels.antigravity?.gemini?.defaultModel) || geminiOptions[0]?.model || "Gemini 3.5 Flash (Medium)";
+    const otherDefault = parseModelLine(agentModels.antigravity?.other?.defaultModel) || otherOptions[0]?.model || "Claude Sonnet 4.6 (Thinking)";
 
     choices.push({
       id: "A",
@@ -227,19 +228,21 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
   }
   if (hasClaude) {
     const claudeOptions = getModelOptionsForAgent("claude", undefined, agentModels);
+    const claudeDefault = parseModelLine(agentModels.claude?.defaultModel) || claudeOptions[0]?.model || "claude-3-7-sonnet-20250219";
     choices.push({
       id: "C",
       agentType: "claude",
-      model: agentModels.claude?.defaultModel || undefined,
+      model: claudeDefault,
       modelOptions: claudeOptions,
     });
   }
   if (hasCodex) {
     const codexOptions = getModelOptionsForAgent("codex", undefined, agentModels);
+    const codexDefault = parseModelLine(agentModels.codex?.defaultModel) || "gpt-5.5 medium";
     choices.push({
       id: "D",
       agentType: "codex",
-      model: agentModels.codex?.defaultModel || "gpt-5.5 medium",
+      model: codexDefault,
       modelOptions: codexOptions,
     });
   }
