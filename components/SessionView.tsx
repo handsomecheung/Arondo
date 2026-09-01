@@ -239,6 +239,51 @@ export default function SessionView({
     e.target.value = "";
   };
 
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounterRef = useRef(0);
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isRunnerOffline || isArchived) return;
+    if (e.dataTransfer.types && Array.from(e.dataTransfer.types).includes("Files")) {
+      dragCounterRef.current += 1;
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isRunnerOffline || isArchived) return;
+    if (e.dataTransfer.types && Array.from(e.dataTransfer.types).includes("Files")) {
+      e.dataTransfer.dropEffect = "copy";
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isRunnerOffline || isArchived) return;
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setIsDragging(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDragging(false);
+    if (isRunnerOffline || isArchived) return;
+    const files = Array.from(e.dataTransfer.files ?? []);
+    if (files.length > 0) {
+      onSelectFiles(files);
+    }
+  };
+
   const [agentSwitchOpen, setAgentSwitchOpen] = useState(false);
   const [agentSwitchMenuPos, setAgentSwitchMenuPos] = useState<{ top: number; left: number } | null>(null);
   const agentSwitchRef = useRef<HTMLDivElement>(null);
@@ -1036,7 +1081,19 @@ export default function SessionView({
       </div>
 
       {showComposer && (
-      <div className="input-area">
+      <div
+        className={`input-area${isDragging ? " drag-over" : ""}`}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {isDragging && (
+          <div className="input-area-drop-overlay">
+            <IconPaperclip size={18} />
+            <span>Drop files to attach</span>
+          </div>
+        )}
         {(isNewSession || isNewDraft) && (
           <div className="input-meta">
             <div className="input-meta-row">
