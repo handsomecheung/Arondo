@@ -800,6 +800,7 @@ export function getDefaultAgentModels(): AgentModelsConfig {
         availableModels: [
           "Claude Sonnet 4.6 (Thinking)",
           "Claude Opus 4.6 (Thinking)",
+          "GPT-OSS 120B (Medium) # Coding performance may be suboptimal; prefix with '#' to comment out if needed",
         ],
       },
     },

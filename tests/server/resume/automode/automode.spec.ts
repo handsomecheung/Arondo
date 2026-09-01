@@ -178,6 +178,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
     expect(resolved.modelOptions?.map((option) => option.id)).toEqual([
       'claude-sonnet-4-6',
       'claude-opus-4-6-thinking',
+      'gpt-oss-120b-medium',
     ]);
     expect(getModelOptionsForAgent('antigravity', 'gemini').some((option) => option.id === 'gpt-oss-120b-medium')).toBeFalsy();
   });
