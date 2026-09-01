@@ -249,13 +249,13 @@ test.describe('Authentication API tests', () => {
     const body = await getRes.json();
     expect(body.agentModels).toBeDefined();
     expect(body.agentModels.antigravity.gemini.defaultModel).toBe('Gemini 3.7 Flash (Medium)');
-    expect(body.agentModels.antigravity.gemini.availableModels).toContain('Gemini 3.7 Flash (High)');
-    expect(body.agentModels.antigravity.gemini.availableModels).not.toContain('Gemini 3.5 Flash (Medium)');
+    expect(body.agentModels.antigravity.gemini.availableModels.some((m: string) => m.startsWith('Gemini 3.7 Flash (High)'))).toBe(true);
+    expect(body.agentModels.antigravity.gemini.availableModels.some((m: string) => m.startsWith('Gemini 3.5 Flash (Medium)'))).toBe(false);
     expect(body.agentModels.antigravity.other.defaultModel).toBe('Claude Sonnet 4.6 (Thinking)');
     expect(body.agentModels.claude.defaultModel).toBe('opus');
     expect(body.agentModels.claude.availableModels.some((m: string) => m.startsWith('opus'))).toBe(true);
     expect(body.agentModels.codex.defaultModel).toBe('gpt-5.6-terra');
-    expect(body.agentModels.codex.availableModels).toContain('gpt-5.6-sol');
+    expect(body.agentModels.codex.availableModels.some((m: string) => m.startsWith('gpt-5.6-sol'))).toBe(true);
 
     // Update agentModels
     const postRes = await request.post('/api/settings', {

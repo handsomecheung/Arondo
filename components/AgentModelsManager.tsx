@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { AgentModelsConfig } from "@/lib/store";
+import { type AgentModelsConfig, DEFAULT_AGENT_MODELS } from "@/lib/agentModels";
 
 interface AgentModelsManagerProps {
   initialConfig?: AgentModelsConfig;
@@ -20,69 +20,23 @@ interface FormState {
   codex: GroupFormState;
 }
 
-const DEFAULT_CONFIGS: AgentModelsConfig = {
-  antigravity: {
-    gemini: {
-      defaultModel: "Gemini 3.7 Flash (Medium)",
-      availableModels: [
-        "Gemini 3.7 Flash (High)",
-        "Gemini 3.7 Flash (Medium)",
-        "Gemini 3.7 Flash (Low)",
-        "Gemini 3.6 Flash (High)",
-        "Gemini 3.6 Flash (Medium)",
-        "Gemini 3.6 Flash (Low)",
-        "Gemini 3.1 Pro (High)",
-        "Gemini 3.1 Pro (Low)",
-      ],
-    },
-    other: {
-      defaultModel: "Claude Sonnet 4.6 (Thinking)",
-      availableModels: [
-        "Claude Sonnet 4.6 (Thinking)",
-        "Claude Opus 4.6 (Thinking)",
-        "GPT-OSS 120B (Medium) # Coding performance may be suboptimal; prefix with '#' to comment out if needed",
-      ],
-    },
-  },
-  claude: {
-    defaultModel: "opus",
-    availableModels: [
-      "opus # Opus 5 with 1M context · Best for everyday, complex tasks · $5/$25 per Mtok",
-      "fable # Fable 5 · Most capable for your hardest and longest-running tasks · $10/$50 per Mtok",
-      "sonnet # Sonnet 5 · Efficient for routine tasks · $2/$10 per Mtok",
-      "haiku # Haiku 4.5 · Fastest for quick answers · $1/$5 per Mtok",
-    ],
-  },
-  codex: {
-    defaultModel: "gpt-5.6-terra",
-    availableModels: [
-      "gpt-5.6-sol",
-      "gpt-5.6-terra",
-      "gpt-5.6-luna",
-      "gpt-5.5",
-      "gpt-5.4",
-      "gpt-5.4-mini",
-    ],
-  },
-};
-
 function configToFormState(config?: AgentModelsConfig): FormState {
   return {
     antigravityGemini: {
-      defaultModel: config?.antigravity?.gemini?.defaultModel ?? DEFAULT_CONFIGS.antigravity.gemini.defaultModel ?? "",
-      availableModelsText: (config?.antigravity?.gemini?.availableModels ?? DEFAULT_CONFIGS.antigravity.gemini.availableModels ?? []).join("\n"),
+      defaultModel: config?.antigravity?.gemini?.defaultModel ?? DEFAULT_AGENT_MODELS.antigravity.gemini.defaultModel ?? "",
+      availableModelsText: (config?.antigravity?.gemini?.availableModels ?? DEFAULT_AGENT_MODELS.antigravity.gemini.availableModels ?? []).join("\n"),
     },
     antigravityOther: {
-      defaultModel: config?.antigravity?.other?.defaultModel ?? DEFAULT_CONFIGS.antigravity.other.defaultModel ?? "",
-      availableModelsText: (config?.antigravity?.other?.availableModels ?? DEFAULT_CONFIGS.antigravity.other.availableModels ?? []).join("\n"),
+      defaultModel: config?.antigravity?.other?.defaultModel ?? DEFAULT_AGENT_MODELS.antigravity.other.defaultModel ?? "",
+      availableModelsText: (config?.antigravity?.other?.availableModels ?? DEFAULT_AGENT_MODELS.antigravity.other.availableModels ?? []).join("\n"),
     },
     claude: {
-      defaultModel: config?.claude?.defaultModel ?? DEFAULT_CONFIGS.claude.defaultModel ?? "",
-      availableModelsText: (config?.claude?.availableModels ?? DEFAULT_CONFIGS.claude.availableModels ?? []).join("\n"),
+      defaultModel: config?.claude?.defaultModel ?? DEFAULT_AGENT_MODELS.claude.defaultModel ?? "",
+      availableModelsText: (config?.claude?.availableModels ?? DEFAULT_AGENT_MODELS.claude.availableModels ?? []).join("\n"),
     },
     codex: {
-      defaultModel: config?.codex?.defaultModel ?? DEFAULT_CONFIGS.codex.defaultModel ?? "",
-      availableModelsText: (config?.codex?.availableModels ?? DEFAULT_CONFIGS.codex.availableModels ?? []).join("\n"),
+      defaultModel: config?.codex?.defaultModel ?? DEFAULT_AGENT_MODELS.codex.defaultModel ?? "",
+      availableModelsText: (config?.codex?.availableModels ?? DEFAULT_AGENT_MODELS.codex.availableModels ?? []).join("\n"),
     },
   };
 }
@@ -109,7 +63,7 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
   };
 
   const handleResetAgyGroup = (group: "gemini" | "other") => {
-    const def = DEFAULT_CONFIGS.antigravity[group];
+    const def = DEFAULT_AGENT_MODELS.antigravity[group];
     const fieldKey: keyof FormState = group === "gemini" ? "antigravityGemini" : "antigravityOther";
     setForm((prev) => ({
       ...prev,
@@ -121,7 +75,7 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
   };
 
   const handleResetAgent = (agent: "claude" | "codex") => {
-    const def = DEFAULT_CONFIGS[agent];
+    const def = DEFAULT_AGENT_MODELS[agent];
     setForm((prev) => ({
       ...prev,
       [agent]: {
@@ -403,7 +357,7 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
             (k, v) => handleChange("codex", k, v),
             () => handleResetAgent("codex"),
             "e.g. gpt-5.6-terra",
-            "gpt-5.6-sol # Flagship reasoning\ngpt-5.6-terra # Default balanced\ngpt-5.6-luna # Fast lightweight\ngpt-5.5\ngpt-5.4\ngpt-5.4-mini",
+            "gpt-5.6-sol # Flagship reasoning\ngpt-5.6-terra # Default balanced\ngpt-5.6-luna # Fast lightweight\ngpt-5.5 # General coding\ngpt-5.4\ngpt-5.4-mini",
             "codex",
           )}
         </div>

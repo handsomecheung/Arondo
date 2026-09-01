@@ -16,21 +16,25 @@ const SESSION_ARCHIVE_DAYS_DEFAULT =
 
 const FILE_SHOW_HIDDEN_DEFAULT = process.env.ARONDO_FILE_SHOW_HIDDEN_DEFAULT !== "false";
 
-export interface AgentModelConfig {
-  defaultModel?: string;
-  availableModels?: string[];
-}
+import {
+  type AgentModelConfig,
+  type AntigravityModelsConfig,
+  type AgentModelsConfig,
+  DEFAULT_AGENT_MODELS,
+  getDefaultAgentModels,
+  parseModelLine,
+  parseModelList,
+} from "./agentModels";
 
-export interface AntigravityModelsConfig {
-  gemini: AgentModelConfig;
-  other: AgentModelConfig;
-}
-
-export interface AgentModelsConfig {
-  antigravity: AntigravityModelsConfig;
-  claude: AgentModelConfig;
-  codex: AgentModelConfig;
-}
+export {
+  type AgentModelConfig,
+  type AntigravityModelsConfig,
+  type AgentModelsConfig,
+  DEFAULT_AGENT_MODELS,
+  getDefaultAgentModels,
+  parseModelLine,
+  parseModelList,
+};
 
 export interface AppSettings {
   sessionArchiveDays?: number;
@@ -752,76 +756,6 @@ export async function unarchiveSession(id: string): Promise<void> {
 export async function deleteProject(id: string): Promise<void> {
   const projectDir = getProjectDir(id);
   await fs.rm(projectDir, { recursive: true, force: true });
-}
-
-/**
- * Parses a single model name string, stripping comments starting with `#`,
- * trimming whitespace, and returning null if the result is empty.
- */
-export function parseModelLine(line?: string | null): string | null {
-  if (!line) return null;
-  const hashIdx = line.indexOf("#");
-  const cleaned = (hashIdx >= 0 ? line.slice(0, hashIdx) : line).trim();
-  return cleaned || null;
-}
-
-/**
- * Parses an array of model lines, removing comment lines, inline comments,
- * and empty entries.
- */
-export function parseModelList(models?: string[] | null): string[] {
-  if (!Array.isArray(models)) return [];
-  return models
-    .map((m) => parseModelLine(m))
-    .filter((m): m is string => m !== null);
-}
-
-export function getDefaultAgentModels(): AgentModelsConfig {
-  return {
-    antigravity: {
-      gemini: {
-        defaultModel: "Gemini 3.7 Flash (Medium)",
-        availableModels: [
-          "Gemini 3.7 Flash (High)",
-          "Gemini 3.7 Flash (Medium)",
-          "Gemini 3.7 Flash (Low)",
-          "Gemini 3.6 Flash (High)",
-          "Gemini 3.6 Flash (Medium)",
-          "Gemini 3.6 Flash (Low)",
-          "Gemini 3.1 Pro (High)",
-          "Gemini 3.1 Pro (Low)",
-        ],
-      },
-      other: {
-        defaultModel: "Claude Sonnet 4.6 (Thinking)",
-        availableModels: [
-          "Claude Sonnet 4.6 (Thinking)",
-          "Claude Opus 4.6 (Thinking)",
-          "GPT-OSS 120B (Medium) # Coding performance may be suboptimal; prefix with '#' to comment out if needed",
-        ],
-      },
-    },
-    claude: {
-      defaultModel: "opus",
-      availableModels: [
-        "opus # Opus 5 with 1M context · Best for everyday, complex tasks · $5/$25 per Mtok",
-        "fable # Fable 5 · Most capable for your hardest and longest-running tasks · $10/$50 per Mtok",
-        "sonnet # Sonnet 5 · Efficient for routine tasks · $2/$10 per Mtok",
-        "haiku # Haiku 4.5 · Fastest for quick answers · $1/$5 per Mtok",
-      ],
-    },
-    codex: {
-      defaultModel: "gpt-5.6-terra",
-      availableModels: [
-        "gpt-5.6-sol",
-        "gpt-5.6-terra",
-        "gpt-5.6-luna",
-        "gpt-5.5",
-        "gpt-5.4",
-        "gpt-5.4-mini",
-      ],
-    },
-  };
 }
 
 export async function getAppSettings(): Promise<AppSettings> {

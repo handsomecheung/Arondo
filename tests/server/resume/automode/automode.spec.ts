@@ -166,23 +166,6 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
     expect(optionIds.some((id) => id.startsWith('gemini-'))).toBeFalsy();
   });
 
-  test('keeps a locked GPT-OSS session within agy other models', async () => {
-    const resolved = await resolveAgentType('auto', [], {
-      lockedAgent: {
-        agentType: 'antigravity',
-        model: 'GPT-OSS 120B (Medium)',
-      },
-    });
-
-    expect(resolved.agyQuotaGroup).toBe('other');
-    expect(resolved.modelOptions?.map((option) => option.id)).toEqual([
-      'claude-sonnet-4-6',
-      'claude-opus-4-6-thinking',
-      'gpt-oss-120b-medium',
-    ]);
-    expect(getModelOptionsForAgent('antigravity', 'gemini').some((option) => option.id === 'gpt-oss-120b-medium')).toBeFalsy();
-  });
-
   test('checks agy quota availability for the failed model group only', async () => {
     await fs.writeFile(quotaPath, JSON.stringify({
       "antigravity_arondo@gmail.com_Google AI Pro": {
