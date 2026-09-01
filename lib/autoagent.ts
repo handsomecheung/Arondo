@@ -95,6 +95,12 @@ const PREDEFINED_MODEL_OPTIONS: Record<string, Omit<AutoModelOption, "model">> =
   "Claude Sonnet 4.6 (Thinking)": { id: "claude-sonnet-4-6", costTier: "strong", description: "Strong general coding model in Antigravity." },
   "Claude Opus 4.6 (Thinking)": { id: "claude-opus-4-6-thinking", costTier: "strong", description: "Highest-cost Antigravity model for the hardest tasks." },
   "GPT-OSS 120B (Medium)": { id: "gpt-oss-120b-medium", costTier: "cheap", description: "Open-source model in Antigravity. May have suboptimal coding performance." },
+  "gpt-5.6-sol": { id: "codex-gpt-5.6-sol", costTier: "strong", description: "Flagship high-performance reasoning model in OpenAI Codex." },
+  "gpt-5.6-terra": { id: "codex-gpt-5.6-terra", costTier: "standard", description: "Balanced default performance model in OpenAI Codex." },
+  "gpt-5.6-luna": { id: "codex-gpt-5.6-luna", costTier: "cheap", description: "Fast and lightweight model in OpenAI Codex." },
+  "gpt-5.5": { id: "codex-gpt-5.5", costTier: "standard", description: "Standard general-purpose model in OpenAI Codex." },
+  "gpt-5.4": { id: "codex-gpt-5.4", costTier: "standard", description: "Codex 5.4 model for general coding." },
+  "gpt-5.4-mini": { id: "codex-gpt-5.4-mini", costTier: "cheap", description: "Cheaper lightweight Codex option for small tasks." },
   "gpt-5.4-mini low": { id: "codex-gpt-5.4-mini-low", effort: "low", costTier: "cheap", description: "Cheaper Codex option for small questions and low-risk changes." },
   "gpt-5.5 medium": { id: "codex-gpt-5.5-medium", effort: "medium", costTier: "standard", description: "Default Codex option for normal coding tasks." },
   "gpt-5.5 high": { id: "codex-gpt-5.5-high", effort: "high", costTier: "strong", description: "Stronger Codex reasoning for hard debugging and broad changes." },
@@ -175,9 +181,12 @@ export function getModelOptionsForAgent(
       return models.map((m) => buildModelOption(m, "codex"));
     }
     return [
-      buildModelOption("gpt-5.4-mini low", "codex"),
-      buildModelOption("gpt-5.5 medium", "codex"),
-      buildModelOption("gpt-5.5 high", "codex"),
+      buildModelOption("gpt-5.6-sol", "codex"),
+      buildModelOption("gpt-5.6-terra", "codex"),
+      buildModelOption("gpt-5.6-luna", "codex"),
+      buildModelOption("gpt-5.5", "codex"),
+      buildModelOption("gpt-5.4", "codex"),
+      buildModelOption("gpt-5.4-mini", "codex"),
     ];
   }
   return [];
@@ -204,7 +213,7 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
   // A: agy + Gemini models
   // B: agy + Other (Claude) models
   // C: claude
-  // D: codex + gpt-5.5 (medium)
+  // D: codex + gpt-5.6-terra
   const choices: AgentChoice[] = [];
   if (hasAgy) {
     const geminiOptions = getModelOptionsForAgent("antigravity", "gemini", agentModels);
@@ -239,7 +248,7 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
   }
   if (hasCodex) {
     const codexOptions = getModelOptionsForAgent("codex", undefined, agentModels);
-    const codexDefault = parseModelLine(agentModels.codex?.defaultModel) || "gpt-5.5 medium";
+    const codexDefault = parseModelLine(agentModels.codex?.defaultModel) || "gpt-5.6-terra";
     choices.push({
       id: "D",
       agentType: "codex",

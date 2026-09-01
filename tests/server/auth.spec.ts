@@ -254,7 +254,8 @@ test.describe('Authentication API tests', () => {
     expect(body.agentModels.antigravity.other.defaultModel).toBe('Claude Sonnet 4.6 (Thinking)');
     expect(body.agentModels.claude.defaultModel).toBe('claude-3-7-sonnet-20250219');
     expect(body.agentModels.claude.availableModels).toContain('claude-3-7-sonnet-20250219');
-    expect(body.agentModels.codex.defaultModel).toBe('gpt-5.5 medium');
+    expect(body.agentModels.codex.defaultModel).toBe('gpt-5.6-terra');
+    expect(body.agentModels.codex.availableModels).toContain('gpt-5.6-sol');
 
     // Update agentModels
     const postRes = await request.post('/api/settings', {

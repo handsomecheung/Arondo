@@ -54,11 +54,14 @@ const DEFAULT_CONFIGS: AgentModelsConfig = {
     ],
   },
   codex: {
-    defaultModel: "gpt-5.5 medium",
+    defaultModel: "gpt-5.6-terra",
     availableModels: [
-      "gpt-5.4-mini low",
-      "gpt-5.5 medium",
-      "gpt-5.5 high",
+      "gpt-5.6-sol",
+      "gpt-5.6-terra",
+      "gpt-5.6-luna",
+      "gpt-5.5",
+      "gpt-5.4",
+      "gpt-5.4-mini",
     ],
   },
 };
@@ -399,8 +402,8 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
             form.codex,
             (k, v) => handleChange("codex", k, v),
             () => handleResetAgent("codex"),
-            "e.g. gpt-5.5 medium",
-            "gpt-5.4-mini low\ngpt-5.5 medium # Standard\ngpt-5.5 high # Heavy reasoning",
+            "e.g. gpt-5.6-terra",
+            "gpt-5.6-sol # Flagship reasoning\ngpt-5.6-terra # Default balanced\ngpt-5.6-luna # Fast lightweight\ngpt-5.5\ngpt-5.4\ngpt-5.4-mini",
             "codex",
           )}
         </div>

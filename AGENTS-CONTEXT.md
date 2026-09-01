@@ -362,8 +362,8 @@ The application enforces token-based authentication on all API routes and WebSoc
           "availableModels": ["claude-3-7-sonnet-20250219", "claude-3-5-sonnet-20241022", "..."]
         },
         "codex": {
-          "defaultModel": "gpt-5.5 medium",
-          "availableModels": ["gpt-5.4-mini low", "gpt-5.5 medium", "gpt-5.5 high"]
+          "defaultModel": "gpt-5.6-terra",
+          "availableModels": ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini"]
         }
       }
     }
@@ -421,7 +421,7 @@ The application enforces token-based authentication on all API routes and WebSoc
     - **Choice A**: Antigravity (`agy`) Gemini model group (Quota: `GeminiHourRemain`, `GeminiWeeklyRemain`; default fallback model configured in `agentModels.antigravity.gemini.defaultModel`, e.g. `Gemini 3.7 Flash (Medium)`)
     - **Choice B**: Antigravity (`agy`) non-Gemini model group (Quota: `OtherHourRemain`, `OtherWeeklyRemain`; default fallback model configured in `agentModels.antigravity.other.defaultModel`, e.g. `Claude Sonnet 4.6 (Thinking)`; model options are drawn from `agentModels.antigravity.other.availableModels`)
     - **Choice C**: Claude (`claude`) (Quota: `HourRemain`, `WeekRemain`; default fallback model configured in `agentModels.claude.defaultModel`, e.g. `claude-3-7-sonnet-20250219`)
-    - **Choice D**: Codex (`codex`) (Quota: `WeeklyRemain`, hourly is treated as always available; default fallback model configured in `agentModels.codex.defaultModel`, e.g. `gpt-5.5 medium`)
+    - **Choice D**: Codex (`codex`) (Quota: `WeeklyRemain`, hourly is treated as always available; default fallback model configured in `agentModels.codex.defaultModel`, e.g. `gpt-5.6-terra`)
   - **Selection Algorithm**:
     1. **Quota-source preference**: Consider choices with a known, non-API-key weekly quota first. If none are known, fall back to unknown subscription quotas; use API-key billed choices only when no subscription choice is available.
     2. **Hourly Quota Filtering**: For known quota choices, if the remaining hourly ratio (`HourRemain`, `GeminiHourRemain`, `OtherHourRemain`) is below `0.15`, append it to the end of the candidate list and exclude it from scoring. If all known choices are below `0.15`, score all of them instead.

@@ -67,7 +67,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
         "Type": "codex",
         "Account": "arondo@gmail.com",
         "Plan": "Plus",
-        "DefaultModel": "gpt-5.5 medium",
+        "DefaultModel": "gpt-5.6-terra",
         "WeeklyRemain": 0.5,
         "WeeklyResetAt": null,
         "updatedAt": Math.floor(Date.now() / 1000),
@@ -76,7 +76,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
 
     await expect(selectAgent(['agy', 'claude', 'codex'])).resolves.toMatchObject({
       agentType: 'codex',
-      model: 'gpt-5.5 medium',
+      model: 'gpt-5.6-terra',
     });
   });
 
@@ -114,7 +114,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
         "Type": "codex",
         "Account": "arondo@gmail.com",
         "Plan": "Plus",
-        "DefaultModel": "gpt-5.5 medium",
+        "DefaultModel": "gpt-5.6-terra",
         "WeeklyRemain": null,
         "WeeklyResetAt": null,
         "updatedAt": Math.floor(Date.now() / 1000),
@@ -123,7 +123,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
 
     await expect(selectAgent(['agy', 'claude', 'codex'])).resolves.toMatchObject({
       agentType: 'codex',
-      model: 'gpt-5.5 medium',
+      model: 'gpt-5.6-terra',
     });
   });
 
@@ -347,7 +347,7 @@ function getQuotaForChoice(choiceId: 'A' | 'B' | 'C') {
       "Type": "codex",
       "Account": "arondo@gmail.com",
       "Plan": "Plus",
-      "DefaultModel": "gpt-5.5 medium",
+      "DefaultModel": "gpt-5.6-terra",
       "WeeklyRemain": 0.1,
       "WeeklyResetAt": null,
       "updatedAt": Math.floor(Date.now() / 1000)
