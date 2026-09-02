@@ -135,7 +135,11 @@ export async function POST(req: NextRequest) {
   let repoPath = repoPathInput as string;
   if (tempDir) {
     try {
-      const result = await runnerManager.sendRequest(runnerId, "fs.mkdtemp", {});
+      const sessions = await getSessions();
+      const busyPaths = sessions
+        .filter((s) => s.runnerId === runnerId && (s.status === "running" || s.status === "script-running") && s.repoPath)
+        .map((s) => s.repoPath);
+      const result = await runnerManager.sendRequest(runnerId, "fs.mkdtemp", { excludePaths: busyPaths });
       repoPath = result.path;
     } catch (error: any) {
       return NextResponse.json({ error: error.message || "Failed to create temp directory" }, { status: 500 });

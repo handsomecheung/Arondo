@@ -158,4 +158,34 @@ test.describe('Temp dir project task visibility', () => {
     const todos = await todoRes.json();
     expect(todos.find((todo: any) => todo.sessionId === session.id)).toBeUndefined();
   });
+
+  test('does not reuse temp dir while session in it is running', async ({ request }) => {
+    const createRes1 = await request.post('/api/sessions', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        prompt: 'running temp dir 1',
+        tempDir: true,
+        runnerId,
+        force: true,
+      }
+    });
+    expect(createRes1.status()).toBe(201);
+    const session1 = await createRes1.json();
+    expect(session1.repoPath).toBeDefined();
+
+    const createRes2 = await request.post('/api/sessions', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        prompt: 'running temp dir 2',
+        tempDir: true,
+        runnerId,
+        force: true,
+      }
+    });
+    expect(createRes2.status()).toBe(201);
+    const session2 = await createRes2.json();
+    expect(session2.repoPath).toBeDefined();
+    expect(session2.repoPath).not.toBe(session1.repoPath);
+  });
 });
+

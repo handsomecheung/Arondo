@@ -279,12 +279,40 @@ func (h *Handler) handleFsList(msg *Message) {
 	h.sendResponse(msg.ID, resp)
 }
 
+type fsMkdtempRequest struct {
+	ExcludePaths []string `json:"excludePaths,omitempty"`
+}
+
 type fsMkdtempResponse struct {
 	OK   bool   `json:"ok"`
 	Path string `json:"path"`
 }
 
 func (h *Handler) handleFsMkdtemp(msg *Message) {
+	req, _ := parsePayload[fsMkdtempRequest](msg)
+
+	excluded := make(map[string]bool)
+	for _, p := range req.ExcludePaths {
+		if p != "" {
+			if abs, err := filepath.Abs(p); err == nil {
+				excluded[filepath.Clean(abs)] = true
+			} else {
+				excluded[filepath.Clean(p)] = true
+			}
+		}
+	}
+	if h.taskManager != nil {
+		for _, p := range h.taskManager.ActiveWorkDirs() {
+			if p != "" {
+				if abs, err := filepath.Abs(p); err == nil {
+					excluded[filepath.Clean(abs)] = true
+				} else {
+					excluded[filepath.Clean(p)] = true
+				}
+			}
+		}
+	}
+
 	// Reuse a temp directory with a fixed prefix if possible.
 	baseTmp := os.TempDir()
 	prefix := "arondo-tempdir-"
@@ -292,6 +320,15 @@ func (h *Handler) handleFsMkdtemp(msg *Message) {
 	for i := 0; ; i++ {
 		candidate := fmt.Sprintf("%s%04d", prefix, i)
 		candidatePath := filepath.Join(baseTmp, candidate)
+		cleanCandidate := filepath.Clean(candidatePath)
+		if abs, err := filepath.Abs(cleanCandidate); err == nil {
+			cleanCandidate = abs
+		}
+
+		if excluded[cleanCandidate] {
+			continue
+		}
+
 		// Try to create the directory.
 		if err := os.Mkdir(candidatePath, 0o755); err == nil {
 			// Successfully created a new empty directory.

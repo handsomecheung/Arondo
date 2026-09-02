@@ -447,6 +447,25 @@ func (tm *TaskManager) ListTasks() []TaskInfo {
 	return infos
 }
 
+func (tm *TaskManager) ActiveWorkDirs() []string {
+	tm.mu.RLock()
+	defer tm.mu.RUnlock()
+	var dirs []string
+	for _, t := range tm.tasks {
+		t.mu.Lock()
+		done := t.done
+		var dir string
+		if t.cmd != nil {
+			dir = t.cmd.Dir
+		}
+		t.mu.Unlock()
+		if !done && dir != "" {
+			dirs = append(dirs, dir)
+		}
+	}
+	return dirs
+}
+
 func (tm *TaskManager) Cleanup(taskID string) {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
