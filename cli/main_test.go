@@ -466,3 +466,215 @@ func TestExtractCommand(t *testing.T) {
 		t.Fatalf("unexpected command: %q", got)
 	}
 }
+
+func TestParseGetMessagesArgsFollow(t *testing.T) {
+	args, err := parseGetMessagesArgs([]string{"--server=https://arondo.example/", "--client-token", "secret", "--session-id", "sess-1", "-f", "--poll-interval=0.5", "--timeout=10"}, cliConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !args.follow || args.pollInterval != 0.5 || args.timeout != 10 || args.sessionID != "sess-1" {
+		t.Fatalf("unexpected arguments: %#v", args)
+	}
+
+	args2, err := parseGetMessagesArgs([]string{"--server=https://arondo.example/", "--client-token", "secret", "--latest", "--follow"}, cliConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !args2.follow || !args2.latest {
+		t.Fatalf("unexpected arguments: %#v", args2)
+	}
+}
+
+func TestParseGetMessagesArgsRejectsInvalid(t *testing.T) {
+	_, err := parseGetMessagesArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--session-id", "sess-1", "--latest"}, cliConfig{})
+	if err == nil || err.Error() != "--session-id and --latest cannot be used together" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	_, err = parseGetMessagesArgs([]string{"--server", "http://localhost", "--client-token", "secret"}, cliConfig{})
+	if err == nil || err.Error() != "either --session-id or --latest is required" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	_, err = parseGetMessagesArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--session-id", "s1", "--output", "invalid"}, cliConfig{})
+	if err == nil || err.Error() != "--output must be plain or json" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	_, err = parseGetMessagesArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--session-id", "s1", "--timeout", "-1"}, cliConfig{})
+	if err == nil || err.Error() != "--timeout must be a non-negative number" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestGetMessagesFollowDoneSession(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/sessions/sess-done" {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":     "sess-done",
+				"status": "done",
+			})
+			return
+		}
+		if r.URL.Path == "/api/messages" {
+			exitCode := 0
+			_ = json.NewEncoder(w).Encode([]map[string]any{
+				{"id": "msg-u", "role": "user", "type": "chat-user", "content": "Hello"},
+				{"id": "msg-a", "role": "system", "type": "agent-run", "command": "agy", "exitCode": exitCode},
+			})
+			return
+		}
+		if r.URL.Path == "/api/sessions/sess-done/log" {
+			_ = json.NewEncoder(w).Encode(map[string]any{"log": "Agent finished output\n"})
+			return
+		}
+	}))
+	defer server.Close()
+
+	c := &client{server: server.URL, token: "token", http: server.Client()}
+	args := getMessagesArguments{
+		server:       server.URL,
+		token:        "token",
+		sessionID:    "sess-done",
+		follow:       true,
+		output:       "plain",
+		pollInterval: 1,
+		timeout:      5,
+	}
+
+	if err := getMessages(c, args); err != nil {
+		t.Fatalf("getMessages error: %v", err)
+	}
+}
+
+func TestGetMessagesFollowStreamingWS(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/ws" {
+			hj, ok := w.(http.Hijacker)
+			if !ok {
+				http.Error(w, "hijack not supported", http.StatusInternalServerError)
+				return
+			}
+			conn, bufrw, err := hj.Hijack()
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			defer conn.Close()
+
+			bufrw.WriteString("HTTP/1.1 101 Switching Protocols\r\n")
+			bufrw.WriteString("Upgrade: websocket\r\n")
+			bufrw.WriteString("Connection: Upgrade\r\n")
+			bufrw.WriteString("Sec-WebSocket-Protocol: arondo-token\r\n\r\n")
+			bufrw.Flush()
+
+			// Send chunk 1
+			c1, _ := json.Marshal(map[string]any{
+				"type":      "terminal:output",
+				"sessionId": "sess-follow-ws",
+				"messageId": "msg-run",
+				"data":      "Streaming step 1\n",
+			})
+			_ = writeServerWSFrame(bufrw, 0x1, c1)
+			bufrw.Flush()
+
+			// Send session:updated done
+			doneMsg, _ := json.Marshal(map[string]any{
+				"type": "session:updated",
+				"payload": map[string]any{
+					"id":     "sess-follow-ws",
+					"status": "done",
+				},
+			})
+			_ = writeServerWSFrame(bufrw, 0x1, doneMsg)
+			bufrw.Flush()
+			return
+		}
+		if r.URL.Path == "/api/sessions/sess-follow-ws" {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":     "sess-follow-ws",
+				"status": "done",
+			})
+			return
+		}
+		if r.URL.Path == "/api/messages" {
+			_ = json.NewEncoder(w).Encode([]map[string]any{
+				{"id": "msg-u", "role": "user", "type": "chat-user", "content": "Start work"},
+				{"id": "msg-run", "role": "system", "type": "agent-run", "command": "agy", "exitCode": nil},
+			})
+			return
+		}
+		if r.URL.Path == "/api/sessions/sess-follow-ws/log" {
+			_ = json.NewEncoder(w).Encode(map[string]any{"log": ""})
+			return
+		}
+	}))
+	defer server.Close()
+
+	c := &client{server: server.URL, token: "token", http: server.Client()}
+	args := getMessagesArguments{
+		server:       server.URL,
+		token:        "token",
+		sessionID:    "sess-follow-ws",
+		follow:       true,
+		output:       "plain",
+		pollInterval: 1,
+		timeout:      5,
+	}
+
+	if err := getMessages(c, args); err != nil {
+		t.Fatalf("getMessages error: %v", err)
+	}
+}
+
+func TestGetMessagesFollowJSONOutput(t *testing.T) {
+	pollCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/sessions/sess-json" {
+			pollCount++
+			status := "running"
+			if pollCount >= 2 {
+				status = "done"
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":     "sess-json",
+				"status": status,
+			})
+			return
+		}
+		if r.URL.Path == "/api/messages" {
+			var exitCode *int
+			if pollCount >= 2 {
+				code := 0
+				exitCode = &code
+			}
+			_ = json.NewEncoder(w).Encode([]map[string]any{
+				{"id": "msg-1", "role": "user", "type": "chat-user", "content": "Query"},
+				{"id": "msg-2", "role": "system", "type": "agent-run", "command": "codex", "exitCode": exitCode},
+			})
+			return
+		}
+		if r.URL.Path == "/api/sessions/sess-json/log" {
+			_ = json.NewEncoder(w).Encode(map[string]any{"log": "Agent result log\n"})
+			return
+		}
+	}))
+	defer server.Close()
+
+	c := &client{server: server.URL, token: "token", http: server.Client()}
+	args := getMessagesArguments{
+		server:       server.URL,
+		token:        "token",
+		sessionID:    "sess-json",
+		follow:       true,
+		output:       "json",
+		withLogs:     true,
+		pollInterval: 0.01,
+		timeout:      2,
+	}
+
+	if err := getMessages(c, args); err != nil {
+		t.Fatalf("getMessages json error: %v", err)
+	}
+}
+
