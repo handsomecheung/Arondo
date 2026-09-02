@@ -59,6 +59,7 @@ export default function AppSidebar({
   const [sessionMenuPos, setSessionMenuPos] = useState<{ top: number; left: number } | null>(null);
   const sessionMenuTriggerRef = useRef<HTMLDivElement>(null);
   const sessionMenuPortalRef = useRef<HTMLDivElement>(null);
+  const [selectedRunnerFilter, setSelectedRunnerFilter] = useState<string | null>(null);
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string | null>(null);
 
   const handleSwipeTouchStart = (id: string) => (e: React.TouchEvent) => {
@@ -203,11 +204,12 @@ export default function AppSidebar({
               </button>
             </div>
           </div>
-          {archivedView ? (
+          {archivedView && (
             <button
               className="sidebar-settings-link"
               onClick={() => {
                 setSelectedProjectFilter(null);
+                setSelectedRunnerFilter(null);
                 onCloseArchivedSessions();
               }}
               id="close-archived-sessions-btn"
@@ -216,83 +218,85 @@ export default function AppSidebar({
               <IconArrowLeft />
               <span>Archived Sessions</span>
             </button>
-          ) : (
-            <div className="sidebar-mode-toggle" role="tablist" aria-label="View mode">
-              <button
-                role="tab"
-                aria-selected={true}
-                className="sidebar-mode-tab active"
-                onClick={() => {
-                  setSelectedProjectFilter(null);
-                }}
-              >
-                Recent Sessions
-              </button>
-            </div>
           )}
           {(() => {
             const targetSessions = archivedView ? archivedSessions : sortedSessions;
-            const sessionProjectIds = new Set(targetSessions.map((s) => s.projectId).filter(Boolean));
-            const visibleProjects = projects.filter((p) => sessionProjectIds.has(p.id));
-            if (visibleProjects.length < 2) return null;
+            const sessionRunnerIds = new Set(targetSessions.map((s) => s.runnerId).filter(Boolean) as string[]);
+            const knownRunnersMap = new Map<string, { id: string; name: string }>();
+            runners.forEach((r) => {
+              knownRunnersMap.set(r.id, { id: r.id, name: r.name || r.hostname || r.id });
+            });
+            sessionRunnerIds.forEach((rId) => {
+              if (!knownRunnersMap.has(rId)) {
+                knownRunnersMap.set(rId, { id: rId, name: rId });
+              }
+            });
+            const availableRunners = Array.from(knownRunnersMap.values());
+
+            const runnerFilteredSessions = selectedRunnerFilter
+              ? targetSessions.filter((s) => s.runnerId === selectedRunnerFilter)
+              : targetSessions;
+            const sessionProjectIds = new Set(runnerFilteredSessions.map((s) => s.projectId).filter(Boolean) as string[]);
+
+            const knownProjectsMap = new Map<string, { id: string; name: string }>();
+            projects.forEach((p) => {
+              if (!selectedRunnerFilter || p.runnerId === selectedRunnerFilter || sessionProjectIds.has(p.id)) {
+                const name = p.repoPath.split("/").pop() || p.repoPath;
+                knownProjectsMap.set(p.id, { id: p.id, name });
+              }
+            });
+            sessionProjectIds.forEach((pId) => {
+              if (!knownProjectsMap.has(pId)) {
+                knownProjectsMap.set(pId, { id: pId, name: pId });
+              }
+            });
+            const availableProjects = Array.from(knownProjectsMap.values());
+
             return (
-              <div
-                style={{
-                  display: "flex",
-                  gap: 6,
-                  overflowX: "auto",
-                  scrollbarWidth: "none",
-                  WebkitOverflowScrolling: "touch",
-                  paddingBottom: 2,
-                } as React.CSSProperties}
-              >
-                <button
-                  onClick={() => setSelectedProjectFilter(null)}
-                  style={{
-                    flexShrink: 0,
-                    padding: "3px 10px",
-                    borderRadius: 20,
-                    border: `1px solid ${selectedProjectFilter === null ? "var(--accent)" : "var(--border)"}`,
-                    background: selectedProjectFilter === null ? "var(--accent-muted, rgba(99,102,241,0.15))" : "transparent",
-                    color: selectedProjectFilter === null ? "var(--accent)" : "var(--text-muted)",
-                    fontSize: 11,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  All
-                </button>
-                {visibleProjects.map((p) => {
-                  const name = p.repoPath.split("/").pop() || p.repoPath;
-                  const active = selectedProjectFilter === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => setSelectedProjectFilter(active ? null : p.id)}
-                      title={p.repoPath}
-                      style={{
-                        flexShrink: 0,
-                        maxWidth: 100,
-                        padding: "3px 10px",
-                        borderRadius: 20,
-                        border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
-                        background: active ? "var(--accent-muted, rgba(99,102,241,0.15))" : "transparent",
-                        color: active ? "var(--accent)" : "var(--text-muted)",
-                        fontSize: 11,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        transition: "all 0.15s ease",
-                      }}
-                    >
-                      {name}
-                    </button>
-                  );
-                })}
+              <div className="sidebar-filter-row">
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <select
+                    className={`sidebar-filter-select ${selectedRunnerFilter ? "active-filter" : ""}`}
+                    value={selectedRunnerFilter || ""}
+                    onChange={(e) => {
+                      const nextRunner = e.target.value || null;
+                      setSelectedRunnerFilter(nextRunner);
+                      if (nextRunner && selectedProjectFilter) {
+                        const proj = projects.find((p) => p.id === selectedProjectFilter);
+                        if (proj && proj.runnerId && proj.runnerId !== nextRunner) {
+                          setSelectedProjectFilter(null);
+                        }
+                      }
+                    }}
+                    aria-label="Filter by runner"
+                    id="sidebar-runner-filter"
+                    title="Filter by runner"
+                  >
+                    <option value="">All Runners</option>
+                    {availableRunners.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <select
+                    className={`sidebar-filter-select ${selectedProjectFilter ? "active-filter" : ""}`}
+                    value={selectedProjectFilter || ""}
+                    onChange={(e) => setSelectedProjectFilter(e.target.value || null)}
+                    aria-label="Filter by project"
+                    id="sidebar-project-filter"
+                    title="Filter by project"
+                  >
+                    <option value="">All Projects</option>
+                    {availableProjects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             );
           })()}
@@ -304,10 +308,20 @@ export default function AppSidebar({
                 <IconArchive size={32} />
                 <p>No archived sessions.</p>
               </div>
-            ) : (
-              archivedSessions
-              .filter((s) => !selectedProjectFilter || s.projectId === selectedProjectFilter)
-              .map((session) => {
+            ) : (() => {
+              const filtered = archivedSessions.filter(
+                (s) =>
+                  (!selectedRunnerFilter || s.runnerId === selectedRunnerFilter) &&
+                  (!selectedProjectFilter || s.projectId === selectedProjectFilter)
+              );
+              if (filtered.length === 0) {
+                return (
+                  <div className="empty-state" style={{ padding: "24px 16px" }}>
+                    <p>No matching archived sessions.</p>
+                  </div>
+                );
+              }
+              return filtered.map((session) => {
                 const project = projects.find((p) => p.id === session.projectId);
                 const projectName = project ? project.repoPath.split("/").pop() || project.repoPath : "";
                 const isSwiping = swipe?.id === session.id;
@@ -356,18 +370,28 @@ export default function AppSidebar({
                     </div>
                   </div>
                 );
-              })
-            )
+              });
+            })()
           ) : sortedSessions.length === 0 ? (
               <div className="empty-state">
                 <IconInbox />
                 <p>No sessions yet.<br />Start by creating a new session.</p>
               </div>
-            ) : (
-              [
-                ...sortedSessions
-              .filter((s) => !selectedProjectFilter || s.projectId === selectedProjectFilter)
-              .map((session, index) => {
+            ) : (() => {
+              const filtered = sortedSessions.filter(
+                (s) =>
+                  (!selectedRunnerFilter || s.runnerId === selectedRunnerFilter) &&
+                  (!selectedProjectFilter || s.projectId === selectedProjectFilter)
+              );
+              if (filtered.length === 0) {
+                return (
+                  <div className="empty-state" style={{ padding: "24px 16px" }}>
+                    <p>No matching sessions.</p>
+                  </div>
+                );
+              }
+              return [
+                ...filtered.map((session, index) => {
                 const project = projects.find((p) => p.id === session.projectId);
                 const projectName = project ? project.repoPath.split("/").pop() || project.repoPath : "";
                 const runner = runners.find((r) => r.id === session.runnerId);
@@ -573,8 +597,8 @@ export default function AppSidebar({
                   </span>
                 </div>
               ] : [])
-            ]
-          )}
+            ];
+          })()}
         </div>
       </aside>
     </>
