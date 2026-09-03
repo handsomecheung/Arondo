@@ -44,23 +44,31 @@ try {
   process.exit(1);
 }
 
-// codex reports resets as "HH:MM on D Mon" — 24h clock, no timezone.
-const targetDate = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+// codex reports resets as "HH:MM on D Mon" for weekly and "HH:MM" for 5h — 24h clock, no timezone.
+const targetDateWeekly = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+const targetDate5h = new Date(Date.now() + 3 * 60 * 60 * 1000);
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const hh = String(targetDate.getHours()).padStart(2, '0');
-const mm = String(targetDate.getMinutes()).padStart(2, '0');
-const resetsStr = `${hh}:${mm} on ${targetDate.getDate()} ${months[targetDate.getMonth()]}`;
-statusContent = statusContent.replace(/__resets__/g, resetsStr);
+const hhWeekly = String(targetDateWeekly.getHours()).padStart(2, '0');
+const mmWeekly = String(targetDateWeekly.getMinutes()).padStart(2, '0');
+const resetsWeeklyStr = `${hhWeekly}:${mmWeekly} on ${targetDateWeekly.getDate()} ${months[targetDateWeekly.getMonth()]}`;
+const hh5h = String(targetDate5h.getHours()).padStart(2, '0');
+const mm5h = String(targetDate5h.getMinutes()).padStart(2, '0');
+const resets5hStr = `${hh5h}:${mm5h}`;
+
+statusContent = statusContent
+  .replace(/__resets_weekly__/g, resetsWeeklyStr)
+  .replace(/__resets_5h__/g, resets5hStr)
+  .replace(/__resets__/g, resetsWeeklyStr);
 
 const statusLines = statusContent.split('\n');
 const initialScreen = [
-  '╭────────────────────────────────────────────────────╮',
-  '│ >_ OpenAI Codex (v0.145.0)                         │',
-  '│                                                    │',
-  '│ model:       gpt-5.5 medium   /model to change     │',
-  '│ directory:   /data/arondo                          │',
-  '│ permissions: YOLO mode                             │',
-  '╰────────────────────────────────────────────────────╯',
+  '╭──────────────────────────────────────────────────────╮',
+  '│ >_ OpenAI Codex (v0.153.1)                           │',
+  '│                                                      │',
+  '│ model:       gpt-5.6-terra medium   /model to change │',
+  '│ directory:   /data/arondo                           │',
+  '│ permissions: YOLO mode                               │',
+  '╰──────────────────────────────────────────────────────╯',
   '',
 ].join('\n');
 

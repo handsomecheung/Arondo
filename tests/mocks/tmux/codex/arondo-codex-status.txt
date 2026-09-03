@@ -1,16 +1,17 @@
-╭────────────────────────────────────────────────────────────────────────────────╮
-│  >_ OpenAI Codex (v0.145.0)                                                    │
-│                                                                                │
-│ Visit https://chatgpt.com/codex/settings/usage for up-to-date                  │
-│ information on rate limits and credits                                         │
-│                                                                                │
-│  Model:                gpt-5.5 (reasoning medium, summaries auto)              │
-│  Directory:            /data/arondo                                           │
-│  Permissions:          Full Access                                            │
-│  Agents.md:            AGENTS.md                                              │
-│  Account:              arondo@gmail.com (Plus)                                │
-│  Collaboration mode:   Default                                                │
-│  Session:              019fa3d9-6cc1-7bb1-84a0-b0f4b0f79909                    │
-│                                                                                │
-│  Weekly limit:         [█████████████████░░░] 84% left (resets __resets__)    │
-╰────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────╮
+│  >_ OpenAI Codex (v0.153.1)                                                          │
+│                                                                                      │
+│ Visit https://chatgpt.com/codex/settings/usage for up-to-date                        │
+│ information on rate limits and credits                                               │
+│                                                                                      │
+│  Model:                gpt-5.6-terra (reasoning medium, summaries auto)              │
+│  Directory:            /data/arondo                                                  │
+│  Permissions:          Full Access                                                   │
+│  Agents.md:            ~/.codex/AGENTS.md, ../AGENTS.md, AGENTS.md                   │
+│  Account:              arondo@gmail.com (Plus)                                       │
+│  Collaboration mode:   Default                                                       │
+│  Session:              01a06975-f01e-7cf3-8ef4-bc4f91c8268d                          │
+│                                                                                      │
+│  5h limit:             [████████████████████] 100% left (resets __resets_5h__)       │
+│  Weekly limit:         [████████████░░░░░░░░] 60% left (resets __resets_weekly__)    │
+╰──────────────────────────────────────────────────────────────────────────────────────╯

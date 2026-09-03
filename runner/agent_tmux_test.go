@@ -89,6 +89,69 @@ func assertAgyRemain(t *testing.T, name string, got *float64, want float64) {
 	}
 }
 
+func TestParseCodexQuotaLatestStatusFormat(t *testing.T) {
+	status, err := os.ReadFile(filepath.Join("..", "tests", "mocks", "tmux", "codex", "arondo-codex-status.txt"))
+	if err != nil {
+		t.Fatalf("failed to read Codex status fixture: %v", err)
+	}
+
+	content := strings.ReplaceAll(string(status), "__resets_5h__", "12:48")
+	content = strings.ReplaceAll(content, "__resets_weekly__", "11:28 on 7 Sep")
+
+	q := parseCodexQuota(content)
+	if q == nil {
+		t.Fatal("parseCodexQuota returned nil")
+	}
+	if q.Account != "arondo@gmail.com" {
+		t.Fatalf("Account = %q, want arondo@gmail.com", q.Account)
+	}
+	if q.Plan != "Plus" {
+		t.Fatalf("Plan = %q, want Plus", q.Plan)
+	}
+	if q.DefaultModel != "gpt-5.6-terra (reasoning medium, summaries auto)" {
+		t.Fatalf("DefaultModel = %q, want 'gpt-5.6-terra (reasoning medium, summaries auto)'", q.DefaultModel)
+	}
+	if q.FiveHourRemain == nil || *q.FiveHourRemain != 1.0 {
+		t.Fatalf("FiveHourRemain = %v, want 1.0", q.FiveHourRemain)
+	}
+	if q.FiveHourResetAt == nil {
+		t.Fatal("expected FiveHourResetAt to be set")
+	}
+	if q.WeeklyRemain == nil || *q.WeeklyRemain != 0.60 {
+		t.Fatalf("WeeklyRemain = %v, want 0.60", q.WeeklyRemain)
+	}
+	if q.WeeklyResetAt == nil {
+		t.Fatal("expected WeeklyResetAt to be set")
+	}
+}
+
+func TestParseCodexResetsTimestamp(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+	}{
+		{"time only", "12:48"},
+		{"date and time", "11:28 on 7 Sep"},
+		{"single digit hour and day", "3:08 on 2 Mar"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ts := parseCodexResetsTimestamp(c.input)
+			if ts == nil {
+				t.Fatalf("parseCodexResetsTimestamp(%q) = nil, want a valid timestamp", c.input)
+			}
+		})
+	}
+
+	if ts := parseCodexResetsTimestamp(""); ts != nil {
+		t.Fatalf("parseCodexResetsTimestamp(\"\") = %v, want nil", *ts)
+	}
+	if ts := parseCodexResetsTimestamp("invalid timestamp"); ts != nil {
+		t.Fatalf("parseCodexResetsTimestamp(%q) = %v, want nil", "invalid timestamp", *ts)
+	}
+}
+
 func TestAgentQuotas(t *testing.T) {
 	// Set up mock bin directory in PATH
 	wd, err := os.Getwd()
@@ -236,8 +299,12 @@ func TestAgentQuotas(t *testing.T) {
 				t.Fatalf("expected plan Plus, got %s", plan)
 			}
 			weeklyRemain, _ := payload.Quota["WeeklyRemain"].(float64)
-			if weeklyRemain < 0.83 || weeklyRemain > 0.85 {
-				t.Fatalf("expected WeeklyRemain ~0.84, got %v", weeklyRemain)
+			if weeklyRemain < 0.59 || weeklyRemain > 0.61 {
+				t.Fatalf("expected WeeklyRemain ~0.60, got %v", weeklyRemain)
+			}
+			fiveHourRemain, _ := payload.Quota["FiveHourRemain"].(float64)
+			if fiveHourRemain < 0.99 || fiveHourRemain > 1.01 {
+				t.Fatalf("expected FiveHourRemain ~1.0, got %v", fiveHourRemain)
 			}
 		case <-time.After(35 * time.Second):
 			t.Fatal("timed out waiting for codex quota.update")

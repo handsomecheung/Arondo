@@ -38,6 +38,8 @@ interface CodexQuota {
   Account: string;
   Plan: string;
   DefaultModel: string;
+  FiveHourRemain?: number | null;
+  FiveHourResetAt?: number | null;
   WeeklyRemain: number | null;
   WeeklyResetAt: number | null;
   updatedAt: number | null;
@@ -875,6 +877,9 @@ export default function RunnersPage() {
                                     model={agentsQuota.codex.DefaultModel}
                                     updatedAt={agentsQuota.codex.updatedAt}
                                     rows={[
+                                      ...(agentsQuota.codex.FiveHourRemain !== undefined && agentsQuota.codex.FiveHourRemain !== null
+                                        ? [{ label: "5-Hour", used: 1 - agentsQuota.codex.FiveHourRemain, remaining: agentsQuota.codex.FiveHourRemain, resetsAt: agentsQuota.codex.FiveHourResetAt ?? null }]
+                                        : []),
                                       { label: "Weekly", used: agentsQuota.codex.WeeklyRemain == null ? null : 1 - agentsQuota.codex.WeeklyRemain, remaining: agentsQuota.codex.WeeklyRemain, resetsAt: agentsQuota.codex.WeeklyResetAt, scoreColor: quotaScoreColors.codex },
                                     ]}
                                     onRefresh={r.connected && !agentsQuota.codex.IsAPIKey ? () => refreshQuota(r.id, "codex") : undefined}

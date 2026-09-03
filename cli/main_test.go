@@ -196,6 +196,11 @@ func TestAnalyzeAgentStatusReasons(t *testing.T) {
 		t.Fatalf("unexpected quota status: %#v", quotaLow)
 	}
 
+	codexLow := analyzeAgentStatus(runner{Connected: true, Agents: []string{"codex"}}, "codex", "codex", map[string]any{"FiveHourRemain": 0.1})
+	if codexLow.Available || codexLow.Reason != "5-hour quota below 15%" {
+		t.Fatalf("unexpected codex quota status: %#v", codexLow)
+	}
+
 	available := analyzeAgentStatus(runner{Connected: true, Agents: []string{"opencode"}}, "opencode", "opencode", nil)
 	if !available.Available || available.Reason != "" {
 		t.Fatalf("unexpected available status: %#v", available)

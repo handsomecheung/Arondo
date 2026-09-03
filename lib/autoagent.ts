@@ -56,6 +56,8 @@ interface CodexQuota {
   Plan: string;
   Account: string;
   DefaultModel: string;
+  FiveHourRemain?: number | null;
+  FiveHourResetAt?: number | null;
   WeeklyRemain: number | null;
   WeeklyResetAt: number | null;
   updatedAt: number | null;
@@ -448,8 +450,7 @@ export async function isQuotaAvailable(
       if (agyQuotaGroup === "other" && (e.OtherHourRemain ?? 1) >= 0.15) return true;
       if (!agyQuotaGroup && ((e.GeminiHourRemain ?? 1) >= 0.15 || (e.OtherHourRemain ?? 1) >= 0.15)) return true;
     } else if (e.Type === "codex") {
-      // No hourly figure reported for codex — treat as always available.
-      return true;
+      if ((e.FiveHourRemain ?? 1) >= 0.15) return true;
     }
   }
   return false;

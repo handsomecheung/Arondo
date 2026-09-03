@@ -43,7 +43,7 @@ func fetchCodexQuota(client *Client) {
 	}
 
 	output, err := pollTmuxPane(session, 30*time.Second, func(text string) bool {
-		return strings.Contains(text, "Account:") && strings.Contains(text, "Weekly limit")
+		return strings.Contains(text, "Account:") && (strings.Contains(text, "Weekly limit") || strings.Contains(text, "5h limit") || strings.Contains(text, "limit:"))
 	})
 	if err != nil {
 		log.Printf("[quota/codex] timed out waiting for status output: %v", err)
@@ -64,26 +64,32 @@ func fetchCodexQuota(client *Client) {
 	log.Printf("[quota/codex] account       : %s", q.Account)
 	log.Printf("[quota/codex] plan          : %s", q.Plan)
 	log.Printf("[quota/codex] default model : %s", q.DefaultModel)
+	log.Printf("[quota/codex] 5h remain     : %s", fmtF(q.FiveHourRemain))
+	log.Printf("[quota/codex] 5h resets     : %s", fmtI(q.FiveHourResetAt))
 	log.Printf("[quota/codex] week remain   : %s", fmtF(q.WeeklyRemain))
 	log.Printf("[quota/codex] week resets   : %s", fmtI(q.WeeklyResetAt))
 }
 
 // CodexQuota holds parsed account and quota data from /status.
 type CodexQuota struct {
-	Account       string
-	Plan          string
-	DefaultModel  string
-	WeeklyRemain  *float64 // 0-1, null if unavailable
-	WeeklyResetAt *int64   // Unix timestamp, null if unavailable
+	Account         string
+	Plan            string
+	DefaultModel    string
+	FiveHourRemain  *float64 // 0-1, null if unavailable
+	FiveHourResetAt *int64   // Unix timestamp, null if unavailable
+	WeeklyRemain    *float64 // 0-1, null if unavailable
+	WeeklyResetAt   *int64   // Unix timestamp, null if unavailable
 }
 
 var (
 	codexAccountPlanRe = regexp.MustCompile(`Account:\s+(\S+@\S+)\s+\(([^)]+)\)`)
 	codexModelRe       = regexp.MustCompile(`Model:\s+(.+)`)
-	// e.g. "Weekly limit:  [███████░░░░░░░░░░░░░░] 36% left (resets 03:08 on 22 Mar)"
-	codexWeeklyLimitRe = regexp.MustCompile(`Weekly limit:.*?(\d+)%\s+left\s+\(resets\s+([^)]+)\)`)
-	// "03:08 on 22 Mar" — 24h clock, no timezone (server-local time).
-	codexResetsDateRe = regexp.MustCompile(`^(\d{1,2}):(\d{2}) on (\d{1,2}) (\w{3})$`)
+	// e.g. "5h limit:             [████████████████████] 100% left (resets 12:48)"
+	codex5hLimitRe = regexp.MustCompile(`5h limit:.*?(\d+)%\s+left(?:\s+\(resets\s+([^)]+)\))?`)
+	// e.g. "Weekly limit:         [████████████░░░░░░░░] 60% left (resets 11:28 on 7 Sep)"
+	codexWeeklyLimitRe = regexp.MustCompile(`Weekly limit:.*?(\d+)%\s+left(?:\s+\(resets\s+([^)]+)\))?`)
+	// "11:28 on 7 Sep" or "12:48" — 24h clock, no timezone (server-local time).
+	codexResetsDateTimeRe = regexp.MustCompile(`^(\d{1,2}):(\d{2})(?:\s+on\s+(\d{1,2})\s+(\w{3}))?$`)
 )
 
 func parseCodexQuota(rawText string) *CodexQuota {
@@ -95,41 +101,62 @@ func parseCodexQuota(rawText string) *CodexQuota {
 		q.Plan = m[2]
 	}
 	if m := codexModelRe.FindStringSubmatch(text); m != nil {
-		q.DefaultModel = strings.TrimSpace(m[1])
+		model := strings.TrimSpace(m[1])
+		model = strings.TrimRight(model, " ││\t\r\n")
+		q.DefaultModel = strings.TrimSpace(model)
 	}
 	if q.Account == "" {
 		// /status never rendered (e.g. login/trust prompt blocked it) — nothing usable.
 		return nil
 	}
 
+	if m := codex5hLimitRe.FindStringSubmatch(text); m != nil {
+		q.FiveHourRemain = pctToFloat(m[1])
+		if len(m) > 2 && m[2] != "" {
+			q.FiveHourResetAt = parseCodexResetsTimestamp(m[2])
+		}
+	}
+
 	if m := codexWeeklyLimitRe.FindStringSubmatch(text); m != nil {
 		q.WeeklyRemain = pctToFloat(m[1])
-		q.WeeklyResetAt = parseCodexResetsTimestamp(m[2])
+		if len(m) > 2 && m[2] != "" {
+			q.WeeklyResetAt = parseCodexResetsTimestamp(m[2])
+		}
 	}
 
 	return q
 }
 
-// parseCodexResetsTimestamp converts a string like "03:08 on 22 Mar" (24h
+// parseCodexResetsTimestamp converts a string like "12:48" or "11:28 on 7 Sep" (24h
 // clock, no timezone — codex reports in the local machine's timezone) to a
 // Unix timestamp of the next occurrence.
 func parseCodexResetsTimestamp(s string) *int64 {
 	s = strings.TrimSpace(s)
-	m := codexResetsDateRe.FindStringSubmatch(s)
+	m := codexResetsDateTimeRe.FindStringSubmatch(s)
 	if m == nil {
 		return nil
 	}
 	now := time.Now()
 	hour, _ := strconv.Atoi(m[1])
 	min, _ := strconv.Atoi(m[2])
-	day, _ := strconv.Atoi(m[3])
-	month := monthMap[m[4]]
-	if month == 0 {
-		return nil
+
+	if m[3] != "" && m[4] != "" {
+		day, _ := strconv.Atoi(m[3])
+		month := monthMap[m[4]]
+		if month == 0 {
+			return nil
+		}
+		t := time.Date(now.Year(), month, day, hour, min, 0, 0, now.Location())
+		if !t.After(now) {
+			t = time.Date(now.Year()+1, month, day, hour, min, 0, 0, now.Location())
+		}
+		ts := t.Unix()
+		return &ts
 	}
-	t := time.Date(now.Year(), month, day, hour, min, 0, 0, now.Location())
+
+	t := time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, now.Location())
 	if !t.After(now) {
-		t = time.Date(now.Year()+1, month, day, hour, min, 0, 0, now.Location())
+		t = t.Add(24 * time.Hour)
 	}
 	ts := t.Unix()
 	return &ts

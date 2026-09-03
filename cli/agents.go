@@ -119,6 +119,9 @@ func quotaUnavailableReason(agentType string, quota map[string]any) string {
 			return "all hourly quotas below 15%"
 		}
 	case "codex":
+		if quotaNumberBelow(quota, "FiveHourRemain", 0.15) {
+			return "5-hour quota below 15%"
+		}
 		if quotaNumberBelow(quota, "WeeklyRemain", 0.000001) {
 			return "weekly quota exhausted"
 		}
