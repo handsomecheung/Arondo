@@ -5,6 +5,7 @@ import { getSessionLog, getAgentModelsConfig, getDefaultAgentModels, parseModelL
 import { getConfigDir } from "./config";
 import { stripAnsi } from "./ansi";
 import type { AutoModelCostTier, AutoModelEffort, AutoModelOption } from "./automodel";
+import { getAutoagentQuotaScore, getAutoagentWeekTimeRemain } from "./autoagent-score";
 
 const CONFIG_DIR = getConfigDir();
 
@@ -393,14 +394,8 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
   // Step 2: Score active choices based on WeekRemain and time passed in week
   const scoredChoices = activeChoices.map((choice) => {
     const { weekRemain, resetsAt } = getMetrics(choice);
-    let weekTimeRemain = 0.0;
-
-    if (resetsAt !== null) {
-      // 1 week is 604,800 seconds
-      weekTimeRemain = Math.max(0, Math.min(1, (resetsAt - now) / 604800));
-    }
-
-    const score = weekRemain! - weekTimeRemain;
+    const weekTimeRemain = getAutoagentWeekTimeRemain(resetsAt, now);
+    const score = getAutoagentQuotaScore(weekRemain, resetsAt, now)!;
     console.log(
       `[autoagent] Step 2 Scoring: Choice ${choice.id} -> ` +
       `WeekRemain=${weekRemain!.toFixed(3)}, WeekTimeRemain=${weekTimeRemain.toFixed(3)}, ` +

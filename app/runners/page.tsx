@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import ConfirmDialog from "@/components/modals/ConfirmDialog";
 import { IconArrowLeft, IconLogo, IconInbox, IconRefresh } from "@/components/Icons";
+import { getAutoagentQuotaScore } from "@/lib/autoagent-score";
 
 interface AgyQuota {
   Account: string;
@@ -115,6 +116,42 @@ interface QuotaRow {
   used: number | null;      // 0-1 consumed ratio
   remaining?: number | null; // 0-1 remaining ratio (optional override)
   resetsAt: number | null;
+  scoreColor?: string;
+}
+
+interface QuotaScoreColors {
+  claude?: string;
+  gemini?: string;
+  other?: string;
+  codex?: string;
+}
+
+function getQuotaScoreColors(quota: AgentsQuota | null): QuotaScoreColors {
+  if (!quota) return {};
+
+  const scores = {
+    claude: quota.claude?.IsAPIKey ? null : getAutoagentQuotaScore(quota.claude?.WeekRemain ?? null, quota.claude?.WeekResetsAt ?? null),
+    gemini: quota.antigravity?.IsAPIKey ? null : getAutoagentQuotaScore(quota.antigravity?.GeminiWeeklyRemain ?? null, quota.antigravity?.GeminiWeeklyResetsAt ?? null),
+    other: quota.antigravity?.IsAPIKey ? null : getAutoagentQuotaScore(quota.antigravity?.OtherWeeklyRemain ?? null, quota.antigravity?.OtherWeeklyResetsAt ?? null),
+    codex: quota.codex?.IsAPIKey ? null : getAutoagentQuotaScore(quota.codex?.WeeklyRemain ?? null, quota.codex?.WeeklyResetAt ?? null),
+  };
+  const knownScores = Object.values(scores).filter((score): score is number => score != null);
+  if (knownScores.length === 0) return {};
+
+  const lowest = Math.min(...knownScores);
+  const highest = Math.max(...knownScores);
+  const colorFor = (score: number | null) => {
+    if (score == null) return undefined;
+    const position = highest === lowest ? 1 : (score - lowest) / (highest - lowest);
+    return `hsl(${Math.round(position * 120)} 70% 42%)`;
+  };
+
+  return {
+    claude: colorFor(scores.claude),
+    gemini: colorFor(scores.gemini),
+    other: colorFor(scores.other),
+    codex: colorFor(scores.codex),
+  };
 }
 
 function QuotaCard({
@@ -202,7 +239,7 @@ function QuotaCard({
                         height: "100%",
                         width: `${pct}%`,
                         borderRadius: 2,
-                        background: pct <= 10 ? "var(--error)" : pct <= 30 ? "var(--warning, #f59e0b)" : "var(--accent)",
+                        background: row.scoreColor ?? "var(--text-muted)",
                         transition: "width 0.3s ease",
                       }}
                     />
@@ -269,6 +306,7 @@ export default function RunnersPage() {
     message: string;
     onConfirm: () => void;
   } | null>(null);
+  const quotaScoreColors = getQuotaScoreColors(agentsQuota);
 
   const loadRunners = useCallback(() => {
     fetch("/api/runners")
@@ -803,8 +841,8 @@ export default function RunnersPage() {
                                     updatedAt={agentsQuota.claude.updatedAt}
                                     unavailableMessage={agentsQuota.claude.IsAPIKey ? "Quota is unavailable when using API Key billing." : undefined}
                                     rows={[
-                                      { label: "Hour", used: agentsQuota.claude.HourRemain == null ? null : 1 - agentsQuota.claude.HourRemain, remaining: agentsQuota.claude.HourRemain, resetsAt: agentsQuota.claude.HourResetAt },
-                                      { label: "Week", used: agentsQuota.claude.WeekRemain == null ? null : 1 - agentsQuota.claude.WeekRemain, remaining: agentsQuota.claude.WeekRemain, resetsAt: agentsQuota.claude.WeekResetsAt },
+                                      { label: "Hour", used: agentsQuota.claude.HourRemain == null ? null : 1 - agentsQuota.claude.HourRemain, remaining: agentsQuota.claude.HourRemain, resetsAt: agentsQuota.claude.HourResetAt, scoreColor: quotaScoreColors.claude },
+                                      { label: "Week", used: agentsQuota.claude.WeekRemain == null ? null : 1 - agentsQuota.claude.WeekRemain, remaining: agentsQuota.claude.WeekRemain, resetsAt: agentsQuota.claude.WeekResetsAt, scoreColor: quotaScoreColors.claude },
                                     ]}
                                     onRefresh={r.connected && !agentsQuota.claude.IsAPIKey ? () => refreshQuota(r.id, "claude") : undefined}
                                     isRefreshing={refreshingQuota[`${r.id}:claude`]}
@@ -819,10 +857,10 @@ export default function RunnersPage() {
                                     model={agentsQuota.antigravity.DefaultModel}
                                     updatedAt={agentsQuota.antigravity.updatedAt}
                                     rows={[
-                                      { label: "Gemini Hour", used: agentsQuota.antigravity.GeminiHourRemain == null ? null : 1 - agentsQuota.antigravity.GeminiHourRemain, remaining: agentsQuota.antigravity.GeminiHourRemain, resetsAt: agentsQuota.antigravity.GeminiHourResetsAt },
-                                      { label: "Gemini Weekly", used: agentsQuota.antigravity.GeminiWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.GeminiWeeklyRemain, remaining: agentsQuota.antigravity.GeminiWeeklyRemain, resetsAt: agentsQuota.antigravity.GeminiWeeklyResetsAt },
-                                      { label: "Other Hour", used: agentsQuota.antigravity.OtherHourRemain == null ? null : 1 - agentsQuota.antigravity.OtherHourRemain, remaining: agentsQuota.antigravity.OtherHourRemain, resetsAt: agentsQuota.antigravity.OtherHourResetsAt },
-                                      { label: "Other Weekly", used: agentsQuota.antigravity.OtherWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.OtherWeeklyRemain, remaining: agentsQuota.antigravity.OtherWeeklyRemain, resetsAt: agentsQuota.antigravity.OtherWeeklyResetsAt },
+                                      { label: "Gemini Hour", used: agentsQuota.antigravity.GeminiHourRemain == null ? null : 1 - agentsQuota.antigravity.GeminiHourRemain, remaining: agentsQuota.antigravity.GeminiHourRemain, resetsAt: agentsQuota.antigravity.GeminiHourResetsAt, scoreColor: quotaScoreColors.gemini },
+                                      { label: "Gemini Weekly", used: agentsQuota.antigravity.GeminiWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.GeminiWeeklyRemain, remaining: agentsQuota.antigravity.GeminiWeeklyRemain, resetsAt: agentsQuota.antigravity.GeminiWeeklyResetsAt, scoreColor: quotaScoreColors.gemini },
+                                      { label: "Other Hour", used: agentsQuota.antigravity.OtherHourRemain == null ? null : 1 - agentsQuota.antigravity.OtherHourRemain, remaining: agentsQuota.antigravity.OtherHourRemain, resetsAt: agentsQuota.antigravity.OtherHourResetsAt, scoreColor: quotaScoreColors.other },
+                                      { label: "Other Weekly", used: agentsQuota.antigravity.OtherWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.OtherWeeklyRemain, remaining: agentsQuota.antigravity.OtherWeeklyRemain, resetsAt: agentsQuota.antigravity.OtherWeeklyResetsAt, scoreColor: quotaScoreColors.other },
                                     ]}
                                     onRefresh={r.connected && !agentsQuota.antigravity.IsAPIKey ? () => refreshQuota(r.id, "agy") : undefined}
                                     isRefreshing={refreshingQuota[`${r.id}:agy`]}
@@ -837,7 +875,7 @@ export default function RunnersPage() {
                                     model={agentsQuota.codex.DefaultModel}
                                     updatedAt={agentsQuota.codex.updatedAt}
                                     rows={[
-                                      { label: "Weekly", used: agentsQuota.codex.WeeklyRemain == null ? null : 1 - agentsQuota.codex.WeeklyRemain, remaining: agentsQuota.codex.WeeklyRemain, resetsAt: agentsQuota.codex.WeeklyResetAt },
+                                      { label: "Weekly", used: agentsQuota.codex.WeeklyRemain == null ? null : 1 - agentsQuota.codex.WeeklyRemain, remaining: agentsQuota.codex.WeeklyRemain, resetsAt: agentsQuota.codex.WeeklyResetAt, scoreColor: quotaScoreColors.codex },
                                     ]}
                                     onRefresh={r.connected && !agentsQuota.codex.IsAPIKey ? () => refreshQuota(r.id, "codex") : undefined}
                                     isRefreshing={refreshingQuota[`${r.id}:codex`]}
