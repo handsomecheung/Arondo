@@ -360,7 +360,10 @@ export default function RunnersPage() {
     }
 
     setLastQuotaRefreshAt((current) => ({ ...current, [key]: Date.now() }));
-    setQuotaRefreshNotice((current) => ({ ...current, [key]: "" }));
+    setQuotaRefreshNotice((current) => ({
+      ...current,
+      [key]: "Refreshing quota. The latest values may take about 1 minute to appear.",
+    }));
     setRefreshingQuota((current) => ({ ...current, [key]: true }));
     try {
       const res = await fetch("/api/agents/quota", {
@@ -376,10 +379,13 @@ export default function RunnersPage() {
         if (selectedRunnerId === runnerId) {
           fetch(`/api/agents/info?runnerId=${encodeURIComponent(runnerId)}`)
             .then((response) => response.json())
-            .then((data: AgentsQuota) => setAgentsQuota(data))
+            .then((data: AgentsQuota) => {
+              setAgentsQuota(data);
+              setQuotaRefreshNotice((current) => ({ ...current, [key]: "Quota refreshed." }));
+            })
             .catch(console.error);
         }
-      }, 3_000);
+      }, 60_000);
     } catch (err) {
       console.error("Failed to refresh quota:", err);
       alert(err instanceof Error ? err.message : "Failed to refresh quota");
@@ -800,7 +806,7 @@ export default function RunnersPage() {
                                       { label: "Hour", used: agentsQuota.claude.HourRemain == null ? null : 1 - agentsQuota.claude.HourRemain, remaining: agentsQuota.claude.HourRemain, resetsAt: agentsQuota.claude.HourResetAt },
                                       { label: "Week", used: agentsQuota.claude.WeekRemain == null ? null : 1 - agentsQuota.claude.WeekRemain, remaining: agentsQuota.claude.WeekRemain, resetsAt: agentsQuota.claude.WeekResetsAt },
                                     ]}
-                                    onRefresh={userRole === "admin" && !agentsQuota.claude.IsAPIKey ? () => refreshQuota(r.id, "claude") : undefined}
+                                    onRefresh={r.connected && !agentsQuota.claude.IsAPIKey ? () => refreshQuota(r.id, "claude") : undefined}
                                     isRefreshing={refreshingQuota[`${r.id}:claude`]}
                                     refreshNotice={quotaRefreshNotice[`${r.id}:claude`]}
                                   />
@@ -818,7 +824,7 @@ export default function RunnersPage() {
                                       { label: "Other Hour", used: agentsQuota.antigravity.OtherHourRemain == null ? null : 1 - agentsQuota.antigravity.OtherHourRemain, remaining: agentsQuota.antigravity.OtherHourRemain, resetsAt: agentsQuota.antigravity.OtherHourResetsAt },
                                       { label: "Other Weekly", used: agentsQuota.antigravity.OtherWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.OtherWeeklyRemain, remaining: agentsQuota.antigravity.OtherWeeklyRemain, resetsAt: agentsQuota.antigravity.OtherWeeklyResetsAt },
                                     ]}
-                                    onRefresh={userRole === "admin" && !agentsQuota.antigravity.IsAPIKey ? () => refreshQuota(r.id, "agy") : undefined}
+                                    onRefresh={r.connected && !agentsQuota.antigravity.IsAPIKey ? () => refreshQuota(r.id, "agy") : undefined}
                                     isRefreshing={refreshingQuota[`${r.id}:agy`]}
                                     refreshNotice={quotaRefreshNotice[`${r.id}:agy`]}
                                   />
@@ -833,7 +839,7 @@ export default function RunnersPage() {
                                     rows={[
                                       { label: "Weekly", used: agentsQuota.codex.WeeklyRemain == null ? null : 1 - agentsQuota.codex.WeeklyRemain, remaining: agentsQuota.codex.WeeklyRemain, resetsAt: agentsQuota.codex.WeeklyResetAt },
                                     ]}
-                                    onRefresh={userRole === "admin" && !agentsQuota.codex.IsAPIKey ? () => refreshQuota(r.id, "codex") : undefined}
+                                    onRefresh={r.connected && !agentsQuota.codex.IsAPIKey ? () => refreshQuota(r.id, "codex") : undefined}
                                     isRefreshing={refreshingQuota[`${r.id}:codex`]}
                                     refreshNotice={quotaRefreshNotice[`${r.id}:codex`]}
                                   />

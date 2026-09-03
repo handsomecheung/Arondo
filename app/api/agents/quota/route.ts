@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getArondoToken, getRoleByToken } from "@/lib/auth";
+import { getArondoToken, getRoleByToken, isValidToken, verifyRunnerPermission } from "@/lib/auth";
 import { runnerManager } from "@/lib/runner-manager";
 
 const QUOTA_AGENTS: Record<string, string> = {
@@ -30,8 +30,8 @@ function requestQuotaRefresh(runnerId: string, agentBinary: string): boolean {
 
 export async function POST(request: NextRequest) {
   const token = getArondoToken(request);
-  if (getRoleByToken(token) !== "admin") {
-    return NextResponse.json({ error: "Admin role required" }, { status: 403 });
+  if (!isValidToken(token)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const runners = await runnerManager.getAllKnownRunners();
@@ -54,6 +54,9 @@ export async function POST(request: NextRequest) {
     if (!runner) {
       return NextResponse.json({ error: "Runner not found" }, { status: 404 });
     }
+    if (!(await verifyRunnerPermission(runnerId, token))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     if (!runner.connected) {
       return NextResponse.json({ error: "Runner is disconnected" }, { status: 409 });
     }
@@ -66,6 +69,10 @@ export async function POST(request: NextRequest) {
       requested.push({ runnerId: runner.id, agent });
     }
     return NextResponse.json({ requested, cooldown: requested.length === 0 });
+  }
+
+  if (getRoleByToken(token) !== "admin") {
+    return NextResponse.json({ error: "Admin role required" }, { status: 403 });
   }
 
   for (const runner of runners) {

@@ -45,14 +45,14 @@ test.describe('Runners API tests', () => {
     expect(response.status()).toBe(403);
   });
 
-  test('should reject quota refresh with a regular user token', async ({ request }) => {
+  test('should allow a regular user to request a targeted quota refresh', async ({ request }) => {
     const response = await request.post('/api/agents/quota', {
       headers: { 'x-arondo-token': 'test-user-token-7890' },
       data: { runnerId: 'some-runner-id', agent: 'claude' },
     });
-    expect(response.status()).toBe(403);
+    expect(response.status()).toBe(404);
     const json = await response.json();
-    expect(json.error).toBe('Admin role required');
+    expect(json.error).toBe('Runner not found');
   });
 
   test('should queue asynchronous quota refreshes', async ({ request }) => {
