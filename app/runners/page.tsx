@@ -18,6 +18,7 @@ interface AgyQuota {
   OtherHourRemain: number | null;
   OtherHourResetsAt: number | null;
   updatedAt: number | null;
+  IsAPIKey?: boolean;
 }
 
 interface ClaudeQuota {
@@ -39,6 +40,7 @@ interface CodexQuota {
   WeeklyRemain: number | null;
   WeeklyResetAt: number | null;
   updatedAt: number | null;
+  IsAPIKey?: boolean;
 }
 
 interface AgentsQuota {
@@ -46,6 +48,8 @@ interface AgentsQuota {
   antigravity: AgyQuota | null;
   codex: CodexQuota | null;
 }
+
+const QUOTA_REFRESH_COOLDOWN_MS = 5 * 60 * 1000;
 
 interface Runner {
   id: string;
@@ -121,6 +125,9 @@ function QuotaCard({
   updatedAt,
   rows,
   unavailableMessage,
+  onRefresh,
+  isRefreshing,
+  refreshNotice,
 }: {
   title: string;
   account: string;
@@ -129,6 +136,9 @@ function QuotaCard({
   updatedAt: number | null;
   rows: QuotaRow[];
   unavailableMessage?: string;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
+  refreshNotice?: string;
 }) {
   return (
     <div
@@ -203,9 +213,41 @@ function QuotaCard({
           })}
         </div>
       )}
-      {updatedAt != null && (
-        <div style={{ fontSize: 10, color: "var(--text-muted)", textAlign: "right" }}>
-          Updated {formatTimestamp(updatedAt)}
+      {(updatedAt != null || onRefresh) && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
+          {updatedAt != null && (
+            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>
+              Updated {formatTimestamp(updatedAt)}
+            </span>
+          )}
+          {refreshNotice && (
+            <span style={{ fontSize: 10, color: "var(--warning, #f59e0b)" }}>
+              {refreshNotice}
+            </span>
+          )}
+          {onRefresh && (
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              title="Refresh this agent's quota"
+              aria-label={`Refresh ${title} quota`}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "var(--text-muted)",
+                cursor: isRefreshing ? "wait" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                padding: 2,
+                opacity: isRefreshing ? 0.5 : 1,
+              }}
+            >
+              <span style={{ display: "flex", transform: isRefreshing ? "rotate(180deg)" : undefined, transition: "transform 0.3s ease" }}>
+                <IconRefresh />
+              </span>
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -219,6 +261,9 @@ export default function RunnersPage() {
   const [selectedRunnerId, setSelectedRunnerId] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<"admin" | "user" | null>(null);
   const [agentsQuota, setAgentsQuota] = useState<AgentsQuota | null>(null);
+  const [refreshingQuota, setRefreshingQuota] = useState<Record<string, boolean>>({});
+  const [lastQuotaRefreshAt, setLastQuotaRefreshAt] = useState<Record<string, number>>({});
+  const [quotaRefreshNotice, setQuotaRefreshNotice] = useState<Record<string, string>>({});
   const [showTempDirSessions, setShowTempDirSessions] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     message: string;
@@ -302,6 +347,46 @@ export default function RunnersPage() {
     },
     [loadRunners, selectedRunnerId],
   );
+
+  const refreshQuota = useCallback(async (runnerId: string, agent: "claude" | "agy" | "codex") => {
+    const key = `${runnerId}:${agent}`;
+    const lastRefreshAt = lastQuotaRefreshAt[key];
+    if (lastRefreshAt != null && Date.now() - lastRefreshAt < QUOTA_REFRESH_COOLDOWN_MS) {
+      setQuotaRefreshNotice((current) => ({
+        ...current,
+        [key]: "Frequent refreshes have no effect. Try again in 5 minutes.",
+      }));
+      return;
+    }
+
+    setLastQuotaRefreshAt((current) => ({ ...current, [key]: Date.now() }));
+    setQuotaRefreshNotice((current) => ({ ...current, [key]: "" }));
+    setRefreshingQuota((current) => ({ ...current, [key]: true }));
+    try {
+      const res = await fetch("/api/agents/quota", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runnerId, agent }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to refresh quota");
+      }
+      window.setTimeout(() => {
+        if (selectedRunnerId === runnerId) {
+          fetch(`/api/agents/info?runnerId=${encodeURIComponent(runnerId)}`)
+            .then((response) => response.json())
+            .then((data: AgentsQuota) => setAgentsQuota(data))
+            .catch(console.error);
+        }
+      }, 3_000);
+    } catch (err) {
+      console.error("Failed to refresh quota:", err);
+      alert(err instanceof Error ? err.message : "Failed to refresh quota");
+    } finally {
+      setRefreshingQuota((current) => ({ ...current, [key]: false }));
+    }
+  }, [lastQuotaRefreshAt, selectedRunnerId]);
 
   const sortedRunners = [...runners].sort((a, b) => {
     if (a.connected !== b.connected) return a.connected ? -1 : 1;
@@ -715,6 +800,9 @@ export default function RunnersPage() {
                                       { label: "Hour", used: agentsQuota.claude.HourRemain == null ? null : 1 - agentsQuota.claude.HourRemain, remaining: agentsQuota.claude.HourRemain, resetsAt: agentsQuota.claude.HourResetAt },
                                       { label: "Week", used: agentsQuota.claude.WeekRemain == null ? null : 1 - agentsQuota.claude.WeekRemain, remaining: agentsQuota.claude.WeekRemain, resetsAt: agentsQuota.claude.WeekResetsAt },
                                     ]}
+                                    onRefresh={userRole === "admin" && !agentsQuota.claude.IsAPIKey ? () => refreshQuota(r.id, "claude") : undefined}
+                                    isRefreshing={refreshingQuota[`${r.id}:claude`]}
+                                    refreshNotice={quotaRefreshNotice[`${r.id}:claude`]}
                                   />
                                 )}
                                 {agentsQuota.antigravity && (
@@ -730,6 +818,9 @@ export default function RunnersPage() {
                                       { label: "Other Hour", used: agentsQuota.antigravity.OtherHourRemain == null ? null : 1 - agentsQuota.antigravity.OtherHourRemain, remaining: agentsQuota.antigravity.OtherHourRemain, resetsAt: agentsQuota.antigravity.OtherHourResetsAt },
                                       { label: "Other Weekly", used: agentsQuota.antigravity.OtherWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.OtherWeeklyRemain, remaining: agentsQuota.antigravity.OtherWeeklyRemain, resetsAt: agentsQuota.antigravity.OtherWeeklyResetsAt },
                                     ]}
+                                    onRefresh={userRole === "admin" && !agentsQuota.antigravity.IsAPIKey ? () => refreshQuota(r.id, "agy") : undefined}
+                                    isRefreshing={refreshingQuota[`${r.id}:agy`]}
+                                    refreshNotice={quotaRefreshNotice[`${r.id}:agy`]}
                                   />
                                 )}
                                 {agentsQuota.codex && (
@@ -742,6 +833,9 @@ export default function RunnersPage() {
                                     rows={[
                                       { label: "Weekly", used: agentsQuota.codex.WeeklyRemain == null ? null : 1 - agentsQuota.codex.WeeklyRemain, remaining: agentsQuota.codex.WeeklyRemain, resetsAt: agentsQuota.codex.WeeklyResetAt },
                                     ]}
+                                    onRefresh={userRole === "admin" && !agentsQuota.codex.IsAPIKey ? () => refreshQuota(r.id, "codex") : undefined}
+                                    isRefreshing={refreshingQuota[`${r.id}:codex`]}
+                                    refreshNotice={quotaRefreshNotice[`${r.id}:codex`]}
                                   />
                                 )}
                               </div>
