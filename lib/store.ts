@@ -583,10 +583,10 @@ export async function clearSessionLog(sessionId: string, messageId: string, proj
   await Promise.all(paths.map((logPath) => fs.writeFile(logPath, "", "utf-8")));
 }
 
-export async function appendSessionLog(sessionId: string, messageId: string, text: string, raw = false, projectId?: string, stream?: LogStream): Promise<void> {
+export async function appendSessionLog(sessionId: string, messageId: string, text: string | Uint8Array, raw = false, projectId?: string, stream?: LogStream): Promise<void> {
   const logPath = getLogFilePath(sessionId, messageId, projectId, stream);
   await ensureDir(path.dirname(logPath));
-  await fs.appendFile(logPath, raw ? text : text + "\n", "utf-8");
+  await fs.appendFile(logPath, raw ? text : `${text}\n`, "utf-8");
 }
 
 export async function appendAutomodelLog(sessionId: string, messageId: string, text: string): Promise<void> {

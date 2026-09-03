@@ -23,6 +23,7 @@ import {
 } from "./agents/opencode";
 import fs from "fs/promises";
 import path from "path";
+import { StringDecoder } from "string_decoder";
 import { getConfigDir } from "./config";
 import {
   getAgentQuotaErrorMessage,
@@ -103,6 +104,8 @@ class RunnerManager {
   private tasks = new Map<string, TaskContext>();
   private ptyKeyToTaskId = new Map<string, string>();
   private pending = new Map<string, PendingRequest>();
+  private execOutputWrites = new Map<string, Promise<void>>();
+  private execOutputDecoders = new Map<string, StringDecoder>();
   private cachedAllowedUserTokenUuids = new Map<string, string[]>();
   private cachedSyncGlobalRules = new Map<string, boolean>();
   private idCounter = 0;
@@ -1042,21 +1045,62 @@ class RunnerManager {
       return;
     }
 
-    let data = payload.data;
-    if (payload.encoding === "base64") {
-      data = Buffer.from(payload.data, "base64").toString("utf-8");
+    const stream = payload.stream === "stderr" ? "stderr" : "stdout";
+    const data = Buffer.from(
+      payload.data,
+      payload.encoding === "base64" ? "base64" : "utf-8",
+    );
+    const previous = this.execOutputWrites.get(payload.taskId) ?? Promise.resolve();
+    const writeOutput = async () => {
+      await appendSessionLog(ctx.sessionId, ctx.messageId, data, true, ctx.projectId, stream);
+
+      if (stream === "stdout") {
+        const decoderKey = `${payload.taskId}:${stream}`;
+        const decoder = this.execOutputDecoders.get(decoderKey) ?? new StringDecoder("utf8");
+        this.execOutputDecoders.set(decoderKey, decoder);
+        const text = decoder.write(data);
+        if (text) {
+          eventBus.publish({
+            type: "terminal_output",
+            payload: {
+              sessionId: ctx.sessionId,
+              messageId: ctx.messageId,
+              data: text,
+            },
+          });
+        }
+      }
+    };
+    const write = previous.then(writeOutput, writeOutput);
+    const queued = write.catch((err) => {
+      console.error("[runner-manager] onExecOutput error:", err);
+    });
+    this.execOutputWrites.set(payload.taskId, queued);
+    await queued;
+  }
+
+  private async drainExecOutput(taskId: string, ctx: TaskContext): Promise<void> {
+    const write = this.execOutputWrites.get(taskId);
+    if (write) {
+      try {
+        await write;
+      } finally {
+        this.execOutputWrites.delete(taskId);
+      }
     }
 
-    const stream = payload.stream === "stderr" ? "stderr" : "stdout";
-    await appendSessionLog(ctx.sessionId, ctx.messageId, data, true, ctx.projectId, stream);
-
-    if (stream === "stdout") {
+    const decoderKey = `${taskId}:stdout`;
+    const decoder = this.execOutputDecoders.get(decoderKey);
+    if (!decoder) return;
+    this.execOutputDecoders.delete(decoderKey);
+    const text = decoder.end();
+    if (text) {
       eventBus.publish({
         type: "terminal_output",
         payload: {
           sessionId: ctx.sessionId,
           messageId: ctx.messageId,
-          data,
+          data: text,
         },
       });
     }
@@ -1071,10 +1115,12 @@ class RunnerManager {
     if (!ctx) return;
     if (ctx.completedAt) return;
 
-    const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
-    this.ptyKeyToTaskId.delete(ptyKey);
     ctx.completedAt = Date.now();
     ctx.exitCode = payload.exitCode;
+    await this.drainExecOutput(payload.taskId, ctx);
+
+    const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
+    this.ptyKeyToTaskId.delete(ptyKey);
     
     if (payload.agyConversationId) {
       (ctx as any).agyConversationId = payload.agyConversationId;
