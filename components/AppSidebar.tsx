@@ -222,16 +222,11 @@ export default function AppSidebar({
           {(() => {
             const targetSessions = archivedView ? archivedSessions : sortedSessions;
             const sessionRunnerIds = new Set(targetSessions.map((s) => s.runnerId).filter(Boolean) as string[]);
-            const knownRunnersMap = new Map<string, { id: string; name: string }>();
-            runners.forEach((r) => {
-              knownRunnersMap.set(r.id, { id: r.id, name: r.name || r.hostname || r.id });
+            const runnersMap = new Map(runners.map((r) => [r.id, r]));
+            const availableRunners = Array.from(sessionRunnerIds).map((rId) => {
+              const r = runnersMap.get(rId);
+              return { id: rId, name: r ? r.name || r.hostname || rId : rId };
             });
-            sessionRunnerIds.forEach((rId) => {
-              if (!knownRunnersMap.has(rId)) {
-                knownRunnersMap.set(rId, { id: rId, name: rId });
-              }
-            });
-            const availableRunners = Array.from(knownRunnersMap.values());
 
             const runnerFilteredSessions = selectedRunnerFilter
               ? targetSessions.filter((s) => s.runnerId === selectedRunnerFilter)
