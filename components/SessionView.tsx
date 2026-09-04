@@ -117,7 +117,7 @@ interface SessionViewProps {
   onNewSessionCommand: (name?: string) => void;
   onRenameSessionCommand: (name: string) => void;
   onExecuteAgentCommand: (promptText: string) => void;
-  onExecuteScriptCommand: (promptText: string) => void;
+  onSelectScriptCommand: (promptText: string) => void;
   onTriggerRunFileSelector: () => void;
   onSwitchAgent: (agentType: string) => void;
   pendingFiles: File[];
@@ -217,7 +217,7 @@ export default function SessionView({
   onNewSessionCommand,
   onRenameSessionCommand,
   onExecuteAgentCommand,
-  onExecuteScriptCommand,
+  onSelectScriptCommand,
   onTriggerRunFileSelector,
   onSwitchAgent,
   pendingFiles,
@@ -1413,7 +1413,7 @@ export default function SessionView({
                     className={`command-menu-item${commandMenuIndex === idx ? " highlighted" : ""}${isActive ? " active" : ""}`}
                     onMouseDown={(e) => {
                       e.preventDefault();
-                      onExecuteScriptCommand(trigger);
+                      onSelectScriptCommand("!" + s.command);
                     }}
                   >
                     <span className="command-menu-name">{trigger}</span>
@@ -1430,7 +1430,7 @@ export default function SessionView({
                     className={`command-menu-item${isActive ? " active" : ""}`}
                     onMouseDown={(e) => {
                       e.preventDefault();
-                      onExecuteScriptCommand(trigger);
+                      onSelectScriptCommand("!" + command);
                     }}
                   >
                     <span className="command-menu-name">{command}</span>

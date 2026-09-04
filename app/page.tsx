@@ -801,10 +801,18 @@ export default function HomePage() {
 
     if (chatFsMode === "run") {
       setChatFsModalOpen(false);
-      const execPath = relativePath.startsWith("/") || relativePath.startsWith(".")
-        ? relativePath
-        : "./" + relativePath;
-      handleScriptCommand("!" + execPath);
+      setShowCommandMenu(false);
+      const insertText = "!" + relativePath;
+      setPrompt(insertText);
+      const el = textareaRef.current;
+      if (el) {
+        requestAnimationFrame(() => {
+          el.focus();
+          el.selectionStart = el.selectionEnd = insertText.length;
+          el.style.height = "auto";
+          el.style.height = `${Math.min(el.scrollHeight, 260)}px`;
+        });
+      }
       return;
     }
 
@@ -867,7 +875,7 @@ export default function HomePage() {
     return data.path;
   };
 
-  const { handlePromptChange, handleNewSessionCommand, handleRenameSessionCommand, handleAgentCommand, handleScriptCommand, handleSubmit, handleKeyDown, commandMenuIndex, pendingConfirmation, resolvePendingConfirmation, cancelPendingConfirmation } = useSessionSubmit({
+  const { handlePromptChange, handleNewSessionCommand, handleRenameSessionCommand, handleAgentCommand, handleScriptCommand, handleSelectScriptCommand, handleSubmit, handleKeyDown, commandMenuIndex, pendingConfirmation, resolvePendingConfirmation, cancelPendingConfirmation } = useSessionSubmit({
     prompt,
     repoPath,
     agentType,
@@ -1617,7 +1625,7 @@ export default function HomePage() {
             onNewSessionCommand={handleNewSessionCommand}
             onRenameSessionCommand={handleRenameSessionCommand}
             onExecuteAgentCommand={handleAgentCommand}
-            onExecuteScriptCommand={handleScriptCommand}
+            onSelectScriptCommand={handleSelectScriptCommand}
             onTriggerRunFileSelector={handleTriggerRunFileSelector}
             onSwitchAgent={handleSwitchAgent}
             pendingFiles={pendingFiles}

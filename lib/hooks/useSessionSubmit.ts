@@ -109,8 +109,13 @@ export function useSessionSubmit({
     const items: string[] = [];
     if (prompt.startsWith("!")) {
       for (const s of sessionScripts) {
-        const trigger = "!" + s.name;
-        if (trigger.startsWith(v) || v.startsWith(trigger)) items.push(trigger);
+        const cmdTrigger = "!" + s.command;
+        const nameTrigger = "!" + s.name;
+        if (cmdTrigger.startsWith(v) || v.startsWith(cmdTrigger) || nameTrigger.startsWith(v) || v.startsWith(nameTrigger)) {
+          if (!items.includes(cmdTrigger)) {
+            items.push(cmdTrigger);
+          }
+        }
       }
       return items;
     }
@@ -375,14 +380,23 @@ export function useSessionSubmit({
     sessionScripts,
     finalizeNewSession,
     setApiError,
-    setTaskQueue,
     onRunScript,
     setPrompt,
     setShowCommandMenu,
     textareaRef,
   ]);
 
-
+  const handleSelectScriptCommand = useCallback((commandText: string) => {
+    setPrompt(commandText);
+    setShowCommandMenu(false);
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      autoResizeTextarea(el);
+      el.selectionStart = el.selectionEnd = el.value.length;
+    });
+  }, [setPrompt, setShowCommandMenu, textareaRef]);
 
   // Resolves the "project not ready" confirmation dialog: send anyway, queue
   // an auto-send draft, or create a manual draft — all reuse the same /api/sessions POST.
@@ -722,6 +736,7 @@ export function useSessionSubmit({
     handleRenameSessionCommand,
     handleAgentCommand,
     handleScriptCommand,
+    handleSelectScriptCommand,
     handleSubmit,
     handleKeyDown,
     commandMenuIndex,
