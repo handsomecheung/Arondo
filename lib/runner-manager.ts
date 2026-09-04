@@ -171,7 +171,7 @@ class RunnerManager {
         const msgs = await getMessages(s.id);
         const runMsgs = msgs.filter((m: any) => {
           if (m.type !== "agent-run" && m.type !== "detached-agent-run" && m.type !== "script-run") return false;
-          if (m.taskDeleted) return false;
+          if (m.taskDeleted || m.deleted) return false;
           const returnMsg = msgs.find((ret: any) => ret.parentId === m.id);
           if (returnMsg) {
             const completedAt = new Date(returnMsg.createdAt).getTime();
@@ -235,7 +235,7 @@ class RunnerManager {
         const msgs = await getMessages("", p.id);
         const runMsgs = msgs.filter((m: any) => {
           if (m.type !== "agent-run" && m.type !== "script-run") return false;
-          if (m.taskDeleted) return false;
+          if (m.taskDeleted || m.deleted) return false;
           const returnMsg = msgs.find((ret: any) => ret.parentId === m.id);
           if (returnMsg) {
             const completedAt = new Date(returnMsg.createdAt).getTime();

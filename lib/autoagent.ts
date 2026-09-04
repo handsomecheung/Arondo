@@ -513,6 +513,7 @@ export async function buildCrossAgentContext(
   const parts: string[] = [];
 
   for (const msg of contextMessages) {
+    if (msg.deleted) continue;
     if (msg.type === "chat-user") {
       parts.push(`User: ${msg.content}`);
     } else if (msg.type === "agent-run" && msg.resolvedAgentType === prevAgentType) {

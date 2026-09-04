@@ -91,6 +91,7 @@ interface SessionViewProps {
   onStopExecCard: (msgId: string) => void;
   onRestartScriptCard: (msgId: string, scriptName: string) => void;
   onRetryCard: (cardInfo: ExecCardInfo) => void;
+  onDeleteScriptCard?: (msgId: string) => void;
   onSubmit: () => void;
   onArchiveSession: (id: string) => void;
   onTogglePinSession: (id: string, pinned: boolean) => void;
@@ -190,6 +191,7 @@ export default function SessionView({
   onStopExecCard,
   onRestartScriptCard,
   onRetryCard,
+  onDeleteScriptCard,
   onSubmit,
   onArchiveSession,
   onTogglePinSession,
@@ -958,80 +960,85 @@ export default function SessionView({
           </div>
         )}
 
-        {(selectedSession || isNewSession || isNewDraft) &&
-          messages.length === 0 &&
-          !isRunning && (
-            <div className="welcome-screen">
-              <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
-                {isNewDraft
-                  ? "This TODO message is saved now and sent according to the selected mode."
-                  : isNewSession
-                    ? "Describe what you want the agent to do…"
-                    : "No messages yet."}
-              </p>
-            </div>
-          )}
+        {(() => {
+          const visibleMessages = messages.filter((m) => !m.deleted);
+          return (
+            <>
+              {(selectedSession || isNewSession || isNewDraft) &&
+                visibleMessages.length === 0 &&
+                !isRunning && (
+                  <div className="welcome-screen">
+                    <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
+                      {isNewDraft
+                        ? "This TODO message is saved now and sent according to the selected mode."
+                        : isNewSession
+                          ? "Describe what you want the agent to do…"
+                          : "No messages yet."}
+                    </p>
+                  </div>
+                )}
 
-        {messages.map((msg) => {
-          if (returnMsgIds.has(msg.id)) return null;
+              {visibleMessages.map((msg) => {
+                if (returnMsgIds.has(msg.id)) return null;
 
-          const cardInfo = execCards.get(msg.id);
-          if (cardInfo) {
-            const cardItem = execCardInfoToItem(cardInfo);
-            const isCardRunning = cardItem.status === "running";
-            const isCardFailed = cardItem.status === "error";
-            const sharedProps = {
-              item: cardItem,
-              collapsible: !isCardRunning,
-              defaultCollapsed: shouldDefaultCollapseExecCard(cardInfo, cardItem.status),
-              onShowCommand: cardInfo.command ? () => onShowCommand(cardInfo.command) : undefined,
-              onStopTask: isCardRunning ? () => onStopExecCard(cardInfo.runMsg.id) : undefined,
-              onRetryTask: isCardFailed ? () => onRetryCard(cardInfo) : undefined,
-            };
-            if (cardInfo.isScript) {
-              return (
-                <ScriptExecCard
-                  key={msg.id}
-                  {...sharedProps}
-                  onViewLog={() => onViewLog(msg.id)}
-                  onRestartScript={isCardRunning ? () => onRestartScriptCard(cardInfo.runMsg.id, cardInfo.commandLabel) : undefined}
-                  sessionId={selectedSessionId!}
-                  ws={ws}
-                />
-              );
-            }
-            return (
-              <AgentExecCard
-                key={msg.id}
-                {...sharedProps}
-                sessionId={selectedSessionId!}
-                ws={ws}
-                repoPath={selectedSession?.repoPath}
-                runnerId={selectedSession?.runnerId}
-                onShowPrompt={cardInfo.prompt ? () => onShowPrompt(cardInfo.prompt!) : undefined}
-                onOpenFilePath={onOpenFilePath}
-              />
-            );
-          }
+                const cardInfo = execCards.get(msg.id);
+                if (cardInfo) {
+                  const cardItem = execCardInfoToItem(cardInfo);
+                  const isCardRunning = cardItem.status === "running";
+                  const isCardFailed = cardItem.status === "error";
+                  const sharedProps = {
+                    item: cardItem,
+                    collapsible: !isCardRunning,
+                    defaultCollapsed: shouldDefaultCollapseExecCard(cardInfo, cardItem.status),
+                    onShowCommand: cardInfo.command ? () => onShowCommand(cardInfo.command) : undefined,
+                    onStopTask: isCardRunning ? () => onStopExecCard(cardInfo.runMsg.id) : undefined,
+                    onRetryTask: isCardFailed ? () => onRetryCard(cardInfo) : undefined,
+                  };
+                  if (cardInfo.isScript) {
+                    return (
+                      <ScriptExecCard
+                        key={msg.id}
+                        {...sharedProps}
+                        onViewLog={() => onViewLog(msg.id)}
+                        onRestartScript={isCardRunning ? () => onRestartScriptCard(cardInfo.runMsg.id, cardInfo.commandLabel) : undefined}
+                        onDeleteTask={!isCardRunning && onDeleteScriptCard ? () => onDeleteScriptCard(cardInfo.runMsg.id) : undefined}
+                        sessionId={selectedSessionId!}
+                        ws={ws}
+                      />
+                    );
+                  }
+                  return (
+                    <AgentExecCard
+                      key={msg.id}
+                      {...sharedProps}
+                      sessionId={selectedSessionId!}
+                      ws={ws}
+                      repoPath={selectedSession?.repoPath}
+                      runnerId={selectedSession?.runnerId}
+                      onShowPrompt={cardInfo.prompt ? () => onShowPrompt(cardInfo.prompt!) : undefined}
+                      onOpenFilePath={onOpenFilePath}
+                    />
+                  );
+                }
 
-          if (msg.type === "user-todo") {
-            return (
-              <UserTodoMessageCard
-                key={msg.id}
-                content={msg.content}
-                timestamp={formatTime(msg.createdAt)}
-                trigger={msg.todoTrigger}
-                status={msg.todoStatus}
-                isFollowup={messages.length > 0 && messages[0].id !== msg.id}
-                renderContent={renderMessageContent}
-                onCancel={() => onCancelTodo(msg.id)}
-                onSendNow={() => onSendTodoNow(msg.id)}
-                onChangeTrigger={(trigger) => onChangeTodoTrigger(msg.id, trigger)}
-                userName={msg.userName}
-                userColor={msg.userColor}
-              />
-            );
-          }
+                if (msg.type === "user-todo") {
+                  return (
+                    <UserTodoMessageCard
+                      key={msg.id}
+                      content={msg.content}
+                      timestamp={formatTime(msg.createdAt)}
+                      trigger={msg.todoTrigger}
+                      status={msg.todoStatus}
+                      isFollowup={visibleMessages.length > 0 && visibleMessages[0].id !== msg.id}
+                      renderContent={renderMessageContent}
+                      onCancel={() => onCancelTodo(msg.id)}
+                      onSendNow={() => onSendTodoNow(msg.id)}
+                      onChangeTrigger={(trigger) => onChangeTodoTrigger(msg.id, trigger)}
+                      userName={msg.userName}
+                      userColor={msg.userColor}
+                    />
+                  );
+                }
 
           if (msg.role === "user" && msg.content.startsWith("/")) {
             const cmdWord = msg.content.trim().split(/\s+/)[0];
@@ -1076,6 +1083,9 @@ export default function SessionView({
             </div>
           );
         })}
+            </>
+          );
+        })()}
 
         <div ref={chatBottomRef} />
       </div>

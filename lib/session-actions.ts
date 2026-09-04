@@ -32,6 +32,7 @@ export async function buildDetachedAgentContext(sessionId: string): Promise<stri
   const parts: string[] = [];
 
   for (const message of messages) {
+    if (message.deleted) continue;
     if (message.type === "detached-agent-run" || message.type === "detached-agent-return") continue;
     if (message.type === "chat-user") {
       parts.push(`User:\n${message.content}`);

@@ -16,11 +16,12 @@ export async function GET(req: NextRequest) {
   }
 
   const messages = await getMessages(sessionId);
+  const visibleMessages = messages.filter((msg) => !msg.deleted);
   try {
     const config = await readTokensConfig();
     const clientMap = new Map(config.clients.map(c => [c.uuid, { name: c.name, color: c.color }]));
 
-    const enriched = messages.map(msg => {
+    const enriched = visibleMessages.map(msg => {
       if (msg.role === "user" && msg.tokenUuid) {
         const clientInfo = clientMap.get(msg.tokenUuid);
         if (clientInfo) {
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(enriched);
   } catch {
-    return NextResponse.json(messages);
+    return NextResponse.json(visibleMessages);
   }
 }
 

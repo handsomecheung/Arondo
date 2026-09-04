@@ -76,6 +76,7 @@ export interface Message {
   projectId?: string;
   detachedKind?: "review" | "btw";
   agentSessionKey?: string;
+  deleted?: boolean;
 }
 
 export interface TaskItem {

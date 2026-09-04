@@ -149,6 +149,7 @@ export interface Message {
   stoppedByUser?: boolean;
   taskId?: string;
   taskDeleted?: boolean;
+  deleted?: boolean;
   resolvedAgentType?: string;
   resolvedAgyQuotaGroup?: "gemini" | "other";
   prompt?: string;
@@ -550,6 +551,33 @@ export async function updateMessage(
       ...patch,
     };
     all[index] = updated;
+    await writeJson(filePath, all);
+    return updated;
+  });
+}
+
+export async function markMessageDeleted(
+  sessionId: string,
+  messageId: string,
+  projectId?: string
+): Promise<Message[]> {
+  const filePath = getMessagesFilePath(sessionId, projectId);
+  return withFileLock(filePath, async () => {
+    const all = await readJson<Message[]>(filePath, []);
+    const target = all.find((m) => m.id === messageId);
+    if (!target) return [];
+
+    const updated: Message[] = [];
+    for (const msg of all) {
+      if (
+        msg.id === messageId ||
+        msg.parentId === messageId ||
+        (target.parentId && (msg.id === target.parentId || msg.parentId === target.parentId))
+      ) {
+        msg.deleted = true;
+        updated.push(msg);
+      }
+    }
     await writeJson(filePath, all);
     return updated;
   });

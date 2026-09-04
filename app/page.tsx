@@ -438,7 +438,7 @@ export default function HomePage() {
     const unmatchedScript: string[] = [];
     let lastUserPrompt = "";
 
-    const validMessages = Array.isArray(messages) ? messages : [];
+    const validMessages = Array.isArray(messages) ? messages.filter((m) => !m.deleted) : [];
     for (const msg of validMessages) {
       if (msg.role === "user" && msg.type === "chat-user") {
         lastUserPrompt = msg.content;
@@ -651,7 +651,7 @@ export default function HomePage() {
     }
     fetch(`/api/messages?sessionId=${selectedSessionId}`)
       .then((r) => (r.ok ? r.json() : []))
-      .then((data: Message[]) => setMessages(Array.isArray(data) ? data : []))
+      .then((data: Message[]) => setMessages(Array.isArray(data) ? data.filter((m) => !m.deleted) : []))
       .catch((err) => {
         console.error(err);
         setMessages([]);
@@ -1032,6 +1032,29 @@ export default function HomePage() {
       // Runner restarts in-place — no state update needed.
     } catch (err) {
       console.error("Failed to restart script:", err);
+    }
+  };
+
+  const handleDeleteScriptCard = async (msgId: string) => {
+    if (!selectedSessionId) return;
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === msgId || m.parentId === msgId ? { ...m, deleted: true } : m
+      )
+    );
+    try {
+      const res = await fetch(`/api/sessions/${selectedSessionId}/messages/${msgId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        console.error("Failed to delete script message:", await res.text());
+        fetch(`/api/messages?sessionId=${selectedSessionId}`)
+          .then((r) => (r.ok ? r.json() : []))
+          .then((data: Message[]) => setMessages(Array.isArray(data) ? data.filter((m) => !m.deleted) : []))
+          .catch(console.error);
+      }
+    } catch (err) {
+      console.error("Failed to delete script message:", err);
     }
   };
 
@@ -1550,6 +1573,7 @@ export default function HomePage() {
             onStopExecCard={handleStopExecCard}
             onRestartScriptCard={handleRestartScriptCard}
             onRetryCard={handleRetryCard}
+            onDeleteScriptCard={handleDeleteScriptCard}
             onSubmit={handleSubmit}
             onArchiveSession={handleArchiveSession}
             onTogglePinSession={handleTogglePinSession}
