@@ -80,6 +80,37 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
     });
   });
 
+  test('deprioritizes Codex when its 5-hour quota is low', async () => {
+    await fs.writeFile(quotaPath, JSON.stringify({
+      "claude_arondo@gmail.com_Claude Pro account": {
+        "Type": "claude",
+        "Account": "arondo@gmail.com",
+        "Plan": "Claude Pro account",
+        "DefaultModel": "claude-sonnet-4-6",
+        "HourRemain": 0.9,
+        "HourResetAt": null,
+        "WeekRemain": 0.1,
+        "WeekResetsAt": null,
+        "updatedAt": Math.floor(Date.now() / 1000),
+      },
+      "codex_arondo@gmail.com_Plus": {
+        "Type": "codex",
+        "Account": "arondo@gmail.com",
+        "Plan": "Plus",
+        "DefaultModel": "gpt-5.6-terra",
+        "FiveHourRemain": 0.1,
+        "FiveHourResetAt": null,
+        "WeeklyRemain": 0.9,
+        "WeeklyResetAt": null,
+        "updatedAt": Math.floor(Date.now() / 1000),
+      },
+    }, null, 2), 'utf-8');
+
+    await expect(selectAgent(['claude', 'codex'])).resolves.toMatchObject({
+      agentType: 'claude',
+    });
+  });
+
   test('prefers unknown Codex quota over Claude and agy API Key billing', async () => {
     await fs.writeFile(quotaPath, JSON.stringify({
       "antigravity_arondo@gmail.com_API Usage Billing": {

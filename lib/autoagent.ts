@@ -319,9 +319,9 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
         resetsAt = q.WeekResetsAt;
       }
     } else if (choice.id === "D") {
-      // Codex only reports a weekly limit; no hourly figure is available.
       const q = latestEntryByType.get("codex") as CodexQuota | undefined;
       if (q) {
+        hourRemain = q.FiveHourRemain ?? null;
         weekRemain = q.WeeklyRemain;
         resetsAt = q.WeeklyResetAt;
       }

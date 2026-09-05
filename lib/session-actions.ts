@@ -81,7 +81,7 @@ export async function dispatchDetachedAgent(
   const runner = runnerManager.getRunner(runnerId);
   const selectedAgentType = agentType || session.agentType;
   const runMessageId = crypto.randomUUID();
-  const resolved = await resolveAgentType(selectedAgentType, runner?.info.agents ?? [], {
+  const resolved = await resolveAgentType(selectedAgentType, runner?.info.agentBinaries ?? [], {
     prompt,
     automodelLog: (text) => appendAutomodelLog(sessionId, runMessageId, text),
   });
@@ -211,7 +211,7 @@ export async function dispatchFollowupMessage(
     isQuotaErrorMessage(session.errorMessage);
 
   const systemMessageId = crypto.randomUUID();
-  const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? [], {
+  const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agentBinaries ?? [], {
     prompt: trimmedPrompt || trimmedMessage,
     automodelLog: (text) => appendAutomodelLog(sessionId, systemMessageId, text),
     lockedAgent: session.agentType === "auto" && session.autoLockedAgentType &&
@@ -376,7 +376,7 @@ export async function dispatchCreateSession(
   }, { tempDir: opts.tempDir });
 
   const systemMessageId = crypto.randomUUID();
-  const resolved = await resolveAgentType(agentType, run.info.agents, {
+  const resolved = await resolveAgentType(agentType, run.info.agentBinaries, {
     prompt: trimmedPrompt,
     automodelLog: (text) => appendAutomodelLog(session.id, systemMessageId, text),
   });

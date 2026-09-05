@@ -47,7 +47,7 @@ export interface Runner {
   connected: boolean;
   version?: string;
   capabilities?: string[];
-  agents?: string[];
+  agentBinaries?: string[];
   allowedUserTokenUuids?: string[];
 }
 

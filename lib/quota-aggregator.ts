@@ -4,26 +4,13 @@ import { runnerManager } from "./runner-manager";
 import { getConfigDir } from "./config";
 
 const CONFIG_DIR = getConfigDir();
-
-const AGENTS_DIR = path.join(CONFIG_DIR, "agents");
 const OUTPUT_PATH = path.join(CONFIG_DIR, "autoagent", "agent", "quota.json");
-const STALE_THRESHOLD_S = 60 * 60; // 1 hour
-
-const AGENT_TYPES = ["claude", "antigravity", "codex"] as const;
-
-// Maps runner binary name → agent file type (used as filename stem and Type field).
-const BINARY_TO_AGENT_TYPE: Record<string, string> = {
-  claude: "claude",
-  agy: "antigravity",
-  codex: "codex",
-};
-
-// Maps quota Type → runner binary name (inverse of BINARY_TO_AGENT_TYPE).
-const TYPE_TO_BINARY: Record<string, string> = {
-  claude: "claude",
-  antigravity: "agy",
-  codex: "codex",
-};
+const STALE_THRESHOLD_S = 60 * 60;
+const INITIAL_FETCH_INTERVAL_MS = 60 * 1000;
+const TYPE_TO_BINARY: Record<string, string> = { claude: "claude", antigravity: "agy", codex: "codex" };
+const BINARY_TO_TYPE = Object.fromEntries(
+  Object.entries(TYPE_TO_BINARY).map(([type, binary]) => [binary, type]),
+);
 
 type QuotaEntry = Record<string, unknown> & {
   Type: string;
@@ -37,96 +24,96 @@ function makeKey(type: string, account: string, plan: string): string {
   return `${type}_${account}_${plan}`;
 }
 
-async function readAgentFile(
-  runnerId: string,
-  agentType: string
-): Promise<QuotaEntry | null> {
-  const filePath = path.join(AGENTS_DIR, runnerId, `${agentType}.json`);
+async function readQuotaEntries(): Promise<Record<string, QuotaEntry>> {
   try {
-    const raw = await fs.readFile(filePath, "utf-8");
-    const data = JSON.parse(raw) as Record<string, unknown>;
-    if (!data.Account || !data.Plan) return null;
-    return {
-      ...data,
-      Type: agentType,
-      Account: data.Account as string,
-      Plan: data.Plan as string,
-      updatedAt: (data.updatedAt as number) ?? 0,
-    };
+    return JSON.parse(await fs.readFile(OUTPUT_PATH, "utf-8"));
   } catch {
-    return null;
+    return {};
   }
 }
 
-// Checks every connected runner's installed agents. For each (runner, agentType)
-// pair that has no data file on disk, sends an info.fetch request to that runner.
-// Returns true if at least one request was sent.
-async function requestMissingEntries(): Promise<boolean> {
-  const connectedRunners = runnerManager.getRunners().filter((r) => r.connected);
-  let sent = false;
+interface InitialFetchRequest {
+  runnerId: string;
+  agent: string;
+}
 
-  for (const runner of connectedRunners) {
-    for (const binary of runner.agents) {
-      const agentType = BINARY_TO_AGENT_TYPE[binary];
-      if (!agentType) continue;
+const initialFetchQueue: InitialFetchRequest[] = [];
+const queuedInitialFetches = new Set<string>();
+let initialFetchTimer: ReturnType<typeof setTimeout> | null = null;
 
-      const filePath = path.join(AGENTS_DIR, runner.id, `${agentType}.json`);
-      const entry = await readAgentFile(runner.id, agentType);
-      if (entry) continue;
+function initialFetchKey(request: InitialFetchRequest): string {
+  return `${request.runnerId}:${request.agent}`;
+}
 
-      // If the file exists but is invalid (e.g., empty account/plan because the
-      // agent is logged out or failed to parse), check if it was recently updated
-      // to avoid constantly spamming the runner with info.fetch requests.
-      try {
-        const raw = await fs.readFile(filePath, "utf-8");
-        const data = JSON.parse(raw) as Record<string, unknown>;
-        const updatedAt = (data.updatedAt as number) ?? 0;
-        const now = Math.floor(Date.now() / 1000);
-        if (now - updatedAt <= STALE_THRESHOLD_S) {
-          continue;
-        }
-      } catch {
-        // File doesn't exist or is invalid JSON
-      }
+function drainInitialFetchQueue(): void {
+  initialFetchTimer = null;
+  const request = initialFetchQueue.shift();
+  if (!request) return;
 
-      runnerManager.sendFire(runner.id, "info.fetch", { agent: binary });
-      console.log(
-        `[quota-aggregator] missing or invalid ${agentType} data for runner ${runner.id} — requested info.fetch`
-      );
-      sent = true;
+  queuedInitialFetches.delete(initialFetchKey(request));
+  const runner = runnerManager.getRunner(request.runnerId);
+  if (runner && runner.info.connected && runner.info.agentBinaries.includes(request.agent)) {
+    runnerManager.sendFire(request.runnerId, "info.fetch", { agent: request.agent });
+    console.log(`[quota-aggregator] initial ${request.agent} quota request sent to runner ${request.runnerId}`);
+  }
+
+  if (initialFetchQueue.length > 0) {
+    initialFetchTimer = setTimeout(drainInitialFetchQueue, INITIAL_FETCH_INTERVAL_MS);
+  }
+}
+
+function queueInitialFetches(): void {
+  const candidates = runnerManager.getRunners()
+    .filter((runner) => runner.connected)
+    .map((runner) => ({
+      runnerId: runner.id,
+      agents: runner.agentBinaries.filter((agent) => {
+        const type = BINARY_TO_TYPE[agent];
+        return type && !runner.agents.some((entry) => entry.Type === type);
+      }),
+    }));
+
+  // Interleave runners so a runner with several agents does not delay every
+  // other runner's initial quota discovery.
+  const longestAgentList = Math.max(0, ...candidates.map((candidate) => candidate.agents.length));
+  for (let index = 0; index < longestAgentList; index++) {
+    for (const candidate of candidates) {
+      const agent = candidate.agents[index];
+      if (!agent) continue;
+      const request = { runnerId: candidate.runnerId, agent };
+      const key = initialFetchKey(request);
+      if (queuedInitialFetches.has(key)) continue;
+      queuedInitialFetches.add(key);
+      initialFetchQueue.push(request);
     }
   }
 
-  return sent;
+  if (!initialFetchTimer && initialFetchQueue.length > 0) {
+    drainInitialFetchQueue();
+  }
 }
 
-// For each aggregated entry whose updatedAt is older than STALE_THRESHOLD_S,
-// picks one connected runner at random (among those with the agent installed)
-// and sends an info.fetch request.
-function requestStaleRefreshes(merged: Record<string, QuotaEntry>): void {
+// Only entries that an online runner explicitly references can be refreshed.
+// A single randomly selected referencing runner performs the request.
+async function requestStaleRefreshes(): Promise<void> {
+  const entries = await readQuotaEntries();
+  const onlineRunners = runnerManager.getRunners().filter((runner) => runner.connected);
   const now = Math.floor(Date.now() / 1000);
-  const connectedRunners = runnerManager.getRunners().filter((r) => r.connected);
-  if (connectedRunners.length === 0) return;
 
-  // Deduplicate by binary: send at most one request per binary type.
-  const sentBinaries = new Set<string>();
-
-  for (const entry of Object.values(merged)) {
-    if (entry.IsAPIKey) continue;
-    if (now - entry.updatedAt <= STALE_THRESHOLD_S) continue;
-
+  for (const [key, entry] of Object.entries(entries)) {
+    if (entry.IsAPIKey || now - entry.updatedAt <= STALE_THRESHOLD_S) continue;
     const binary = TYPE_TO_BINARY[entry.Type];
-    if (!binary || sentBinaries.has(binary)) continue;
-
-    const capable = connectedRunners.filter((r) => r.agents.includes(binary));
-    if (capable.length === 0) continue;
-
-    const chosen = capable[Math.floor(Math.random() * capable.length)];
-    runnerManager.sendFire(chosen.id, "info.fetch", { agent: binary });
-    sentBinaries.add(binary);
-    console.log(
-      `[quota-aggregator] stale ${entry.Type} (key: ${makeKey(entry.Type, entry.Account, entry.Plan)}) — requested info.fetch from runner ${chosen.id}`
+    if (!binary) continue;
+    const references = onlineRunners.filter(
+      (runner) => runner.agents.some(
+        (agent) => makeKey(agent.Type, agent.Account, agent.Plan) === key,
+      ),
     );
+    if (references.length === 0) continue;
+
+    const runner = references[Math.floor(Math.random() * references.length)];
+    runnerManager.sendFire(runner.id, "info.fetch", { agent: binary });
+    console.log(`[quota-aggregator] stale ${entry.Type} (key: ${key}) — requested info.fetch from runner ${runner.id}`);
   }
 }
 
@@ -135,58 +122,18 @@ const MIN_ACCESS_INTERVAL_MS = 5 * 60 * 1000;
 
 export async function aggregateQuota(): Promise<void> {
   lastAggregateAt = Date.now();
-  let runnerIds: string[];
-  try {
-    const entries = await fs.readdir(AGENTS_DIR, { withFileTypes: true });
-    runnerIds = entries
-      .filter((e) => e.isDirectory())
-      .map((e) => e.name);
-  } catch {
-    runnerIds = [];
-  }
-
-  const merged: Record<string, QuotaEntry> = {};
-
-  for (const runnerId of runnerIds) {
-    for (const agentType of AGENT_TYPES) {
-      const entry = await readAgentFile(runnerId, agentType);
-      if (!entry) continue;
-
-      const key = makeKey(entry.Type, entry.Account, entry.Plan);
-      const existing = merged[key];
-      if (!existing || entry.updatedAt > existing.updatedAt) {
-        merged[key] = entry;
-      }
-    }
-  }
-
-  await fs.mkdir(path.dirname(OUTPUT_PATH), { recursive: true });
-  await fs.writeFile(OUTPUT_PATH, JSON.stringify(merged, null, 2), "utf-8");
-  console.log(`[quota-aggregator] written ${Object.keys(merged).length} entries to ${OUTPUT_PATH}`);
-
-  // Missing entries take priority: if any runner is missing data files for its
-  // installed agents, request those first and skip the stale check this cycle.
-  if (await requestMissingEntries()) return;
-
-  requestStaleRefreshes(merged);
+  queueInitialFetches();
+  await requestStaleRefreshes();
 }
 
-// Called on every incoming HTTP request. If aggregateQuota hasn't run in the
-// last MIN_ACCESS_INTERVAL_MS, triggers it in the background.
 export function notifyQuotaAggregatorAccess(): void {
   if (Date.now() - lastAggregateAt <= MIN_ACCESS_INTERVAL_MS) return;
-  aggregateQuota().catch((err) =>
-    console.error("[quota-aggregator] access-triggered run failed:", err)
-  );
+  aggregateQuota().catch((err) => console.error("[quota-aggregator] access-triggered run failed:", err));
 }
 
 export function startQuotaAggregator(): void {
-  aggregateQuota().catch((err) =>
-    console.error("[quota-aggregator] initial run failed:", err)
-  );
+  aggregateQuota().catch((err) => console.error("[quota-aggregator] initial run failed:", err));
   setInterval(() => {
-    aggregateQuota().catch((err) =>
-      console.error("[quota-aggregator] periodic run failed:", err)
-    );
+    aggregateQuota().catch((err) => console.error("[quota-aggregator] periodic run failed:", err));
   }, 6 * 60 * 60 * 1000);
 }

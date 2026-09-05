@@ -49,12 +49,22 @@ export interface RunnerInfo {
   arch: string;
   version: string;
   capabilities: string[];
-  agents: string[];
+  // Agents installed on the runner, as reported by the Runner protocol.
+  agentBinaries: string[];
+  // Quota identities intentionally contain no quota measurements. The
+  // authoritative measurements live in autoagent/agent/quota.json.
+  agents: RunnerAgentQuotaRef[];
   connected: boolean;
   lastSeenAt?: number;
   connectedAt?: number;
   allowedUserTokenUuids?: string[];
   syncGlobalRules?: boolean;
+}
+
+export interface RunnerAgentQuotaRef {
+  Type: string;
+  Account: string;
+  Plan: string;
 }
 
 interface RunnerConnection {
@@ -122,8 +132,9 @@ class RunnerManager {
 
   private async persistRunner(info: RunnerInfo): Promise<void> {
     const filePath = this.runnerFilePath(info.id);
+    const { agentBinaries: _agentBinaries, ...persistedInfo } = info;
     await fs.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.writeFile(filePath, JSON.stringify(info, null, 2), "utf-8");
+    await fs.writeFile(filePath, JSON.stringify(persistedInfo, null, 2), "utf-8");
   }
 
   async restoreRunners(): Promise<void> {
@@ -357,6 +368,14 @@ class RunnerManager {
       }
     }
 
+    let agents: RunnerAgentQuotaRef[] = [];
+    try {
+      const saved = JSON.parse(await fs.readFile(this.runnerFilePath(id), "utf-8")) as Pick<RunnerInfo, "agents">;
+      agents = Array.isArray(saved.agents) ? saved.agents : [];
+    } catch {
+      // A new runner has no quota references until its first quota update.
+    }
+
     const info: RunnerInfo = {
       id,
       name,
@@ -367,7 +386,8 @@ class RunnerManager {
       arch: registerPayload.arch || "",
       version: registerPayload.version || "",
       capabilities: registerPayload.capabilities || [],
-      agents: registerPayload.agents || [],
+      agentBinaries: registerPayload.agents || [],
+      agents,
       connected: true,
       lastSeenAt: Date.now(),
       connectedAt: Date.now(),
@@ -1010,7 +1030,7 @@ class RunnerManager {
   private onAgentStatus(runnerId: string, payload: { agents: string[] }): void {
     const conn = this.runners.get(runnerId);
     if (!conn || !Array.isArray(payload?.agents)) return;
-    conn.info.agents = payload.agents;
+    conn.info.agentBinaries = payload.agents;
     this.persistRunner(conn.info).catch(() => {});
     console.log(
       `[runner-manager] runner ${runnerId} agents updated: [${payload.agents.join(", ")}]`,
@@ -1023,22 +1043,44 @@ class RunnerManager {
   ): Promise<void> {
     const { agent, quota } = payload ?? {};
     if (!agent || !quota) return;
-    const fileNames: Record<string, string> = {
-      claude: "claude.json",
-      agy: "antigravity.json",
-      codex: "codex.json",
+    const agentTypes: Record<string, string> = {
+      claude: "claude",
+      agy: "antigravity",
+      codex: "codex",
     };
-    const fileName = fileNames[agent];
-    if (!fileName) {
+    const type = agentTypes[agent];
+    if (!type) {
       console.warn(`[runner-manager] unknown quota agent: ${agent}`);
       return;
     }
-    const agentDir = path.join(CONFIG_DIR, "agents", runnerId);
-    await fs.mkdir(agentDir, { recursive: true });
-    const filePath = path.join(agentDir, fileName);
-    const data = { ...quota, updatedAt: Math.floor(Date.now() / 1000) };
-    await fs.writeFile(filePath, JSON.stringify(data, null, 2), "utf-8");
-    console.log(`[runner-manager] quota saved: ${filePath}`);
+    const account = quota.Account;
+    const plan = quota.Plan;
+    if (typeof account !== "string" || typeof plan !== "string" || !account || !plan) {
+      console.warn(`[runner-manager] quota update missing identity for ${agent} on ${runnerId}`);
+      return;
+    }
+
+    const conn = this.runners.get(runnerId);
+    if (conn) {
+      conn.info.agents = [
+        ...conn.info.agents.filter((entry) => entry.Type !== type),
+        { Type: type, Account: account, Plan: plan },
+      ];
+      await this.persistRunner(conn.info);
+    }
+
+    const quotaPath = path.join(CONFIG_DIR, "autoagent", "agent", "quota.json");
+    let quotas: Record<string, Record<string, unknown>> = {};
+    try {
+      quotas = JSON.parse(await fs.readFile(quotaPath, "utf-8"));
+    } catch {
+      // The first quota update creates the aggregate file.
+    }
+    const data = { ...quota, Type: type, Account: account, Plan: plan, updatedAt: Math.floor(Date.now() / 1000) };
+    quotas[`${type}_${account}_${plan}`] = data;
+    await fs.mkdir(path.dirname(quotaPath), { recursive: true });
+    await fs.writeFile(quotaPath, JSON.stringify(quotas, null, 2), "utf-8");
+    console.log(`[runner-manager] quota saved: ${quotaPath}`);
   }
 
   private async onExecOutput(payload: {
