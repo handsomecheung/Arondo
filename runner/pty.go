@@ -185,9 +185,6 @@ func (tm *TaskManager) SpawnPiped(opts SpawnPipedOptions) (int, error) {
 			if onExit != nil {
 				onExit(exitCode)
 			}
-			tm.mu.Lock()
-			delete(tm.tasks, t.id)
-			tm.mu.Unlock()
 		}
 	}()
 
@@ -280,9 +277,6 @@ func (tm *TaskManager) launchProcess(t *task, cols, rows uint16) error {
 			if onExit != nil {
 				onExit(exitCode)
 			}
-			tm.mu.Lock()
-			delete(tm.tasks, t.id)
-			tm.mu.Unlock()
 		}
 	}()
 
@@ -300,33 +294,32 @@ func (tm *TaskManager) Restart(taskID, command, workDir string, cols, rows uint1
 		return 0, fmt.Errorf("task %s not found", taskID)
 	}
 
-	// Mark as restarting and send SIGTERM to the current process.
+	// Mark as restarting and stop the current process when it is still active.
 	t.mu.Lock()
-	if t.done {
-		t.mu.Unlock()
-		return 0, fmt.Errorf("task %s already exited", taskID)
-	}
+	done := t.done
 	t.isRestarting = true
 	procDoneC := t.procDoneC
-	if t.cmd.Process != nil {
+	if !done && t.cmd.Process != nil {
 		killTaskProcess(t.cmd, syscall.SIGTERM)
 	}
 	t.mu.Unlock()
 
-	select {
-	case <-procDoneC:
-		// Exited cleanly after SIGTERM.
-	case <-time.After(5 * time.Second):
-		// Escalate to SIGKILL.
-		t.mu.Lock()
-		if !t.done && t.cmd.Process != nil {
-			killTaskProcess(t.cmd, syscall.SIGKILL)
-		}
-		t.mu.Unlock()
+	if !done {
 		select {
 		case <-procDoneC:
-		case <-time.After(2 * time.Second):
-			return 0, fmt.Errorf("task %s failed to stop within timeout", taskID)
+			// Exited cleanly after SIGTERM.
+		case <-time.After(5 * time.Second):
+			// Escalate to SIGKILL.
+			t.mu.Lock()
+			if !t.done && t.cmd.Process != nil {
+				killTaskProcess(t.cmd, syscall.SIGKILL)
+			}
+			t.mu.Unlock()
+			select {
+			case <-procDoneC:
+			case <-time.After(2 * time.Second):
+				return 0, fmt.Errorf("task %s failed to stop within timeout", taskID)
+			}
 		}
 	}
 

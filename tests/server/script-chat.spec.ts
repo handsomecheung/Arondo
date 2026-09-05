@@ -157,4 +157,54 @@ test.describe('Chat while session scripts are running', () => {
       await fs.rm(repoDir, { recursive: true, force: true });
     }
   });
+
+  test('retries a failed script in its existing card', async ({ request }) => {
+    const mockBinDir = path.resolve(__dirname, '../mocks/bin/claude');
+    const mockLogDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arondo-script-retry-logs-'));
+    const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arondo-script-retry-repo-'));
+    execFileSync('git', ['init'], { cwd: repoDir });
+    const { runnerProcess, runnerId } = await setupRunner(request, 'script-retry-runner', mockBinDir, {
+      CLAUDE_DIR_LOG: mockLogDir,
+    });
+
+    let sessionId = '';
+    try {
+      const createRes = await request.post('/api/sessions', {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+        data: { prompt: 'Session for script retry test', repoPath: repoDir, runnerId, agentType: 'claude' },
+      });
+      expect(createRes.status()).toBe(201);
+      sessionId = (await createRes.json()).id;
+      await waitForSessionNotRunning(request, sessionId);
+
+      const runRes = await request.post(`/api/sessions/${sessionId}/run-script`, {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+        data: { scriptName: 'exit 1', prompt: '!exit 1' },
+      });
+      expect(runRes.status()).toBe(200);
+      const { messageId } = await runRes.json();
+      await waitForSessionNotRunning(request, sessionId);
+
+      const retryRes = await request.post(`/api/sessions/${sessionId}/restart-script`, {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+        data: { scriptName: 'exit 1', messageId },
+      });
+      expect(retryRes.status()).toBe(200);
+      await waitForSessionNotRunning(request, sessionId);
+
+      const messagesRes = await request.get(`/api/messages?sessionId=${sessionId}`, {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+      });
+      const messages = await messagesRes.json();
+      expect(messages.filter((message: any) => message.type === 'script-run')).toHaveLength(1);
+      expect(messages.find((message: any) => message.type === 'script-run').id).toBe(messageId);
+    } finally {
+      if (sessionId) await request.delete(`/api/sessions/${sessionId}`, {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+      });
+      await teardownRunner(runnerProcess);
+      await fs.rm(mockLogDir, { recursive: true, force: true });
+      await fs.rm(repoDir, { recursive: true, force: true });
+    }
+  });
 });

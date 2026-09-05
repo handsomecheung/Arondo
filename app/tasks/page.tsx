@@ -633,19 +633,14 @@ export default function TasksPage() {
     try {
       let res: Response;
       if (task.type === "script" && task.scriptName) {
-        if (!task.sessionId) {
-          res = await fetch(`/api/projects/${task.projectId}/run-script`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ scriptName: task.scriptName }),
-          });
-        } else {
-          res = await fetch(`/api/sessions/${task.sessionId}/run-script`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ scriptName: task.scriptName }),
-          });
-        }
+        const url = task.sessionId
+          ? `/api/sessions/${task.sessionId}/restart-script`
+          : `/api/projects/${task.projectId}/restart-script`;
+        res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scriptName: task.scriptName, messageId: task.messageId }),
+        });
       } else if (task.type === "agent" && task.sessionId) {
         res = await fetch(`/api/sessions/${task.sessionId}/rerun-agent`, {
           method: "POST",
@@ -656,12 +651,10 @@ export default function TasksPage() {
         return;
       }
       if (!res.ok) return;
-      const data = await res.json();
-      const newMessageId = data.taskId || data.messageId;
       setTaskQueue((prev) =>
         prev.map((t) =>
           t.id === task.id
-            ? { ...t, status: "running" as const, messageId: newMessageId, completedAt: undefined, createdAt: Date.now() }
+            ? { ...t, status: "running" as const, completedAt: undefined, createdAt: Date.now() }
             : t
         )
       );

@@ -807,7 +807,16 @@ class RunnerManager {
     const runnerId = this.resolveRunnerId(ctx.runnerId);
     if (!runnerId) return false;
 
+    const previousCompletion = {
+      completedAt: ctx.completedAt,
+      exitCode: ctx.exitCode,
+      stoppedByUser: ctx.stoppedByUser,
+    };
+
     try {
+      ctx.completedAt = undefined;
+      ctx.exitCode = undefined;
+      ctx.stoppedByUser = false;
       const res: any = await this.sendRequest(
         runnerId,
         "exec.restart",
@@ -823,6 +832,7 @@ class RunnerManager {
       if (res?.pid) this.updateTaskPid(taskId, res.pid);
       return true;
     } catch (err) {
+      Object.assign(ctx, previousCompletion);
       console.error(`[runner-manager] failed to restart task ${taskId}:`, err);
       return false;
     }
@@ -1119,9 +1129,6 @@ class RunnerManager {
     ctx.exitCode = payload.exitCode;
     await this.drainExecOutput(payload.taskId, ctx);
 
-    const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
-    this.ptyKeyToTaskId.delete(ptyKey);
-    
     if (payload.agyConversationId) {
       (ctx as any).agyConversationId = payload.agyConversationId;
     }

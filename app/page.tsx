@@ -1086,7 +1086,21 @@ export default function HomePage() {
   const handleRetryCard = async (cardInfo: ExecCardInfo) => {
     if (!selectedSessionId) return;
     if (cardInfo.isScript) {
-      handleRunScript(cardInfo.commandLabel);
+      try {
+        const res = await fetch(`/api/sessions/${selectedSessionId}/restart-script`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scriptName: cardInfo.commandLabel, messageId: cardInfo.runMsg.id }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        if (cardInfo.returnMsg) {
+          setMessages((prev) => prev.map((message) =>
+            message.id === cardInfo.returnMsg?.id ? { ...message, deleted: true } : message,
+          ));
+        }
+      } catch (err) {
+        console.error("Failed to retry script:", err);
+      }
     } else {
       try {
         await fetch(`/api/sessions/${selectedSessionId}/rerun-agent`, {
