@@ -111,11 +111,12 @@ test.describe('Authentication API tests', () => {
   test('settings stored in arondo.json survive token updates', async ({ request }) => {
     const settingsRes = await request.post('/api/settings', {
       headers: { 'x-arondo-token': 'test-token-123456' },
-      data: { sessionArchiveDays: 3, showHiddenFiles: false },
+      data: { sessionArchiveDays: 3, tempDirProjectRetentionHours: 120, showHiddenFiles: false },
     });
     expect(settingsRes.status()).toBe(200);
     await expect(settingsRes.json()).resolves.toMatchObject({
       sessionArchiveDays: 3,
+      tempDirProjectRetentionHours: 120,
       showHiddenFiles: false,
     });
 
@@ -132,11 +133,24 @@ test.describe('Authentication API tests', () => {
     expect(getSettingsRes.status()).toBe(200);
     await expect(getSettingsRes.json()).resolves.toMatchObject({
       sessionArchiveDays: 3,
+      tempDirProjectRetentionHours: 120,
       showHiddenFiles: false,
     });
 
     await request.delete(`/api/auth/client-tokens?role=user&token=${token}`, {
       headers: { 'x-arondo-token': 'test-token-123456' },
+    });
+  });
+
+  test('rejects an invalid temporary project retention period', async ({ request }) => {
+    const response = await request.post('/api/settings', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: { tempDirProjectRetentionHours: 0 },
+    });
+
+    expect(response.status()).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'tempDirProjectRetentionHours must be a positive number',
     });
   });
 
@@ -339,4 +353,3 @@ test.describe('Authentication API tests', () => {
     expect(invalidAgentRes.status()).toBe(400);
   });
 });
-

@@ -206,6 +206,7 @@ Open [http://localhost:3251](http://localhost:3251) in your browser. Select the 
 - `ARONDO_CONFIG_DIR` – (Optional) Custom directory to store configuration and runtime data. Defaults to `~/.arondo` in both development and production.
 - `PORT` – (Optional) Server port. Defaults to `3251` in development, `3250` in production.
 - `ARONDO_SESSION_ARCHIVE_DAYS_DEFAULT` – (Optional) Default number of idle days before active sessions are auto-archived, used when no override is set in Settings. Defaults to `7`.
+- `ARONDO_TEMP_DIR_PROJECT_RETENTION_HOURS_DEFAULT` – (Optional) Default number of hours temporary sessions and projects are retained before cleanup, used when no override is set in Settings. Defaults to `72`.
 - `ARONDO_FILE_SHOW_HIDDEN_DEFAULT` – (Optional) Default for whether hidden files/directories (dotfiles) appear in the file browser and @ path selector, used when no override is set in Settings. Defaults to `true`; set to `false` to hide dotfiles by default.
 - `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY` – Provider API keys used by `automodel`, checked in that order. These can also be configured from Settings and stored as `setitngs.llmApiKeys` in `arondo.json`; environment variables take precedence and disable editing for that provider in the UI. If none are configured, Auto Mode keeps using the predefined model selected by the existing quota-based logic. The automodel provider, model, and timeout are fixed in code.
 

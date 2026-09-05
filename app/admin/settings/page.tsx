@@ -212,6 +212,8 @@ export default function AdminSettingsPage() {
 
   const [sessionArchiveDays, setSessionArchiveDays] = useState<number | "">("");
   const sessionArchiveDaysAutoSaveReady = useRef(false);
+  const [tempDirProjectRetentionHours, setTempDirProjectRetentionHours] = useState<number | "">("");
+  const tempDirProjectRetentionHoursAutoSaveReady = useRef(false);
   const [serverVersion, setServerVersion] = useState<string>("");
 
   const [showHiddenFiles, setShowHiddenFiles] = useState(true);
@@ -254,6 +256,7 @@ export default function AdminSettingsPage() {
       .then((r) => r.json())
       .then((data: {
         sessionArchiveDays: number;
+        tempDirProjectRetentionHours: number;
         showHiddenFiles?: boolean;
         showTempDirSessions?: boolean;
         enableAutomodel?: boolean;
@@ -262,6 +265,7 @@ export default function AdminSettingsPage() {
         agentModels?: AgentModelsConfig;
       }) => {
         setSessionArchiveDays(data.sessionArchiveDays);
+        setTempDirProjectRetentionHours(data.tempDirProjectRetentionHours);
         if (data.showHiddenFiles !== undefined) {
           setShowHiddenFiles(data.showHiddenFiles);
         }
@@ -475,6 +479,21 @@ export default function AdminSettingsPage() {
     }
   }, []);
 
+  const saveTempDirProjectRetentionHours = useCallback(async (hours: number) => {
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tempDirProjectRetentionHours: hours }),
+      });
+      if (!res.ok) {
+        alert("Failed to save temporary project retention hours");
+      }
+    } catch (err) {
+      console.error("Failed to save temporary project retention hours:", err);
+    }
+  }, []);
+
   const handleToggleShowHiddenFiles = useCallback(async (checked: boolean) => {
     setShowHiddenFiles(checked);
     setSavingShowHiddenFiles(true);
@@ -633,6 +652,21 @@ export default function AdminSettingsPage() {
 
     return () => window.clearTimeout(timeout);
   }, [sessionArchiveDays, saveSessionArchiveDays]);
+
+  useEffect(() => {
+    if (tempDirProjectRetentionHours === "" || tempDirProjectRetentionHours < 1) return;
+
+    if (!tempDirProjectRetentionHoursAutoSaveReady.current) {
+      tempDirProjectRetentionHoursAutoSaveReady.current = true;
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      saveTempDirProjectRetentionHours(tempDirProjectRetentionHours);
+    }, 500);
+
+    return () => window.clearTimeout(timeout);
+  }, [tempDirProjectRetentionHours, saveTempDirProjectRetentionHours]);
 
   useEffect(() => {
     fetch("/api/auth/verify")
@@ -878,6 +912,35 @@ export default function AdminSettingsPage() {
                   value={sessionArchiveDays}
                   onChange={(e) =>
                     setSessionArchiveDays(e.target.value === "" ? "" : Number(e.target.value))
+                  }
+                  style={{
+                    width: 100,
+                    padding: "7px 10px",
+                    fontSize: 13,
+                    backgroundColor: "var(--bg-elevated)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius-sm)",
+                    color: "var(--text-primary)",
+                    outline: "none",
+                  }}
+                />
+              </div>
+              <p
+                style={{
+                  fontSize: 12,
+                  color: "var(--text-muted)",
+                  marginBottom: 12,
+                }}
+              >
+                Number of hours temporary sessions and projects are retained before cleanup.
+              </p>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                <input
+                  type="number"
+                  min={1}
+                  value={tempDirProjectRetentionHours}
+                  onChange={(e) =>
+                    setTempDirProjectRetentionHours(e.target.value === "" ? "" : Number(e.target.value))
                   }
                   style={{
                     width: 100,

@@ -13,6 +13,9 @@ const ARONDO_CONFIG_FILE = path.join(CONFIG_DIR, "arondo.json");
 const DEFAULT_SESSION_ARCHIVE_DAYS = 7;
 const SESSION_ARCHIVE_DAYS_DEFAULT =
   Number(process.env.ARONDO_SESSION_ARCHIVE_DAYS_DEFAULT) || DEFAULT_SESSION_ARCHIVE_DAYS;
+const DEFAULT_TEMP_DIR_PROJECT_RETENTION_HOURS = 72;
+const TEMP_DIR_PROJECT_RETENTION_HOURS_DEFAULT =
+  Number(process.env.ARONDO_TEMP_DIR_PROJECT_RETENTION_HOURS_DEFAULT) || DEFAULT_TEMP_DIR_PROJECT_RETENTION_HOURS;
 
 const FILE_SHOW_HIDDEN_DEFAULT = process.env.ARONDO_FILE_SHOW_HIDDEN_DEFAULT !== "false";
 
@@ -38,6 +41,7 @@ export {
 
 export interface AppSettings {
   sessionArchiveDays?: number;
+  tempDirProjectRetentionHours?: number;
   showHiddenFiles?: boolean;
   showTempDirSessions?: boolean;
   enableAutomodel?: boolean;
@@ -872,6 +876,11 @@ export async function updateAppSettings(patch: Partial<AppSettings>): Promise<Ap
 export async function getSessionArchiveDays(): Promise<number> {
   const settings = await getAppSettings();
   return settings.sessionArchiveDays || SESSION_ARCHIVE_DAYS_DEFAULT;
+}
+
+export async function getTempDirProjectRetentionHours(): Promise<number> {
+  const settings = await getAppSettings();
+  return settings.tempDirProjectRetentionHours || TEMP_DIR_PROJECT_RETENTION_HOURS_DEFAULT;
 }
 
 export async function getShowHiddenFiles(): Promise<boolean> {

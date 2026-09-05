@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProjects, deleteProject, isTempDirProject, getShowTempDirSessions } from "@/lib/store";
+import { getProjects, deleteProject, getTempDirProjectRetentionHours, isTempDirProject, getShowTempDirSessions } from "@/lib/store";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken } from "@/lib/auth";
-
-const TEMP_DIR_PROJECT_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
 
 export async function GET(request: NextRequest) {
   const token = getArondoToken(request);
@@ -15,6 +13,8 @@ export async function GET(request: NextRequest) {
   const knownRunners = await runnerManager.getAllKnownRunners();
   const runnerIds = new Set(knownRunners.map((r) => r.id));
   const showTempDirSessions = await getShowTempDirSessions();
+  const tempDirProjectRetentionHours = await getTempDirProjectRetentionHours();
+  const tempDirProjectMaxAgeMs = tempDirProjectRetentionHours * 60 * 60 * 1000;
 
   const valid: typeof projects = [];
   for (const project of projects) {
@@ -31,8 +31,8 @@ export async function GET(request: NextRequest) {
 
     if (isTempDirProject(project)) {
       const age = Date.now() - new Date(project.createdAt).getTime();
-      if (age > TEMP_DIR_PROJECT_MAX_AGE_MS) {
-        console.log(`[projects] temp dir project ${project.id} older than 3 days, deleting`);
+      if (age > tempDirProjectMaxAgeMs) {
+        console.log(`[projects] temp dir project ${project.id} older than ${tempDirProjectRetentionHours} hours, deleting`);
         await deleteProject(project.id);
         continue;
       }

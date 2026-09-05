@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getArondoToken, getRoleByToken, isValidToken } from "@/lib/auth";
-import { updateAppSettings, getAppSettings, getSessionArchiveDays, getShowHiddenFiles, getShowTempDirSessions, getEnableAutomodel, getAgentModelsConfig, type AgentModelsConfig } from "@/lib/store";
+import { updateAppSettings, getAppSettings, getSessionArchiveDays, getTempDirProjectRetentionHours, getShowHiddenFiles, getShowTempDirSessions, getEnableAutomodel, getAgentModelsConfig, type AgentModelsConfig } from "@/lib/store";
 import { getLlmApiKeyEnvStatus, type LlmApiKeyName } from "@/lib/automodel/config";
 import fs from "fs/promises";
 import path from "path";
@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
   }
 
   const sessionArchiveDays = await getSessionArchiveDays();
+  const tempDirProjectRetentionHours = await getTempDirProjectRetentionHours();
   const showHiddenFiles = await getShowHiddenFiles();
   const showTempDirSessions = await getShowTempDirSessions();
   const enableAutomodel = await getEnableAutomodel();
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
     console.error("Failed to read package.json version:", err);
   }
 
-  return NextResponse.json({ sessionArchiveDays, showHiddenFiles, showTempDirSessions, enableAutomodel, version, llmApiKeys, agentModels });
+  return NextResponse.json({ sessionArchiveDays, tempDirProjectRetentionHours, showHiddenFiles, showTempDirSessions, enableAutomodel, version, llmApiKeys, agentModels });
 }
 
 export async function POST(request: NextRequest) {
@@ -56,10 +57,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Admin role required" }, { status: 403 });
   }
 
-  const { sessionArchiveDays, showHiddenFiles, showTempDirSessions, enableAutomodel, llmApiKeys, agentModels } = await request.json();
+  const { sessionArchiveDays, tempDirProjectRetentionHours, showHiddenFiles, showTempDirSessions, enableAutomodel, llmApiKeys, agentModels } = await request.json();
   if (sessionArchiveDays !== undefined) {
     if (typeof sessionArchiveDays !== "number" || !Number.isFinite(sessionArchiveDays) || sessionArchiveDays < 1) {
       return NextResponse.json({ error: "sessionArchiveDays must be a positive number" }, { status: 400 });
+    }
+  }
+  if (tempDirProjectRetentionHours !== undefined) {
+    if (typeof tempDirProjectRetentionHours !== "number" || !Number.isFinite(tempDirProjectRetentionHours) || tempDirProjectRetentionHours < 1) {
+      return NextResponse.json({ error: "tempDirProjectRetentionHours must be a positive number" }, { status: 400 });
     }
   }
   if (showHiddenFiles !== undefined && typeof showHiddenFiles !== "boolean") {
@@ -116,6 +122,7 @@ export async function POST(request: NextRequest) {
 
   const patch: {
     sessionArchiveDays?: number;
+    tempDirProjectRetentionHours?: number;
     showHiddenFiles?: boolean;
     showTempDirSessions?: boolean;
     enableAutomodel?: boolean;
@@ -123,6 +130,7 @@ export async function POST(request: NextRequest) {
     agentModels?: AgentModelsConfig;
   } = {};
   if (sessionArchiveDays !== undefined) patch.sessionArchiveDays = sessionArchiveDays;
+  if (tempDirProjectRetentionHours !== undefined) patch.tempDirProjectRetentionHours = tempDirProjectRetentionHours;
   if (showHiddenFiles !== undefined) patch.showHiddenFiles = showHiddenFiles;
   if (showTempDirSessions !== undefined) patch.showTempDirSessions = showTempDirSessions;
   if (enableAutomodel !== undefined) patch.enableAutomodel = enableAutomodel;
