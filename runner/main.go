@@ -28,9 +28,17 @@ func main() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
-	go client.Run()
+	runDone := make(chan struct{})
+	go func() {
+		client.Run()
+		close(runDone)
+	}()
 
-	sig := <-sigCh
-	log.Printf("received signal %v, shutting down", sig)
-	client.Stop()
+	select {
+	case sig := <-sigCh:
+		log.Printf("received signal %v, shutting down", sig)
+		client.Stop()
+	case <-runDone:
+		log.Println("runner stopped")
+	}
 }

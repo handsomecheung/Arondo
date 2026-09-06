@@ -28,8 +28,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, allowedUserTokenUuids, syncGlobalRules } = body;
-    if (!id || (allowedUserTokenUuids === undefined && syncGlobalRules === undefined)) {
+    const { id, allowedUserTokenUuids, syncGlobalRules, disconnect } = body;
+    if (!id || (allowedUserTokenUuids === undefined && syncGlobalRules === undefined && disconnect !== true)) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
@@ -39,6 +39,9 @@ export async function POST(request: NextRequest) {
     }
 
     let success = true;
+    if (disconnect === true) {
+      await runnerManager.shutdownRunner(id);
+    }
     if (Array.isArray(allowedUserTokenUuids)) {
       success = (await runnerManager.updateRunnerAllowedUserTokenUuids(id, allowedUserTokenUuids)) && success;
     }

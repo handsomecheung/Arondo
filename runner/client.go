@@ -34,6 +34,7 @@ type Client struct {
 	handler   *Handler
 	sendMu    sync.Mutex
 	done      chan struct{}
+	stopOnce  sync.Once
 }
 
 func NewClient(serverURL, token string) *Client {
@@ -76,7 +77,9 @@ func (c *Client) Run() {
 }
 
 func (c *Client) Stop() {
-	close(c.done)
+	c.stopOnce.Do(func() {
+		close(c.done)
+	})
 	if c.conn != nil {
 		c.conn.Close()
 	}

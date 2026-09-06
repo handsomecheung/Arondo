@@ -715,6 +715,10 @@ class RunnerManager {
     ctrl.ws.send(JSON.stringify(msg));
   }
 
+  async shutdownRunner(runnerId: string): Promise<void> {
+    await this.sendRequest(runnerId, "runner.shutdown", {}, 10_000);
+  }
+
   // ─── Task management ─────────────────────────────────────────────────
 
   async registerTask(ctx: TaskContext): Promise<void> {

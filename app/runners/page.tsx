@@ -301,12 +301,16 @@ export default function RunnersPage() {
   const [userRole, setUserRole] = useState<"admin" | "user" | null>(null);
   const [agentsQuota, setAgentsQuota] = useState<AgentsQuota | null>(null);
   const [refreshingQuota, setRefreshingQuota] = useState<Record<string, boolean>>({});
+  const [disconnectingRunnerId, setDisconnectingRunnerId] = useState<string | null>(null);
   const [lastQuotaRefreshAt, setLastQuotaRefreshAt] = useState<Record<string, number>>({});
   const [quotaRefreshNotice, setQuotaRefreshNotice] = useState<Record<string, string>>({});
   const [showTempDirSessions, setShowTempDirSessions] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     message: string;
     onConfirm: () => void;
+    title?: string;
+    confirmLabel?: string;
+    danger?: boolean;
   } | null>(null);
   const quotaScoreColors = getQuotaScoreColors(agentsQuota);
 
@@ -387,6 +391,28 @@ export default function RunnersPage() {
     },
     [loadRunners, selectedRunnerId],
   );
+
+  const handleDisconnectRunner = useCallback(async (id: string) => {
+    setDisconnectingRunnerId(id);
+    try {
+      const res = await fetch("/api/runners", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, disconnect: true }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to disconnect runner");
+      }
+      loadRunners();
+      if (selectedRunnerId === id) setSelectedRunnerId(null);
+    } catch (err) {
+      console.error("Failed to disconnect runner:", err);
+      alert(err instanceof Error ? err.message : "Failed to disconnect runner");
+    } finally {
+      setDisconnectingRunnerId(null);
+    }
+  }, [loadRunners, selectedRunnerId]);
 
   const refreshQuota = useCallback(async (runnerId: string, agent: "claude" | "agy" | "codex") => {
     const key = `${runnerId}:${agent}`;
@@ -675,6 +701,46 @@ export default function RunnersPage() {
                                 }}
                               >
                                 Delete
+                              </button>
+                            )}
+                            {r.connected && userRole === "admin" && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setConfirmDialog({
+                                    title: "Disconnect Runner",
+                                    message: `Disconnect runner "${r.name}"? Its active tasks will be stopped.`,
+                                    confirmLabel: "Disconnect",
+                                    danger: true,
+                                    onConfirm: async () => {
+                                      setConfirmDialog(null);
+                                      await handleDisconnectRunner(r.id);
+                                    },
+                                  });
+                                }}
+                                disabled={disconnectingRunnerId === r.id}
+                                style={{
+                                  padding: "2px 6px",
+                                  fontSize: 11,
+                                  fontWeight: 500,
+                                  color: "var(--error, #e74c3c)",
+                                  background: "transparent",
+                                  border: "1px solid var(--border)",
+                                  borderRadius: "var(--radius-sm)",
+                                  cursor: disconnectingRunnerId === r.id ? "wait" : "pointer",
+                                  opacity: disconnectingRunnerId === r.id ? 0.5 : 1,
+                                  transition: "all 0.2s ease",
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = "rgba(231, 76, 60, 0.1)";
+                                  e.currentTarget.style.borderColor = "var(--error, #e74c3c)";
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = "transparent";
+                                  e.currentTarget.style.borderColor = "var(--border)";
+                                }}
+                              >
+                                {disconnectingRunnerId === r.id ? "Disconnecting…" : "Disconnect"}
                               </button>
                             )}
                           </div>

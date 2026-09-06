@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"time"
 )
 
 type Handler struct {
@@ -70,9 +71,19 @@ func (h *Handler) handleRequest(msg *Message) {
 		h.handleInfoFetch(msg)
 	case "opencode.sessionList":
 		h.handleOpencodeSessionList(msg)
+	case "runner.shutdown":
+		h.handleRunnerShutdown(msg)
 	default:
 		h.sendError(msg.ID, "NOT_FOUND", "unknown method: "+msg.Method)
 	}
+}
+
+func (h *Handler) handleRunnerShutdown(msg *Message) {
+	h.sendResponse(msg.ID, OkResponse{OK: true})
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		h.client.Stop()
+	}()
 }
 
 func (h *Handler) handleEvent(msg *Message) {
