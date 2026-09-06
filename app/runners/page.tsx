@@ -241,7 +241,9 @@ function QuotaCard({
                         height: "100%",
                         width: `${pct}%`,
                         borderRadius: 2,
-                        background: row.scoreColor ?? "var(--text-muted)",
+                        background: row.resetsAt == null
+                          ? "var(--text-muted)"
+                          : row.scoreColor ?? "var(--text-muted)",
                         transition: "width 0.3s ease",
                       }}
                     />
