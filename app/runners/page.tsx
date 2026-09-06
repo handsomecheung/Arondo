@@ -64,7 +64,7 @@ interface Runner {
   connected: boolean;
   version?: string;
   capabilities?: string[];
-  agentBinaries?: string[];
+  agents?: string[];
   lastSeenAt?: number;
   connectedAt?: number;
   allowedUserTokenUuids?: string[];
@@ -606,7 +606,7 @@ export default function RunnersPage() {
                     { label: "Codex", cmd: "codex", comingSoon: false },
                     { label: "OpenCode", cmd: "opencode", comingSoon: false },
                   ];
-                  const hasAgentInfo = Array.isArray(r.agentBinaries);
+                  const hasAgentInfo = Array.isArray(r.agents);
                   const isSelected = selectedRunnerId === r.id;
                   const rProjects = projects.filter(
                     (p) => p.runnerId === r.id && (showTempDirSessions || !p.tempDir),
@@ -771,7 +771,7 @@ export default function RunnersPage() {
                           >
                             {agentDefs.map(({ label, cmd, comingSoon }) => {
                               const installed =
-                                !comingSoon && r.agentBinaries!.includes(cmd);
+                                !comingSoon && r.agents!.includes(cmd);
                               const tooltipText = comingSoon
                                 ? `${label}: Under Development`
                                 : installed

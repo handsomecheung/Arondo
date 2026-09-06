@@ -52,7 +52,7 @@ function drainInitialFetchQueue(): void {
 
   queuedInitialFetches.delete(initialFetchKey(request));
   const runner = runnerManager.getRunner(request.runnerId);
-  if (runner && runner.info.connected && runner.info.agentBinaries.includes(request.agent)) {
+  if (runner && runner.info.connected && runner.info.agents.includes(request.agent)) {
     runnerManager.sendFire(request.runnerId, "info.fetch", { agent: request.agent });
     console.log(`[quota-aggregator] initial ${request.agent} quota request sent to runner ${request.runnerId}`);
   }
@@ -67,9 +67,9 @@ function queueInitialFetches(): void {
     .filter((runner) => runner.connected)
     .map((runner) => ({
       runnerId: runner.id,
-      agents: runner.agentBinaries.filter((agent) => {
+      agents: runner.agents.filter((agent) => {
         const type = BINARY_TO_TYPE[agent];
-        return type && !runner.agents.some((entry) => entry.Type === type);
+        return type && !runner.quotaAgents.some((entry) => entry.Type === type);
       }),
     }));
 
@@ -93,6 +93,10 @@ function queueInitialFetches(): void {
   }
 }
 
+export function requestInitialQuotaFetches(): void {
+  queueInitialFetches();
+}
+
 // Only entries that an online runner explicitly references can be refreshed.
 // A single randomly selected referencing runner performs the request.
 async function requestStaleRefreshes(): Promise<void> {
@@ -105,7 +109,7 @@ async function requestStaleRefreshes(): Promise<void> {
     const binary = TYPE_TO_BINARY[entry.Type];
     if (!binary) continue;
     const references = onlineRunners.filter(
-      (runner) => runner.agents.some(
+      (runner) => runner.quotaAgents.some(
         (agent) => makeKey(agent.Type, agent.Account, agent.Plan) === key,
       ),
     );

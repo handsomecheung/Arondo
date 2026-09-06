@@ -24,10 +24,10 @@ export async function GET(req: NextRequest) {
       fs.readFile(runnerPath, "utf-8"),
       fs.readFile(quotaPath, "utf-8"),
     ]);
-    const runner = JSON.parse(runnerRaw) as { agents?: Array<{ Type: string; Account: string; Plan: string }> };
+    const runner = JSON.parse(runnerRaw) as { quotaAgents?: Array<{ Type: string; Account: string; Plan: string }> };
     const quotas = JSON.parse(quotaRaw) as Record<string, unknown>;
     const result: Record<string, unknown> = { claude: null, antigravity: null, codex: null };
-    for (const agent of runner.agents ?? []) {
+    for (const agent of runner.quotaAgents ?? []) {
       if (!(agent.Type in result)) continue;
       result[agent.Type] = quotas[`${agent.Type}_${agent.Account}_${agent.Plan}`] ?? null;
     }

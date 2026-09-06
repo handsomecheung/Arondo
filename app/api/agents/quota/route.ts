@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     if (!runner.connected) {
       return NextResponse.json({ error: "Runner is disconnected" }, { status: 409 });
     }
-    if (!runner.agentBinaries.includes(agentBinary)) {
+    if (!runner.agents.includes(agentBinary)) {
       return NextResponse.json({ error: "Agent is not installed on this runner" }, { status: 400 });
     }
 
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
     if (!runner.connected) {
       continue;
     }
-    for (const binary of runner.agentBinaries) {
+    for (const binary of runner.agents) {
       const agent = QUOTA_AGENTS[binary];
       if (!agent) continue;
       if (requestQuotaRefresh(runner.id, binary)) {

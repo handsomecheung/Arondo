@@ -49,11 +49,8 @@ export interface RunnerInfo {
   arch: string;
   version: string;
   capabilities: string[];
-  // Agents installed on the runner, as reported by the Runner protocol.
-  agentBinaries: string[];
-  // Quota identities intentionally contain no quota measurements. The
-  // authoritative measurements live in autoagent/agent/quota.json.
-  agents: RunnerAgentQuotaRef[];
+  agents: string[];
+  quotaAgents: RunnerAgentQuotaRef[];
   connected: boolean;
   lastSeenAt?: number;
   connectedAt?: number;
@@ -132,9 +129,8 @@ class RunnerManager {
 
   private async persistRunner(info: RunnerInfo): Promise<void> {
     const filePath = this.runnerFilePath(info.id);
-    const { agentBinaries: _agentBinaries, ...persistedInfo } = info;
     await fs.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.writeFile(filePath, JSON.stringify(persistedInfo, null, 2), "utf-8");
+    await fs.writeFile(filePath, JSON.stringify(info, null, 2), "utf-8");
   }
 
   async restoreRunners(): Promise<void> {
@@ -368,10 +364,10 @@ class RunnerManager {
       }
     }
 
-    let agents: RunnerAgentQuotaRef[] = [];
+    let quotaAgents: RunnerAgentQuotaRef[] = [];
     try {
-      const saved = JSON.parse(await fs.readFile(this.runnerFilePath(id), "utf-8")) as Pick<RunnerInfo, "agents">;
-      agents = Array.isArray(saved.agents) ? saved.agents : [];
+      const saved = JSON.parse(await fs.readFile(this.runnerFilePath(id), "utf-8")) as Pick<RunnerInfo, "quotaAgents">;
+      quotaAgents = Array.isArray(saved.quotaAgents) ? saved.quotaAgents : [];
     } catch {
       // A new runner has no quota references until its first quota update.
     }
@@ -386,8 +382,8 @@ class RunnerManager {
       arch: registerPayload.arch || "",
       version: registerPayload.version || "",
       capabilities: registerPayload.capabilities || [],
-      agentBinaries: registerPayload.agents || [],
-      agents,
+      agents: registerPayload.agents || [],
+      quotaAgents,
       connected: true,
       lastSeenAt: Date.now(),
       connectedAt: Date.now(),
@@ -1034,8 +1030,11 @@ class RunnerManager {
   private onAgentStatus(runnerId: string, payload: { agents: string[] }): void {
     const conn = this.runners.get(runnerId);
     if (!conn || !Array.isArray(payload?.agents)) return;
-    conn.info.agentBinaries = payload.agents;
+    conn.info.agents = payload.agents;
     this.persistRunner(conn.info).catch(() => {});
+    import("./quota-aggregator").then(({ requestInitialQuotaFetches }) =>
+      requestInitialQuotaFetches(),
+    );
     console.log(
       `[runner-manager] runner ${runnerId} agents updated: [${payload.agents.join(", ")}]`,
     );
@@ -1066,8 +1065,8 @@ class RunnerManager {
 
     const conn = this.runners.get(runnerId);
     if (conn) {
-      conn.info.agents = [
-        ...conn.info.agents.filter((entry) => entry.Type !== type),
+      conn.info.quotaAgents = [
+        ...conn.info.quotaAgents.filter((entry) => entry.Type !== type),
         { Type: type, Account: account, Plan: plan },
       ];
       await this.persistRunner(conn.info);

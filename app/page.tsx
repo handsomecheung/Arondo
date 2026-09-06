@@ -247,7 +247,7 @@ export default function HomePage() {
   );
 
   const selectedRunner = runners.find((r) => r.id === runnerId) ?? null;
-  const runnerAgents = selectedRunner?.agentBinaries;
+  const runnerAgents = selectedRunner?.agents;
   const isAgentAvailable = (agentCmd: string): boolean => {
     if (!runnerAgents) return true;
     return runnerAgents.includes(agentCmd);

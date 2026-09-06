@@ -77,7 +77,7 @@ export async function POST(
 
   const runnerConn = runnerManager.getRunner(runnerId);
   const systemMessageId = crypto.randomUUID();
-  const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agentBinaries ?? [], {
+  const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? [], {
     prompt,
     automodelLog: (text) => appendAutomodelLog(id, systemMessageId, text),
   });
