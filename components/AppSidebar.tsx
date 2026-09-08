@@ -234,16 +234,10 @@ export default function AppSidebar({
             const sessionProjectIds = new Set(runnerFilteredSessions.map((s) => s.projectId).filter(Boolean) as string[]);
 
             const knownProjectsMap = new Map<string, { id: string; name: string }>();
-            projects.forEach((p) => {
-              if (!selectedRunnerFilter || p.runnerId === selectedRunnerFilter || sessionProjectIds.has(p.id)) {
-                const name = p.repoPath.split("/").pop() || p.repoPath;
-                knownProjectsMap.set(p.id, { id: p.id, name });
-              }
-            });
             sessionProjectIds.forEach((pId) => {
-              if (!knownProjectsMap.has(pId)) {
-                knownProjectsMap.set(pId, { id: pId, name: pId });
-              }
+              const p = projects.find((proj) => proj.id === pId);
+              const name = p ? p.repoPath.split("/").pop() || p.repoPath : pId;
+              knownProjectsMap.set(pId, { id: pId, name });
             });
             const availableProjects = Array.from(knownProjectsMap.values());
 
