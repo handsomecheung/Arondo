@@ -609,7 +609,13 @@ export default function HomePage() {
         const updated: Session = await res.json();
         setArchivedSessions((prev) => prev.filter((s) => s.id !== id));
         setSessions((prev) => [...prev.filter((s) => s.id !== id), updated]);
-        setArchivedView(false);
+        if (selectedSessionId === id) {
+          setSelectedSessionId(null);
+          setMessages([]);
+          setSessionLog("");
+          setActiveLogMsgId(null);
+          setLogModalOpen(false);
+        }
         checkArchivedSessions();
       } else {
         const data = await res.json();
