@@ -478,17 +478,20 @@ export async function createSession(
 
 export async function updateSession(
   id: string,
-  patch: Partial<Omit<Session, "id" | "createdAt">>
+  patch: Partial<Omit<Session, "id" | "createdAt">>,
+  opts?: { touchUpdatedAt?: boolean }
 ): Promise<Session | undefined> {
   const filePath = getSessionFilePath(id);
   return withFileLock(filePath, async () => {
     const session = await readJson<Session | null>(filePath, null);
     if (!session) return undefined;
 
+    const touchUpdatedAt = opts?.touchUpdatedAt ?? true;
+    const updatedAt = touchUpdatedAt ? new Date().toISOString() : session.updatedAt;
     const updated: Session = {
       ...session,
       ...patch,
-      updatedAt: new Date().toISOString(),
+      updatedAt,
     };
     if (patch.status === "done" || patch.status === "error") {
       updated.completedAt = updated.updatedAt;
@@ -776,13 +779,17 @@ export async function archiveSession(id: string, manual = false): Promise<void> 
   const sessionDir = getSessionDir(id);
   await ensureDir(ARCHIVED_SESSIONS_DIR);
   await fs.rename(sessionDir, path.join(ARCHIVED_SESSIONS_DIR, id));
-  await updateSession(id, { pinnedAt: undefined, ...(manual ? { archivedManually: true } : {}) });
+  await updateSession(
+    id,
+    { pinnedAt: undefined, ...(manual ? { archivedManually: true } : {}) },
+    { touchUpdatedAt: false }
+  );
 }
 
 export async function unarchiveSession(id: string): Promise<void> {
   await ensureDir(SESSIONS_DIR);
   await fs.rename(path.join(ARCHIVED_SESSIONS_DIR, id), path.join(SESSIONS_DIR, id));
-  await updateSession(id, { archivedManually: false });
+  await updateSession(id, { archivedManually: false }, { touchUpdatedAt: false });
 }
 
 export async function deleteProject(id: string): Promise<void> {

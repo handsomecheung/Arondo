@@ -70,6 +70,7 @@ export async function PATCH(
 
   try {
     const patch: Record<string, any> = {};
+    let touchUpdatedAt = true;
     if (name !== undefined) patch.name = name;
     if (agentType !== undefined) {
       patch.agentType = agentType;
@@ -78,8 +79,13 @@ export async function PATCH(
       patch.autoLockedAgentEffort = undefined;
       patch.autoLockedAgyQuotaGroup = undefined;
     }
-    if (pinned !== undefined) patch.pinnedAt = pinned ? new Date().toISOString() : undefined;
-    const updated = await updateSession(id, patch);
+    if (pinned !== undefined) {
+      patch.pinnedAt = pinned ? new Date().toISOString() : undefined;
+      if (name === undefined && agentType === undefined) {
+        touchUpdatedAt = false;
+      }
+    }
+    const updated = await updateSession(id, patch, { touchUpdatedAt });
     eventBus.publish({ type: "session_updated", payload: updated });
     return NextResponse.json(updated);
   } catch (error: any) {

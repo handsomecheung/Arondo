@@ -133,4 +133,78 @@ test.describe('Sessions API integration tests', () => {
     const foundAfter = sessionsAfter.find((s: any) => s.id === sessionId);
     expect(foundAfter).toBeUndefined();
   });
+
+  test('should not change session updatedAt when pinning, unpinning, archiving, or unarchiving', async ({ request }) => {
+    // 1. Create a session
+    const createRes = await request.post('/api/sessions', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        prompt: '',
+        repoPath: '/tmp/test-repo',
+        runnerId: runnerId,
+        name: 'Timestamp Test Session'
+      }
+    });
+    expect(createRes.status()).toBe(201);
+    const session = await createRes.json();
+    const originalUpdatedAt = session.updatedAt;
+    const sessionId = session.id;
+
+    // Small delay to ensure that if updatedAt were updated, the timestamp would differ
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // 2. Pin session -> updatedAt must NOT change
+    const pinRes = await request.patch(`/api/sessions/${sessionId}`, {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: { pinned: true }
+    });
+    expect(pinRes.status()).toBe(200);
+    const pinnedSession = await pinRes.json();
+    expect(pinnedSession.pinnedAt).toBeDefined();
+    expect(pinnedSession.updatedAt).toBe(originalUpdatedAt);
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // 3. Unpin session -> updatedAt must NOT change
+    const unpinRes = await request.patch(`/api/sessions/${sessionId}`, {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: { pinned: false }
+    });
+    expect(unpinRes.status()).toBe(200);
+    const unpinnedSession = await unpinRes.json();
+    expect(unpinnedSession.pinnedAt).toBeUndefined();
+    expect(unpinnedSession.updatedAt).toBe(originalUpdatedAt);
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // 4. Archive session -> updatedAt must NOT change
+    const archiveRes = await request.post(`/api/sessions/${sessionId}/archive`, {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+    expect(archiveRes.status()).toBe(200);
+
+    const getArchivedRes = await request.get('/api/sessions/archived', {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+    expect(getArchivedRes.status()).toBe(200);
+    const archivedSessions = await getArchivedRes.json();
+    const archived = archivedSessions.find((s: any) => s.id === sessionId);
+    expect(archived).toBeDefined();
+    expect(archived.updatedAt).toBe(originalUpdatedAt);
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // 5. Unarchive session -> updatedAt must NOT change
+    const unarchiveRes = await request.post(`/api/sessions/${sessionId}/unarchive`, {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+    expect(unarchiveRes.status()).toBe(200);
+    const unarchived = await unarchiveRes.json();
+    expect(unarchived.updatedAt).toBe(originalUpdatedAt);
+
+    // Cleanup
+    await request.delete(`/api/sessions/${sessionId}`, {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+  });
 });
