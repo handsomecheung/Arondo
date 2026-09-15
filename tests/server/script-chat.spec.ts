@@ -6,6 +6,123 @@ import { execFileSync } from 'child_process';
 import { setupRunner, teardownRunner, waitForSessionNotRunning } from './resume/resume.helper';
 
 test.describe('Chat while session scripts are running', () => {
+  test('sends a normal message without confirmation when a manual todo is pending', async ({ request }) => {
+    const mockBinDir = path.resolve(__dirname, '../mocks/bin/claude');
+    const mockLogDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arondo-manual-todo-logs-'));
+    const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arondo-manual-todo-repo-'));
+    execFileSync('git', ['init'], { cwd: repoDir });
+
+    const { runnerProcess, runnerId } = await setupRunner(request, 'manual-todo-runner', mockBinDir, {
+      CLAUDE_DIR_LOG: mockLogDir,
+    });
+
+    let sessionId = '';
+    try {
+      const createRes = await request.post('/api/sessions', {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+        data: {
+          prompt: '',
+          repoPath: repoDir,
+          runnerId,
+          agentType: 'claude',
+        },
+      });
+      expect(createRes.status()).toBe(201);
+      sessionId = (await createRes.json()).id;
+
+      const todoRes = await request.post(`/api/sessions/${sessionId}/todo-messages`, {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+        data: {
+          message: 'Send this manually later',
+          trigger: { kind: 'manual' },
+        },
+      });
+      expect(todoRes.status()).toBe(201);
+
+      const messageRes = await request.post(`/api/sessions/${sessionId}/messages`, {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+        data: {
+          message: 'Send this normal message now',
+        },
+      });
+      const messageBody = await messageRes.json();
+
+      expect(messageRes.status()).toBe(200);
+      expect(messageBody.needsConfirmation).toBeUndefined();
+      expect(messageBody.success).toBe(true);
+    } finally {
+      if (sessionId) {
+        await request.delete(`/api/sessions/${sessionId}`, {
+          headers: { 'x-arondo-token': 'test-token-123456' },
+        });
+      }
+      await teardownRunner(runnerProcess);
+      await fs.rm(mockLogDir, { recursive: true, force: true });
+      await fs.rm(repoDir, { recursive: true, force: true });
+    }
+  });
+
+  for (const todo of [
+    { name: 'scheduled', trigger: { kind: 'at', timestamp: Date.now() + 60 * 60 * 1000 } },
+    { name: 'codebase-ready', trigger: { kind: 'codebaseReady' } },
+  ]) {
+    test(`sends a normal message without confirmation when a ${todo.name} todo is pending`, async ({ request }) => {
+      const mockBinDir = path.resolve(__dirname, '../mocks/bin/claude');
+      const mockLogDir = await fs.mkdtemp(path.join(os.tmpdir(), `arondo-${todo.name}-todo-logs-`));
+      const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), `arondo-${todo.name}-todo-repo-`));
+      execFileSync('git', ['init'], { cwd: repoDir });
+
+      const { runnerProcess, runnerId } = await setupRunner(request, `${todo.name}-todo-runner`, mockBinDir, {
+        CLAUDE_DIR_LOG: mockLogDir,
+      });
+
+      let sessionId = '';
+      try {
+        const createRes = await request.post('/api/sessions', {
+          headers: { 'x-arondo-token': 'test-token-123456' },
+          data: {
+            prompt: '',
+            repoPath: repoDir,
+            runnerId,
+            agentType: 'claude',
+          },
+        });
+        expect(createRes.status()).toBe(201);
+        sessionId = (await createRes.json()).id;
+
+        const todoRes = await request.post(`/api/sessions/${sessionId}/todo-messages`, {
+          headers: { 'x-arondo-token': 'test-token-123456' },
+          data: {
+            message: `Send this ${todo.name} message later`,
+            trigger: todo.trigger,
+          },
+        });
+        expect(todoRes.status()).toBe(201);
+
+        const messageRes = await request.post(`/api/sessions/${sessionId}/messages`, {
+          headers: { 'x-arondo-token': 'test-token-123456' },
+          data: {
+            message: 'Send this normal message now',
+          },
+        });
+        const messageBody = await messageRes.json();
+
+        expect(messageRes.status()).toBe(200);
+        expect(messageBody.needsConfirmation).toBeUndefined();
+        expect(messageBody.success).toBe(true);
+      } finally {
+        if (sessionId) {
+          await request.delete(`/api/sessions/${sessionId}`, {
+            headers: { 'x-arondo-token': 'test-token-123456' },
+          });
+        }
+        await teardownRunner(runnerProcess);
+        await fs.rm(mockLogDir, { recursive: true, force: true });
+        await fs.rm(repoDir, { recursive: true, force: true });
+      }
+    });
+  }
+
   test('sends a follow-up normally without a confirmation response', async ({ request }) => {
     const mockBinDir = path.resolve(__dirname, '../mocks/bin/claude');
     const mockLogDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arondo-claude-logs-'));

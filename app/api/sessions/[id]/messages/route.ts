@@ -65,11 +65,9 @@ export async function POST(
       } else {
         // Follow-up message: only this session's own agent run matters. Running
         // scripts are allowed to continue in the background while chat proceeds.
-        // A message can't jump ahead of todos already queued on this session.
         const busy = session.status === "running";
-        const queued = !!(session.pendingTodoMessageIds && session.pendingTodoMessageIds.length > 0);
-        if (busy || queued) {
-          return NextResponse.json({ needsConfirmation: true, reason: { dirty: false, busy, queued, isFollowup: true } }, { status: 409 });
+        if (busy) {
+          return NextResponse.json({ needsConfirmation: true, reason: { dirty: false, busy, isFollowup: true } }, { status: 409 });
         }
       }
     }
