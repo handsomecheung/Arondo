@@ -315,6 +315,8 @@ cli/arondo-cli send \
 建立不帶 `--temp-dir` 或 `--path` 的會話時，Script 使用其目前工作目錄作為仓库路徑。
 當省略 `--runner-id` 時，它會選擇目前主機名稱連接的 Runner；當沒有 Runner 或多個 Runner 共用該主機名稱時，使用 `--runner-id`。
 使用 `--resume` 將訊息傳送到所選運行程序和仓库路徑的最近更新的會話。它不能與 `--session-id` 或 `--temp-dir` 結合使用。
+配合 `--temp-dir` 使用 `--once` 可建立禁止後續訊息的一次性會話；針對該會話的後續 `--resume` 或 `--session-id` 請求將被拒絕。
+使用 `--cache on`（預設值：`off`，需要配合 `--once`）將一次性會話輸出按 Prompt 的 SHA-256 雜湊作為 Key 快取在 `${ARONDO_CONFIG_DIR}/cache/once/` 中；後續相符的調用將直接回傳快取結果而無需調用 Agent。
 使用 `--confirmation auto`、`--confirmation draft` 或 `--confirmation force` 來處理 Server 的 `needsConfirmation` 回應，對應 Web UI 的三個按鈕：自動排隊發送、儲存為手動草稿、或立即發送。
 當 Server 回傳 `needsConfirmation: true` 時，CLI 會列印一條提示，列出這些重試選項。
 最終 JSON 結果使用 `sessionId` 並包含 Agent 的標準輸出作為 `rawOutput`。

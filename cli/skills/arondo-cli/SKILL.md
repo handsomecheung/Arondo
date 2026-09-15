@@ -40,7 +40,7 @@ cli/arondo-cli send \
   "Implement the requested change and run the relevant validation."
 ```
 
-Choose `--agent` from `auto`, `antigravity`, `claude`, `codex`, or `opencode`. Prefer `auto` unless the user selects a specific agent. Use `--temp-dir` only for isolated, disposable work; it cannot be combined with `--resume`.
+Choose `--agent` from `auto`, `antigravity`, `claude`, `codex`, or `opencode`. Prefer `auto` unless the user selects a specific agent. Use `--temp-dir` only for isolated, disposable work; it cannot be combined with `--resume`. Pass `--once` with `--temp-dir` to create a single-use session that rejects follow-up messages. Add `--cache on` (default: `off`, requires `--once`) to return cached results from `${ARONDO_CONFIG_DIR}/cache/once/` for matching prompt hashes without invoking an agent.
 
 The command blocks until completion (defaults: 3-second polling and 600-second timeout). Set `--timeout` or `--poll-interval` only when the task requires different limits.
 
