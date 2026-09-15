@@ -118,6 +118,8 @@ export interface Session {
   autoLockedAgentEffort?: string;
   autoLockedAgyQuotaGroup?: "gemini" | "other";
   tokenUuid?: string;
+  // Set to true if the session only allows a single message (must be created with tempDir).
+  once?: boolean;
 }
 
 export type MessageType =

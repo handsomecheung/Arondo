@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dispatchDetachedAgent } from "@/lib/session-actions";
 import { getArondoToken, verifySessionPermission } from "@/lib/auth";
-import { isSessionArchived, type DetachedAgentKind } from "@/lib/store";
+import { isSessionArchived, getSession, type DetachedAgentKind } from "@/lib/store";
 
 export async function POST(
   req: NextRequest,
@@ -14,6 +14,14 @@ export async function POST(
   }
   if (isSessionArchived(id)) {
     return NextResponse.json({ error: "Session is archived. Unarchive it to run a separate agent." }, { status: 403 });
+  }
+
+  const session = await getSession(id);
+  if (!session) {
+    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+  }
+  if (session.once) {
+    return NextResponse.json({ error: "Session only allows a single message" }, { status: 400 });
   }
 
   const { kind, message = "", agentType } = await req.json() as {

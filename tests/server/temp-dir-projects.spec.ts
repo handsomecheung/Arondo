@@ -187,5 +187,70 @@ test.describe('Temp dir project task visibility', () => {
     expect(session2.repoPath).toBeDefined();
     expect(session2.repoPath).not.toBe(session1.repoPath);
   });
+
+  test('validates once option and rejects sending subsequent messages', async ({ request }) => {
+    // 1. Should reject once without tempDir
+    const invalidRes = await request.post('/api/sessions', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        prompt: '',
+        repoPath: '/tmp/test-repo',
+        runnerId,
+        once: true,
+      }
+    });
+    expect(invalidRes.status()).toBe(400);
+    const invalidJson = await invalidRes.json();
+    expect(invalidJson.error).toBe('once can only be used when tempDir is set');
+
+    // 2. Create session with tempDir and once
+    const createRes = await request.post('/api/sessions', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        prompt: '',
+        tempDir: true,
+        runnerId,
+        once: true,
+      }
+    });
+    expect(createRes.status()).toBe(201);
+    const session = await createRes.json();
+    expect(session.id).toBeDefined();
+    expect(session.once).toBe(true);
+
+    // 3. Reject follow-up message
+    const msgRes = await request.post(`/api/sessions/${session.id}/messages`, {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        message: 'Second message',
+      }
+    });
+    expect(msgRes.status()).toBe(400);
+    const msgJson = await msgRes.json();
+    expect(msgJson.error).toBe('Session only allows a single message');
+
+    // 4. Reject todo message
+    const todoRes = await request.post(`/api/sessions/${session.id}/todo-messages`, {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        message: 'Queued message',
+        trigger: { kind: 'manual' },
+      }
+    });
+    expect(todoRes.status()).toBe(400);
+    const todoJson = await todoRes.json();
+    expect(todoJson.error).toBe('Session only allows a single message');
+
+    // 5. Reject detached agent run
+    const detachedRes = await request.post(`/api/sessions/${session.id}/detached-agent-runs`, {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        kind: 'review',
+      }
+    });
+    expect(detachedRes.status()).toBe(400);
+    const detachedJson = await detachedRes.json();
+    expect(detachedJson.error).toBe('Session only allows a single message');
+  });
 });
 

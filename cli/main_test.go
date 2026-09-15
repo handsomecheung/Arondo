@@ -66,6 +66,31 @@ func TestParseArgsRejectsInvalidCombinations(t *testing.T) {
 	if err == nil || err.Error() != "--resume cannot be used with --temp-dir" {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
+	_, err = parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--session-id", "s1", "--temp-dir", "message"}, cliConfig{})
+	if err == nil || err.Error() != "--session-id cannot be used with --temp-dir" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	_, err = parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--once", "message"}, cliConfig{})
+	if err == nil || err.Error() != "--once can only be used with --temp-dir" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	_, err = parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--session-id", "s1", "--once", "message"}, cliConfig{})
+	if err == nil || err.Error() != "--once can only be used with --temp-dir" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseArgsOnce(t *testing.T) {
+	args, err := parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--temp-dir", "--once", "Do work"}, cliConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !args.tempDir || !args.once {
+		t.Fatalf("expected tempDir and once to be true, got tempDir=%v once=%v", args.tempDir, args.once)
+	}
 }
 
 func TestParseArgsRejectsNonFiniteDurations(t *testing.T) {
@@ -680,6 +705,71 @@ func TestGetMessagesFollowJSONOutput(t *testing.T) {
 
 	if err := getMessages(c, args); err != nil {
 		t.Fatalf("getMessages json error: %v", err)
+	}
+}
+
+func TestCreateSessionSendsOncePayload(t *testing.T) {
+	var capturedPayload map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/sessions" || r.Method != http.MethodPost {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		_ = json.NewDecoder(r.Body).Decode(&capturedPayload)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id":     "sess-once-1",
+			"status": "running",
+			"once":   true,
+		})
+	}))
+	defer server.Close()
+
+	c := &client{server: server.URL, token: "token", http: server.Client()}
+	args := arguments{
+		prompt:    "Test single shot prompt",
+		tempDir:   true,
+		once:      true,
+		agentType: "auto",
+	}
+
+	session, err := c.createSession(args, false)
+	if err != nil {
+		t.Fatalf("createSession failed: %v", err)
+	}
+	if session.ID != "sess-once-1" {
+		t.Fatalf("unexpected session ID: %s", session.ID)
+	}
+	if capturedPayload["once"] != true {
+		t.Fatalf("expected payload once=true, got %#v", capturedPayload["once"])
+	}
+	if capturedPayload["tempDir"] != true {
+		t.Fatalf("expected payload tempDir=true, got %#v", capturedPayload["tempDir"])
+	}
+}
+
+func TestSendMessageToOnceSessionReturnsError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/sessions/sess-once-1/messages" && r.Method == http.MethodPost {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"error": "Session only allows a single message",
+			})
+			return
+		}
+	}))
+	defer server.Close()
+
+	c := &client{server: server.URL, token: "token", http: server.Client()}
+	args := arguments{prompt: "second message"}
+	_, err := c.sendMessage("sess-once-1", args, false)
+	if err == nil {
+		t.Fatal("expected sendMessage to fail for single-use session")
+	}
+	var apiErr *apiError
+	if !errors.As(err, &apiErr) || apiErr.status != http.StatusBadRequest {
+		t.Fatalf("expected 400 apiError, got: %v", err)
+	}
+	if apiErr.body["error"] != "Session only allows a single message" {
+		t.Fatalf("unexpected error message: %#v", apiErr.body["error"])
 	}
 }
 

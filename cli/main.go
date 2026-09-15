@@ -36,6 +36,7 @@ Options:
   --runner-id <id>             Target runner ID (default: connected runner with the current hostname)
   --path <path>                Repository path on the runner (default: current working directory)
   --temp-dir                   Create the session in a fresh temporary directory on the runner
+  --once                       Allow only a single message in the session (can only be used with --temp-dir)
   --session-id <id>            Send the message to an existing session
   --resume                     Resume the most recently updated session for the runner and repository path
   --confirmation <value>       Resolve a needs-confirmation response: auto, draft, or force
@@ -60,7 +61,7 @@ Run cli/arondo-cli <command> --help for command options.`
 type arguments struct {
 	server, token, runnerID, repoPath, sessionID, agentType, prompt, output, confirmation string
 	pollInterval, timeout                                                                 float64
-	tempDir, resume                                                                       bool
+	tempDir, resume, once                                                                 bool
 }
 
 type apiError struct {
@@ -141,6 +142,9 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 		case "--temp-dir":
 			args.tempDir = true
 			continue
+		case "--once":
+			args.once = true
+			continue
 		case "--force":
 			return arguments{}, errors.New("--force has been replaced by --confirmation force")
 		case "--resume":
@@ -206,6 +210,12 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 	}
 	if args.resume && args.tempDir {
 		return arguments{}, errors.New("--resume cannot be used with --temp-dir")
+	}
+	if args.sessionID != "" && args.tempDir {
+		return arguments{}, errors.New("--session-id cannot be used with --temp-dir")
+	}
+	if args.once && !args.tempDir {
+		return arguments{}, errors.New("--once can only be used with --temp-dir")
 	}
 	if args.sessionID == "" && !args.tempDir && args.repoPath == "" {
 		workingDirectory, err := os.Getwd()
@@ -313,6 +323,9 @@ func (c *client) createSession(args arguments, force bool) (session, error) {
 		payload["tempDir"] = true
 	} else {
 		payload["repoPath"] = args.repoPath
+	}
+	if args.once {
+		payload["once"] = true
 	}
 	if args.runnerID != "" {
 		payload["runnerId"] = args.runnerID

@@ -19,6 +19,14 @@ export async function POST(
     return NextResponse.json({ error: "Session is archived. Unarchive it to send messages." }, { status: 403 });
   }
 
+  const session = await getSession(id);
+  if (!session) {
+    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+  }
+  if (session.once) {
+    return NextResponse.json({ error: "Session only allows a single message" }, { status: 400 });
+  }
+
   const { message, type, prompt, force } = await req.json();
   if (!message || !message.trim()) {
     return NextResponse.json({ error: "message is required" }, { status: 400 });

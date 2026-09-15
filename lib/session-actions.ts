@@ -352,7 +352,7 @@ export async function dispatchCreateSession(
   repoPath: string,
   agentType: string,
   prompt: string,
-  opts: { id?: string; name?: string; tokenUuid?: string; displayMessage?: string; tempDir?: boolean } = {},
+  opts: { id?: string; name?: string; tokenUuid?: string; displayMessage?: string; tempDir?: boolean; once?: boolean } = {},
 ): Promise<ActionResult> {
   const trimmedPrompt = prompt.trim();
   if (!trimmedPrompt) {
@@ -373,6 +373,7 @@ export async function dispatchCreateSession(
     repoPath,
     runnerId,
     tokenUuid: opts.tokenUuid,
+    once: opts.once ? true : undefined,
   }, { tempDir: opts.tempDir });
 
   const systemMessageId = crypto.randomUUID();

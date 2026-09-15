@@ -83,12 +83,13 @@ async function pickRandomAllowedRunnerId(token: string | null): Promise<string |
 export async function POST(req: NextRequest) {
   const token = getArondoToken(req);
   const body = await req.json();
-  const { id: idInput, prompt, message, repoPath: repoPathInput, tempDir, agentType = "auto", runnerId: runnerIdInput, name, isDraft, draftTrigger = "codebaseReady", draftAt, force } = body as {
+  const { id: idInput, prompt, message, repoPath: repoPathInput, tempDir, once, agentType = "auto", runnerId: runnerIdInput, name, isDraft, draftTrigger = "codebaseReady", draftAt, force } = body as {
     id?: string;
     prompt: string;
     message?: string;
     repoPath?: string;
     tempDir?: boolean;
+    once?: boolean;
     agentType?: string;
     runnerId?: string;
     name?: string;
@@ -97,6 +98,10 @@ export async function POST(req: NextRequest) {
     draftAt?: number;
     force?: boolean;
   };
+
+  if (once && !tempDir) {
+    return NextResponse.json({ error: "once can only be used when tempDir is set" }, { status: 400 });
+  }
 
   if (isDraft && draftTrigger === "at" && (typeof draftAt !== "number" || draftAt <= Date.now())) {
     return NextResponse.json({ error: "draftAt must be a timestamp in the future" }, { status: 400 });
@@ -155,6 +160,7 @@ export async function POST(req: NextRequest) {
       repoPath,
       runnerId,
       tokenUuid: getUuidByToken(token) || undefined,
+      once: once ? true : undefined,
     }, { tempDir });
     eventBus.publish({ type: "session_updated", payload: session });
     return NextResponse.json(session, { status: 201 });
@@ -171,6 +177,7 @@ export async function POST(req: NextRequest) {
       repoPath,
       runnerId,
       tokenUuid: getUuidByToken(token) || undefined,
+      once: once ? true : undefined,
     }, { tempDir });
     const todoMessage = await addTodoMessage(session.id, {
       content: trimmedMessage,
@@ -200,6 +207,7 @@ export async function POST(req: NextRequest) {
     tokenUuid: getUuidByToken(token) || undefined,
     displayMessage: message,
     tempDir,
+    once,
   });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });

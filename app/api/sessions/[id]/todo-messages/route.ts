@@ -24,6 +24,9 @@ export async function POST(
   if (!session) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
+  if (session.once) {
+    return NextResponse.json({ error: "Session only allows a single message" }, { status: 400 });
+  }
 
   const { message, prompt, trigger } = (await req.json()) as {
     message?: string;
