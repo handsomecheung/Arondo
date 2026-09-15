@@ -5,11 +5,13 @@ import {
   updateSession,
   addMessage,
   clearSessionLog,
+  appendSessionLog,
   appendAutomodelLog,
   getMessages,
   getProjectScripts,
   recordScriptHistory,
   getSessionLog,
+  readOnceCache,
   type DetachedAgentKind,
 } from "./store";
 import { getAgent, resolveAgentType, PROMPT_ENV_VAR, type ConcreteAgentType } from "./agents";
@@ -352,13 +354,74 @@ export async function dispatchCreateSession(
   repoPath: string,
   agentType: string,
   prompt: string,
-  opts: { id?: string; name?: string; tokenUuid?: string; displayMessage?: string; tempDir?: boolean; once?: boolean } = {},
+  opts: { id?: string; name?: string; tokenUuid?: string; displayMessage?: string; tempDir?: boolean; once?: boolean; cache?: "on" | "off" } = {},
 ): Promise<ActionResult> {
   const trimmedPrompt = prompt.trim();
   if (!trimmedPrompt) {
     return { ok: false, error: "prompt is required", status: 400 };
   }
   const displayMessage = opts.displayMessage?.trim() || trimmedPrompt;
+
+  if (opts.cache === "on") {
+    const cachedOutput = await readOnceCache(trimmedPrompt);
+    if (cachedOutput !== null) {
+      const session = await createSession({
+        id: opts.id,
+        status: "done",
+        name: opts.name?.trim() || deriveSessionName(displayMessage, repoPath),
+        agentType,
+        repoPath,
+        runnerId,
+        tokenUuid: opts.tokenUuid,
+        once: opts.once ? true : undefined,
+        cache: "on",
+      }, { tempDir: opts.tempDir });
+
+      await updateSession(session.id, { status: "done" });
+
+      const userMessage = await addMessage({
+        sessionId: session.id,
+        role: "user",
+        content: displayMessage,
+        prompt: trimmedPrompt,
+        type: "chat-user",
+        tokenUuid: opts.tokenUuid,
+        cache: "on",
+      });
+      eventBus.publish({ type: "message_added", payload: userMessage });
+
+      const systemMessageId = crypto.randomUUID();
+      const systemMsg = await addMessage({
+        id: systemMessageId,
+        sessionId: session.id,
+        role: "system",
+        content: `⚙️ Executing command:\n\`\`\`bash\n[cached]\n\`\`\``,
+        type: "agent-run",
+        command: "[cached]",
+        resolvedAgentType: agentType,
+        prompt: trimmedPrompt,
+        cache: "on",
+      });
+      eventBus.publish({ type: "message_added", payload: systemMsg });
+
+      await clearSessionLog(session.id, systemMessageId);
+      await appendSessionLog(session.id, systemMessageId, cachedOutput, true);
+
+      const agentMsg = await addMessage({
+        sessionId: session.id,
+        role: "agent",
+        content: "✅ Done!",
+        type: "agent-return",
+        parentId: systemMsg.id,
+        cache: "on",
+      });
+      eventBus.publish({ type: "message_added", payload: agentMsg });
+
+      const updated = (await getSession(session.id)) || session;
+      eventBus.publish({ type: "session_updated", payload: updated });
+      return { ok: true, session: updated };
+    }
+  }
 
   const run = runnerManager.getRunner(runnerId);
   if (!run) {
@@ -374,6 +437,7 @@ export async function dispatchCreateSession(
     runnerId,
     tokenUuid: opts.tokenUuid,
     once: opts.once ? true : undefined,
+    cache: opts.cache === "on" ? "on" : undefined,
   }, { tempDir: opts.tempDir });
 
   const systemMessageId = crypto.randomUUID();
@@ -411,6 +475,7 @@ export async function dispatchCreateSession(
     prompt: trimmedPrompt,
     type: "chat-user",
     tokenUuid: opts.tokenUuid,
+    cache: opts.cache === "on" ? "on" : undefined,
   });
   eventBus.publish({ type: "message_added", payload: userMessage });
 
@@ -424,6 +489,7 @@ export async function dispatchCreateSession(
     resolvedAgentType: resolvedType,
     resolvedAgyQuotaGroup: resolved.agyQuotaGroup,
     prompt: fullPrompt,
+    cache: opts.cache === "on" ? "on" : undefined,
   });
   eventBus.publish({ type: "message_added", payload: systemMsg });
 
@@ -438,6 +504,8 @@ export async function dispatchCreateSession(
     agentType: resolvedType,
     agyQuotaGroup: resolved.agyQuotaGroup,
     command,
+    prompt: trimmedPrompt,
+    cache: opts.cache === "on" ? "on" : undefined,
   });
 
   await clearSessionLog(session.id, systemMsg.id);

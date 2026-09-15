@@ -10,6 +10,7 @@ import {
   updateMessage,
   getMessages,
   addTodoMessage,
+  writeOnceCache,
 } from "./store";
 import {
   getAgySessionId,
@@ -88,6 +89,7 @@ export interface TaskContext {
   agentType?: string;
   agyQuotaGroup?: "gemini" | "other";
   detachedKind?: "review" | "btw";
+  cache?: "on" | "off";
 }
 
 interface PendingRequest {
@@ -1334,6 +1336,21 @@ class RunnerManager {
               : `Agent exited with code ${exitCode}`,
     });
 
+    const shouldCache = (ctx.cache === "on" || session?.cache === "on");
+    if (success && shouldCache && !quotaExhausted && !invalidModelSelection) {
+      const msgIdx = messages.findIndex((m) => m.id === ctx.messageId);
+      const lastUserMsg = [...messages.slice(0, msgIdx)].reverse().find((m) => m.role === "user");
+      const promptToCache = ctx.prompt || lastUserMsg?.prompt || lastUserMsg?.content;
+      if (promptToCache) {
+        try {
+          const log = await getSessionLog(ctx.sessionId, ctx.messageId);
+          await writeOnceCache(promptToCache, log);
+        } catch (err) {
+          console.error("[runner-manager] failed to write once cache:", err);
+        }
+      }
+    }
+
     const content = invalidModelSelection
       ? "⚠️ Invalid model selection for Antigravity — please update the model in Settings, or temporarily switch away from Auto mode."
       : quotaExhausted
@@ -1349,6 +1366,7 @@ class RunnerManager {
       content,
       type: "agent-return",
       parentId: ctx.messageId,
+      cache: shouldCache ? "on" : undefined,
     });
 
     eventBus.publish({ type: "message_added", payload: agentMsg });

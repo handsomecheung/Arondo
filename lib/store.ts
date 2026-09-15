@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import fsSync from "fs";
 import path from "path";
+import crypto from "crypto";
 import { getConfigDir } from "./config";
 import { withFileLock, writeJsonAtomic } from "./fileLock";
 
@@ -120,6 +121,7 @@ export interface Session {
   tokenUuid?: string;
   // Set to true if the session only allows a single message (must be created with tempDir).
   once?: boolean;
+  cache?: "on" | "off";
 }
 
 export type MessageType =
@@ -162,6 +164,7 @@ export interface Message {
   tokenUuid?: string;
   userName?: string;
   userColor?: string;
+  cache?: "on" | "off";
   // Detached agent runs use a fresh agent conversation and never participate
   // in the parent session's normal conversation history.
   detachedKind?: DetachedAgentKind;
@@ -171,6 +174,33 @@ export interface Message {
   todoTrigger?: TodoTrigger;
   todoResultMessageId?: string;
   todoError?: string;
+}
+
+// ─── Once Cache ───────────────────────────────────────────────────────────────
+
+const ONCE_CACHE_DIR = path.join(CONFIG_DIR, "cache", "once");
+
+export function getPromptHash(prompt: string): string {
+  return crypto.createHash("sha256").update(prompt.trim()).digest("hex");
+}
+
+export function getOnceCacheFilePath(prompt: string): string {
+  return path.join(ONCE_CACHE_DIR, getPromptHash(prompt));
+}
+
+export async function readOnceCache(prompt: string): Promise<string | null> {
+  try {
+    const filePath = getOnceCacheFilePath(prompt);
+    return await fs.readFile(filePath, "utf-8");
+  } catch {
+    return null;
+  }
+}
+
+export async function writeOnceCache(prompt: string, output: string): Promise<void> {
+  const filePath = getOnceCacheFilePath(prompt);
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, output, "utf-8");
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

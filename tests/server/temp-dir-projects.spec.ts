@@ -252,5 +252,80 @@ test.describe('Temp dir project task visibility', () => {
     const detachedJson = await detachedRes.json();
     expect(detachedJson.error).toBe('Session only allows a single message');
   });
+
+  test('validates cache option and retrieves result from cache', async ({ request }) => {
+    // 1. Should reject cache without once
+    const invalidRes1 = await request.post('/api/sessions', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        prompt: 'test prompt',
+        tempDir: true,
+        runnerId,
+        cache: 'on',
+      }
+    });
+    expect(invalidRes1.status()).toBe(400);
+    expect((await invalidRes1.json()).error).toBe('cache can only be used when once is set');
+
+    // 2. Should reject invalid cache value
+    const invalidRes2 = await request.post('/api/sessions', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        prompt: 'test prompt',
+        tempDir: true,
+        runnerId,
+        once: true,
+        cache: 'maybe',
+      }
+    });
+    expect(invalidRes2.status()).toBe(400);
+    expect((await invalidRes2.json()).error).toBe('cache must be on or off');
+
+    // 3. Pre-seed cache file
+    const crypto = await import('crypto');
+    const prompt = 'cached prompt test ' + crypto.randomUUID();
+    const promptHash = crypto.createHash('sha256').update(prompt.trim()).digest('hex');
+    const cacheDir = path.join(CONFIG_DIR, 'cache', 'once');
+    await fs.mkdir(cacheDir, { recursive: true });
+    await fs.writeFile(path.join(cacheDir, promptHash), 'CACHED AGENT OUTPUT 12345\n', 'utf-8');
+
+    // 4. Create session with cache: "on"
+    const cachedSessionRes = await request.post('/api/sessions', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        prompt,
+        tempDir: true,
+        runnerId,
+        once: true,
+        cache: 'on',
+      }
+    });
+    expect(cachedSessionRes.status()).toBe(201);
+    const session = await cachedSessionRes.json();
+    expect(session.status).toBe('done');
+    expect(session.cache).toBe('on');
+    expect(session.once).toBe(true);
+
+    // 5. Check messages.json contains cache: "on"
+    const messagesRes = await request.get(`/api/messages?sessionId=${session.id}`, {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+    expect(messagesRes.status()).toBe(200);
+    const messages = await messagesRes.json();
+    expect(messages.length).toBeGreaterThan(0);
+    for (const msg of messages) {
+      expect(msg.cache).toBe('on');
+    }
+
+    // 6. Check log contains cached output
+    const agentRunMsg = messages.find((m: any) => m.type === 'agent-run');
+    expect(agentRunMsg).toBeDefined();
+    const logRes = await request.get(`/api/sessions/${session.id}/log?messageId=${agentRunMsg.id}`, {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+    expect(logRes.status()).toBe(200);
+    const logJson = await logRes.json();
+    expect(logJson.log).toBe('CACHED AGENT OUTPUT 12345\n');
+  });
 });
 

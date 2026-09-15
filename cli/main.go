@@ -37,6 +37,7 @@ Options:
   --path <path>                Repository path on the runner (default: current working directory)
   --temp-dir                   Create the session in a fresh temporary directory on the runner
   --once                       Allow only a single message in the session (can only be used with --temp-dir)
+  --cache <mode>               Cache single-use session results: on or off (default: off, requires --once)
   --session-id <id>            Send the message to an existing session
   --resume                     Resume the most recently updated session for the runner and repository path
   --confirmation <value>       Resolve a needs-confirmation response: auto, draft, or force
@@ -59,9 +60,9 @@ Commands:
 Run cli/arondo-cli <command> --help for command options.`
 
 type arguments struct {
-	server, token, runnerID, repoPath, sessionID, agentType, prompt, output, confirmation string
-	pollInterval, timeout                                                                 float64
-	tempDir, resume, once                                                                 bool
+	server, token, runnerID, repoPath, sessionID, agentType, prompt, output, confirmation, cache string
+	pollInterval, timeout                                                                         float64
+	tempDir, resume, once                                                                         bool
 }
 
 type apiError struct {
@@ -124,7 +125,7 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 	valueOptions := map[string]*string{
 		"--server": &args.server, "--client-token": &args.token, "--runner-id": &args.runnerID, "--path": &args.repoPath,
 		"--session-id": &args.sessionID, "--agent": &args.agentType, "--output": &args.output,
-		"--confirmation": &args.confirmation,
+		"--confirmation": &args.confirmation, "--cache": &args.cache,
 	}
 
 	for index := 0; index < len(argv); index++ {
@@ -216,6 +217,14 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 	}
 	if args.once && !args.tempDir {
 		return arguments{}, errors.New("--once can only be used with --temp-dir")
+	}
+	if args.cache != "" {
+		if args.cache != "on" && args.cache != "off" {
+			return arguments{}, errors.New("--cache must be on or off")
+		}
+		if !args.once {
+			return arguments{}, errors.New("--cache can only be used with --once")
+		}
 	}
 	if args.sessionID == "" && !args.tempDir && args.repoPath == "" {
 		workingDirectory, err := os.Getwd()
@@ -326,6 +335,9 @@ func (c *client) createSession(args arguments, force bool) (session, error) {
 	}
 	if args.once {
 		payload["once"] = true
+	}
+	if args.cache != "" {
+		payload["cache"] = args.cache
 	}
 	if args.runnerID != "" {
 		payload["runnerId"] = args.runnerID

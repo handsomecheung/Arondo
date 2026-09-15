@@ -91,6 +91,27 @@ func TestParseArgsOnce(t *testing.T) {
 	if !args.tempDir || !args.once {
 		t.Fatalf("expected tempDir and once to be true, got tempDir=%v once=%v", args.tempDir, args.once)
 	}
+
+	// Test with --cache on
+	argsCache, err := parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--temp-dir", "--once", "--cache", "on", "Do work"}, cliConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if argsCache.cache != "on" {
+		t.Fatalf("expected cache to be 'on', got %v", argsCache.cache)
+	}
+
+	// Test rejecting --cache without --once
+	_, err = parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--temp-dir", "--cache", "on", "Do work"}, cliConfig{})
+	if err == nil || err.Error() != "--cache can only be used with --once" {
+		t.Fatalf("unexpected error for --cache without --once: %v", err)
+	}
+
+	// Test rejecting invalid --cache value
+	_, err = parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--temp-dir", "--once", "--cache", "invalid", "Do work"}, cliConfig{})
+	if err == nil || err.Error() != "--cache must be on or off" {
+		t.Fatalf("unexpected error for invalid --cache: %v", err)
+	}
 }
 
 func TestParseArgsRejectsNonFiniteDurations(t *testing.T) {
@@ -743,6 +764,15 @@ func TestCreateSessionSendsOncePayload(t *testing.T) {
 	}
 	if capturedPayload["tempDir"] != true {
 		t.Fatalf("expected payload tempDir=true, got %#v", capturedPayload["tempDir"])
+	}
+
+	args.cache = "on"
+	_, err = c.createSession(args, false)
+	if err != nil {
+		t.Fatalf("createSession with cache failed: %v", err)
+	}
+	if capturedPayload["cache"] != "on" {
+		t.Fatalf("expected payload cache='on', got %#v", capturedPayload["cache"])
 	}
 }
 
