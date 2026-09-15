@@ -275,7 +275,7 @@ export async function getSessions(): Promise<Session[]> {
         try {
           const session = await readJson<Session | null>(filePath, null);
           if (session) {
-            sessions.push(session);
+            sessions.push(await withDerivedSessionError(session));
           }
         } catch {
           // Ignore corrupt metadata
@@ -292,7 +292,7 @@ export async function getSessions(): Promise<Session[]> {
 export async function getSession(id: string): Promise<Session | undefined> {
   const filePath = getSessionFilePath(id);
   const session = await readJson<Session | null>(filePath, null);
-  return session || undefined;
+  return session ? withDerivedSessionError(session) : undefined;
 }
 
 export async function getArchivedSessions(): Promise<Session[]> {
@@ -518,14 +518,18 @@ export async function updateSession(
     const session = await readJson<Session | null>(filePath, null);
     if (!session) return undefined;
 
+    const persistentPatch = { ...patch };
+    delete persistentPatch.errorMessage;
+    const persistentSession = { ...session };
+    delete persistentSession.errorMessage;
     const touchUpdatedAt = opts?.touchUpdatedAt ?? true;
-    const updatedAt = touchUpdatedAt ? new Date().toISOString() : session.updatedAt;
+    const updatedAt = touchUpdatedAt ? new Date().toISOString() : persistentSession.updatedAt;
     const updated: Session = {
-      ...session,
-      ...patch,
+      ...persistentSession,
+      ...persistentPatch,
       updatedAt,
     };
-    if (patch.status === "done" || patch.status === "error") {
+    if (persistentPatch.status === "done" || persistentPatch.status === "error") {
       updated.completedAt = updated.updatedAt;
     }
 
@@ -620,6 +624,32 @@ export async function markMessageDeleted(
     await writeJson(filePath, all);
     return updated;
   });
+}
+
+export function deriveSessionCompletion(messages: Message[]): Pick<Session, "status" | "errorMessage" | "completedAt"> {
+  const latestResult = [...messages].reverse().find(
+    (message) =>
+      !message.deleted &&
+      (message.type === "agent-return" || message.type === "script-return" || message.type === "system-error"),
+  );
+
+  if (!latestResult) {
+    return { status: "idle", errorMessage: undefined, completedAt: undefined };
+  }
+
+  if (latestResult.content.startsWith("❌") || latestResult.content.startsWith("⚠️")) {
+    return {
+      status: "error",
+      errorMessage: latestResult.content.replace(/^[❌⚠️]\s*(?:Error:\s*)?/, ""),
+    };
+  }
+
+  return { status: "done", errorMessage: undefined };
+}
+
+async function withDerivedSessionError(session: Session): Promise<Session> {
+  const completion = deriveSessionCompletion(await getMessages(session.id));
+  return { ...session, errorMessage: completion.errorMessage };
 }
 
 // ─── Logs ─────────────────────────────────────────────────────────────────────

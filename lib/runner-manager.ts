@@ -316,13 +316,20 @@ class RunnerManager {
             (t) => t.sessionId === s.id && !t.completedAt,
           );
           if (!hasActiveTask) {
+            const errorMessage = "Session execution interrupted (possibly server restarted)";
             console.log(
               `[runner-manager] session ${s.id} is marked as "${s.status}" but has no active tasks. Reconciling to "error".`,
             );
             await updateSession(s.id, {
               status: "error",
-              errorMessage: "Session execution interrupted (possibly server restarted)",
             });
+            const message = await addMessage({
+              sessionId: s.id,
+              role: "system",
+              content: `❌ Error: ${errorMessage}`,
+              type: "system-error",
+            });
+            eventBus.publish({ type: "message_added", payload: message });
           }
         }
       }
@@ -1352,9 +1359,9 @@ class RunnerManager {
     }
 
     const content = invalidModelSelection
-      ? "⚠️ Invalid model selection for Antigravity — please update the model in Settings, or temporarily switch away from Auto mode."
+      ? `⚠️ ${getAgyInvalidModelErrorMessage()}`
       : quotaExhausted
-        ? "⚠️ Your quota may be exhausted — please check your usage and try again later."
+        ? `⚠️ ${getAgentQuotaErrorMessage(resolvedAgentType)}`
         : success
           ? "✅ Done!"
           : stoppedByUser

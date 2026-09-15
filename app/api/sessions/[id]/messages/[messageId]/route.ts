@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession, getMessages, markMessageDeleted } from "@/lib/store";
+import { deriveSessionCompletion, getSession, getMessages, markMessageDeleted, updateSession } from "@/lib/store";
 import { getArondoToken, verifySessionPermission } from "@/lib/auth";
 import { eventBus } from "@/lib/event-bus";
 
@@ -37,6 +37,16 @@ export async function DELETE(
   for (const updated of updatedMessages) {
     eventBus.publish({ type: "message_updated", payload: updated });
   }
+
+  const deletedMessageIds = new Set(updatedMessages.map((message) => message.id));
+  const completion = deriveSessionCompletion(
+    messages.map((message) =>
+      deletedMessageIds.has(message.id) ? { ...message, deleted: true } : message,
+    ),
+  );
+  await updateSession(id, completion);
+  const updatedSession = await getSession(id);
+  eventBus.publish({ type: "session_updated", payload: updatedSession });
 
   return NextResponse.json({ success: true, count: updatedMessages.length });
 }

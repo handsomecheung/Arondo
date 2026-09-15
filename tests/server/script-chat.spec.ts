@@ -207,4 +207,63 @@ test.describe('Chat while session scripts are running', () => {
       await fs.rm(repoDir, { recursive: true, force: true });
     }
   });
+
+  test('recalculates session status after deleting a failed script card', async ({ request }) => {
+    const mockBinDir = path.resolve(__dirname, '../mocks/bin/claude');
+    const mockLogDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arondo-script-status-logs-'));
+    const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arondo-script-status-repo-'));
+    execFileSync('git', ['init'], { cwd: repoDir });
+    const { runnerProcess, runnerId } = await setupRunner(request, 'script-status-runner', mockBinDir, {
+      CLAUDE_DIR_LOG: mockLogDir,
+    });
+
+    let sessionId = '';
+    try {
+      const createRes = await request.post('/api/sessions', {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+        data: { prompt: 'Session for script status test', repoPath: repoDir, runnerId, agentType: 'claude' },
+      });
+      expect(createRes.status()).toBe(201);
+      sessionId = (await createRes.json()).id;
+      await waitForSessionNotRunning(request, sessionId);
+
+      const runRes = await request.post(`/api/sessions/${sessionId}/run-script`, {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+        data: { scriptName: 'exit 1', prompt: '!exit 1' },
+      });
+      expect(runRes.status()).toBe(200);
+      const { messageId } = await runRes.json();
+      await waitForSessionNotRunning(request, sessionId);
+
+      const failedSessionRes = await request.get(`/api/sessions/${sessionId}`, {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+      });
+      const failedSession = await failedSessionRes.json();
+      expect(failedSession.status).toBe('error');
+      expect(failedSession.errorMessage).toBe('Script exited with code 1');
+
+      const configDir = process.env.ARONDO_CONFIG_DIR ? path.resolve(process.env.ARONDO_CONFIG_DIR) : path.join(process.cwd(), 'data');
+      const sessionRaw = JSON.parse(await fs.readFile(path.join(configDir, 'sessions', sessionId, 'session.json'), 'utf-8'));
+      expect(sessionRaw.errorMessage).toBeUndefined();
+
+      const deleteRes = await request.delete(`/api/sessions/${sessionId}/messages/${messageId}`, {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+      });
+      expect(deleteRes.status()).toBe(200);
+
+      const sessionRes = await request.get(`/api/sessions/${sessionId}`, {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+      });
+      const updatedSession = await sessionRes.json();
+      expect(updatedSession.status).toBe('done');
+      expect(updatedSession.errorMessage).toBeUndefined();
+    } finally {
+      if (sessionId) await request.delete(`/api/sessions/${sessionId}`, {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+      });
+      await teardownRunner(runnerProcess);
+      await fs.rm(mockLogDir, { recursive: true, force: true });
+      await fs.rm(repoDir, { recursive: true, force: true });
+    }
+  });
 });
