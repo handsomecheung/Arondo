@@ -18,7 +18,7 @@ import {
   IconClaude, IconAntigravity, IconCodex, IconOpencode, IconClock,
   IconArchive, IconPin, IconPaperclip, IconX, IconCommit,
 } from "@/components/Icons";
-import { getTriggerWord } from "@/lib/agentCommands";
+import { getTriggerWord, isAgentCommand } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
 import { CHAT_INPUT_TIPS } from "@/lib/chatInputTips";
 
@@ -1040,7 +1040,7 @@ export default function SessionView({
                   );
                 }
 
-          if (msg.role === "user" && msg.content.startsWith("/")) {
+          if (msg.role === "user" && isAgentCommand(msg.content, agentCommands)) {
             const cmdWord = msg.content.trim().split(/\s+/)[0];
             return (
               <UserAgentCommandCard

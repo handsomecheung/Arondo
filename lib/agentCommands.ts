@@ -86,3 +86,11 @@ export function resolveAgentCommand(
   }
   return null;
 }
+
+export function isAgentCommand(
+  promptText: string,
+  commands: AgentCommand[] = AGENT_COMMANDS,
+): boolean {
+  return resolveAgentCommand(promptText, commands) !== null;
+}
+
