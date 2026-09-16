@@ -7,20 +7,22 @@ import { AGENT_COMMANDS } from '../../lib/agentCommands';
 const mockSession: Session = {
   id: 'test-session-1',
   name: 'Test Session',
+  projectId: 'proj-1',
   repoPath: '/path/to/repo',
   runnerId: 'runner-1',
   agentType: 'agy',
   status: 'idle',
-  createdAt: Date.now(),
-  updatedAt: Date.now(),
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
 };
 
 const mockMessages: Message[] = [
   {
     id: 'msg-url-path-1',
+    sessionId: 'test-session-1',
     role: 'user',
     content: '/user/id',
-    createdAt: Date.now(),
+    createdAt: new Date().toISOString(),
   },
 ];
 

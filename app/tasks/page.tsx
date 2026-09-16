@@ -663,6 +663,24 @@ export default function TasksPage() {
     }
   };
 
+  const handleAnalyzeTask = async (task: TaskItem, message: string) => {
+    if (!task.sessionId) return;
+    try {
+      const res = await fetch(`/api/sessions/${task.sessionId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, prompt: message, type: "chat-user" }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setActionError(data.error || "Failed to send analysis request");
+      }
+    } catch (err) {
+      console.error("Failed to send analysis request:", err);
+      setActionError("Failed to send analysis request. Please try again.");
+    }
+  };
+
   return (
     <div
       style={{
@@ -1171,6 +1189,7 @@ export default function TasksPage() {
                                 onShowCommand={task.command ? () => setCommandTask(task) : undefined}
                                 onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
                                 onRestartScript={isRunning && task.type === "script" && task.scriptName && task.messageId ? () => handleRestartScript(task) : undefined}
+                                onAnalyze={task.sessionId ? (msg) => handleAnalyzeTask(task, msg) : undefined}
                                 onRetryTask={task.status === "error" ? () => handleRetryTask(task) : undefined}
                                 onDeleteTask={!isRunning && !task.sessionId ? () => handleDeleteTask(task) : undefined}
                               />
@@ -1340,6 +1359,7 @@ export default function TasksPage() {
                                 onShowCommand={task.command ? () => setCommandTask(task) : undefined}
                                 onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
                                 onRestartScript={isRunning && task.type === "script" && task.scriptName && task.messageId ? () => handleRestartScript(task) : undefined}
+                                onAnalyze={task.sessionId ? (msg) => handleAnalyzeTask(task, msg) : undefined}
                                 onRetryTask={task.status === "error" ? () => handleRetryTask(task) : undefined}
                                 onDeleteTask={!isRunning && !task.sessionId ? () => handleDeleteTask(task) : undefined}
                               />

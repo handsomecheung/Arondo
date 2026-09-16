@@ -278,6 +278,11 @@ export function useSessionSubmit({
     await sendAgentMessage(promptText, agentMessage);
   }, [sendAgentMessage, agentCommands, selectedSessionId, setApiError, setPrompt, setShowCommandMenu, textareaRef]);
 
+  const handleSendMessage = useCallback(async (text: string) => {
+    if (!selectedSessionId || !text.trim()) return;
+    await sendAgentMessage(text, text);
+  }, [selectedSessionId, sendAgentMessage]);
+
   // Shared post-creation bookkeeping for a freshly created session, whether
   // it was sent immediately, forced past a confirmation, or created as a draft.
   const finalizeNewSession = useCallback((newSession: Session, trimmedPrompt: string, immediate: boolean) => {
@@ -738,6 +743,7 @@ export function useSessionSubmit({
     handleScriptCommand,
     handleSelectScriptCommand,
     handleSubmit,
+    handleSendMessage,
     handleKeyDown,
     commandMenuIndex,
     pendingConfirmation,

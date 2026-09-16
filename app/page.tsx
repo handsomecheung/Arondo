@@ -881,7 +881,7 @@ export default function HomePage() {
     return data.path;
   };
 
-  const { handlePromptChange, handleNewSessionCommand, handleRenameSessionCommand, handleAgentCommand, handleScriptCommand, handleSelectScriptCommand, handleSubmit, handleKeyDown, commandMenuIndex, pendingConfirmation, resolvePendingConfirmation, cancelPendingConfirmation } = useSessionSubmit({
+  const { handlePromptChange, handleNewSessionCommand, handleRenameSessionCommand, handleAgentCommand, handleScriptCommand, handleSelectScriptCommand, handleSubmit, handleKeyDown, handleSendMessage, commandMenuIndex, pendingConfirmation, resolvePendingConfirmation, cancelPendingConfirmation } = useSessionSubmit({
     prompt,
     repoPath,
     agentType,
@@ -1603,6 +1603,7 @@ export default function HomePage() {
             onRetryCard={handleRetryCard}
             onDeleteScriptCard={handleDeleteScriptCard}
             onSubmit={handleSubmit}
+            onSendMessage={handleSendMessage}
             onArchiveSession={handleArchiveSession}
             onTogglePinSession={handleTogglePinSession}
             onSendDraftNow={handleSendDraftNow}

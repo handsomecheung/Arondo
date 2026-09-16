@@ -93,6 +93,7 @@ interface SessionViewProps {
   onRetryCard: (cardInfo: ExecCardInfo) => void;
   onDeleteScriptCard?: (msgId: string) => void;
   onSubmit: () => void;
+  onSendMessage?: (text: string) => void;
   onArchiveSession: (id: string) => void;
   onTogglePinSession: (id: string, pinned: boolean) => void;
   onSendDraftNow: () => void;
@@ -193,6 +194,7 @@ export default function SessionView({
   onRetryCard,
   onDeleteScriptCard,
   onSubmit,
+  onSendMessage,
   onArchiveSession,
   onTogglePinSession,
   onSendDraftNow,
@@ -1000,6 +1002,7 @@ export default function SessionView({
                         key={msg.id}
                         {...sharedProps}
                         onViewLog={() => onViewLog(msg.id)}
+                        onAnalyze={onSendMessage}
                         onRestartScript={isCardRunning ? () => onRestartScriptCard(cardInfo.runMsg.id, cardInfo.commandLabel) : undefined}
                         onDeleteTask={!isCardRunning && onDeleteScriptCard ? () => onDeleteScriptCard(cardInfo.runMsg.id) : undefined}
                         sessionId={selectedSessionId!}

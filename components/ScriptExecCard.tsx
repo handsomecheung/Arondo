@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import ExecCard, { ExecCardProps } from "@/components/ExecCard";
-import { IconTerminal } from "@/components/Icons";
+import { IconTerminal, IconAntigravity } from "@/components/Icons";
 
 function stripAnsi(text: string): string {
   return text.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/\r/g, "");
@@ -10,6 +10,7 @@ function stripAnsi(text: string): string {
 
 interface ScriptExecCardProps extends ExecCardProps {
   onViewLog?: () => void;
+  onAnalyze?: (message: string) => void | Promise<void>;
   sessionId?: string;
   projectId?: string;
   ws?: WebSocket | null;
@@ -18,6 +19,7 @@ interface ScriptExecCardProps extends ExecCardProps {
 
 export default function ScriptExecCard({
   onViewLog,
+  onAnalyze,
   sessionId,
   projectId,
   ws,
@@ -76,12 +78,71 @@ export default function ScriptExecCard({
     outputRef.current.scrollTop = outputRef.current.scrollHeight;
   }, [log, isRunning, showLogInline]);
 
-  const extraMenuItems = hasLog && onViewLog
+  const MAX_OUTPUT_CHARS = 5_000;
+
+  const handleAnalyze = async () => {
+    let logContent = log;
+    if (!logContent && props.item.messageId && logSessionId) {
+      const url = isGlobal
+        ? `/api/sessions/global/log?messageId=${props.item.messageId}&projectId=${projectId}`
+        : `/api/sessions/${logSessionId}/log?messageId=${props.item.messageId}`;
+      try {
+        const r = await fetch(url);
+        const data = await r.json();
+        if (data.log) logContent = stripAnsi(data.log);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    let resultStatus = "";
+    if (props.item.status === "done") {
+      resultStatus = "\nStatus: Succeeded";
+    } else if (props.item.status === "error") {
+      resultStatus = "\nStatus: Failed";
+    }
+
+    let formattedLog = logContent ? logContent.trim() : "(No output)";
+    if (formattedLog.length > MAX_OUTPUT_CHARS) {
+      formattedLog = `[Earlier output truncated. Showing the last ${MAX_OUTPUT_CHARS.toLocaleString()} characters:]\n\n${formattedLog.slice(-MAX_OUTPUT_CHARS)}`;
+    }
+
+    const scriptLabel = props.item.command || props.item.title || "script";
+    const message = `Please analyze the execution result of the following script:\n\nCommand: \`${scriptLabel}\`${resultStatus}\n\nOutput:\n\`\`\`\n${formattedLog}\n\`\`\``;
+
+    if (onAnalyze) {
+      onAnalyze(message);
+    } else if (sessionId) {
+      try {
+        await fetch(`/api/sessions/${sessionId}/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message, prompt: message, type: "chat-user" }),
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+  };
+
+  const canAnalyze = hasLog && (!!onAnalyze || !!sessionId);
+
+  const extraMenuItems = (hasLog && onViewLog) || canAnalyze
     ? (closeMenu: () => void) => (
-      <button className="task-menu-item" onClick={() => { closeMenu(); onViewLog(); }}>
-        <IconTerminal />
-        <span>Open Terminal</span>
-      </button>
+      <>
+        {hasLog && onViewLog && (
+          <button className="task-menu-item" onClick={() => { closeMenu(); onViewLog(); }}>
+            <IconTerminal />
+            <span>Open Terminal</span>
+          </button>
+        )}
+        {canAnalyze && (
+          <button className="task-menu-item" onClick={() => { closeMenu(); handleAnalyze(); }}>
+            <IconAntigravity />
+            <span>Analyze with Agent</span>
+          </button>
+        )}
+      </>
     )
     : undefined;
 
