@@ -808,7 +808,12 @@ export default function HomePage() {
     if (chatFsMode === "run") {
       setChatFsModalOpen(false);
       setShowCommandMenu(false);
-      const insertText = "!" + relativePath;
+      const runPath = relativePath === "."
+        ? "./"
+        : (!relativePath.startsWith("/") && !relativePath.startsWith("./")
+          ? `./${relativePath}`
+          : relativePath);
+      const insertText = "!" + runPath;
       setPrompt(insertText);
       const el = textareaRef.current;
       if (el) {
