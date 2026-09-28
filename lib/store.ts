@@ -95,8 +95,8 @@ export interface Session {
   // Set to true on manual archive, false on manual unarchive. Undefined
   // means never manually touched — the only state auto-archive may act on.
   archivedManually?: boolean;
-  // ISO timestamp of when the session was pinned. Pinned sessions sort first,
-  // ordered by this value; undefined/absent means not pinned.
+  // ISO timestamp of when the session was pinned. Pinned sessions are ordered
+  // by this value after unread successful completions.
   pinnedAt?: string;
   // ISO timestamp of the last time the user opened this session in the UI.
   // Compared against completedAt to decide whether to show the "unread

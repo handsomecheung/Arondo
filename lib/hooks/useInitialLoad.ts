@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import type { Session, TaskItem } from "@/types/home";
 import type { AgentCommand } from "@/lib/agentCommands";
+import { sortSessionsForSidebar } from "@/lib/homeUtils";
 
 interface UseInitialLoadParams {
   initUrl: { session: string | null; project: string | null };
@@ -40,15 +41,7 @@ export function useInitialLoad({
           // URL points at a session that no longer exists — show the new-session prompt
           setSelectedSessionId(null);
         } else if (!urlProject && data.length > 0) {
-          // Sort sessions matching page.tsx sorting behavior to find the latest session
-          const sortedData = [...data].sort((a, b) => {
-            const aPinned = a.pinnedAt ? new Date(a.pinnedAt).getTime() : 0;
-            const bPinned = b.pinnedAt ? new Date(b.pinnedAt).getTime() : 0;
-            if (aPinned !== bPinned) return bPinned - aPinned;
-            const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
-            const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
-            return bTime - aTime;
-          });
+          const sortedData = sortSessionsForSidebar(data);
 
           const latestSession = sortedData[0];
           const lastUpdatedTime = new Date(latestSession.updatedAt || latestSession.createdAt || 0).getTime();

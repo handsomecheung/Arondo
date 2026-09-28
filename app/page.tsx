@@ -25,7 +25,7 @@ import RenameSessionDialog from "@/components/modals/RenameSessionDialog";
 import ConfirmDialog from "@/components/modals/ConfirmDialog";
 import InfoDialog from "@/components/modals/InfoDialog";
 import {
-  readUrlState,
+  readUrlState, sortSessionsForSidebar,
   parseExecCommand, resolveRepoFilePath, isUnviewedCompletion,
 } from "@/lib/homeUtils";
 import { safeDecodeURIComponent } from "@/lib/remarkFileLinks";
@@ -68,16 +68,7 @@ export default function HomePage() {
   }, []);
 
   const [sessions, setSessions] = useState<Session[]>([]);
-  const sortedSessions = useMemo(() => {
-    return [...sessions].sort((a, b) => {
-      const aPinned = a.pinnedAt ? new Date(a.pinnedAt).getTime() : 0;
-      const bPinned = b.pinnedAt ? new Date(b.pinnedAt).getTime() : 0;
-      if (aPinned !== bPinned) return bPinned - aPinned;
-      const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
-      const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
-      return bTime - aTime;
-    });
-  }, [sessions]);
+  const sortedSessions = useMemo(() => sortSessionsForSidebar(sessions), [sessions]);
   const unviewedCompletionCount = useMemo(
     () => sessions.filter(isUnviewedCompletion).length,
     [sessions],

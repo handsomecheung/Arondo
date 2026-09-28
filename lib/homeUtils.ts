@@ -9,6 +9,28 @@ export function isUnviewedCompletion(session: Session): boolean {
   return new Date(session.completedAt).getTime() > new Date(session.lastViewedAt).getTime();
 }
 
+export function sortSessionsForSidebar(sessions: Session[]): Session[] {
+  return [...sessions].sort((a, b) => {
+    const aHasUnreadSuccess = a.status === "done" && isUnviewedCompletion(a);
+    const bHasUnreadSuccess = b.status === "done" && isUnviewedCompletion(b);
+    if (aHasUnreadSuccess !== bHasUnreadSuccess) return aHasUnreadSuccess ? -1 : 1;
+
+    if (aHasUnreadSuccess && bHasUnreadSuccess) {
+      const aCompleted = new Date(a.completedAt!).getTime();
+      const bCompleted = new Date(b.completedAt!).getTime();
+      if (aCompleted !== bCompleted) return bCompleted - aCompleted;
+    }
+
+    const aPinned = a.pinnedAt ? new Date(a.pinnedAt).getTime() : 0;
+    const bPinned = b.pinnedAt ? new Date(b.pinnedAt).getTime() : 0;
+    if (aPinned !== bPinned) return bPinned - aPinned;
+
+    const aUpdated = new Date(a.updatedAt || a.createdAt || 0).getTime();
+    const bUpdated = new Date(b.updatedAt || b.createdAt || 0).getTime();
+    return bUpdated - aUpdated;
+  });
+}
+
 export function resolveRepoFilePath(repoPath: string, path: string): string {
   if (path.startsWith("/")) return path;
   return `${repoPath.replace(/\/$/, "")}/${path}`;
