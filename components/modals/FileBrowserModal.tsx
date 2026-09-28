@@ -57,7 +57,7 @@ export default function FileBrowserModal({ open, onClose, runnerId, initialPath 
   const [loadingMore, setLoadingMore] = useState(false);
 
   const [mobileView, setMobileView] = useState<View>("list");
-  const [wordWrap, setWordWrap] = useState(false);
+  const [wordWrap, setWordWrap] = useState(true);
   const [optionsOpen, setOptionsOpen] = useState(false);
 
   const filePanelRef = useRef<HTMLDivElement>(null);
