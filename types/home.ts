@@ -20,7 +20,6 @@ export interface Session {
   errorMessage?: string;
   createdAt: string;
   updatedAt: string;
-  runningScripts?: string[];
   pinnedAt?: string;
   lastViewedAt?: string;
   completedAt?: string;

@@ -27,7 +27,6 @@ interface Session {
   command?: string;
   createdAt: string;
   updatedAt: string;
-  runningScripts?: string[];
 }
 
 interface Project {

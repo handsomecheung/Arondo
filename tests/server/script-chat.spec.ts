@@ -165,6 +165,11 @@ test.describe('Chat while session scripts are running', () => {
       expect(runningSessionRes.status()).toBe(200);
       const runningSession = await runningSessionRes.json();
       expect(runningSession.status).toBe('script-running');
+      expect(runningSession.runningScripts).toBeUndefined();
+
+      const configDir = process.env.ARONDO_CONFIG_DIR ? path.resolve(process.env.ARONDO_CONFIG_DIR) : path.join(process.cwd(), 'data');
+      const sessionOnDisk = JSON.parse(await fs.readFile(path.join(configDir, 'sessions', sessionId, 'session.json'), 'utf-8'));
+      expect(sessionOnDisk.runningScripts).toBeUndefined();
 
       const messageRes = await request.post(`/api/sessions/${sessionId}/messages`, {
         headers: { 'x-arondo-token': 'test-token-123456' },

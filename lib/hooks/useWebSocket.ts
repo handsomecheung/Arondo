@@ -97,15 +97,7 @@ export function useWebSocket({
             });
             if (updated.status === "script-running") {
               setTaskQueue((prev) =>
-                prev.filter((t) => {
-                  if (t.sessionId !== updated.id) return true;
-                  if (t.type === "agent") return false;
-                  const running = updated.runningScripts || [];
-                  const scriptName = t.name.startsWith("Script: ")
-                    ? t.name.substring(8)
-                    : t.name;
-                  return running.includes(scriptName);
-                }),
+                prev.filter((t) => t.sessionId !== updated.id || t.type !== "agent"),
               );
             } else if (
               updated.status === "done" ||

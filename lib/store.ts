@@ -92,7 +92,6 @@ export interface Session {
   errorMessage?: string;
   createdAt: string;
   updatedAt: string;
-  runningScripts?: string[];
   // Set to true on manual archive, false on manual unarchive. Undefined
   // means never manually touched — the only state auto-archive may act on.
   archivedManually?: boolean;
@@ -307,7 +306,7 @@ export async function getArchivedSessions(): Promise<Session[]> {
         try {
           const session = await readJson<Session | null>(filePath, null);
           if (session) {
-            sessions.push(session);
+            sessions.push(withoutLegacyRunningScripts(session));
           }
         } catch {
           // Ignore corrupt metadata
@@ -496,8 +495,10 @@ export async function createSession(
 ): Promise<Session> {
   const id = data.id || crypto.randomUUID();
   const project = await getOrCreateProject(data.repoPath, data.runnerId, { tempDir: opts.tempDir });
+  const sessionData = { ...data } as typeof data & { runningScripts?: string[] };
+  delete sessionData.runningScripts;
   const session: Session = {
-    ...data,
+    ...sessionData,
     id,
     projectId: project.id,
     createdAt: new Date().toISOString(),
@@ -518,10 +519,12 @@ export async function updateSession(
     const session = await readJson<Session | null>(filePath, null);
     if (!session) return undefined;
 
-    const persistentPatch = { ...patch };
+    const persistentPatch = { ...patch } as typeof patch & { runningScripts?: string[] };
     delete persistentPatch.errorMessage;
+    delete persistentPatch.runningScripts;
     const persistentSession = { ...session };
     delete persistentSession.errorMessage;
+    delete (persistentSession as { runningScripts?: string[] }).runningScripts;
     const touchUpdatedAt = opts?.touchUpdatedAt ?? true;
     const updatedAt = touchUpdatedAt ? new Date().toISOString() : persistentSession.updatedAt;
     const updated: Session = {
@@ -599,6 +602,24 @@ export async function updateMessage(
   });
 }
 
+export function getRunningScriptRuns(messages: Message[]): Message[] {
+  const completedRunIds = new Set(
+    messages
+      .filter((message) => message.type === "script-return" && !message.deleted && message.parentId)
+      .map((message) => message.parentId!),
+  );
+  return messages.filter(
+    (message) =>
+      message.type === "script-run" &&
+      !message.deleted &&
+      !completedRunIds.has(message.id),
+  );
+}
+
+export async function getRunningSessionScriptRuns(sessionId: string): Promise<Message[]> {
+  return getRunningScriptRuns(await getMessages(sessionId));
+}
+
 export async function markMessageDeleted(
   sessionId: string,
   messageId: string,
@@ -648,8 +669,21 @@ export function deriveSessionCompletion(messages: Message[]): Pick<Session, "sta
 }
 
 async function withDerivedSessionError(session: Session): Promise<Session> {
-  const completion = deriveSessionCompletion(await getMessages(session.id));
-  return { ...session, errorMessage: completion.errorMessage };
+  const messages = await getMessages(session.id);
+  const completion = deriveSessionCompletion(messages);
+  const status =
+    session.status === "script-running" && getRunningScriptRuns(messages).length === 0
+      ? completion.status
+      : session.status;
+  return { ...withoutLegacyRunningScripts(session), status, errorMessage: completion.errorMessage };
+}
+
+function withoutLegacyRunningScripts(session: Session): Session {
+  const withoutRunningScripts = { ...session } as Session & {
+    runningScripts?: string[];
+  };
+  delete withoutRunningScripts.runningScripts;
+  return withoutRunningScripts;
 }
 
 // ─── Logs ─────────────────────────────────────────────────────────────────────

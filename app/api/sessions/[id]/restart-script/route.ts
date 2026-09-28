@@ -54,7 +54,6 @@ export async function POST(
     const updatedSession = await updateSession(id, {
       status: "script-running",
       errorMessage: undefined,
-      runningScripts: [...(session.runningScripts || []), scriptName],
     });
     eventBus.publish({ type: "session_updated", payload: updatedSession });
   }

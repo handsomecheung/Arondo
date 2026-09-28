@@ -8,6 +8,7 @@ import {
   appendSessionLog,
   appendAutomodelLog,
   getMessages,
+  getRunningSessionScriptRuns,
   getProjectScripts,
   recordScriptHistory,
   getSessionLog,
@@ -553,8 +554,6 @@ export async function dispatchSessionScript(
     return { ok: false, error: "Session not found", status: 404 };
   }
 
-  const runningScripts = session.runningScripts || [];
-
   const scripts = await getProjectScripts(session.projectId);
   const script = scripts.find((s) => s.name === scriptName) ?? { name: scriptName, command: scriptName };
 
@@ -574,7 +573,6 @@ export async function dispatchSessionScript(
 
   const updatedSession = await updateSession(sessionId, {
     status: session.status === "running" ? "running" : "script-running",
-    runningScripts: [...runningScripts, scriptName],
   });
   eventBus.publish({ type: "session_updated", payload: updatedSession });
 
@@ -609,25 +607,21 @@ export async function dispatchSessionScript(
     })
     .catch(async (err) => {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      const removeIdx = runningScripts.indexOf(scriptName);
-      const nextRunning = removeIdx >= 0
-        ? [...runningScripts.slice(0, removeIdx), ...runningScripts.slice(removeIdx + 1)]
-        : [...runningScripts];
-      const hasAgentTask = runnerManager.getAllTasks().some(
-        (t) => t.sessionId === sessionId && t.type === "agent" && !t.completedAt,
-      );
-      const nextStatus = hasAgentTask ? "running" : nextRunning.length > 0 ? "script-running" : "error";
-      const updated = await updateSession(sessionId, {
-        status: nextStatus as any,
-        runningScripts: nextRunning,
-        errorMessage,
-      });
       const errMsg = await addMessage({
         sessionId,
         role: "system",
         content: `❌ Error: ${errorMessage}`,
         type: "script-return",
         parentId: systemMsg.id,
+      });
+      const runningScripts = await getRunningSessionScriptRuns(sessionId);
+      const hasAgentTask = runnerManager.getAllTasks().some(
+        (t) => t.sessionId === sessionId && t.type === "agent" && !t.completedAt,
+      );
+      const nextStatus = hasAgentTask ? "running" : runningScripts.length > 0 ? "script-running" : "error";
+      const updated = await updateSession(sessionId, {
+        status: nextStatus as any,
+        errorMessage,
       });
       eventBus.publish({ type: "message_added", payload: errMsg });
       eventBus.publish({ type: "session_updated", payload: updated });

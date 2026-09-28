@@ -9,6 +9,7 @@ import {
   getSessions,
   updateMessage,
   getMessages,
+  getRunningSessionScriptRuns,
   addTodoMessage,
   writeOnceCache,
 } from "./store";
@@ -1320,7 +1321,7 @@ class RunnerManager {
       }
     }
 
-    const hasRunningScripts = (session?.runningScripts?.length ?? 0) > 0;
+    const hasRunningScripts = (await getRunningSessionScriptRuns(ctx.sessionId)).length > 0;
     let nextStatus: string;
     if (hasRunningScripts) {
       nextStatus = "script-running";
@@ -1448,64 +1449,48 @@ class RunnerManager {
       return;
     }
 
-    const session = await getSession(ctx.sessionId);
-    const currentRunning = session?.runningScripts || [];
-    const removeIndex = currentRunning.indexOf(ctx.scriptName!);
-    const nextRunning =
-      removeIndex >= 0
-        ? [
-            ...currentRunning.slice(0, removeIndex),
-            ...currentRunning.slice(removeIndex + 1),
-          ]
-        : [...currentRunning];
-
     const hasAgentTask = Array.from(this.tasks.values()).some(
       (t) =>
         t.sessionId === ctx.sessionId && t.type === "agent" && !t.completedAt,
     );
 
+    const stoppedByUser = !!ctx.stoppedByUser;
+    const errorMessage = stoppedByUser
+      ? "Stopped by user"
+      : `Script exited with code ${exitCode}`;
+    const returnMessage = await addMessage({
+      sessionId: ctx.sessionId,
+      role: "system",
+      content: exitCode === 0
+        ? "✅ Script completed successfully."
+        : stoppedByUser
+          ? "🛑 Stopped by user"
+          : `❌ Error: ${errorMessage}`,
+      type: "script-return",
+      parentId: ctx.messageId,
+    });
+    const runningScripts = await getRunningSessionScriptRuns(ctx.sessionId);
+
     if (exitCode === 0) {
       let nextStatus: string;
       if (hasAgentTask) nextStatus = "running";
-      else if (nextRunning.length > 0) nextStatus = "script-running";
+      else if (runningScripts.length > 0) nextStatus = "script-running";
       else nextStatus = "done";
       const updated = await updateSession(ctx.sessionId, {
         status: nextStatus as any,
-        runningScripts: nextRunning,
       });
-      const doneMsg = await addMessage({
-        sessionId: ctx.sessionId,
-        role: "system",
-        content: "✅ Script completed successfully.",
-        type: "script-return",
-        parentId: ctx.messageId,
-      });
-      eventBus.publish({ type: "message_added", payload: doneMsg });
+      eventBus.publish({ type: "message_added", payload: returnMessage });
       eventBus.publish({ type: "session_updated", payload: updated });
     } else {
-      const stoppedByUser = !!ctx.stoppedByUser;
-      const errorMessage = stoppedByUser
-        ? "Stopped by user"
-        : `Script exited with code ${exitCode}`;
       let nextStatus: string;
       if (hasAgentTask) nextStatus = "running";
-      else if (nextRunning.length > 0) nextStatus = "script-running";
+      else if (runningScripts.length > 0) nextStatus = "script-running";
       else nextStatus = stoppedByUser ? "done" : "error";
       const updated = await updateSession(ctx.sessionId, {
         status: nextStatus as any,
-        runningScripts: nextRunning,
         errorMessage: stoppedByUser ? undefined : errorMessage,
       });
-      const errMsg = await addMessage({
-        sessionId: ctx.sessionId,
-        role: "system",
-        content: stoppedByUser
-          ? "🛑 Stopped by user"
-          : `❌ Error: ${errorMessage}`,
-        type: "script-return",
-        parentId: ctx.messageId,
-      });
-      eventBus.publish({ type: "message_added", payload: errMsg });
+      eventBus.publish({ type: "message_added", payload: returnMessage });
       eventBus.publish({ type: "session_updated", payload: updated });
     }
   }
