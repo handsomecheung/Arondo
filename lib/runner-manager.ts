@@ -313,6 +313,48 @@ class RunnerManager {
       const sessions = await getSessions();
       for (const s of sessions) {
         if (s.status === "running" || s.status === "script-running") {
+          const messages = await getMessages(s.id);
+          const executionRuns = messages.filter(
+            (message) =>
+              (message.type === "agent-run" ||
+                message.type === "detached-agent-run" ||
+                message.type === "script-run") &&
+              !message.deleted &&
+              !message.taskDeleted,
+          );
+          const unfinishedRuns = executionRuns.filter(
+            (run) => !messages.some(
+              (message) => message.parentId === run.id && !message.deleted,
+            ),
+          );
+
+          // A script-return can be persisted just before the session status is
+          // updated. Recover its final state instead of reporting an interruption.
+          if (executionRuns.length > 0 && unfinishedRuns.length === 0) {
+            const latestReturn = messages
+              .filter(
+                (message) =>
+                  !!message.parentId &&
+                  !message.deleted &&
+                  executionRuns.some((run) => run.id === message.parentId),
+              )
+              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+            const failed = latestReturn?.content.startsWith("❌") || latestReturn?.content.startsWith("⚠️");
+            const updated = await updateSession(s.id, {
+              status: failed ? "error" : "done",
+              errorMessage: failed ? latestReturn.content : undefined,
+            });
+            eventBus.publish({ type: "session_updated", payload: updated });
+            continue;
+          }
+
+          if (unfinishedRuns.length > 0 && unfinishedRuns.every((run) => run.type === "script-run")) {
+            // A script rerun removes its previous return message before the
+            // runner reports the replacement process. Wait for task.status
+            // instead of treating that intentional transition as an outage.
+            continue;
+          }
+
           const hasActiveTask = Array.from(this.tasks.values()).some(
             (t) => t.sessionId === s.id && !t.completedAt,
           );

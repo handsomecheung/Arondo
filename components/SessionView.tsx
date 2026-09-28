@@ -90,7 +90,7 @@ interface SessionViewProps {
   onShowPrompt: (prompt: string) => void;
   onStopExecCard: (msgId: string) => void;
   onRestartScriptCard: (msgId: string, scriptName: string) => void;
-  onRetryCard: (cardInfo: ExecCardInfo) => void;
+  onRerunCard: (cardInfo: ExecCardInfo) => void;
   onDeleteScriptCard?: (msgId: string) => void;
   onSubmit: () => void;
   onSendMessage?: (text: string) => void;
@@ -191,7 +191,7 @@ export default function SessionView({
   onShowPrompt,
   onStopExecCard,
   onRestartScriptCard,
-  onRetryCard,
+  onRerunCard,
   onDeleteScriptCard,
   onSubmit,
   onSendMessage,
@@ -994,7 +994,9 @@ export default function SessionView({
                     defaultCollapsed: shouldDefaultCollapseExecCard(cardInfo, cardItem.status),
                     onShowCommand: cardInfo.command ? () => onShowCommand(cardInfo.command) : undefined,
                     onStopTask: isCardRunning ? () => onStopExecCard(cardInfo.runMsg.id) : undefined,
-                    onRetryTask: isCardFailed ? () => onRetryCard(cardInfo) : undefined,
+                    onRerunTask: cardInfo.isScript
+                      ? !isCardRunning ? () => onRerunCard(cardInfo) : undefined
+                      : isCardFailed ? () => onRerunCard(cardInfo) : undefined,
                   };
                   if (cardInfo.isScript) {
                     return (

@@ -1085,7 +1085,7 @@ export default function HomePage() {
     }
   };
 
-  const handleRetryCard = async (cardInfo: ExecCardInfo) => {
+  const handleRerunCard = async (cardInfo: ExecCardInfo) => {
     if (!selectedSessionId) return;
     if (cardInfo.isScript) {
       try {
@@ -1101,7 +1101,7 @@ export default function HomePage() {
           ));
         }
       } catch (err) {
-        console.error("Failed to retry script:", err);
+        console.error("Failed to rerun script:", err);
       }
     } else {
       try {
@@ -1111,7 +1111,7 @@ export default function HomePage() {
           body: JSON.stringify({ messageId: cardInfo.runMsg.id }),
         });
       } catch (err) {
-        console.error("Failed to retry agent:", err);
+        console.error("Failed to rerun agent:", err);
       }
     }
   };
@@ -1590,7 +1590,7 @@ export default function HomePage() {
             onShowPrompt={(prompt) => setPromptModalText(prompt)}
             onStopExecCard={handleStopExecCard}
             onRestartScriptCard={handleRestartScriptCard}
-            onRetryCard={handleRetryCard}
+            onRerunCard={handleRerunCard}
             onDeleteScriptCard={handleDeleteScriptCard}
             onSubmit={handleSubmit}
             onSendMessage={handleSendMessage}

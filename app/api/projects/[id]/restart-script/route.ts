@@ -42,10 +42,6 @@ export async function POST(
   const returnMessage = messages.find(
     (message) => message.parentId === messageId && message.type === "script-return" && !message.deleted,
   );
-  if (returnMessage && (returnMessage.content.startsWith("✅") || returnMessage.content.startsWith("🛑"))) {
-    return NextResponse.json({ error: "Only failed script runs can be retried" }, { status: 400 });
-  }
-
   if (returnMessage) {
     await Promise.all([
       updateMessage("", returnMessage.id, { deleted: true }, projectId),

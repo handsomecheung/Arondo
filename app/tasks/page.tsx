@@ -628,7 +628,7 @@ export default function TasksPage() {
     }
   };
 
-  const handleRetryTask = async (task: TaskItem) => {
+  const handleRerunTask = async (task: TaskItem) => {
     try {
       let res: Response;
       if (task.type === "script" && task.scriptName) {
@@ -1161,7 +1161,7 @@ export default function TasksPage() {
                                   ws={wsInstance}
                                   onShowCommand={task.command ? () => setCommandTask(task) : undefined}
                                   onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
-                                  onRetryTask={task.type === "agent" && task.status === "error" ? () => handleRetryTask(task) : undefined}
+                                  onRerunTask={task.type === "agent" && task.status === "error" ? () => handleRerunTask(task) : undefined}
                                   onDeleteTask={!isRunning && !task.sessionId ? () => handleDeleteTask(task) : undefined}
                                   onShowPrompt={task.prompt ? () => setCommandTask({ ...task, name: `Agent Prompt`, command: task.prompt }) : undefined}
                                   onViewLog={task.messageId ? () => setTerminalTask(task) : undefined}
@@ -1189,7 +1189,9 @@ export default function TasksPage() {
                                 onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
                                 onRestartScript={isRunning && task.type === "script" && task.scriptName && task.messageId ? () => handleRestartScript(task) : undefined}
                                 onAnalyze={task.sessionId ? (msg) => handleAnalyzeTask(task, msg) : undefined}
-                                onRetryTask={task.status === "error" ? () => handleRetryTask(task) : undefined}
+                                onRerunTask={task.type === "script" && task.status !== "running"
+                                  ? () => handleRerunTask(task)
+                                  : undefined}
                                 onDeleteTask={!isRunning && !task.sessionId ? () => handleDeleteTask(task) : undefined}
                               />
                             );
@@ -1330,7 +1332,7 @@ export default function TasksPage() {
                                   ws={wsInstance}
                                   onShowCommand={task.command ? () => setCommandTask(task) : undefined}
                                   onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
-                                  onRetryTask={task.type === "agent" && task.status === "error" ? () => handleRetryTask(task) : undefined}
+                                  onRerunTask={task.type === "agent" && task.status === "error" ? () => handleRerunTask(task) : undefined}
                                   onDeleteTask={!isRunning && !task.sessionId ? () => handleDeleteTask(task) : undefined}
                                   onShowPrompt={task.prompt ? () => setCommandTask({ ...task, name: `Agent Prompt`, command: task.prompt }) : undefined}
                                   onViewLog={task.messageId ? () => setTerminalTask(task) : undefined}
@@ -1359,7 +1361,9 @@ export default function TasksPage() {
                                 onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
                                 onRestartScript={isRunning && task.type === "script" && task.scriptName && task.messageId ? () => handleRestartScript(task) : undefined}
                                 onAnalyze={task.sessionId ? (msg) => handleAnalyzeTask(task, msg) : undefined}
-                                onRetryTask={task.status === "error" ? () => handleRetryTask(task) : undefined}
+                                onRerunTask={task.type === "script" && task.status !== "running"
+                                  ? () => handleRerunTask(task)
+                                  : undefined}
                                 onDeleteTask={!isRunning && !task.sessionId ? () => handleDeleteTask(task) : undefined}
                               />
                             );

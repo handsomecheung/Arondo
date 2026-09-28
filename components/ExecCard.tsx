@@ -23,7 +23,7 @@ export interface ExecCardProps {
   onShowCommand?: () => void;
   onStopTask?: () => void;
   onRestartScript?: () => void;
-  onRetryTask?: () => void;
+  onRerunTask?: () => void;
   onDeleteTask?: () => void;
   collapsible?: boolean;
   defaultCollapsed?: boolean;
@@ -67,7 +67,7 @@ function IconRestart() {
   );
 }
 
-function IconRetry() {
+function IconRerun() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="23 4 23 10 17 10" />
@@ -120,7 +120,7 @@ export default function ExecCard({
   onShowCommand,
   onStopTask,
   onRestartScript,
-  onRetryTask,
+  onRerunTask,
   onDeleteTask,
   collapsible,
   defaultCollapsed,
@@ -155,7 +155,6 @@ export default function ExecCard({
   }, [collapsible, defaultCollapsed]);
 
   const isRunning = item.status === "running";
-  const isFailed = item.status === "error";
   const hasLog = !!item.messageId;
 
   let statusClass = "exec-card-running";
@@ -170,7 +169,7 @@ export default function ExecCard({
     (!!item.command && !!onShowCommand) ||
     (isRunning && hasLog && !!onStopTask) ||
     (isRunning && item.type === "script" && !!onRestartScript) ||
-    (isFailed && !!onRetryTask) ||
+    !!onRerunTask ||
     (!isRunning && !!onDeleteTask);
 
   return (
@@ -276,16 +275,16 @@ export default function ExecCard({
                         <span>Restart</span>
                       </button>
                     )}
-                    {isFailed && onRetryTask && (
+                    {onRerunTask && (
                       <button
                         className="task-menu-item"
                         onClick={() => {
                           setMenuOpen(false);
-                          onRetryTask();
+                          onRerunTask();
                         }}
                       >
-                        <IconRetry />
-                        <span>Retry</span>
+                        <IconRerun />
+                        <span>Rerun</span>
                       </button>
                     )}
                     {isRunning && hasLog && onStopTask && (
