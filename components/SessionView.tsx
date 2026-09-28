@@ -1109,7 +1109,7 @@ export default function SessionView({
         )}
         {(isNewSession || isNewDraft) && (
           <div className="input-meta">
-            <div className="input-meta-row">
+            <div className="input-meta-row runner-meta-row">
               <span className="input-label input-meta-row-label">Runner:</span>
               <div
                 className="custom-dropdown-container new-session-dropdown-container"
@@ -1169,7 +1169,7 @@ export default function SessionView({
               </div>
             </div>
 
-            <div className="input-meta-row">
+            <div className="input-meta-row project-meta-row">
               <span className="input-label input-meta-row-label">Project:</span>
               <div
                 className="custom-dropdown-container new-session-dropdown-container"
@@ -1182,11 +1182,6 @@ export default function SessionView({
                     !isRunning && runnerId && setProjectDropdownOpen(!projectDropdownOpen)
                   }
                   disabled={isRunning || !runnerId}
-                  style={
-                    (isNewSession || isNewDraft) && !repoPath.trim()
-                      ? { borderColor: "var(--error)" }
-                      : {}
-                  }
                   id="project-select-trigger"
                 >
                   <span>
@@ -1195,7 +1190,7 @@ export default function SessionView({
                       const matched = runnerProjects.find((p) => p.repoPath === repoPath);
                       if (matched) return matched.repoPath.split("/").pop() || matched.repoPath;
                       if (repoPath.trim()) return repoPath.split("/").pop() || repoPath;
-                      return runnerId ? "Select Project" : "Select runner first";
+                      return runnerId ? "No Project" : "Select runner first";
                     })()}
                   </span>
                   <IconChevronDown
@@ -1204,6 +1199,16 @@ export default function SessionView({
                 </button>
                 {projectDropdownOpen && (
                   <div className="custom-dropdown-menu new-session-dropdown-menu">
+                    <button
+                      type="button"
+                      className={`custom-dropdown-item ${!repoPath ? "active" : ""}`}
+                      onClick={() => {
+                        onSetRepoPath("");
+                        setProjectDropdownOpen(false);
+                      }}
+                    >
+                      No Project
+                    </button>
                     {projects.filter((p) => p.runnerId === runnerId).length === 0 ? (
                       <div className="custom-dropdown-item disabled">
                         No projects on this runner
@@ -1245,17 +1250,14 @@ export default function SessionView({
                   repoPath ? `Selected: ${repoPath}` : "Browse Directory"
                 }
                 id="browse-repo-btn"
-                style={
-                  (isNewSession || isNewDraft) && !repoPath.trim()
-                    ? { borderColor: "var(--error)" }
-                    : {}
-                }
               >
                 <IconFolder />
               </button>
             </div>
 
-            <div className="input-meta-row">
+            <p className="project-optional-hint">Choose a Project only when the agent needs to modify local code.</p>
+
+            <div className="input-meta-row agent-meta-row">
               <span className="input-label input-meta-row-label">Agent:</span>
               <div
                 className="custom-dropdown-container new-session-dropdown-container"

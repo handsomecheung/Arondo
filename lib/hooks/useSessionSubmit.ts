@@ -576,7 +576,7 @@ export function useSessionSubmit({
 
     try {
       if (isNewSession || isNewDraft || !selectedSessionId) {
-        if (!repoPath.trim() || !runnerId) return;
+        if (!runnerId) return;
         if (isNewDraft && !displayMessage) return;
         if (isNewDraft && draftTrigger === "at" && !draftAt) {
           setApiError({ title: "Send Error", message: "Choose a date and time for the scheduled send." });
@@ -600,7 +600,7 @@ export function useSessionSubmit({
             ...(targetSessionId ? { id: targetSessionId } : {}),
             prompt: agentPrompt,
             message: displayMessage,
-            repoPath: trimmedRepoPath,
+            ...(trimmedRepoPath ? { repoPath: trimmedRepoPath } : { noProject: true }),
             agentType,
             runnerId,
             ...(isNewDraft

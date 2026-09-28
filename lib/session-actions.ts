@@ -355,7 +355,7 @@ export async function dispatchCreateSession(
   repoPath: string,
   agentType: string,
   prompt: string,
-  opts: { id?: string; name?: string; tokenUuid?: string; displayMessage?: string; tempDir?: boolean; once?: boolean; cache?: "on" | "off" } = {},
+  opts: { id?: string; name?: string; tokenUuid?: string; displayMessage?: string; tempDir?: boolean; noProject?: boolean; once?: boolean; cache?: "on" | "off" } = {},
 ): Promise<ActionResult> {
   const trimmedPrompt = prompt.trim();
   if (!trimmedPrompt) {
@@ -376,7 +376,7 @@ export async function dispatchCreateSession(
         tokenUuid: opts.tokenUuid,
         once: opts.once ? true : undefined,
         cache: "on",
-      }, { tempDir: opts.tempDir });
+      }, { tempDir: opts.tempDir, noProject: opts.noProject });
 
       await updateSession(session.id, { status: "done" });
 
@@ -439,7 +439,7 @@ export async function dispatchCreateSession(
     tokenUuid: opts.tokenUuid,
     once: opts.once ? true : undefined,
     cache: opts.cache === "on" ? "on" : undefined,
-  }, { tempDir: opts.tempDir });
+  }, { tempDir: opts.tempDir, noProject: opts.noProject });
 
   const systemMessageId = crypto.randomUUID();
   const resolved = await resolveAgentType(agentType, run.info.agents, {
@@ -552,6 +552,9 @@ export async function dispatchSessionScript(
   const session = await getSession(sessionId);
   if (!session) {
     return { ok: false, error: "Session not found", status: 404 };
+  }
+  if (!session.projectId) {
+    return { ok: false, error: "Session has no project scripts", status: 400 };
   }
 
   const scripts = await getProjectScripts(session.projectId);

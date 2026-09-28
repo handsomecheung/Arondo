@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-const defaultChunkSize int64 = 64 * 1024  // 64KB per chunk
+const defaultChunkSize int64 = 64 * 1024   // 64KB per chunk
 const maxFileUploadSize = 50 * 1024 * 1024 // 50MB
 
 type fsReadRequest struct {
@@ -281,6 +281,7 @@ func (h *Handler) handleFsList(msg *Message) {
 
 type fsMkdtempRequest struct {
 	ExcludePaths []string `json:"excludePaths,omitempty"`
+	Purpose      string   `json:"purpose,omitempty"`
 }
 
 type fsMkdtempResponse struct {
@@ -290,6 +291,15 @@ type fsMkdtempResponse struct {
 
 func (h *Handler) handleFsMkdtemp(msg *Message) {
 	req, _ := parsePayload[fsMkdtempRequest](msg)
+	if req.Purpose == "no-project-session" {
+		dir, err := os.MkdirTemp("", "arondo-session-")
+		if err != nil {
+			h.sendError(msg.ID, "INTERNAL", "failed to create session directory: "+err.Error())
+			return
+		}
+		h.sendResponse(msg.ID, fsMkdtempResponse{OK: true, Path: dir})
+		return
+	}
 
 	excluded := make(map[string]bool)
 	for _, p := range req.ExcludePaths {

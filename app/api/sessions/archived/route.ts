@@ -14,8 +14,9 @@ export async function GET(request: NextRequest) {
   const showTempDirSessions = await getShowTempDirSessions();
   const valid: typeof sessions = [];
   for (const session of sessions) {
-    const project = projectsById.get(session.projectId);
-    if (!project || (!showTempDirSessions && isTempDirProject(project))) continue;
+    const project = session.projectId ? projectsById.get(session.projectId) : undefined;
+    if (session.projectId && !project) continue;
+    if (!showTempDirSessions && project && isTempDirProject(project)) continue;
 
     const isAllowed = await runnerManager.isTokenAllowedForRunnerId(session.runnerId, token);
     if (isAllowed) valid.push(session);

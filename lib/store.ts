@@ -87,7 +87,7 @@ export interface Session {
   status: SessionStatus;
   agentType: string;
   repoPath: string;
-  projectId: string;
+  projectId?: string;
   runnerId: string;
   errorMessage?: string;
   createdAt: string;
@@ -121,6 +121,9 @@ export interface Session {
   // Set to true if the session only allows a single message (must be created with tempDir).
   once?: boolean;
   cache?: "on" | "off";
+  // Set when the session was created without a Project. Its repoPath is a
+  // dedicated runner-side temporary directory, not a tempDir workspace.
+  noProject?: boolean;
 }
 
 export type MessageType =
@@ -507,16 +510,19 @@ export async function recordScriptHistory(projectId: string, command: string): P
 
 export async function createSession(
   data: Omit<Session, "id" | "projectId" | "createdAt" | "updatedAt"> & { id?: string },
-  opts: { tempDir?: boolean } = {}
+  opts: { tempDir?: boolean; noProject?: boolean } = {}
 ): Promise<Session> {
   const id = data.id || crypto.randomUUID();
-  const project = await getOrCreateProject(data.repoPath, data.runnerId, { tempDir: opts.tempDir });
+  const project = opts.noProject
+    ? undefined
+    : await getOrCreateProject(data.repoPath, data.runnerId, { tempDir: opts.tempDir });
   const sessionData = { ...data } as typeof data & { runningScripts?: string[] };
   delete sessionData.runningScripts;
   const session: Session = {
     ...sessionData,
     id,
-    projectId: project.id,
+    ...(project ? { projectId: project.id } : {}),
+    ...(opts.noProject ? { noProject: true } : {}),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

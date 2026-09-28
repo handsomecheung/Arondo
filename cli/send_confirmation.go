@@ -13,6 +13,8 @@ func (c *client) createQueuedSession(args arguments, trigger string) (session, e
 	payload := map[string]any{"prompt": args.prompt, "agentType": args.agentType, "isDraft": true, "draftTrigger": trigger}
 	if args.tempDir {
 		payload["tempDir"] = true
+	} else if args.noProject {
+		payload["noProject"] = true
 	} else {
 		payload["repoPath"] = args.repoPath
 	}

@@ -1204,9 +1204,9 @@ export default function HomePage() {
     selectedRunnerConnected &&
     !isArchivedSession &&
     (isNewDraft
-      ? repoPath.trim().length > 0 && !!runnerId && prompt.trim().length > 0
+      ? !!runnerId && prompt.trim().length > 0
       : isNewSession
-        ? repoPath.trim().length > 0 && !!runnerId
+        ? !!runnerId
         : isDraftSession
           ? true
           : prompt.trim().length > 0 && !!selectedSessionId);
@@ -1222,9 +1222,6 @@ export default function HomePage() {
       if (!runnerId) {
         return "Please select a runner first";
       }
-      if (repoPath.trim().length === 0) {
-        return "Please select a project path";
-      }
       if (!prompt.trim()) {
         return "Describe what you want to do";
       }
@@ -1233,9 +1230,6 @@ export default function HomePage() {
     if (isNewSession) {
       if (!runnerId) {
         return "Please select a runner first";
-      }
-      if (repoPath.trim().length === 0) {
-        return "Please select a project path";
       }
       if (!prompt.trim()) {
         return "Create Blank Session";

@@ -54,7 +54,7 @@ export async function POST(
       // (pending) todo messages before its first real dispatch.
       const existingMessages = await getMessages(id);
       const isFirstMessage = existingMessages.length === 0;
-      if (isFirstMessage) {
+      if (isFirstMessage && !session.noProject) {
         // The first message on a freshly created (empty) session hasn't gone through
         // the codebase-readiness check new sessions get in POST /api/sessions — apply
         // the same confirmation gate here so behavior is consistent either way.

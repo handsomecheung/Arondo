@@ -5,7 +5,7 @@ import { getArondoToken, isValidToken } from "@/lib/auth";
 import fs from "fs/promises";
 
 // Helper to load only the minimal necessary metadata from each session file
-async function readSessionMetadata(filePath: string): Promise<{ runnerId: string; projectId: string } | null> {
+async function readSessionMetadata(filePath: string): Promise<{ runnerId: string; projectId?: string } | null> {
   try {
     const data = await fs.readFile(filePath, "utf-8");
     return JSON.parse(data);
@@ -27,8 +27,9 @@ export async function GET(request: NextRequest) {
   for (const filePath of filePaths) {
     const session = await readSessionMetadata(filePath);
     if (session && session.runnerId) {
-      const project = projectsById.get(session.projectId);
-      if (!project || (!showTempDirSessions && isTempDirProject(project))) continue;
+      const project = session.projectId ? projectsById.get(session.projectId) : undefined;
+      if (session.projectId && !project) continue;
+      if (!showTempDirSessions && project && isTempDirProject(project)) continue;
 
       const isAllowed = await runnerManager.isTokenAllowedForRunnerId(session.runnerId, token);
       if (isAllowed) {

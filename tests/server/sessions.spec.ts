@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { spawn, ChildProcess } from 'child_process';
 import path from 'path';
+import fs from 'fs/promises';
+import os from 'os';
 
 test.describe('Sessions API integration tests', () => {
   let runnerProcess: ChildProcess;
@@ -132,6 +134,33 @@ test.describe('Sessions API integration tests', () => {
     const sessionsAfter = await listAfterRes.json();
     const foundAfter = sessionsAfter.find((s: any) => s.id === sessionId);
     expect(foundAfter).toBeUndefined();
+  });
+
+  test('should create a no-project session in its own temporary directory', async ({ request }) => {
+    const createRes = await request.post('/api/sessions', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        prompt: '',
+        noProject: true,
+        runnerId,
+        name: 'No Project Session',
+      },
+    });
+    expect(createRes.status()).toBe(201);
+    const session = await createRes.json();
+    expect(session.noProject).toBe(true);
+    expect(session.projectId).toBeUndefined();
+    expect(session.repoPath.startsWith(path.join(os.tmpdir(), 'arondo-session-'))).toBe(true);
+
+    const metadata = JSON.parse(await fs.readFile(
+      path.join(os.tmpdir(), 'arondo-test-config', 'sessions', session.id, 'session.json'),
+      'utf-8',
+    ));
+    expect(metadata.noProject).toBe(true);
+
+    await request.delete(`/api/sessions/${session.id}`, {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+    });
   });
 
   test('should not change session updatedAt when pinning, unpinning, archiving, or unarchiving', async ({ request }) => {

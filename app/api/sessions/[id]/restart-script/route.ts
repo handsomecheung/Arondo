@@ -20,6 +20,9 @@ export async function POST(
   if (!session) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
+  if (!session.projectId) {
+    return NextResponse.json({ error: "Session has no project scripts" }, { status: 400 });
+  }
 
   const { scriptName, messageId } = await req.json();
   if (!scriptName) {

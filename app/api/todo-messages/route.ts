@@ -19,8 +19,9 @@ export async function GET(request: NextRequest) {
   const items = [];
   for (const session of sessions) {
     if (!session.pendingTodoMessageIds || session.pendingTodoMessageIds.length === 0) continue;
-    const project = projectsById.get(session.projectId);
-    if (!project || (!showTempDirSessions && isTempDirProject(project))) continue;
+    const project = session.projectId ? projectsById.get(session.projectId) : undefined;
+    if (session.projectId && !project) continue;
+    if (!showTempDirSessions && project && isTempDirProject(project)) continue;
     const isAllowed = await runnerManager.isTokenAllowedForRunnerId(session.runnerId, token);
     if (!isAllowed) continue;
 

@@ -62,8 +62,9 @@ export async function executeAction(session: Session, todo: Message): Promise<vo
 
 // A draft's target codebase is "ready" once no agent is actively running
 // against it and the working tree has no uncommitted changes.
-async function isCodebaseReady(runnerId: string, repoPath: string): Promise<boolean> {
-  const { dirty, busy } = await getProjectReadiness(runnerId, repoPath);
+async function isCodebaseReady(session: Pick<Session, "runnerId" | "repoPath" | "noProject">): Promise<boolean> {
+  if (session.noProject) return true;
+  const { dirty, busy } = await getProjectReadiness(session.runnerId, session.repoPath);
   return !dirty && !busy;
 }
 
@@ -83,7 +84,7 @@ async function evaluateTodo(session: Session, todo: Message): Promise<void> {
   } else if (trigger.kind === "quotaAvailable") {
     if (await isQuotaAvailable(trigger.agentType as any, trigger.agyQuotaGroup)) await executeAction(session, todo);
   } else if (trigger.kind === "codebaseReady") {
-    if (await isCodebaseReady(session.runnerId, session.repoPath)) await executeAction(session, todo);
+    if (await isCodebaseReady(session)) await executeAction(session, todo);
   }
   // "manual" never auto-fires.
 }
@@ -153,7 +154,7 @@ function onSessionUpdated(session: Session): void {
       for (const target of targets) {
         const todos = await getPendingTodoMessages(target.id);
         const draft = todos.find((t) => t.todoTrigger?.kind === "codebaseReady");
-        if (draft && (await isCodebaseReady(target.runnerId, target.repoPath))) {
+        if (draft && (await isCodebaseReady(target))) {
           await executeAction(target, draft).catch((err) =>
             console.error("[scheduler] fast-path dispatch failed:", err),
           );

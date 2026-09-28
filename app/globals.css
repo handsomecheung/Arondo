@@ -1013,6 +1013,26 @@ body {
   gap: 8px;
 }
 
+.agent-meta-row {
+  order: 2;
+}
+
+.runner-meta-row {
+  order: 1;
+}
+
+.project-meta-row {
+  order: 3;
+}
+
+.project-optional-hint {
+  order: 4;
+  margin: -2px 0 0 60px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .input-meta-row-label {
   flex-shrink: 0;
   width: 52px;

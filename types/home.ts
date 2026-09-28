@@ -15,7 +15,7 @@ export interface Session {
   status: SessionStatus;
   agentType: string;
   repoPath: string;
-  projectId: string;
+  projectId?: string;
   runnerId: string;
   errorMessage?: string;
   createdAt: string;
@@ -26,6 +26,7 @@ export interface Session {
   pendingTodoMessageIds?: string[];
   pendingTodoTrigger?: TodoTriggerKind;
   tokenUuid?: string;
+  noProject?: boolean;
 }
 
 export interface Project {

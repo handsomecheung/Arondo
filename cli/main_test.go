@@ -61,6 +61,16 @@ func TestParseArgs(t *testing.T) {
 	}
 }
 
+func TestParseArgsNoProject(t *testing.T) {
+	args, err := parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--no-path", "Answer this"}, cliConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !args.noProject || args.repoPath != "" {
+		t.Fatalf("expected --no-path without a repository path, got %#v", args)
+	}
+}
+
 func TestParseArgsRejectsInvalidCombinations(t *testing.T) {
 	_, err := parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--resume", "--temp-dir", "message"}, cliConfig{})
 	if err == nil || err.Error() != "--resume cannot be used with --temp-dir" {
@@ -69,6 +79,11 @@ func TestParseArgsRejectsInvalidCombinations(t *testing.T) {
 
 	_, err = parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--session-id", "s1", "--temp-dir", "message"}, cliConfig{})
 	if err == nil || err.Error() != "--session-id cannot be used with --temp-dir" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	_, err = parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--temp-dir", "--no-path", "message"}, cliConfig{})
+	if err == nil || err.Error() != "--temp-dir cannot be used with --no-path" {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -776,6 +791,27 @@ func TestCreateSessionSendsOncePayload(t *testing.T) {
 	}
 }
 
+func TestCreateSessionSendsNoProjectPayload(t *testing.T) {
+	var capturedPayload map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&capturedPayload)
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": "sess-no-project"})
+	}))
+	defer server.Close()
+
+	c := &client{server: server.URL, token: "token", http: server.Client()}
+	_, err := c.createSession(arguments{prompt: "Answer a question", noProject: true, agentType: "auto"}, false)
+	if err != nil {
+		t.Fatalf("createSession failed: %v", err)
+	}
+	if capturedPayload["noProject"] != true {
+		t.Fatalf("expected noProject=true, got %#v", capturedPayload["noProject"])
+	}
+	if _, ok := capturedPayload["repoPath"]; ok {
+		t.Fatalf("repoPath must be omitted for --no-path, got %#v", capturedPayload["repoPath"])
+	}
+}
+
 func TestSendMessageToOnceSessionReturnsError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/sessions/sess-once-1/messages" && r.Method == http.MethodPost {
@@ -802,4 +838,3 @@ func TestSendMessageToOnceSessionReturnsError(t *testing.T) {
 		t.Fatalf("unexpected error message: %#v", apiErr.body["error"])
 	}
 }
-
