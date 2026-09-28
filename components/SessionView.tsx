@@ -232,6 +232,13 @@ export default function SessionView({
   const sessionProjectExists = selectedSession?.projectId
     ? projects.some((p) => p.id === selectedSession.projectId)
     : true;
+  const isTempDirSession = Boolean(
+    selectedSession?.tempDir ||
+    selectedSession?.once ||
+    (selectedSession?.projectId && projects.find((p) => p.id === selectedSession.projectId)?.tempDir)
+  );
+  const isNoPathSession = Boolean(selectedSession?.noProject);
+  const isOnceSession = Boolean(selectedSession?.once);
   const hasPendingTodo = messages.some(
     (message) => message.type === "user-todo" && message.todoStatus === "pending",
   );
@@ -522,12 +529,35 @@ export default function SessionView({
                 minWidth: 0,
               }}
             >
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 1 }}>
-                Project:{" "}
-                {selectedSession.repoPath
-                  ? (selectedSession.repoPath.split("/").pop() || selectedSession.repoPath)
-                  : "None"}
-              </span>
+              {isOnceSession ? (
+                <span
+                  title="This single-use session runs in an isolated temporary workspace and only accepts a single prompt"
+                  style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 1 }}
+                >
+                  Single-use Workspace
+                </span>
+              ) : isNoPathSession ? (
+                <span
+                  title="This session runs in a dedicated temporary directory without a project path"
+                  style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 1 }}
+                >
+                  Standalone Workspace
+                </span>
+              ) : isTempDirSession ? (
+                <span
+                  title="This session runs in an isolated temporary directory workspace"
+                  style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 1 }}
+                >
+                  Temporary Workspace
+                </span>
+              ) : (
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 1 }}>
+                  Project:{" "}
+                  {selectedSession.repoPath
+                    ? (selectedSession.repoPath.split("/").pop() || selectedSession.repoPath)
+                    : "None"}
+                </span>
+              )}
               <div ref={agentSwitchRef} style={{ position: "relative", flexShrink: 0 }}>
                 <button
                   type="button"

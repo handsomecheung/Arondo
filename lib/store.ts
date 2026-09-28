@@ -124,6 +124,7 @@ export interface Session {
   // Set when the session was created without a Project. Its repoPath is a
   // dedicated runner-side temporary directory, not a tempDir workspace.
   noProject?: boolean;
+  tempDir?: boolean;
 }
 
 export type MessageType =
@@ -522,6 +523,7 @@ export async function createSession(
     ...sessionData,
     id,
     ...(project ? { projectId: project.id } : {}),
+    ...(opts.tempDir ? { tempDir: true } : {}),
     ...(opts.noProject ? { noProject: true } : {}),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

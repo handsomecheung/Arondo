@@ -26,7 +26,9 @@ export interface Session {
   pendingTodoMessageIds?: string[];
   pendingTodoTrigger?: TodoTriggerKind;
   tokenUuid?: string;
+  once?: boolean;
   noProject?: boolean;
+  tempDir?: boolean;
 }
 
 export interface Project {
