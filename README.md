@@ -350,12 +350,12 @@ The final JSON result is written to stdout; progress messages and errors are wri
 Additional CLI commands help inspect runner readiness before sending work:
 
 ```bash
-cli/arondo-cli list-agents
+cli/arondo-cli get-agents
 cli/arondo-cli get-quota
 cli/arondo-cli update-quota
 ```
 
-`list-agents` reports whether Antigravity, Claude, Codex, and OpenCode are available on each accessible runner, including quota-derived availability reasons. `get-quota` prints the latest recorded quota data, and `update-quota` queues an asynchronous quota refresh. All CLI commands use the same connection-setting precedence: explicit `--server` / `--client-token`, then `ARONDO_SERVER` / `ARONDO_CLIENT_TOKEN`, then `cli.server` / `cli.clientToken` in `~/.arondo/arondo.json`.
+`get-agents` reports whether Antigravity, Claude, Codex, and OpenCode are available on each accessible runner, including quota-derived availability reasons. `get-quota` prints the latest recorded quota data, and `update-quota` queues an asynchronous quota refresh. All CLI commands use the same connection-setting precedence: explicit `--server` / `--client-token`, then `ARONDO_SERVER` / `ARONDO_CLIENT_TOKEN`, then `cli.server` / `cli.clientToken` in `~/.arondo/arondo.json`.
 
 ### Install the Arondo CLI Skill
 

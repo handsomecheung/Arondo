@@ -10,7 +10,7 @@ import (
 const listAgentsUsage = `List agent availability for all accessible runners.
 
 Usage:
-  cli/arondo-cli list-agents \
+  cli/arondo-cli get-agents \
     --server http://localhost:3251 \
     --client-token <client_access_token>
 

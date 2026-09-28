@@ -53,7 +53,7 @@ Commands:
   send          Create a session or send a message to an existing session, then wait for the result
   get-messages  Print the full conversation history of a session
   get-projects  List all accessible projects
-  list-agents   List agent availability for all accessible runners
+  get-agents    List agent availability for all accessible runners
   get-quota     List the recorded quota usage for all accessible runners
   update-quota  Force an asynchronous quota refresh for all accessible runners
 
@@ -512,7 +512,7 @@ func run(argv []string) error {
 	if len(argv) == 0 {
 		return fmt.Errorf("a command is required\n\n%s", rootUsage)
 	}
-	if argv[0] != "send" && argv[0] != "get-messages" && argv[0] != "get-projects" && argv[0] != "list-agents" && argv[0] != "get-quota" && argv[0] != "update-quota" {
+	if argv[0] != "send" && argv[0] != "get-messages" && argv[0] != "get-projects" && argv[0] != "get-agents" && argv[0] != "get-quota" && argv[0] != "update-quota" {
 		return fmt.Errorf("unknown command: %s\n\n%s", argv[0], rootUsage)
 	}
 	configDir, err := configDir()
@@ -545,7 +545,7 @@ func run(argv []string) error {
 		}
 		return getProjects(&client{server: args.server, token: args.token, http: http.DefaultClient}, args)
 	}
-	if argv[0] == "list-agents" {
+	if argv[0] == "get-agents" {
 		args, err := parseListAgentsArgs(argv[1:], config)
 		if errors.Is(err, errHelp) {
 			fmt.Fprintln(os.Stderr, listAgentsUsage)

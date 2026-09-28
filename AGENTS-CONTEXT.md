@@ -56,7 +56,7 @@ runner/                  # Go runner binary
   handler_pty.go        # pty.input (write to PTY), pty.resize
   pty.go                # TaskManager: spawn processes with PTY, scrollback buffer, auto-cleanup on exit
 cli/
-  main.go               # Dependency-free Go CLI: send/list-agents/get-quota/update-quota
+  main.go               # Dependency-free Go CLI: send/get-agents/get-quota/update-quota
   install-skill         # Installs the bundled arondo-cli skill for supported agents
 app/
   page.tsx              # Main UI (runner selector, chat, status tracking, terminal modals, 3-dot dropdown)
@@ -294,7 +294,7 @@ Uses the `process` singleton pattern (shared across tsx and Turbopack contexts).
 cd cli && go build -o arondo-cli . && cd ..  # Build the Go CLI
 ```
 
-The CLI reads connection settings in this order: command flags (`--server`, `--client-token`), then `ARONDO_SERVER` / `ARONDO_CLIENT_TOKEN`, then `cli.server` / `cli.clientToken` in `~/.arondo/arondo.json`. `send` creates or resumes sessions and waits for completion (`--once` restricts `--temp-dir` sessions to a single message, and `--cache on` caches output by prompt hash). `list-agents` reports Antigravity, Claude, Codex, and OpenCode availability per runner. `get-quota` prints recorded quota data, and `update-quota` queues an asynchronous quota refresh via `/api/agents/quota`.
+The CLI reads connection settings in this order: command flags (`--server`, `--client-token`), then `ARONDO_SERVER` / `ARONDO_CLIENT_TOKEN`, then `cli.server` / `cli.clientToken` in `~/.arondo/arondo.json`. `send` creates or resumes sessions and waits for completion (`--once` restricts `--temp-dir` sessions to a single message, and `--cache on` caches output by prompt hash). `get-agents` reports Antigravity, Claude, Codex, and OpenCode availability per runner. `get-quota` prints recorded quota data, and `update-quota` queues an asynchronous quota refresh via `/api/agents/quota`.
 
 ## Real-time Communication
 
