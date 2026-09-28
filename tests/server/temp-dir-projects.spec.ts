@@ -3,6 +3,8 @@ import { spawn, ChildProcess } from 'child_process';
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
+import crypto from 'crypto';
+import { readOnceCache, writeOnceCache } from '../../lib/store';
 
 const CONFIG_DIR = process.env.ARONDO_CONFIG_DIR || path.join(os.tmpdir(), 'arondo-test-config');
 
@@ -282,12 +284,16 @@ test.describe('Temp dir project task visibility', () => {
     expect((await invalidRes2.json()).error).toBe('cache must be on or off');
 
     // 3. Pre-seed cache file
-    const crypto = await import('crypto');
     const prompt = 'cached prompt test ' + crypto.randomUUID();
     const promptHash = crypto.createHash('sha256').update(prompt.trim()).digest('hex');
     const cacheDir = path.join(CONFIG_DIR, 'cache', 'once');
     await fs.mkdir(cacheDir, { recursive: true });
     await fs.writeFile(path.join(cacheDir, promptHash), 'CACHED AGENT OUTPUT 12345\n', 'utf-8');
+    await fs.writeFile(
+      path.join(cacheDir, `${promptHash}.meta.json`),
+      JSON.stringify({ createdAt: Date.now() }),
+      'utf-8',
+    );
 
     // 4. Create session with cache: "on"
     const cachedSessionRes = await request.post('/api/sessions', {
@@ -327,5 +333,22 @@ test.describe('Temp dir project task visibility', () => {
     const logJson = await logRes.json();
     expect(logJson.log).toBe('CACHED AGENT OUTPUT 12345\n');
   });
-});
 
+  test('expires cached output after seven days without deleting it', async () => {
+    const prompt = `expired cache test ${crypto.randomUUID()}`;
+    await writeOnceCache(prompt, 'EXPIRED CACHED OUTPUT');
+
+    const promptHash = crypto.createHash('sha256').update(prompt.trim()).digest('hex');
+    const metadataPath = path.join(CONFIG_DIR, 'cache', 'once', `${promptHash}.meta.json`);
+    const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf-8'));
+    expect(metadata.createdAt).toEqual(expect.any(Number));
+    await fs.writeFile(
+      metadataPath,
+      JSON.stringify({ createdAt: Date.now() - (7 * 24 * 60 * 60 * 1000) }),
+      'utf-8',
+    );
+
+    await expect(fs.stat(path.join(CONFIG_DIR, 'cache', 'once', promptHash))).resolves.toBeDefined();
+    await expect(readOnceCache(prompt)).resolves.toBeNull();
+  });
+});

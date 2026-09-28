@@ -207,7 +207,7 @@ tests/                  # Playwright integration tests
   global-rules.md       # Global agent rules written from Settings
   agent-sessions.json  # Agent session map: { "agy": {}, "codex": {}, "opencode": {} }
   cache/
-    once/               # Cached outputs for single-use sessions (keyed by prompt SHA-256)
+    once/               # Cached outputs for single-use sessions (keyed by prompt SHA-256, expire after 7 days; metadata in ${hash}.meta.json)
   sessions/
     [sessionId]/
       session.json      # Session metadata (status, agent, repoPath, runnerId)
@@ -294,7 +294,7 @@ Uses the `process` singleton pattern (shared across tsx and Turbopack contexts).
 cd cli && go build -o arondo-cli . && cd ..  # Build the Go CLI
 ```
 
-The CLI reads connection settings in this order: command flags (`--server`, `--client-token`), then `ARONDO_SERVER` / `ARONDO_CLIENT_TOKEN`, then `cli.server` / `cli.clientToken` in `~/.arondo/arondo.json`. `send` creates or resumes sessions and waits for completion (`--once` restricts `--temp-dir` sessions to a single message, and `--cache on` caches output by prompt hash). `get-agents` reports Antigravity, Claude, Codex, and OpenCode availability per runner. `get-quota` prints recorded quota data, and `update-quota` queues an asynchronous quota refresh via `/api/agents/quota`.
+The CLI reads connection settings in this order: command flags (`--server`, `--client-token`), then `ARONDO_SERVER` / `ARONDO_CLIENT_TOKEN`, then `cli.server` / `cli.clientToken` in `~/.arondo/arondo.json`. `send` creates or resumes sessions and waits for completion (`--once` restricts `--temp-dir` sessions to a single message, and `--cache on` caches output by prompt hash for seven days). `get-agents` reports Antigravity, Claude, Codex, and OpenCode availability per runner. `get-quota` prints recorded quota data, and `update-quota` queues an asynchronous quota refresh via `/api/agents/quota`.
 
 ## Real-time Communication
 

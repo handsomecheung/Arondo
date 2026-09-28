@@ -178,6 +178,11 @@ export interface Message {
 // ─── Once Cache ───────────────────────────────────────────────────────────────
 
 const ONCE_CACHE_DIR = path.join(CONFIG_DIR, "cache", "once");
+const ONCE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+interface OnceCacheMetadata {
+  createdAt: number;
+}
 
 export function getPromptHash(prompt: string): string {
   return crypto.createHash("sha256").update(prompt.trim()).digest("hex");
@@ -187,9 +192,19 @@ export function getOnceCacheFilePath(prompt: string): string {
   return path.join(ONCE_CACHE_DIR, getPromptHash(prompt));
 }
 
+export function getOnceCacheMetadataFilePath(prompt: string): string {
+  return `${getOnceCacheFilePath(prompt)}.meta.json`;
+}
+
 export async function readOnceCache(prompt: string): Promise<string | null> {
   try {
     const filePath = getOnceCacheFilePath(prompt);
+    const metadataPath = getOnceCacheMetadataFilePath(prompt);
+    const metadata = JSON.parse(await fs.readFile(metadataPath, "utf-8")) as OnceCacheMetadata;
+    const age = Date.now() - metadata.createdAt;
+    if (!Number.isFinite(metadata.createdAt) || age < 0 || age >= ONCE_CACHE_TTL_MS) {
+      return null;
+    }
     return await fs.readFile(filePath, "utf-8");
   } catch {
     return null;
@@ -200,6 +215,7 @@ export async function writeOnceCache(prompt: string, output: string): Promise<vo
   const filePath = getOnceCacheFilePath(prompt);
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, output, "utf-8");
+  await writeJsonAtomic(getOnceCacheMetadataFilePath(prompt), { createdAt: Date.now() } satisfies OnceCacheMetadata);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
