@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -70,21 +71,37 @@ func TestParseAgyQuotaLatestUsageFormat(t *testing.T) {
 	if q.Account != "arondo@gmail.com" {
 		t.Fatalf("Account = %q, want arondo@gmail.com", q.Account)
 	}
+	assertAgyRemain(t, "GeminiWeeklyRemain", q.GeminiWeeklyRemain, 0.9786)
+	assertAgyRemain(t, "GeminiHourRemain", q.GeminiHourRemain, 0.946)
+	assertAgyRemain(t, "OtherWeeklyRemain", q.OtherWeeklyRemain, 0.959)
+	assertAgyRemain(t, "OtherHourRemain", q.OtherHourRemain, 1)
+	if q.GeminiWeeklyResetsAt == nil || q.GeminiHourResetsAt == nil || q.OtherWeeklyResetsAt == nil {
+		t.Fatal("expected reset timestamps for non-full quotas")
+	}
+	if q.OtherHourResetsAt != nil {
+		t.Fatal("available quota must not have a reset timestamp")
+	}
+}
+
+func TestParseAgyQuotaLegacyUsageFormat(t *testing.T) {
+	q := parseAgyQuota(`
+GEMINI MODELS
+  Weekly Limit Remaining
+    78% remaining · Refreshes in 155h 15m
+  Five Hour Limit Remaining
+    Refreshes in 2h 15m
+`)
+
 	assertAgyRemain(t, "GeminiWeeklyRemain", q.GeminiWeeklyRemain, 0.78)
 	assertAgyRemain(t, "GeminiHourRemain", q.GeminiHourRemain, 0)
-	assertAgyRemain(t, "OtherWeeklyRemain", q.OtherWeeklyRemain, 1)
-	assertAgyRemain(t, "OtherHourRemain", q.OtherHourRemain, 1)
 	if q.GeminiWeeklyResetsAt == nil || q.GeminiHourResetsAt == nil {
-		t.Fatal("expected Gemini reset timestamps")
-	}
-	if q.OtherWeeklyResetsAt != nil || q.OtherHourResetsAt != nil {
-		t.Fatal("available quotas must not have reset timestamps")
+		t.Fatal("expected reset timestamps for legacy quota format")
 	}
 }
 
 func assertAgyRemain(t *testing.T, name string, got *float64, want float64) {
 	t.Helper()
-	if got == nil || *got != want {
+	if got == nil || math.Abs(*got-want) > 1e-9 {
 		t.Fatalf("%s = %v, want %v", name, got, want)
 	}
 }

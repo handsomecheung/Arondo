@@ -9,20 +9,20 @@ GEMINI MODELS
   Models within this group: Gemini Flash, Gemini Pro
 
   Weekly Limit Remaining
-    [███████████████████████████████████████░░░░░░░░░░░] 77.76%
-    78% remaining · Refreshes in 155h 15m
+    [█████████████████████████████████████████████████░] 97.86%
+    Refreshes in 47h 29m
 
   Five Hour Limit Remaining
-    [░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 0.00%
-    Refreshes in 2h 15m
+    [███████████████████████████████████████████████░░░] 94.60%
+    Refreshes in 2h 49m
 
 
 CLAUDE AND GPT MODELS
   Models within this group: Claude Opus, Claude Sonnet, GPT-OSS
 
   Weekly Limit Remaining
-    [██████████████████████████████████████████████████] 100.00%
-    Quota available
+    [████████████████████████████████████████████████░░] 95.90%
+    Refreshes in 84h 49m
 
   Five Hour Limit Remaining
     [██████████████████████████████████████████████████] 100.00%

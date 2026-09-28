@@ -85,6 +85,7 @@ var (
 	accountRe      = regexp.MustCompile(`(?m)^\s*Account:\s*(\S+@\S+)\s*$`)
 	defaultModelRe = regexp.MustCompile(`(?m)esc to cancel\s+(\S.*?)\s*$`)
 	remainRe       = regexp.MustCompile(`(\d+(?:\.\d+)?)\s*%\s+remaining\s+·\s+Refreshes in\s+(.+)`)
+	percentageRe   = regexp.MustCompile(`(?:^|\])\s*(\d+(?:\.\d+)?)\s*%$`)
 	refreshOnlyRe  = regexp.MustCompile(`^Refreshes in\s+(.+)`)
 )
 
@@ -103,36 +104,50 @@ func parseAgyQuota(text string) *AgyQuota {
 	}
 
 	var section, limitType string
+	var pendingRemain *float64
 	for _, rawLine := range strings.Split(text, "\n") {
 		line := strings.TrimSpace(rawLine)
 		switch {
 		case line == "GEMINI MODELS":
-			section, limitType = "gemini", ""
+			section, limitType, pendingRemain = "gemini", "", nil
 		case strings.HasSuffix(line, "MODELS") && line != "GEMINI MODELS":
-			section, limitType = "other", ""
+			section, limitType, pendingRemain = "other", "", nil
 		case strings.HasPrefix(line, "Weekly Limit"):
-			limitType = "weekly"
+			limitType, pendingRemain = "weekly", nil
 		case strings.HasPrefix(line, "Five Hour Limit"):
-			limitType = "fivehour"
+			limitType, pendingRemain = "fivehour", nil
 		case line == "Quota available":
 			applyAgyLimit(q, section, limitType, floatPtr(1.0), nil)
+			pendingRemain = nil
 		case strings.HasPrefix(line, "Disabled:"):
 			applyAgyLimit(q, section, limitType, nil, nil)
+			pendingRemain = nil
 		default:
 			if m := remainRe.FindStringSubmatch(line); m != nil {
 				applyAgyLimit(q, section, limitType,
 					pctToFloat(m[1]),
 					parseDurationTimestamp(strings.TrimSpace(m[2])),
 				)
+				pendingRemain = nil
+			} else if m := percentageRe.FindStringSubmatch(line); m != nil {
+				pendingRemain = pctToFloat(m[1])
 			} else if m := refreshOnlyRe.FindStringSubmatch(line); m != nil {
 				applyAgyLimit(q, section, limitType,
-					floatPtr(0.0),
+					pendingRemainOrZero(pendingRemain),
 					parseDurationTimestamp(strings.TrimSpace(m[1])),
 				)
+				pendingRemain = nil
 			}
 		}
 	}
 	return q
+}
+
+func pendingRemainOrZero(remain *float64) *float64 {
+	if remain != nil {
+		return remain
+	}
+	return floatPtr(0.0)
 }
 
 func applyAgyLimit(q *AgyQuota, section, limitType string, remain *float64, refresh *int64) {
