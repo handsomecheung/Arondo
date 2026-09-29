@@ -125,6 +125,7 @@ export async function dispatchDetachedAgent(
     createdAt: Date.now(),
     agentType: resolved.agentType,
     command,
+    prompt: trimmedMessage || instructions,
     detachedKind: kind,
   });
   await clearSessionLog(sessionId, runMessage.id);
@@ -302,6 +303,7 @@ export async function dispatchFollowupMessage(
     agentType: resolvedType,
     agyQuotaGroup: resolved.agyQuotaGroup,
     command,
+    prompt: trimmedPrompt || trimmedMessage,
   });
 
   await clearSessionLog(sessionId, systemMsg.id);
@@ -592,6 +594,7 @@ export async function dispatchSessionScript(
     messageId: systemMsg.id,
     type: "script",
     scriptName,
+    command: script.command,
     createdAt: Date.now(),
   });
 

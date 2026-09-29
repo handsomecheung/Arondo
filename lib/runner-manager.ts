@@ -39,6 +39,15 @@ import { sendWebPushNotification } from "./web-push-server";
 const CONFIG_DIR = getConfigDir();
 const RUNNERS_DIR = path.join(CONFIG_DIR, "runners");
 const TASK_RETENTION_MS = 3 * 24 * 60 * 60 * 1000;
+const NOTIFICATION_PREVIEW_LENGTH = 120;
+
+function notificationPreview(value: string | undefined): string | undefined {
+  const normalized = value?.replace(/\s+/g, " ").trim();
+  if (!normalized) return undefined;
+  return normalized.length > NOTIFICATION_PREVIEW_LENGTH
+    ? `${normalized.slice(0, NOTIFICATION_PREVIEW_LENGTH - 1)}…`
+    : normalized;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1425,6 +1434,7 @@ class RunnerManager {
 
     if (!stoppedByUser) {
       const sessionTitle = session?.name || ctx.sessionId.slice(0, 8);
+      const promptPreview = notificationPreview(ctx.prompt);
       const pushTitle = invalidModelSelection
         ? "⚠️ Invalid Model"
         : quotaExhausted
@@ -1433,12 +1443,20 @@ class RunnerManager {
             ? "✅ Task Completed"
             : "❌ Task Failed";
       const pushBody = invalidModelSelection
-        ? `Session "${sessionTitle}": Invalid model selected.`
+        ? promptPreview
+          ? `${promptPreview}: Invalid model selected.`
+          : `Session "${sessionTitle}": Invalid model selected.`
         : quotaExhausted
-          ? `Session "${sessionTitle}": Quota exhausted for ${resolvedAgentType}.`
+          ? promptPreview
+            ? `${promptPreview}: Quota exhausted for ${resolvedAgentType}.`
+            : `Session "${sessionTitle}": Quota exhausted for ${resolvedAgentType}.`
           : success
-            ? `Session "${sessionTitle}": Agent finished successfully.`
-            : `Session "${sessionTitle}": Agent exited with error code ${exitCode}.`;
+            ? promptPreview
+              ? `${promptPreview}: Agent finished successfully.`
+              : `Session "${sessionTitle}": Agent finished successfully.`
+            : promptPreview
+              ? `${promptPreview}: Agent exited with error code ${exitCode}.`
+              : `Session "${sessionTitle}": Agent exited with error code ${exitCode}.`;
 
       sendWebPushNotification({
         title: pushTitle,
@@ -1567,11 +1585,16 @@ class RunnerManager {
     if (!stoppedByUser) {
       const session = await getSession(ctx.sessionId);
       const sessionTitle = session?.name || ctx.sessionId.slice(0, 8);
+      const commandPreview = notificationPreview(ctx.command);
       sendWebPushNotification({
         title: exitCode === 0 ? "⚡ Script Completed" : "❌ Script Failed",
         body: exitCode === 0
-          ? `Session "${sessionTitle}": Script finished successfully.`
-          : `Session "${sessionTitle}": ${errorMessage}`,
+          ? commandPreview
+            ? `${commandPreview}: Script finished successfully.`
+            : `Session "${sessionTitle}": Script finished successfully.`
+          : commandPreview
+            ? `${commandPreview}: ${errorMessage}`
+            : `Session "${sessionTitle}": ${errorMessage}`,
         url: `/`,
         tag: `session-${ctx.sessionId}`,
       }).catch((err) => {

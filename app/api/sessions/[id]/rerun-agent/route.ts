@@ -129,6 +129,7 @@ export async function POST(
     createdAt: Date.now(),
     agentType: resolvedType,
     command,
+    prompt,
   });
 
   await clearSessionLog(id, systemMsg.id);
