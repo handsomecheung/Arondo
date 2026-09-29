@@ -400,6 +400,17 @@ export default function SessionView({
     if (textareaRef.current) autoResizeTextarea(textareaRef.current);
   }, [chatInputPlaceholder, chatInputValue, textareaRef]);
 
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    if (
+      !(isNewSession || isNewDraft) ||
+      !textarea ||
+      document.activeElement !== textarea
+    ) return;
+
+    textarea.scrollIntoView({ block: "nearest" });
+  }, [chatInputValue, isNewDraft, isNewSession, textareaRef]);
+
   function agentTypeLabel(type: string): string {
     if (type === "antigravity") return "Antigravity CLI";
     if (type === "claude") return "Claude Code";
@@ -1127,7 +1138,7 @@ export default function SessionView({
 
       {showComposer && (
       <div
-        className={`input-area${isDragging ? " drag-over" : ""}`}
+        className={`input-area${isNewSession || isNewDraft ? " new-session-input-area" : ""}${isDragging ? " drag-over" : ""}`}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
