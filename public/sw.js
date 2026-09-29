@@ -1,7 +1,40 @@
+// Service Worker installation & immediate activation
+self.addEventListener("install", (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(clients.claim());
+});
+
 // Presence of a fetch handler is required by Chrome on Android for full PWA
 // installability (standalone), not just a home screen shortcut. No caching
 // is performed here.
 self.addEventListener("fetch", () => {});
+
+// Handle push events from the server (Web Push API)
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+
+  try {
+    const data = event.data.json();
+    const title = data.title || "Arondo";
+    const options = {
+      body: data.body || "",
+      icon: data.icon || "/icon-192.png",
+      badge: data.badge || "/badge-96.png",
+      tag: data.tag || undefined,
+      data: {
+        url: data.url || "/",
+        ...(data.data || {}),
+      },
+    };
+
+    event.waitUntil(self.registration.showNotification(title, options));
+  } catch (err) {
+    console.error("[Service Worker] Error displaying push notification:", err);
+  }
+});
 
 // Handle notification clicks to open or focus the appropriate web app page
 self.addEventListener("notificationclick", (event) => {

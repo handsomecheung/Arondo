@@ -34,11 +34,16 @@ export function ClientInit() {
       };
     }
 
-    // 2. Register service worker (required by Chrome on Android for full PWA installability)
+    // 2. Register service worker (required by Chrome on Android and iOS for PWA)
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch((err) => {
-        console.error("Service worker registration failed:", err);
-      });
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then((reg) => {
+          reg.update().catch(() => {});
+        })
+        .catch((err) => {
+          console.error("Service worker registration failed:", err);
+        });
     }
 
     // 3. Perform authentication check

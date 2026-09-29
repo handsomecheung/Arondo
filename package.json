@@ -25,6 +25,7 @@
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
     "unist-util-visit": "^5.1.0",
+    "web-push": "^3.6.7",
     "ws": "^8.21.0",
     "zod": "^4.4.3"
   },
@@ -33,6 +34,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "@types/ws": "^8.18.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",

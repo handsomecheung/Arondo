@@ -34,6 +34,7 @@ import {
   isAgentQuotaExhausted,
   isAgyInvalidModelError,
 } from "./agent-quota-errors";
+import { sendWebPushNotification } from "./web-push-server";
 
 const CONFIG_DIR = getConfigDir();
 const RUNNERS_DIR = path.join(CONFIG_DIR, "runners");
@@ -1422,6 +1423,33 @@ class RunnerManager {
     eventBus.publish({ type: "message_added", payload: agentMsg });
     eventBus.publish({ type: "session_updated", payload: updated });
 
+    if (!stoppedByUser) {
+      const sessionTitle = session?.name || ctx.sessionId.slice(0, 8);
+      const pushTitle = invalidModelSelection
+        ? "⚠️ Invalid Model"
+        : quotaExhausted
+          ? "⚠️ Quota Exhausted"
+          : success
+            ? "✅ Task Completed"
+            : "❌ Task Failed";
+      const pushBody = invalidModelSelection
+        ? `Session "${sessionTitle}": Invalid model selected.`
+        : quotaExhausted
+          ? `Session "${sessionTitle}": Quota exhausted for ${resolvedAgentType}.`
+          : success
+            ? `Session "${sessionTitle}": Agent finished successfully.`
+            : `Session "${sessionTitle}": Agent exited with error code ${exitCode}.`;
+
+      sendWebPushNotification({
+        title: pushTitle,
+        body: pushBody,
+        url: `/`,
+        tag: `session-${ctx.sessionId}`,
+      }).catch((err) => {
+        console.error("[runner-manager] Failed to send web push for agent exit:", err);
+      });
+    }
+
     if (quotaExhausted && !stoppedByUser) {
       const msgIdx = messages.findIndex((m) => m.id === ctx.messageId);
       const lastUserMsg = [...messages.slice(0, msgIdx)].reverse().find((m) => m.role === "user");
@@ -1534,6 +1562,21 @@ class RunnerManager {
       });
       eventBus.publish({ type: "message_added", payload: returnMessage });
       eventBus.publish({ type: "session_updated", payload: updated });
+    }
+
+    if (!stoppedByUser) {
+      const session = await getSession(ctx.sessionId);
+      const sessionTitle = session?.name || ctx.sessionId.slice(0, 8);
+      sendWebPushNotification({
+        title: exitCode === 0 ? "⚡ Script Completed" : "❌ Script Failed",
+        body: exitCode === 0
+          ? `Session "${sessionTitle}": Script finished successfully.`
+          : `Session "${sessionTitle}": ${errorMessage}`,
+        url: `/`,
+        tag: `session-${ctx.sessionId}`,
+      }).catch((err) => {
+        console.error("[runner-manager] Failed to send web push for script exit:", err);
+      });
     }
   }
 
