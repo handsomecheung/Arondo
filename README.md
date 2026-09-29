@@ -160,7 +160,8 @@ All execution goes through a Runner — there is no local fallback on the server
 - **Mobile-Friendly UI**: Designed with collapsible panels, modal logs, responsive menus, and touch-friendly actions. Supports a swipe-to-delete gesture for session items in the mobile sidebar.
 - **Project Management**: Scopes and tracks sessions within resolved repository paths. Supports custom project scripts and AI auto-script discovery (executed safely on the selected runner).
 - **Unread Session Completion Indicator**: Automatically tracks when background running sessions complete (`done` or `error`). It compares the session's `completedAt` timestamp with the user's `lastViewedAt` timestamp. If a session has unviewed completions, the UI displays a colored dot next to the session in the sidebar (green for success, red for error) and an unread count badge in the header menu button.
-- **PWA / Installable App**: Ships a web app manifest (`app/manifest.ts`) and a registered service worker (`public/sw.js`) so the app can be installed to the home screen with a standalone window, including on Android Chrome which requires a service worker with a fetch handler for full installability.
+- **Native Web Push Notifications (VAPID)**: Delivers server-driven native push notifications to registered desktop and mobile devices even when the browser is closed or running in the background. Notifies upon agent completion, script exit, or task failure. Device subscriptions and delayed test notifications (e.g. 30s) are managed in Settings, and server VAPID contact email is configurable in Admin Settings. Supports modern browsers and iOS/iPadOS 16.4+ (as an installed PWA).
+- **PWA / Installable App**: Ships a web app manifest (`app/manifest.ts`) and a registered service worker (`public/sw.js`) so the app can be installed to the home screen with a standalone window across desktop and mobile platforms.
 
 ## Getting Started
 

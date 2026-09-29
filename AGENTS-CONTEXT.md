@@ -144,6 +144,15 @@ app/
     messages/route.ts   # GET: list messages for a session
     fs/route.ts         # GET: browse directories on a runner
     fs/infos/route.ts   # POST: batch check path existence and git diff status on the runner (used for markdown file link verification and inline diff triggering)
+    notifications/
+      vapid-public-key/
+        route.ts        # GET: retrieve server VAPID public key for Web Push registration
+      subscribe/
+        route.ts        # POST: register or update a client Web Push subscription
+      unsubscribe/
+        route.ts        # POST: unregister a client Web Push subscription
+      test/
+        route.ts        # POST: trigger an immediate or delayed (e.g. 30s) test push notification
     auth/
       client-tokens/
         route.ts        # GET/POST/DELETE: manage client access tokens (admin role only)
@@ -151,11 +160,13 @@ app/
         route.ts        # GET/POST/DELETE: manage per-runner access tokens (admin role only)
       verify/
         route.ts        # POST: verify token validity
+public/
+  sw.js                 # Service Worker: background Web Push notification display, notificationclick deep-linking, and lifecycle events
 components/
   Terminal.tsx          # xterm.js terminal component (live WS mode + history replay mode)
   ShellTerminal.tsx     # Interactive shell terminal component (spawns server-side PTY via WebSocket)
   UserAgentCommandCard.tsx # Exec card representing a user-initiated agent slash command in the timeline
-  ClientInit.tsx        # Performs client-side session token checking and login redirects
+  ClientInit.tsx        # Performs client-side session token checking, service worker registration, and login redirects
   UserMessageCard.tsx   # Card component to render user chat messages with a Copy action
   ScheduleDateTimeInputs.tsx # Shared separate date+time picker (not a single datetime-local field), used by draft creation, chat input scheduler, and todo card trigger change
   modals/
@@ -165,9 +176,11 @@ lib/
   config.ts             # Configuration helpers, resolves data directory (defaults to ~/.arondo)
   store.ts              # File-based JSON storage (sessions, messages, logs, projects, scripts)
   agentCommands.ts      # Merges built-in and user-defined agent slash commands, resolves matches
+  notification.ts       # Client-side Web Push helper: subscription, permission management, service worker reset, test push trigger
+  web-push-server.ts    # Server-side Web Push notifications: VAPID key generation, persistent subscription storage, delivery via web-push
   remarkFileLinks.ts    # Custom remark plugin to scan, verify, and linkify file paths inside markdown output
   event-bus.ts          # In-memory pub/sub (singleton on `process` for cross-context sharing)
-  runner-manager.ts     # Manages runner connections, task routing, and task persistence
+  runner-manager.ts     # Manages runner connections, task routing, task persistence, and push notification dispatch on task completion
   runner-server.ts      # WebSocket handler for /runner endpoint (registration, heartbeat)
   ws-server.ts          # WebSocket handler for /ws endpoint: event bus broadcast + PTY I/O + shell PTY bridging
   project-readiness.ts  # Utility to check project readiness (uncommitted changes, running agents)
@@ -200,6 +213,7 @@ tests/                  # Playwright integration tests
     global-rules.spec.ts # Reading and writing global agent rules
     sessions.spec.ts    # Session lifecycle (create, update, delete) integration
     detached-agent-runs.spec.ts # Detached review and side-question agent integration
+    web-push.spec.ts    # Web Push (VAPID) API and settings integration test suite
     server.spec.ts      # Health check and basic connectivity tests
   runner/               # Test suites for Go Runner handler capabilities
     fs.spec.ts          # File browsing and read capability tests
@@ -208,6 +222,7 @@ tests/                  # Playwright integration tests
     runner.spec.ts      # Runner connection and handshake tests
 ~/.arondo/              # Runtime configuration & data directory (overridden by ARONDO_CONFIG_DIR)
   arondo.json           # Unified runtime config: access tokens and top-level setitngs
+  web-push.json         # Web Push VAPID keys, contactEmail, and registered device subscriptions
   agent-commands.json   # Persisted custom agent slash commands
   global-rules.md       # Global agent rules written from Settings
   agent-sessions.json  # Agent session map: { "agy": {}, "codex": {}, "opencode": {} }
@@ -448,7 +463,13 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **Project Readiness Gate on `POST /api/sessions/[id]/messages`**: The dirty/busy confirmation gate applied to new session creation also applies to the very first message sent on an already-empty session (`existingMessages.length === 0`) — it checks the runner+repoPath working tree and cross-session agent activity, returning `409 { needsConfirmation, reason: { dirty, busy, isFollowup: false } }` unless `force: true` is passed. Once a session has any message, later follow-ups skip the dirty/cross-session check entirely and only block on this session's own `running`/`script-running` status or an already-queued todo ahead of it (`409 { reason: { busy, queued, isFollowup: true } }`). The `ProjectNotReadyModal`'s auto-send option for follow-ups waits on `afterSession` (done-only) instead of `codebaseReady`. `getConfirmationButtons()` (`lib/homeUtils.ts`) serves as the single source of truth for the project readiness confirmation buttons, while `canForceSend()` hides the modal's "Send now anyway" button whenever `reason.busy` is set, since the backend unconditionally rejects `force: true` while an agent is running, leaving only the auto-send/save-as-draft options.
 - **Diff View File Collapse/Expand**: The visual HTML diff viewer supports collapsing and expanding individual changed files dynamically, enhancing diff readability.
 - **Unread Session Completion Indicator**: Automatically tracks when background running sessions complete (`done` or `error`). It compares the session's `completedAt` timestamp with the user's `lastViewedAt` timestamp (updated via the `/api/sessions/[id]/view` endpoint). If a session has unviewed completions, the UI displays a colored dot in the sidebar (green for success, red for error) and an unread count badge on the mobile navigation menu.
-- **PWA Installability**: `app/manifest.ts` provides the web app manifest (name, icons, standalone display). `components/ClientInit.tsx` registers `public/sw.js` on load; the service worker's sole purpose is a no-op `fetch` handler, which Chrome on Android requires (in addition to the manifest) before it will offer full "Install app" / standalone-window installability rather than just a home-screen shortcut.
+- **Native Web Push Notifications (VAPID)**: Delivers server-driven native push notifications to registered desktop and mobile devices even when the browser is closed or running in the background. Push dispatches are integrated directly into `runner-manager.ts` upon agent completion, script exit, or task failure.
+  - **VAPID Keys & Subscriptions**: Server auto-generates VAPID keys on first start, stored persistently in `~/.arondo/web-push.json` alongside registered client subscriptions. Subscriptions track endpoint, keys (`p256dh`, `auth`), `userTokenUuid`, `userAgent`, and creation/usage timestamps.
+  - **Endpoints**: `/api/notifications/vapid-public-key` serves the public key, `/api/notifications/subscribe` and `/api/notifications/unsubscribe` register/deregister subscriptions, and `/api/notifications/test` triggers immediate or 30-second delayed test notifications to test background delivery on mobile devices.
+  - **Service Worker (`public/sw.js`)**: Listens for `push` events to show native notifications with title, body, icon, badge, and deep-link payload. `notificationclick` automatically focuses existing windows or opens the relevant session URL.
+  - **Settings Separation**: Client device preferences (enable/disable push for this device, 30s test push, Service Worker cache reset) live in `/settings`, while global VAPID server configuration (`contactEmail`) is managed exclusively in `/admin/settings`.
+  - **PWA & iOS Support**: Works across modern browsers (Chrome, Edge, Firefox, Safari). On iOS/iPadOS 16.4+, Web Push is fully supported when Arondo is added to the Home Screen as a PWA.
+- **PWA Installability**: `app/manifest.ts` provides the web app manifest (name, icons, standalone display). `components/ClientInit.tsx` registers `public/sw.js` on load to enable standalone installation across platforms as well as background Web Push notification handling.
 
 ## Project & Custom Scripts Management
 - **Project Scoping**: Sessions are mapped to projects by repository path + runnerId. Projects store metadata at `~/.arondo/projects/[projectId]/project.json`.

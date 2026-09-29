@@ -150,7 +150,8 @@ Browser (Next.js UI)  <--ws-->  Server (Next.js)  <--ws-->  Runner A (Go, machin
 - **行動友善的使用者介面**：採用可折疊面板、模式日誌、響應式選單和觸控友善操作進行設計。支援對移動側邊欄中的會話項目進行滑動刪除手勢。
 - **專案管理**：確定仓库路徑內的範圍並追蹤會話。支援自訂專案 Script 和 AI 自動 Script 發現（在選定的 Runner 上安全執行）。
 - **未讀取會話完成指示器**：自動追蹤後台運行會話何時完成（`done` 或 `error`）。它將會話的 `completedAt` 時間戳與使用者的 `lastViewedAt` 時間戳進行比較。如果會話有未查看的完成情況，UI 會在側邊欄中的會話旁邊顯示一個彩色點（綠色表示成功，紅色表示錯誤），並在標題選單按鈕中顯示未讀計數徽章。
-- **PWA / 可安裝應用程式**：發送 Web 應用程式清單 (`app/manifest.ts`) 和註冊的 Service Worker (`public/sw.js`)，以便可以使用獨立視窗將應用程式安裝到主螢幕，包括在 Android Chrome 上，這需要具有獲取處理程序的 Service Worker 才能實現完全安裝。
+- **原生 Web Push 推播通知 (VAPID)**：即使應用程式在後台運行或已完全關閉，也能向已註冊的桌面端和行動設備發送由伺服器主導的原生推播通知。在 Agent 運行完成、Script 退出或發生錯誤時自動通知。設備訂閱管理與 30 秒延遲測試通知可在 Settings 中操作，伺服器 VAPID 聯絡信箱可在 Admin Settings 中配置。支援主流現代瀏覽器以及 iOS/iPadOS 16.4+（新增至主畫面為 PWA 時）。
+- **PWA / 可安裝應用程式**：發送 Web 應用程式清單 (`app/manifest.ts`) 和註冊的 Service Worker (`public/sw.js`)，以便可以使用獨立視窗將應用程式安裝到桌面和行動端的主畫面。
 
 ## 快速開始
 
