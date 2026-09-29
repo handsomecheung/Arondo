@@ -16,24 +16,32 @@ self.addEventListener("fetch", () => {});
 self.addEventListener("push", (event) => {
   if (!event.data) return;
 
-  try {
-    const data = event.data.json();
-    const title = data.title || "Arondo";
-    const options = {
-      body: data.body || "",
-      icon: data.icon || "/icon-192.png",
-      badge: data.badge || "/badge-96.png",
-      tag: data.tag || undefined,
-      data: {
-        url: data.url || "/",
-        ...(data.data || {}),
-      },
-    };
+  event.waitUntil((async () => {
+    try {
+      const windowClients = await clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+      if (windowClients.some((client) => client.visibilityState === "visible")) return;
 
-    event.waitUntil(self.registration.showNotification(title, options));
-  } catch (err) {
-    console.error("[Service Worker] Error displaying push notification:", err);
-  }
+      const data = event.data.json();
+      const title = data.title || "Arondo";
+      const options = {
+        body: data.body || "",
+        icon: data.icon || "/icon-192.png",
+        badge: data.badge || "/badge-96.png",
+        tag: data.tag || undefined,
+        data: {
+          url: data.url || "/",
+          ...(data.data || {}),
+        },
+      };
+
+      await self.registration.showNotification(title, options);
+    } catch (err) {
+      console.error("[Service Worker] Error displaying push notification:", err);
+    }
+  })());
 });
 
 // Handle notification clicks to open or focus the appropriate web app page
