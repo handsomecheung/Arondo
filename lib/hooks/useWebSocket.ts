@@ -72,29 +72,7 @@ export function useWebSocket({
 
           if (event.type === "session:updated") {
             const updated = event.payload as Session;
-            setSessions((prev) => {
-              const oldSession = prev.find((s) => s.id === updated.id);
-              if (oldSession && (oldSession.status === "running" || oldSession.status === "script-running")) {
-                if (updated.status === "done") {
-                  import("@/lib/notification").then(({ sendNotification }) => {
-                    sendNotification(
-                      "Task Completed",
-                      `Task "${updated.name || "Agent Session"}" completed successfully.`,
-                      `/tasks`
-                    );
-                  });
-                } else if (updated.status === "error") {
-                  import("@/lib/notification").then(({ sendNotification }) => {
-                    sendNotification(
-                      "Task Failed",
-                      `Task "${updated.name || "Agent Session"}" failed.`,
-                      `/tasks`
-                    );
-                  });
-                }
-              }
-              return prev.map((s) => (s.id === updated.id ? updated : s));
-            });
+            setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
             if (updated.status === "script-running") {
               setTaskQueue((prev) =>
                 prev.filter((t) => t.sessionId !== updated.id || t.type !== "agent"),
