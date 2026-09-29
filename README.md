@@ -57,6 +57,8 @@ Open a live shell on the selected Runner from a session’s three-dot menu when 
 
 > **Fallback only:** Arondo is designed around agents and saved scripts, which are the recommended ways to work. The Terminal is provided as a safety net, not as the primary workflow; its dense command-line interface is particularly uncomfortable to use on mobile devices.
 
+> **Android keyboard suggestions:** Arondo disables autocorrection, auto-capitalization, spellcheck, and browser autocomplete for terminal input. However, a web app cannot reliably hide Gboard's suggestion strip on a per-site basis. If it is distracting, turn off **Show suggestion strip** in Gboard's **Text correction** settings.
+
 <p>
   <img src="public/readme/terminal-menu.png" alt="Session three-dot menu with the Open Terminal action" width="360">
   <img src="public/readme/terminal-htop.png" alt="Live terminal running htop with the mobile special-key bar" width="360">
