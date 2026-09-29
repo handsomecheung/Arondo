@@ -66,3 +66,57 @@ func TestSpawnPipedSeparatesStdoutAndStderr(t *testing.T) {
 		t.Fatalf("stderr = %q, want %q", got, "err")
 	}
 }
+
+func TestScriptInputWaitPasswordPromptDetection(t *testing.T) {
+	tm := NewTaskManager()
+	changes := make(chan bool, 4)
+	done := make(chan int, 1)
+
+	_, err := tm.Spawn(SpawnOptions{
+		TaskID:  "prompt-input-wait",
+		Command: "bash",
+		Args:    []string{"-c", `printf "[sudo] password for testuser: "; read pass; echo "success: $pass"`},
+		OnExit:  func(code int) { done <- code },
+		OnInputWaitChange: func(waiting bool) {
+			changes <- waiting
+		},
+	})
+	if err != nil {
+		t.Fatalf("Spawn returned error: %v", err)
+	}
+
+	// Should transition to waiting state
+	select {
+	case waiting := <-changes:
+		if !waiting {
+			t.Fatalf("expected waiting=true, got %v", waiting)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for prompt input wait state")
+	}
+
+	// Send input
+	if err := tm.WritePTY("prompt-input-wait", []byte("secret123\n")); err != nil {
+		t.Fatalf("WritePTY returned error: %v", err)
+	}
+
+	// Should transition back to waiting=false
+	select {
+	case waiting := <-changes:
+		if waiting {
+			t.Fatalf("expected waiting=false, got %v", waiting)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for prompt input wait false")
+	}
+
+	select {
+	case code := <-done:
+		if code != 0 {
+			t.Fatalf("exit code = %d, want 0", code)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for task to exit")
+	}
+}
+

@@ -33,6 +33,8 @@ type task struct {
 	isRestarting      bool
 	detectInputWait   bool
 	waitingForInput   bool
+	lastOutputTime    time.Time
+	lastInputTime     time.Time
 	onInputWaitChange func(bool)
 	procDoneC         chan struct{}
 }
@@ -248,6 +250,7 @@ func (tm *TaskManager) launchProcess(t *task, cols, rows uint16) error {
 				if len(t.buffer) > maxBufferSize {
 					t.buffer = t.buffer[len(t.buffer)-maxBufferSize:]
 				}
+				t.lastOutputTime = time.Now()
 				onData := t.onData
 				t.mu.Unlock()
 
@@ -351,6 +354,9 @@ func (tm *TaskManager) Restart(taskID, command, workDir string, cols, rows uint1
 	t.done = false
 	t.exitCode = 0
 	t.isRestarting = false
+	t.waitingForInput = false
+	t.lastOutputTime = time.Time{}
+	t.lastInputTime = time.Time{}
 	t.procDoneC = make(chan struct{})
 	t.mu.Unlock()
 
@@ -382,6 +388,9 @@ func (tm *TaskManager) WritePTY(taskID string, data []byte) error {
 	if t.ptyFile == nil {
 		return fmt.Errorf("task %s has no PTY", taskID)
 	}
+	t.mu.Lock()
+	t.lastInputTime = time.Now()
+	t.mu.Unlock()
 	_, err := t.ptyFile.Write(data)
 	if err == nil && containsLineBreak(data) {
 		tm.setInputWaiting(t, false)
@@ -413,7 +422,7 @@ func (tm *TaskManager) setInputWaiting(t *task, waiting bool) {
 }
 
 func (tm *TaskManager) monitorInputWait() {
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTicker(250 * time.Millisecond)
 	defer ticker.Stop()
 	for range ticker.C {
 		tm.mu.RLock()
@@ -426,12 +435,29 @@ func (tm *TaskManager) monitorInputWait() {
 			t.mu.Lock()
 			detect := t.detectInputWait && !t.done && t.cmd != nil && t.cmd.Process != nil
 			pid := 0
+			var bufferTail []byte
+			lastOutput := t.lastOutputTime
+			lastInput := t.lastInputTime
 			if detect {
 				pid = t.cmd.Process.Pid
+				if len(t.buffer) > 0 {
+					tailLen := 1024
+					if len(t.buffer) < tailLen {
+						tailLen = len(t.buffer)
+					}
+					bufferTail = make([]byte, tailLen)
+					copy(bufferTail, t.buffer[len(t.buffer)-tailLen:])
+				}
 			}
 			t.mu.Unlock()
 			if detect {
-				tm.setInputWaiting(t, processGroupWaitingForTTYInput(pid))
+				waiting := processGroupWaitingForTTYInput(pid)
+				if !waiting && isMatchingPasswordPrompt(bufferTail) &&
+					!lastOutput.IsZero() && time.Since(lastOutput) >= 300*time.Millisecond &&
+					(lastInput.IsZero() || lastOutput.After(lastInput)) {
+					waiting = true
+				}
+				tm.setInputWaiting(t, waiting)
 			}
 		}
 	}
