@@ -23,6 +23,7 @@ import { runnerManager } from "./runner-manager";
 import { readTokensConfig } from "./auth";
 import { isQuotaErrorMessage } from "./agent-quota-errors";
 import { stripAnsi } from "./ansi";
+import { shouldSendTaskNotification } from "./task-notifications";
 
 const MAX_SESSION_NAME_LENGTH = 80;
 
@@ -164,6 +165,7 @@ export async function dispatchFollowupMessage(
   message: string,
   opts: { prompt?: string; type?: string; tokenUuid?: string } = {},
 ): Promise<ActionResult> {
+  const taskStartedAt = Date.now();
   const session = await getSession(sessionId);
   if (!session) {
     return { ok: false, error: "Session not found", status: 404 };
@@ -299,7 +301,7 @@ export async function dispatchFollowupMessage(
     sessionId,
     messageId: systemMsg.id,
     type: "agent",
-    createdAt: Date.now(),
+    createdAt: taskStartedAt,
     agentType: resolvedType,
     agyQuotaGroup: resolved.agyQuotaGroup,
     command,
@@ -359,6 +361,7 @@ export async function dispatchCreateSession(
   prompt: string,
   opts: { id?: string; name?: string; tokenUuid?: string; displayMessage?: string; tempDir?: boolean; noProject?: boolean; once?: boolean; cache?: "on" | "off" } = {},
 ): Promise<ActionResult> {
+  const taskStartedAt = Date.now();
   const trimmedPrompt = prompt.trim();
   if (!trimmedPrompt) {
     return { ok: false, error: "prompt is required", status: 400 };
@@ -422,14 +425,16 @@ export async function dispatchCreateSession(
 
       const updated = (await getSession(session.id)) || session;
       eventBus.publish({ type: "session_updated", payload: updated });
-      runnerManager.sendSessionNotification(session.id, {
-        title: "✅ Task Completed",
-        body: `${trimmedPrompt.slice(0, 119)}${trimmedPrompt.length > 119 ? "…" : ""}: Result returned from cache.`,
-        url: "/",
-        tag: `session-${session.id}`,
-      }).catch((err) => {
-        console.error("[session-actions] Failed to send web push for cached agent result:", err);
-      });
+      if (shouldSendTaskNotification(taskStartedAt)) {
+        runnerManager.sendSessionNotification(session.id, {
+          title: "✅ Task Completed",
+          body: `${trimmedPrompt.slice(0, 119)}${trimmedPrompt.length > 119 ? "…" : ""}: Result returned from cache.`,
+          url: "/",
+          tag: `session-${session.id}`,
+        }).catch((err) => {
+          console.error("[session-actions] Failed to send web push for cached agent result:", err);
+        });
+      }
       return { ok: true, session: updated };
     }
   }
@@ -511,7 +516,7 @@ export async function dispatchCreateSession(
     sessionId: session.id,
     messageId: systemMsg.id,
     type: "agent",
-    createdAt: Date.now(),
+    createdAt: taskStartedAt,
     agentType: resolvedType,
     agyQuotaGroup: resolved.agyQuotaGroup,
     command,

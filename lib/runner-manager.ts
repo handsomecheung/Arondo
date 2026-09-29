@@ -38,6 +38,7 @@ import {
   isAgyInvalidModelError,
 } from "./agent-quota-errors";
 import { sendWebPushNotification, type WebPushPayload } from "./web-push-server";
+import { shouldSendTaskNotification } from "./task-notifications";
 
 const CONFIG_DIR = getConfigDir();
 const RUNNERS_DIR = path.join(CONFIG_DIR, "runners");
@@ -1309,6 +1310,7 @@ class RunnerManager {
     eventBus.publish({ type: "message_updated", payload: message });
 
     if (!payload.waiting) return;
+    if (!shouldSendTaskNotification(ctx.createdAt)) return;
     if (!(await this.shouldSendSessionNotification(ctx.sessionId))) return;
     const session = ctx.sessionId ? await getSession(ctx.sessionId) : undefined;
     const sessionTitle = session?.name || ctx.sessionId.slice(0, 8);
@@ -1489,7 +1491,11 @@ class RunnerManager {
     eventBus.publish({ type: "message_added", payload: agentMsg });
     eventBus.publish({ type: "session_updated", payload: updated });
 
-    if (!stoppedByUser && await this.shouldSendSessionNotification(ctx.sessionId)) {
+    if (
+      !stoppedByUser &&
+      shouldSendTaskNotification(ctx.createdAt) &&
+      await this.shouldSendSessionNotification(ctx.sessionId)
+    ) {
       const sessionTitle = session?.name || ctx.sessionId.slice(0, 8);
       const promptPreview = notificationPreview(ctx.prompt);
       const pushTitle = invalidModelSelection
@@ -1639,7 +1645,11 @@ class RunnerManager {
       eventBus.publish({ type: "session_updated", payload: updated });
     }
 
-    if (!stoppedByUser && await this.shouldSendSessionNotification(ctx.sessionId)) {
+    if (
+      !stoppedByUser &&
+      shouldSendTaskNotification(ctx.createdAt) &&
+      await this.shouldSendSessionNotification(ctx.sessionId)
+    ) {
       const session = await getSession(ctx.sessionId);
       const sessionTitle = session?.name || ctx.sessionId.slice(0, 8);
       const commandPreview = notificationPreview(ctx.command);
