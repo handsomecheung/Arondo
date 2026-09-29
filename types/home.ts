@@ -79,6 +79,7 @@ export interface Message {
   detachedKind?: "review" | "btw";
   agentSessionKey?: string;
   deleted?: boolean;
+  waitingForInput?: boolean;
 }
 
 export interface TaskItem {

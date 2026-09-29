@@ -193,6 +193,12 @@ func (h *Handler) handleExecScript(msg *Message) {
 				"exitCode": exitCode,
 			})
 		},
+		OnInputWaitChange: func(waiting bool) {
+			h.sendEvent("exec.inputWait", map[string]any{
+				"taskId":  req.TaskID,
+				"waiting": waiting,
+			})
+		},
 	})
 
 	if err != nil {

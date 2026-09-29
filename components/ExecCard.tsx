@@ -15,6 +15,7 @@ export interface ExecCardItem {
   command?: string;
   messageId?: string;
   timestamp?: string;
+  waitingForInput?: boolean;
 }
 
 export interface ExecCardProps {
@@ -25,6 +26,7 @@ export interface ExecCardProps {
   onRestartScript?: () => void;
   onRerunTask?: () => void;
   onDeleteTask?: () => void;
+  onInputWait?: () => void;
   collapsible?: boolean;
   defaultCollapsed?: boolean;
   extraMenuItems?: (closeMenu: () => void) => React.ReactNode;
@@ -122,6 +124,7 @@ export default function ExecCard({
   onRestartScript,
   onRerunTask,
   onDeleteTask,
+  onInputWait,
   collapsible,
   defaultCollapsed,
   extraMenuItems,
@@ -179,7 +182,17 @@ export default function ExecCard({
     >
       <div className="exec-card-header">
         <div className="exec-card-icon">
-          {isRunning ? (
+          {isRunning && item.waitingForInput ? (
+            <button
+              type="button"
+              className="exec-card-input-wait-icon"
+              title="Open Terminal — script is waiting for input"
+              aria-label="Open Terminal — script is waiting for input"
+              onClick={onInputWait}
+            >
+              ⌨
+            </button>
+          ) : isRunning ? (
             <span className="exec-card-spinner" />
           ) : item.type === "command" ? (
             <IconTerminal />

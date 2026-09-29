@@ -146,6 +146,7 @@ func (c *Client) sendRegister() error {
 		"arch":     runtime.GOARCH,
 		"capabilities": []string{
 			"exec.agent", "exec.script", "exec.cancel",
+			"exec.inputWait",
 			"pty.input", "pty.resize",
 			"fs.list",
 			"git.status", "git.diff", "git.log",

@@ -149,7 +149,7 @@ export default function ScriptExecCard({
   const className = `script-exec-card ${props.className || ""}`;
 
   return (
-    <ExecCard {...props} extraMenuItems={extraMenuItems} className={className}>
+    <ExecCard {...props} onInputWait={onViewLog} extraMenuItems={extraMenuItems} className={className}>
       {showLogInline && hasLogSource && (
         <pre ref={outputRef} className="agent-exec-output" style={{ maxHeight: "250px" }}>
           {log || "Running command..."}

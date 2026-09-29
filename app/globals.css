@@ -1771,6 +1771,16 @@ body {
   background: var(--accent-glow);
   color: var(--accent);
 }
+.exec-card-input-wait-icon {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: #f59e0b;
+  font-size: 19px;
+  line-height: 1;
+  padding: 0;
+}
 .exec-card-success .exec-card-icon {
   background: var(--success-bg);
   color: var(--success);

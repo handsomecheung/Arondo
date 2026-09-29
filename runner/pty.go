@@ -21,17 +21,20 @@ type TaskInfo struct {
 }
 
 type task struct {
-	id           string
-	cmd          *exec.Cmd
-	ptyFile      *os.File
-	buffer       []byte
-	done         bool
-	exitCode     int
-	mu           sync.Mutex
-	onData       func([]byte)
-	onExit       func(int)
-	isRestarting bool
-	procDoneC    chan struct{}
+	id                string
+	cmd               *exec.Cmd
+	ptyFile           *os.File
+	buffer            []byte
+	done              bool
+	exitCode          int
+	mu                sync.Mutex
+	onData            func([]byte)
+	onExit            func(int)
+	isRestarting      bool
+	detectInputWait   bool
+	waitingForInput   bool
+	onInputWaitChange func(bool)
+	procDoneC         chan struct{}
 }
 
 type TaskManager struct {
@@ -40,21 +43,24 @@ type TaskManager struct {
 }
 
 func NewTaskManager() *TaskManager {
-	return &TaskManager{
+	tm := &TaskManager{
 		tasks: make(map[string]*task),
 	}
+	go tm.monitorInputWait()
+	return tm
 }
 
 type SpawnOptions struct {
-	TaskID  string
-	Command string
-	Args    []string
-	WorkDir string
-	Env     []string
-	Cols    uint16
-	Rows    uint16
-	OnData  func(data []byte)
-	OnExit  func(exitCode int)
+	TaskID            string
+	Command           string
+	Args              []string
+	WorkDir           string
+	Env               []string
+	Cols              uint16
+	Rows              uint16
+	OnData            func(data []byte)
+	OnExit            func(exitCode int)
+	OnInputWaitChange func(waiting bool)
 }
 
 type SpawnPipedOptions struct {
@@ -89,11 +95,13 @@ func (tm *TaskManager) Spawn(opts SpawnOptions) (int, error) {
 		cmd.Env = os.Environ()
 	}
 	t := &task{
-		id:        opts.TaskID,
-		cmd:       cmd,
-		onData:    opts.OnData,
-		onExit:    opts.OnExit,
-		procDoneC: make(chan struct{}),
+		id:                opts.TaskID,
+		cmd:               cmd,
+		onData:            opts.OnData,
+		onExit:            opts.OnExit,
+		detectInputWait:   opts.OnInputWaitChange != nil,
+		onInputWaitChange: opts.OnInputWaitChange,
+		procDoneC:         make(chan struct{}),
 	}
 	tm.tasks[opts.TaskID] = t
 	tm.mu.Unlock()
@@ -375,7 +383,58 @@ func (tm *TaskManager) WritePTY(taskID string, data []byte) error {
 		return fmt.Errorf("task %s has no PTY", taskID)
 	}
 	_, err := t.ptyFile.Write(data)
+	if err == nil && containsLineBreak(data) {
+		tm.setInputWaiting(t, false)
+	}
 	return err
+}
+
+func containsLineBreak(data []byte) bool {
+	for _, b := range data {
+		if b == '\r' || b == '\n' {
+			return true
+		}
+	}
+	return false
+}
+
+func (tm *TaskManager) setInputWaiting(t *task, waiting bool) {
+	t.mu.Lock()
+	if !t.detectInputWait || t.waitingForInput == waiting {
+		t.mu.Unlock()
+		return
+	}
+	t.waitingForInput = waiting
+	callback := t.onInputWaitChange
+	t.mu.Unlock()
+	if callback != nil {
+		callback(waiting)
+	}
+}
+
+func (tm *TaskManager) monitorInputWait() {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		tm.mu.RLock()
+		tasks := make([]*task, 0, len(tm.tasks))
+		for _, t := range tm.tasks {
+			tasks = append(tasks, t)
+		}
+		tm.mu.RUnlock()
+		for _, t := range tasks {
+			t.mu.Lock()
+			detect := t.detectInputWait && !t.done && t.cmd != nil && t.cmd.Process != nil
+			pid := 0
+			if detect {
+				pid = t.cmd.Process.Pid
+			}
+			t.mu.Unlock()
+			if detect {
+				tm.setInputWaiting(t, processGroupWaitingForTTYInput(pid))
+			}
+		}
+	}
 }
 
 func (tm *TaskManager) ResizePTY(taskID string, cols, rows uint16) error {

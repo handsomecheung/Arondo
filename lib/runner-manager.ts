@@ -1066,6 +1066,11 @@ class RunnerManager {
           console.error("[runner-manager] onExecExit error:", err);
         });
         break;
+      case "exec.inputWait":
+        this.onExecInputWait(msg.payload).catch((err) => {
+          console.error("[runner-manager] onExecInputWait error:", err);
+        });
+        break;
       case "shell.exit":
         this.onShellExit(runnerId, msg.payload);
         break;
@@ -1234,6 +1239,10 @@ class RunnerManager {
 
     ctx.completedAt = Date.now();
     ctx.exitCode = payload.exitCode;
+    if (ctx.type === "script" && ctx.messageId) {
+      const message = await updateMessage(ctx.sessionId, ctx.messageId, { waitingForInput: false }, ctx.projectId);
+      if (message) eventBus.publish({ type: "message_updated", payload: message });
+    }
     await this.drainExecOutput(payload.taskId, ctx);
 
     if (payload.agyConversationId) {
@@ -1266,6 +1275,35 @@ class RunnerManager {
     } else {
       await this.handleScriptExit(ctx, payload.exitCode);
     }
+  }
+
+  private async onExecInputWait(payload: { taskId: string; waiting: boolean }): Promise<void> {
+    const ctx = this.tasks.get(payload?.taskId);
+    if (!ctx || ctx.type !== "script" || ctx.completedAt || !ctx.messageId) return;
+
+    const message = await updateMessage(
+      ctx.sessionId,
+      ctx.messageId,
+      { waitingForInput: !!payload.waiting },
+      ctx.projectId,
+    );
+    if (!message) return;
+    eventBus.publish({ type: "message_updated", payload: message });
+
+    if (!payload.waiting) return;
+    const session = ctx.sessionId ? await getSession(ctx.sessionId) : undefined;
+    const sessionTitle = session?.name || ctx.sessionId.slice(0, 8);
+    const commandPreview = notificationPreview(ctx.command);
+    sendWebPushNotification({
+      title: "⌨️ Script Needs Input",
+      body: commandPreview
+        ? `${commandPreview}: Waiting for your input.`
+        : `Session "${sessionTitle}": Script is waiting for your input.`,
+      url: "/",
+      tag: `script-input-${ctx.taskId}-${Date.now()}`,
+    }).catch((err) => {
+      console.error("[runner-manager] Failed to send web push for script input:", err);
+    });
   }
 
   private onShellOutput(runnerId: string, payload: {

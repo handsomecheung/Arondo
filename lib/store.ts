@@ -168,6 +168,7 @@ export interface Message {
   userName?: string;
   userColor?: string;
   cache?: "on" | "off";
+  waitingForInput?: boolean;
   // Detached agent runs use a fresh agent conversation and never participate
   // in the parent session's normal conversation history.
   detachedKind?: DetachedAgentKind;

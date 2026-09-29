@@ -169,7 +169,7 @@ export function execCardInfoToItem(info: ExecCardInfo): ExecCardItem {
   const isStopped = isDone && info.returnMsg!.content.startsWith("🛑");
   let statusText: string;
   if (!isDone) {
-    statusText = "Running...";
+    statusText = info.isScript && info.runMsg.waitingForInput ? "Waiting for input" : "Running...";
   } else if (isSuccess) {
     statusText = "Completed";
   } else if (isStopped) {
@@ -190,5 +190,6 @@ export function execCardInfoToItem(info: ExecCardInfo): ExecCardItem {
     command: info.command || undefined,
     messageId: info.runMsg.id,
     timestamp: formatTime(info.runMsg.createdAt),
+    waitingForInput: !isDone && info.isScript && !!info.runMsg.waitingForInput,
   };
 }
