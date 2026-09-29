@@ -422,6 +422,14 @@ export async function dispatchCreateSession(
 
       const updated = (await getSession(session.id)) || session;
       eventBus.publish({ type: "session_updated", payload: updated });
+      runnerManager.sendSessionNotification(session.id, {
+        title: "✅ Task Completed",
+        body: `${trimmedPrompt.slice(0, 119)}${trimmedPrompt.length > 119 ? "…" : ""}: Result returned from cache.`,
+        url: "/",
+        tag: `session-${session.id}`,
+      }).catch((err) => {
+        console.error("[session-actions] Failed to send web push for cached agent result:", err);
+      });
       return { ok: true, session: updated };
     }
   }
