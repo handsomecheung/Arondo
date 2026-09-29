@@ -1,17 +1,22 @@
-╭──────────────────────────────────────────────────────────────────────────────────────╮
-│  >_ OpenAI Codex (v0.153.1)                                                          │
-│                                                                                      │
-│ Visit https://chatgpt.com/codex/settings/usage for up-to-date                        │
-│ information on rate limits and credits                                               │
-│                                                                                      │
-│  Model:                gpt-5.6-terra (reasoning medium, summaries auto)              │
-│  Directory:            /data/arondo                                                  │
-│  Permissions:          Full Access                                                   │
-│  Agents.md:            ~/.codex/AGENTS.md, ../AGENTS.md, AGENTS.md                   │
-│  Account:              arondo@gmail.com (Plus)                                       │
-│  Collaboration mode:   Default                                                       │
-│  Session:              01a06975-f01e-7cf3-8ef4-bc4f91c8268d                          │
-│                                                                                      │
-│  5h limit:             [████████████████████] 100% left (resets __resets_5h__)       │
-│  Weekly limit:         [████████████░░░░░░░░] 60% left (resets __resets_weekly__)    │
-╰──────────────────────────────────────────────────────────────────────────────────────╯
+╭───────────────────────────────────────────────────────────────────────────────────────────╮
+│  >_ OpenAI Codex (v0.158.0)                                                               │
+│                                                                                           │
+│ Visit https://chatgpt.com/codex/settings/usage for up-to-date                             │
+│ information on rate limits and credits                                                    │
+│                                                                                           │
+│  Server:                      Local background server                                     │
+│                                                                                           │
+│  Model:                       GPT-Reserve (reasoning medium, summaries auto)              │
+│  Model provider:              openai                                                      │
+│  Directory:                   /mnt/coder-workspaces/private-workspace/repos/github/Arondo │
+│  Permissions:                 Full Access                                                 │
+│  Agents.md:                   ~/.codex/AGENTS.md, AGENTS.md                               │
+│  Account:                     Plus                                                        │
+│  Collaboration mode:          Default                                                     │
+│  Session:                     01a0ed8b-f070-7c12-8ac9-036bf01fc427                        │
+│                                                                                           │
+│  5h limit:                    [████████████████████] 100% left (resets __resets_5h__)       │
+│  Weekly limit:                [████████████░░░░░░░░] 60% left (resets __resets_weekly__)    │
+│  Luna Reserve Weekly limit:   [████████████████████] 100% left (resets __resets_luna__)    │
+╰───────────────────────────────────────────────────────────────────────────────────────────╯
+

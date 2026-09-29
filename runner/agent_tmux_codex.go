@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -82,32 +84,44 @@ type CodexQuota struct {
 }
 
 var (
-	codexAccountPlanRe = regexp.MustCompile(`Account:\s+(\S+@\S+)\s+\(([^)]+)\)`)
+	codexAccountRe     = regexp.MustCompile(`Account:\s+([^\n\r│]+)`)
+	codexEmailPlanRe   = regexp.MustCompile(`^(\S+@\S+)\s+\(([^)]+)\)$`)
 	codexModelRe       = regexp.MustCompile(`Model:\s+(.+)`)
-	// e.g. "5h limit:             [████████████████████] 100% left (resets 12:48)"
-	codex5hLimitRe = regexp.MustCompile(`5h limit:.*?(\d+)%\s+left(?:\s+\(resets\s+([^)]+)\))?`)
-	// e.g. "Weekly limit:         [████████████░░░░░░░░] 60% left (resets 11:28 on 7 Sep)"
-	codexWeeklyLimitRe = regexp.MustCompile(`Weekly limit:.*?(\d+)%\s+left(?:\s+\(resets\s+([^)]+)\))?`)
-	// "11:28 on 7 Sep" or "12:48" — 24h clock, no timezone (server-local time).
-	codexResetsDateTimeRe = regexp.MustCompile(`^(\d{1,2}):(\d{2})(?:\s+on\s+(\d{1,2})\s+(\w{3}))?$`)
+	// e.g. "5h limit:             [████████████████████] 100% left (resets 12:48)" or "resets 12:08 AM on 30 Sep"
+	codex5hLimitRe = regexp.MustCompile(`(?m)(?:^|[│\r\n])\s*5h limit:.*?(\d+)%\s+left(?:\s+\(resets\s+([^)]+)\))?`)
+	// e.g. "Weekly limit:         [████████████░░░░░░░░] 60% left (resets 11:28 on 7 Sep)" or "resets 7:43 AM on 4 Oct"
+	codexWeeklyLimitRe = regexp.MustCompile(`(?m)(?:^|[│\r\n])\s*Weekly limit:.*?(\d+)%\s+left(?:\s+\(resets\s+([^)]+)\))?`)
+	// "11:28 on 7 Sep", "12:48", "12:08 AM on 30 Sep", "7:43 AM on 4 Oct", "11:22 PM on 6 Oct", etc.
+	codexResetsDateTimeRe = regexp.MustCompile(`^(\d{1,2}):(\d{2})(?:\s*([APap][Mm]))?(?:\s+on\s+(\d{1,2})\s+(\w{3}))?$`)
 )
 
 func parseCodexQuota(rawText string) *CodexQuota {
 	text := stripAnsi(rawText)
 	q := &CodexQuota{}
 
-	if m := codexAccountPlanRe.FindStringSubmatch(text); m != nil {
-		q.Account = m[1]
-		q.Plan = m[2]
+	hasAccountLine := false
+	if m := codexAccountRe.FindStringSubmatch(text); m != nil {
+		hasAccountLine = true
+		raw := strings.TrimSpace(m[1])
+		if planMatch := codexEmailPlanRe.FindStringSubmatch(raw); planMatch != nil {
+			q.Plan = planMatch[2]
+		} else if !strings.Contains(raw, "@") {
+			q.Plan = raw
+		}
 	}
 	if m := codexModelRe.FindStringSubmatch(text); m != nil {
 		model := strings.TrimSpace(m[1])
 		model = strings.TrimRight(model, " ││\t\r\n")
 		q.DefaultModel = strings.TrimSpace(model)
 	}
-	if q.Account == "" {
+	if !hasAccountLine {
 		// /status never rendered (e.g. login/trust prompt blocked it) — nothing usable.
 		return nil
+	}
+
+	q.Account = readCodexAccountID()
+	if q.Account == "" {
+		q.Account = "unknown"
 	}
 
 	if m := codex5hLimitRe.FindStringSubmatch(text); m != nil {
@@ -127,9 +141,37 @@ func parseCodexQuota(rawText string) *CodexQuota {
 	return q
 }
 
-// parseCodexResetsTimestamp converts a string like "12:48" or "11:28 on 7 Sep" (24h
-// clock, no timezone — codex reports in the local machine's timezone) to a
-// Unix timestamp of the next occurrence.
+// readCodexAccountID attempts to read tokens.account_id from ~/.codex/auth.json.
+// If reading or parsing fails, or if account_id is empty, it returns "unknown".
+func readCodexAccountID() string {
+	var authPath string
+	if custom := os.Getenv("CODEX_AUTH_PATH"); custom != "" {
+		authPath = custom
+	} else if codexHome := os.Getenv("CODEX_HOME"); codexHome != "" {
+		authPath = filepath.Join(codexHome, "auth.json")
+	} else if home, err := os.UserHomeDir(); err == nil {
+		authPath = filepath.Join(home, ".codex", "auth.json")
+	}
+	if authPath == "" {
+		return "unknown"
+	}
+	data, err := os.ReadFile(authPath)
+	if err != nil {
+		return "unknown"
+	}
+	var auth struct {
+		Tokens struct {
+			AccountID string `json:"account_id"`
+		} `json:"tokens"`
+	}
+	if err := json.Unmarshal(data, &auth); err != nil || strings.TrimSpace(auth.Tokens.AccountID) == "" {
+		return "unknown"
+	}
+	return strings.TrimSpace(auth.Tokens.AccountID)
+}
+
+// parseCodexResetsTimestamp converts a string like "12:48", "11:28 on 7 Sep",
+// "12:08 AM on 30 Sep", or "7:43 AM on 4 Oct" to a Unix timestamp of the next occurrence.
 func parseCodexResetsTimestamp(s string) *int64 {
 	s = strings.TrimSpace(s)
 	m := codexResetsDateTimeRe.FindStringSubmatch(s)
@@ -139,10 +181,20 @@ func parseCodexResetsTimestamp(s string) *int64 {
 	now := time.Now()
 	hour, _ := strconv.Atoi(m[1])
 	min, _ := strconv.Atoi(m[2])
+	ampm := strings.ToUpper(strings.TrimSpace(m[3]))
+	if ampm == "AM" {
+		if hour == 12 {
+			hour = 0
+		}
+	} else if ampm == "PM" {
+		if hour < 12 {
+			hour += 12
+		}
+	}
 
-	if m[3] != "" && m[4] != "" {
-		day, _ := strconv.Atoi(m[3])
-		month := monthMap[m[4]]
+	if m[4] != "" && m[5] != "" {
+		day, _ := strconv.Atoi(m[4])
+		month := monthMap[m[5]]
 		if month == 0 {
 			return nil
 		}
@@ -162,9 +214,10 @@ func parseCodexResetsTimestamp(s string) *int64 {
 	return &ts
 }
 
-// confirmCodexPrompts handles the workspace-trust confirmation Codex shows on
-// first launch in a new directory ("Do you trust the contents of this
-// directory?" / "1. Yes, continue").
+// confirmCodexPrompts handles interactive prompts Codex shows on launch,
+// such as workspace-trust confirmations ("Do you trust the contents of this directory?")
+// or usage limit switch modals ("Automatically switched to ... due to usage limits" /
+// "Press enter to confirm or esc to continue working").
 func confirmCodexPrompts(session string) {
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
@@ -173,10 +226,19 @@ func confirmCodexPrompts(session string) {
 			time.Sleep(time.Second)
 			continue
 		}
-		if !strings.Contains(stripAnsi(text), "trust the contents of this directory") {
-			break
+		cleanText := stripAnsi(text)
+		if strings.Contains(cleanText, "trust the contents of this directory") {
+			run("tmux", "send-keys", "-t", session, "1", "Enter") //nolint
+			time.Sleep(2 * time.Second)
+			continue
 		}
-		run("tmux", "send-keys", "-t", session, "1", "Enter") //nolint
-		time.Sleep(3 * time.Second)
+		if strings.Contains(cleanText, "esc to continue working") ||
+			strings.Contains(cleanText, "Automatically switched to") ||
+			strings.Contains(cleanText, "due to usage limits") {
+			run("tmux", "send-keys", "-t", session, "Escape") //nolint
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		break
 	}
 }

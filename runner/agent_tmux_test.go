@@ -107,20 +107,67 @@ func assertAgyRemain(t *testing.T, name string, got *float64, want float64) {
 }
 
 func TestParseCodexQuotaLatestStatusFormat(t *testing.T) {
+	mockAuth := filepath.Join("..", "tests", "mocks", "tmux", "codex", "auth.json")
+	t.Setenv("CODEX_AUTH_PATH", mockAuth)
+
 	status, err := os.ReadFile(filepath.Join("..", "tests", "mocks", "tmux", "codex", "arondo-codex-status.txt"))
 	if err != nil {
 		t.Fatalf("failed to read Codex status fixture: %v", err)
 	}
 
-	content := strings.ReplaceAll(string(status), "__resets_5h__", "12:48")
-	content = strings.ReplaceAll(content, "__resets_weekly__", "11:28 on 7 Sep")
+	content := strings.ReplaceAll(string(status), "__resets_5h__", "12:08 AM on 30 Sep")
+	content = strings.ReplaceAll(content, "__resets_weekly__", "7:43 AM on 4 Oct")
+	content = strings.ReplaceAll(content, "__resets_luna__", "11:22 PM on 6 Oct")
 
 	q := parseCodexQuota(content)
 	if q == nil {
 		t.Fatal("parseCodexQuota returned nil")
 	}
-	if q.Account != "arondo@gmail.com" {
-		t.Fatalf("Account = %q, want arondo@gmail.com", q.Account)
+	if q.Account != "019f9883-1234-5678-9abc-def012345678" {
+		t.Fatalf("Account = %q, want 019f9883-1234-5678-9abc-def012345678", q.Account)
+	}
+	if q.Plan != "Plus" {
+		t.Fatalf("Plan = %q, want Plus", q.Plan)
+	}
+	if q.DefaultModel != "GPT-Reserve (reasoning medium, summaries auto)" {
+		t.Fatalf("DefaultModel = %q, want 'GPT-Reserve (reasoning medium, summaries auto)'", q.DefaultModel)
+	}
+	if q.FiveHourRemain == nil || *q.FiveHourRemain != 1.0 {
+		t.Fatalf("FiveHourRemain = %v, want 1.0", q.FiveHourRemain)
+	}
+	if q.FiveHourResetAt == nil {
+		t.Fatal("expected FiveHourResetAt to be set")
+	}
+	if q.WeeklyRemain == nil || *q.WeeklyRemain != 0.60 {
+		t.Fatalf("WeeklyRemain = %v, want 0.60", q.WeeklyRemain)
+	}
+	if q.WeeklyResetAt == nil {
+		t.Fatal("expected WeeklyResetAt to be set")
+	}
+}
+
+func TestParseCodexQuotaLegacyStatusFormat(t *testing.T) {
+	mockAuth := filepath.Join("..", "tests", "mocks", "tmux", "codex", "auth.json")
+	t.Setenv("CODEX_AUTH_PATH", mockAuth)
+
+	legacyStatus := `
+╭──────────────────────────────────────────────────────────────────────────────────────╮
+│  >_ OpenAI Codex (v0.153.1)                                                          │
+│                                                                                      │
+│  Model:                gpt-5.6-terra (reasoning medium, summaries auto)              │
+│  Directory:            /data/arondo                                                  │
+│  Account:              arondo@gmail.com (Plus)                                       │
+│                                                                                      │
+│  5h limit:             [████████████████████] 100% left (resets 12:48)               │
+│  Weekly limit:         [████████████░░░░░░░░] 60% left (resets 11:28 on 7 Sep)       │
+╰──────────────────────────────────────────────────────────────────────────────────────╯
+`
+	q := parseCodexQuota(legacyStatus)
+	if q == nil {
+		t.Fatal("parseCodexQuota returned nil for legacy status")
+	}
+	if q.Account != "019f9883-1234-5678-9abc-def012345678" {
+		t.Fatalf("Account = %q, want 019f9883-1234-5678-9abc-def012345678", q.Account)
 	}
 	if q.Plan != "Plus" {
 		t.Fatalf("Plan = %q, want Plus", q.Plan)
@@ -142,14 +189,136 @@ func TestParseCodexQuotaLatestStatusFormat(t *testing.T) {
 	}
 }
 
+func TestParseCodexQuotaRealStatusOutput(t *testing.T) {
+	mockAuth := filepath.Join("..", "tests", "mocks", "tmux", "codex", "auth.json")
+	t.Setenv("CODEX_AUTH_PATH", mockAuth)
+
+	status := `/status
+
+╭───────────────────────────────────────────────────────────────────────────────────────────╮
+│  >_ OpenAI Codex (v0.158.0)                                                               │
+│                                                                                           │
+│ Visit https://chatgpt.com/codex/settings/usage for up-to-date                             │
+│ information on rate limits and credits                                                    │
+│                                                                                           │
+│  Server:                      Local background server                                     │
+│                                                                                           │
+│  Model:                       GPT-Reserve (reasoning medium, summaries auto)              │
+│  Model provider:              openai                                                      │
+│  Directory:                   /mnt/coder-workspaces/private-workspace/repos/github/Arondo │
+│  Permissions:                 Full Access                                                 │
+│  Agents.md:                   ~/.codex/AGENTS.md, AGENTS.md                               │
+│  Account:                     Plus                                                        │
+│  Collaboration mode:          Default                                                     │
+│  Session:                     01a0ed8b-f070-7c12-8ac9-036bf01fc427                        │
+│                                                                                           │
+│  5h limit:                    [░░░░░░░░░░░░░░░░░░░░] 0% left (resets 12:08 AM on 30 Sep)  │
+│  Weekly limit:                [███░░░░░░░░░░░░░░░░░] 16% left (resets 7:43 AM on 4 Oct)   │
+│  Luna Reserve Weekly limit:   [████████████████████] 100% left (resets 11:22 PM on 6 Oct) │
+╰───────────────────────────────────────────────────────────────────────────────────────────╯`
+
+	q := parseCodexQuota(status)
+	if q == nil {
+		t.Fatal("parseCodexQuota returned nil for real status output")
+	}
+	if q.Account != "019f9883-1234-5678-9abc-def012345678" {
+		t.Fatalf("Account = %q, want 019f9883-1234-5678-9abc-def012345678", q.Account)
+	}
+	if q.Plan != "Plus" {
+		t.Fatalf("Plan = %q, want Plus", q.Plan)
+	}
+	if q.DefaultModel != "GPT-Reserve (reasoning medium, summaries auto)" {
+		t.Fatalf("DefaultModel = %q, want 'GPT-Reserve (reasoning medium, summaries auto)'", q.DefaultModel)
+	}
+	if q.FiveHourRemain == nil || *q.FiveHourRemain != 0.0 {
+		t.Fatalf("FiveHourRemain = %v, want 0.0", q.FiveHourRemain)
+	}
+	if q.FiveHourResetAt == nil {
+		t.Fatal("expected FiveHourResetAt to be set")
+	}
+	if q.WeeklyRemain == nil || *q.WeeklyRemain != 0.16 {
+		t.Fatalf("WeeklyRemain = %v, want 0.16", q.WeeklyRemain)
+	}
+	if q.WeeklyResetAt == nil {
+		t.Fatal("expected WeeklyResetAt to be set")
+	}
+}
+
+func TestParseCodexQuotaFallbackUnknownWhenNoAuth(t *testing.T) {
+	t.Setenv("CODEX_AUTH_PATH", filepath.Join(t.TempDir(), "nonexistent_auth.json"))
+
+	status := `
+╭───────────────────────────────────────────────────────────────────────────────────────────╮
+│  Account:                     Plus                                                        │
+│  Model:                       GPT-Reserve (reasoning medium, summaries auto)              │
+│  Weekly limit:                [████████████░░░░░░░░] 60% left (resets 7:43 AM on 4 Oct)   │
+╰───────────────────────────────────────────────────────────────────────────────────────────╯`
+
+	q := parseCodexQuota(status)
+	if q == nil {
+		t.Fatal("parseCodexQuota returned nil")
+	}
+	if q.Account != "unknown" {
+		t.Fatalf("Account = %q, want unknown", q.Account)
+	}
+	if q.Plan != "Plus" {
+		t.Fatalf("Plan = %q, want Plus", q.Plan)
+	}
+}
+
+func TestReadCodexAccountID(t *testing.T) {
+	dir := t.TempDir()
+
+	// 1. Valid auth.json with account_id
+	validAuthPath := filepath.Join(dir, "valid_auth.json")
+	if err := os.WriteFile(validAuthPath, []byte(`{"tokens":{"account_id":"acc-12345"}}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CODEX_AUTH_PATH", validAuthPath)
+	if got := readCodexAccountID(); got != "acc-12345" {
+		t.Fatalf("readCodexAccountID() = %q, want acc-12345", got)
+	}
+
+	// 2. Auth.json missing account_id
+	emptyAuthPath := filepath.Join(dir, "empty_auth.json")
+	if err := os.WriteFile(emptyAuthPath, []byte(`{"tokens":{"account_id":""}}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CODEX_AUTH_PATH", emptyAuthPath)
+	if got := readCodexAccountID(); got != "unknown" {
+		t.Fatalf("readCodexAccountID() = %q, want unknown", got)
+	}
+
+	// 3. Invalid JSON
+	invalidAuthPath := filepath.Join(dir, "invalid.json")
+	if err := os.WriteFile(invalidAuthPath, []byte(`not json`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CODEX_AUTH_PATH", invalidAuthPath)
+	if got := readCodexAccountID(); got != "unknown" {
+		t.Fatalf("readCodexAccountID() = %q, want unknown", got)
+	}
+
+	// 4. Nonexistent file
+	t.Setenv("CODEX_AUTH_PATH", filepath.Join(dir, "nonexistent.json"))
+	if got := readCodexAccountID(); got != "unknown" {
+		t.Fatalf("readCodexAccountID() = %q, want unknown", got)
+	}
+}
+
 func TestParseCodexResetsTimestamp(t *testing.T) {
 	cases := []struct {
 		name  string
 		input string
 	}{
-		{"time only", "12:48"},
-		{"date and time", "11:28 on 7 Sep"},
-		{"single digit hour and day", "3:08 on 2 Mar"},
+		{"24h time only", "12:48"},
+		{"24h date and time", "11:28 on 7 Sep"},
+		{"24h single digit hour and day", "3:08 on 2 Mar"},
+		{"12h AM with date", "12:08 AM on 30 Sep"},
+		{"12h AM single digit hour with date", "7:43 AM on 4 Oct"},
+		{"12h PM with date", "11:22 PM on 6 Oct"},
+		{"12h time only AM", "12:08 AM"},
+		{"12h time only PM", "7:43 PM"},
 	}
 
 	for _, c := range cases {
@@ -179,6 +348,8 @@ func TestAgentQuotas(t *testing.T) {
 	mockAgyBinDir := filepath.Clean(filepath.Join(wd, "../tests/mocks/bin/agy"))
 	mockClaudeBinDir := filepath.Clean(filepath.Join(wd, "../tests/mocks/bin/claude"))
 	mockCodexBinDir := filepath.Clean(filepath.Join(wd, "../tests/mocks/bin/codex"))
+	mockCodexAuthPath := filepath.Clean(filepath.Join(wd, "../tests/mocks/tmux/codex/auth.json"))
+	t.Setenv("CODEX_AUTH_PATH", mockCodexAuthPath)
 	originalPath := os.Getenv("PATH")
 	err = os.Setenv("PATH", mockAgyBinDir+":"+mockClaudeBinDir+":"+mockCodexBinDir+":"+originalPath)
 	if err != nil {
@@ -308,8 +479,8 @@ func TestAgentQuotas(t *testing.T) {
 				t.Fatalf("expected agent codex, got %s", payload.Agent)
 			}
 			account, _ := payload.Quota["Account"].(string)
-			if account != "arondo@gmail.com" {
-				t.Fatalf("expected account arondo@gmail.com, got %s", account)
+			if account != "019f9883-1234-5678-9abc-def012345678" {
+				t.Fatalf("expected account 019f9883-1234-5678-9abc-def012345678, got %s", account)
 			}
 			plan, _ := payload.Quota["Plan"].(string)
 			if plan != "Plus" {
