@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getArondoToken, getRoleByToken, isValidToken } from "@/lib/auth";
 import { updateAppSettings, getAppSettings, getSessionArchiveDays, getTempDirProjectRetentionHours, getShowHiddenFiles, getShowTempDirSessions, getEnableAutomodel, getAgentModelsConfig, type AgentModelsConfig } from "@/lib/store";
 import { getLlmApiKeyEnvStatus, type LlmApiKeyName } from "@/lib/automodel/config";
+import { getWebPushContactEmail, updateWebPushContactEmail } from "@/lib/web-push-server";
 import fs from "fs/promises";
 import path from "path";
 
@@ -23,6 +24,7 @@ export async function GET(request: NextRequest) {
   const showTempDirSessions = await getShowTempDirSessions();
   const enableAutomodel = await getEnableAutomodel();
   const agentModels = await getAgentModelsConfig();
+  const webPushContactEmail = await getWebPushContactEmail();
   const appSettings = await getAppSettings();
   const envStatus = getLlmApiKeyEnvStatus();
   const llmApiKeys = Object.fromEntries(
@@ -47,7 +49,17 @@ export async function GET(request: NextRequest) {
     console.error("Failed to read package.json version:", err);
   }
 
-  return NextResponse.json({ sessionArchiveDays, tempDirProjectRetentionHours, showHiddenFiles, showTempDirSessions, enableAutomodel, version, llmApiKeys, agentModels });
+  return NextResponse.json({
+    sessionArchiveDays,
+    tempDirProjectRetentionHours,
+    showHiddenFiles,
+    showTempDirSessions,
+    enableAutomodel,
+    version,
+    llmApiKeys,
+    agentModels,
+    webPushContactEmail,
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -57,7 +69,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Admin role required" }, { status: 403 });
   }
 
-  const { sessionArchiveDays, tempDirProjectRetentionHours, showHiddenFiles, showTempDirSessions, enableAutomodel, llmApiKeys, agentModels } = await request.json();
+  const {
+    sessionArchiveDays,
+    tempDirProjectRetentionHours,
+    showHiddenFiles,
+    showTempDirSessions,
+    enableAutomodel,
+    llmApiKeys,
+    agentModels,
+    webPushContactEmail,
+  } = await request.json();
   if (sessionArchiveDays !== undefined) {
     if (typeof sessionArchiveDays !== "number" || !Number.isFinite(sessionArchiveDays) || sessionArchiveDays < 1) {
       return NextResponse.json({ error: "sessionArchiveDays must be a positive number" }, { status: 400 });
@@ -193,6 +214,16 @@ export async function POST(request: NextRequest) {
     patch.agentModels = next;
   }
 
+  let nextContactEmail: string | undefined;
+  if (webPushContactEmail !== undefined) {
+    if (typeof webPushContactEmail !== "string") {
+      return NextResponse.json({ error: "webPushContactEmail must be a string" }, { status: 400 });
+    }
+    nextContactEmail = await updateWebPushContactEmail(webPushContactEmail);
+  } else {
+    nextContactEmail = await getWebPushContactEmail();
+  }
+
   const updated = await updateAppSettings(patch);
   const envStatus = getLlmApiKeyEnvStatus();
   const status = Object.fromEntries(
@@ -211,5 +242,6 @@ export async function POST(request: NextRequest) {
     enableAutomodel: updated.enableAutomodel !== undefined ? updated.enableAutomodel : false,
     llmApiKeys: status,
     agentModels: updated.agentModels || (await getAgentModelsConfig()),
+    webPushContactEmail: nextContactEmail,
   });
 }

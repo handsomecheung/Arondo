@@ -21,6 +21,8 @@
 
 5. **No dead code**: If you find unused dead code, delete it immediately. Do not keep it.
 
+6. **Settings vs Admin Settings Separation**: `/settings` is accessible to all users for device-level and personal preferences (such as enabling Web Push notifications on the current device). All server-level settings and configuration file modifications (`arondo.json`, `web-push.json`, agent models, tokens, global rules, etc.) must strictly be implemented in `/admin/settings` (Admin role only).
+
 ---
 
 Before starting work, ensure you have read the `README.md` in current directory to understand the project's background, objectives, and overall architecture. If a `README.md` exists in your current working directory (the project subdirectory you are modifying), refer to it for specific instructions and project details.
@@ -65,7 +67,10 @@ app/
   runners/
     page.tsx            # Standalone page for monitoring, disconnecting, and deleting runners, and viewing quota details
   settings/
-    page.tsx            # Standalone page for monitoring and deleting runners, viewing quota details, and managing global settings
+    page.tsx            # Standalone page for user/device-level preferences (e.g. Web Push toggle, test push, reset service worker)
+  admin/
+    settings/
+      page.tsx          # Standalone page for server-level administration (runners, tokens, agent models, automodel keys, global rules, VAPID contact email)
   tasks/
     page.tsx            # Tasks management page (session list, shell terminal, status monitoring)
   layout.tsx            # Root layout

@@ -68,4 +68,23 @@ test.describe('Web Push (VAPID) Notifications API', () => {
     const immediateData = await immediateRes.json();
     expect(immediateData.success).toBe(true);
   });
+
+  test('should get and update webPushContactEmail without mailto prefix', async ({ request }) => {
+    // Update contact email without mailto:
+    const updateRes = await request.post('/api/settings', {
+      headers: { 'x-arondo-token': validToken },
+      data: { webPushContactEmail: 'custom-admin@example.com' },
+    });
+    expect(updateRes.status()).toBe(200);
+    const updateData = await updateRes.json();
+    expect(updateData.webPushContactEmail).toBe('custom-admin@example.com');
+
+    // Get settings and verify
+    const getRes = await request.get('/api/settings', {
+      headers: { 'x-arondo-token': validToken },
+    });
+    expect(getRes.status()).toBe(200);
+    const getData = await getRes.json();
+    expect(getData.webPushContactEmail).toBe('custom-admin@example.com');
+  });
 });

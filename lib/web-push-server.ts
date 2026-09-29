@@ -41,25 +41,44 @@ export interface WebPushPayload {
 
 let vapidInitialized = false;
 
+function toVapidSubject(emailOrUrl?: string): string {
+  if (!emailOrUrl) return "mailto:admin@arondo.local";
+  const trimmed = emailOrUrl.trim();
+  if (!trimmed) return "mailto:admin@arondo.local";
+  if (trimmed.startsWith("mailto:") || trimmed.startsWith("https://") || trimmed.startsWith("http://")) {
+    return trimmed;
+  }
+  return `mailto:${trimmed}`;
+}
+
+function normalizeStoredContactEmail(emailOrUrl?: string): string {
+  if (!emailOrUrl) return "admin@arondo.local";
+  let trimmed = emailOrUrl.trim();
+  if (trimmed.startsWith("mailto:")) {
+    trimmed = trimmed.substring("mailto:".length).trim();
+  }
+  return trimmed || "admin@arondo.local";
+}
+
 async function loadWebPushConfig(): Promise<WebPushConfig> {
   try {
     const raw = await fs.readFile(WEB_PUSH_CONFIG_FILE, "utf-8");
     const data = JSON.parse(raw);
     return {
       vapidKeys: data.vapidKeys,
-      contactEmail: data.contactEmail || "mailto:admin@arondo.local",
+      contactEmail: normalizeStoredContactEmail(data.contactEmail),
       subscriptions: Array.isArray(data.subscriptions) ? data.subscriptions : [],
     };
   } catch (err: any) {
     if (err.code === "ENOENT") {
       return {
-        contactEmail: "mailto:admin@arondo.local",
+        contactEmail: "admin@arondo.local",
         subscriptions: [],
       };
     }
     console.error("[web-push] Failed to read web-push.json:", err);
     return {
-      contactEmail: "mailto:admin@arondo.local",
+      contactEmail: "admin@arondo.local",
       subscriptions: [],
     };
   }
@@ -77,7 +96,7 @@ export async function ensureVapidDetails(): Promise<{ publicKey: string; private
   if (config.vapidKeys?.publicKey && config.vapidKeys?.privateKey) {
     if (!vapidInitialized) {
       webpush.setVapidDetails(
-        config.contactEmail || "mailto:admin@arondo.local",
+        toVapidSubject(config.contactEmail),
         config.vapidKeys.publicKey,
         config.vapidKeys.privateKey,
       );
@@ -92,7 +111,7 @@ export async function ensureVapidDetails(): Promise<{ publicKey: string; private
   await saveWebPushConfig(config);
 
   webpush.setVapidDetails(
-    config.contactEmail || "mailto:admin@arondo.local",
+    toVapidSubject(config.contactEmail),
     keys.publicKey,
     keys.privateKey,
   );
@@ -103,6 +122,30 @@ export async function ensureVapidDetails(): Promise<{ publicKey: string; private
 export async function getVapidPublicKey(): Promise<string> {
   const keys = await ensureVapidDetails();
   return keys.publicKey;
+}
+
+export async function getWebPushContactEmail(): Promise<string> {
+  const config = await loadWebPushConfig();
+  return normalizeStoredContactEmail(config.contactEmail);
+}
+
+export async function updateWebPushContactEmail(contactEmail: string): Promise<string> {
+  const stored = normalizeStoredContactEmail(contactEmail);
+
+  const config = await loadWebPushConfig();
+  config.contactEmail = stored;
+  await saveWebPushConfig(config);
+
+  if (config.vapidKeys?.publicKey && config.vapidKeys?.privateKey) {
+    webpush.setVapidDetails(
+      toVapidSubject(stored),
+      config.vapidKeys.publicKey,
+      config.vapidKeys.privateKey,
+    );
+    vapidInitialized = true;
+  }
+
+  return stored;
 }
 
 export async function registerPushSubscription(
