@@ -257,7 +257,7 @@ export default function SettingsPage() {
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
               <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-                Push Notifications (Web Push)
+                Push Notifications
               </h2>
               {isPushSubscribed ? (
                 <span
@@ -270,7 +270,7 @@ export default function SettingsPage() {
                     color: "var(--success)",
                   }}
                 >
-                  ● Active on this device
+                  ● Active
                 </span>
               ) : (
                 <span
@@ -339,7 +339,7 @@ export default function SettingsPage() {
                       boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
                     }}
                   >
-                    {isPushLoading ? "Scheduling..." : "Send Test Notification (in 30s)"}
+                    {isPushLoading ? "Scheduling..." : "Test (in 30s)"}
                   </button>
 
                   <button
@@ -358,7 +358,7 @@ export default function SettingsPage() {
                       transition: "all 0.2s ease",
                     }}
                   >
-                    Disable Push Notifications
+                    Disable
                   </button>
 
                   <button
@@ -378,7 +378,7 @@ export default function SettingsPage() {
                     }}
                     title="Clear old Service Worker cache and re-register push"
                   >
-                    Reset & Re-sync
+                    Reset
                   </button>
                 </>
               )}

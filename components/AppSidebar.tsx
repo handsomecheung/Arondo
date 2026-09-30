@@ -180,7 +180,7 @@ export default function AppSidebar({
                     }}
                     id="menu-settings"
                   >
-                    <IconSettings /> Settings
+                    <IconSettings /> Device Settings
                   </Link>
                   {userRole === "admin" && (
                     <Link
