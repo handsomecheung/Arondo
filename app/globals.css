@@ -980,6 +980,9 @@ body {
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
   }
+  .new-session-input-area.has-open-popup {
+    overflow-y: visible;
+  }
 }
 .input-area.drag-over {
   background: var(--accent-glow);

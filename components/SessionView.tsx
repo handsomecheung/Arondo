@@ -1138,7 +1138,7 @@ export default function SessionView({
 
       {showComposer && (
       <div
-        className={`input-area${isNewSession || isNewDraft ? " new-session-input-area" : ""}${isDragging ? " drag-over" : ""}`}
+        className={`input-area${isNewSession || isNewDraft ? " new-session-input-area" : ""}${runnerDropdownOpen || projectDropdownOpen || agentDropdownOpen || attachMenuOpen !== "closed" ? " has-open-popup" : ""}${isDragging ? " drag-over" : ""}`}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
