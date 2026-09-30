@@ -52,6 +52,7 @@ export async function dispatchProjectScript(
     command: script.command,
     projectId,
     createdAt: Date.now(),
+    tokenUuid: opts.tokenUuid,
   });
 
   await clearSessionLog("", systemMsg.id, projectId);

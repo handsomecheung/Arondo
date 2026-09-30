@@ -87,4 +87,101 @@ test.describe('Web Push (VAPID) Notifications API', () => {
     const getData = await getRes.json();
     expect(getData.webPushContactEmail).toBe('custom-admin@example.com');
   });
+
+  test('should isolate push notifications per client token UUID', async ({ request }) => {
+    // 1. Create client token for User A
+    const resA = await request.post('/api/auth/client-tokens', {
+      headers: { 'x-arondo-token': validToken },
+      data: { name: 'User-A-Push', type: 'user' },
+    });
+    expect(resA.status()).toBe(200);
+    const dataA = await resA.json();
+    const tokenA = dataA.token;
+
+    // 2. Create client token for User B
+    const resB = await request.post('/api/auth/client-tokens', {
+      headers: { 'x-arondo-token': validToken },
+      data: { name: 'User-B-Push', type: 'user' },
+    });
+    expect(resB.status()).toBe(200);
+    const dataB = await resB.json();
+    const tokenB = dataB.token;
+
+    const subA = {
+      endpoint: 'https://fcm.googleapis.com/fcm/send/test-sub-user-a',
+      keys: {
+        p256dh: 'BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM',
+        auth: 'tBHItJI5svbpez7KI4CCXg',
+      },
+    };
+
+    const subB = {
+      endpoint: 'https://fcm.googleapis.com/fcm/send/test-sub-user-b',
+      keys: {
+        p256dh: 'BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM',
+        auth: 'tBHItJI5svbpez7KI4CCXg',
+      },
+    };
+
+    try {
+      // User A subscribes
+      const regA = await request.post('/api/notifications/subscribe', {
+        headers: { 'x-arondo-token': tokenA },
+        data: { subscription: subA },
+      });
+      expect(regA.status()).toBe(200);
+
+      // User B subscribes
+      const regB = await request.post('/api/notifications/subscribe', {
+        headers: { 'x-arondo-token': tokenB },
+        data: { subscription: subB },
+      });
+      expect(regB.status()).toBe(200);
+
+      // User A triggers immediate test push -> attempts delivery to only 1 subscription (User A's)
+      const testPushA = await request.post('/api/notifications/test', {
+        headers: { 'x-arondo-token': tokenA },
+        data: { delaySeconds: 0 },
+      });
+      expect(testPushA.status()).toBe(200);
+      const pushDataA = await testPushA.json();
+      // Since the endpoint is dummy FCM, it will fail 1 delivery, sent + failed must equal exactly 1 (only user A's subscription)
+      expect(pushDataA.sent + pushDataA.failed).toBe(1);
+
+      // A user without any subscriptions triggers test push -> targets 0 subscriptions
+      const resC = await request.post('/api/auth/client-tokens', {
+        headers: { 'x-arondo-token': validToken },
+        data: { name: 'User-C-Push', type: 'user' },
+      });
+      const tokenC = (await resC.json()).token;
+
+      const testPushC = await request.post('/api/notifications/test', {
+        headers: { 'x-arondo-token': tokenC },
+        data: { delaySeconds: 0 },
+      });
+      expect(testPushC.status()).toBe(200);
+      const pushDataC = await testPushC.json();
+      expect(pushDataC.sent).toBe(0);
+      expect(pushDataC.failed).toBe(0);
+
+      await request.delete(`/api/auth/client-tokens?role=user&token=${tokenC}`, {
+        headers: { 'x-arondo-token': validToken },
+      });
+    } finally {
+      await request.post('/api/notifications/unsubscribe', {
+        headers: { 'x-arondo-token': tokenA },
+        data: { endpoint: subA.endpoint },
+      });
+      await request.post('/api/notifications/unsubscribe', {
+        headers: { 'x-arondo-token': tokenB },
+        data: { endpoint: subB.endpoint },
+      });
+      await request.delete(`/api/auth/client-tokens?role=user&token=${tokenA}`, {
+        headers: { 'x-arondo-token': validToken },
+      });
+      await request.delete(`/api/auth/client-tokens?role=user&token=${tokenB}`, {
+        headers: { 'x-arondo-token': validToken },
+      });
+    }
+  });
 });

@@ -105,6 +105,7 @@ export interface TaskContext {
   agyQuotaGroup?: "gemini" | "other";
   detachedKind?: "review" | "btw";
   cache?: "on" | "off";
+  tokenUuid?: string;
 }
 
 interface PendingRequest {
@@ -148,9 +149,18 @@ class RunnerManager {
     return getShowTempDirSessions();
   }
 
-  async sendSessionNotification(sessionId: string, payload: WebPushPayload): Promise<void> {
+  async sendSessionNotification(
+    sessionId: string,
+    payload: WebPushPayload,
+    targetUserTokenUuid?: string,
+  ): Promise<void> {
     if (!(await this.shouldSendSessionNotification(sessionId))) return;
-    await sendWebPushNotification(payload);
+    let userUuid = targetUserTokenUuid;
+    if (!userUuid && sessionId) {
+      const session = await getSession(sessionId);
+      userUuid = session?.tokenUuid;
+    }
+    await sendWebPushNotification(payload, userUuid);
   }
 
   // ─── Runner persistence ─────────────────────────────────────────────
@@ -261,6 +271,7 @@ class RunnerManager {
             completedAt,
             exitCode: m.exitCode,
             stoppedByUser: m.stoppedByUser,
+            tokenUuid: m.tokenUuid || s.tokenUuid,
           };
           this.tasks.set(taskId, ctx);
           const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
@@ -316,6 +327,7 @@ class RunnerManager {
             completedAt,
             exitCode: m.exitCode,
             stoppedByUser: m.stoppedByUser,
+            tokenUuid: m.tokenUuid,
           };
           this.tasks.set(taskId, ctx);
           const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
@@ -1311,18 +1323,21 @@ class RunnerManager {
 
     if (!payload.waiting) return;
     if (!shouldSendTaskNotification(ctx.createdAt)) return;
-    if (!(await this.shouldSendSessionNotification(ctx.sessionId))) return;
+    if (ctx.sessionId && !(await this.shouldSendSessionNotification(ctx.sessionId))) return;
     const session = ctx.sessionId ? await getSession(ctx.sessionId) : undefined;
-    const sessionTitle = session?.name || ctx.sessionId.slice(0, 8);
+    const sessionTitle = session?.name || (ctx.sessionId ? ctx.sessionId.slice(0, 8) : undefined);
     const commandPreview = notificationPreview(ctx.command);
+    const targetUserTokenUuid = ctx.tokenUuid || session?.tokenUuid;
     sendWebPushNotification({
       title: "⌨️ Script Needs Input",
       body: commandPreview
         ? `${commandPreview}: Waiting for your input.`
-        : `Session "${sessionTitle}": Script is waiting for your input.`,
+        : sessionTitle
+          ? `Session "${sessionTitle}": Script is waiting for your input.`
+          : "Script is waiting for your input.",
       url: "/",
       tag: `script-input-${ctx.taskId}-${Date.now()}`,
-    }).catch((err) => {
+    }, targetUserTokenUuid).catch((err) => {
       console.error("[runner-manager] Failed to send web push for script input:", err);
     });
   }
@@ -1521,12 +1536,13 @@ class RunnerManager {
               ? `${promptPreview}: Agent exited with error code ${exitCode}.`
               : `Session "${sessionTitle}": Agent exited with error code ${exitCode}.`;
 
+      const targetUserTokenUuid = ctx.tokenUuid || session?.tokenUuid;
       sendWebPushNotification({
         title: pushTitle,
         body: pushBody,
         url: `/`,
         tag: `session-${ctx.sessionId}`,
-      }).catch((err) => {
+      }, targetUserTokenUuid).catch((err) => {
         console.error("[runner-manager] Failed to send web push for agent exit:", err);
       });
     }
@@ -1549,6 +1565,7 @@ class RunnerManager {
                 ? ctx.agyQuotaGroup ?? systemMsg?.resolvedAgyQuotaGroup
                 : undefined,
             },
+            tokenUuid: lastUserMsg.tokenUuid || ctx.tokenUuid || session?.tokenUuid,
           });
           eventBus.publish({ type: "message_added", payload: todoMessage });
           const withTodo = await getSession(ctx.sessionId);
@@ -1579,6 +1596,7 @@ class RunnerManager {
       type: "detached-agent-return",
       parentId: ctx.messageId,
       detachedKind: ctx.detachedKind,
+      tokenUuid: ctx.tokenUuid,
     });
     eventBus.publish({ type: "message_added", payload: message });
   }
@@ -1619,6 +1637,7 @@ class RunnerManager {
           : `❌ Error: ${errorMessage}`,
       type: "script-return",
       parentId: ctx.messageId,
+      tokenUuid: ctx.tokenUuid,
     });
     const runningScripts = await getRunningSessionScriptRuns(ctx.sessionId);
 
@@ -1648,23 +1667,28 @@ class RunnerManager {
     if (
       !stoppedByUser &&
       shouldSendTaskNotification(ctx.createdAt) &&
-      await this.shouldSendSessionNotification(ctx.sessionId)
+      (!ctx.sessionId || (await this.shouldSendSessionNotification(ctx.sessionId)))
     ) {
-      const session = await getSession(ctx.sessionId);
-      const sessionTitle = session?.name || ctx.sessionId.slice(0, 8);
+      const session = ctx.sessionId ? await getSession(ctx.sessionId) : undefined;
+      const sessionTitle = session?.name || (ctx.sessionId ? ctx.sessionId.slice(0, 8) : undefined);
       const commandPreview = notificationPreview(ctx.command);
+      const targetUserTokenUuid = ctx.tokenUuid || session?.tokenUuid;
       sendWebPushNotification({
         title: exitCode === 0 ? "⚡ Script Completed" : "❌ Script Failed",
         body: exitCode === 0
           ? commandPreview
             ? `${commandPreview}: Script finished successfully.`
-            : `Session "${sessionTitle}": Script finished successfully.`
+            : sessionTitle
+              ? `Session "${sessionTitle}": Script finished successfully.`
+              : "Script finished successfully."
           : commandPreview
             ? `${commandPreview}: ${errorMessage}`
-            : `Session "${sessionTitle}": ${errorMessage}`,
+            : sessionTitle
+              ? `Session "${sessionTitle}": ${errorMessage}`
+              : errorMessage,
         url: `/`,
-        tag: `session-${ctx.sessionId}`,
-      }).catch((err) => {
+        tag: ctx.sessionId ? `session-${ctx.sessionId}` : `task-${ctx.taskId}`,
+      }, targetUserTokenUuid).catch((err) => {
         console.error("[runner-manager] Failed to send web push for script exit:", err);
       });
     }

@@ -211,7 +211,7 @@ export async function sendWebPushNotification(
   let targetSubs = config.subscriptions;
   if (targetUserTokenUuid) {
     targetSubs = targetSubs.filter(
-      (s) => !s.userTokenUuid || s.userTokenUuid === targetUserTokenUuid,
+      (s) => s.userTokenUuid === targetUserTokenUuid,
     );
   }
 

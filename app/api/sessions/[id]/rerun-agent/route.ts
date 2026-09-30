@@ -3,7 +3,7 @@ import { getSession, getMessages, addMessage, updateSession, clearSessionLog, ap
 import { getAgent, resolveAgentType, PROMPT_ENV_VAR } from "@/lib/agents";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
-import { getArondoToken, verifySessionPermission } from "@/lib/auth";
+import { getArondoToken, verifySessionPermission, getUuidByToken } from "@/lib/auth";
 
 export async function POST(
   req: NextRequest,
@@ -104,6 +104,7 @@ export async function POST(
   });
 
   const updatedSession = await updateSession(id, { status: "running", errorMessage: undefined });
+  const tokenUuid = getUuidByToken(token) || session.tokenUuid || undefined;
 
   const systemMsg = await addMessage({
     id: systemMessageId,
@@ -115,6 +116,7 @@ export async function POST(
     resolvedAgentType: resolvedType,
     resolvedAgyQuotaGroup: resolved.agyQuotaGroup,
     prompt: fullPrompt,
+    tokenUuid,
   });
   eventBus.publish({ type: "message_added", payload: systemMsg });
   eventBus.publish({ type: "session_updated", payload: updatedSession });
@@ -130,6 +132,7 @@ export async function POST(
     agentType: resolvedType,
     command,
     prompt,
+    tokenUuid,
   });
 
   await clearSessionLog(id, systemMsg.id);

@@ -128,6 +128,7 @@ export async function dispatchDetachedAgent(
     command,
     prompt: trimmedMessage || instructions,
     detachedKind: kind,
+    tokenUuid: session.tokenUuid,
   });
   await clearSessionLog(sessionId, runMessage.id);
 
@@ -149,6 +150,7 @@ export async function dispatchDetachedAgent(
       type: "detached-agent-return",
       parentId: runMessage.id,
       detachedKind: kind,
+      tokenUuid: session.tokenUuid,
     });
     eventBus.publish({ type: "message_added", payload: errorMessageRecord });
   });
@@ -286,6 +288,7 @@ export async function dispatchFollowupMessage(
     resolvedAgentType: resolvedType,
     resolvedAgyQuotaGroup: resolved.agyQuotaGroup,
     prompt: fullPrompt,
+    tokenUuid: opts.tokenUuid || session.tokenUuid,
   });
   eventBus.publish({ type: "message_added", payload: systemMsg });
 
@@ -306,6 +309,7 @@ export async function dispatchFollowupMessage(
     agyQuotaGroup: resolved.agyQuotaGroup,
     command,
     prompt: trimmedPrompt || trimmedMessage,
+    tokenUuid: opts.tokenUuid || session.tokenUuid,
   });
 
   await clearSessionLog(sessionId, systemMsg.id);
@@ -431,7 +435,7 @@ export async function dispatchCreateSession(
           body: `${trimmedPrompt.slice(0, 119)}${trimmedPrompt.length > 119 ? "…" : ""}: Result returned from cache.`,
           url: "/",
           tag: `session-${session.id}`,
-        }).catch((err) => {
+        }, opts.tokenUuid || session.tokenUuid).catch((err) => {
           console.error("[session-actions] Failed to send web push for cached agent result:", err);
         });
       }
@@ -506,6 +510,7 @@ export async function dispatchCreateSession(
     resolvedAgyQuotaGroup: resolved.agyQuotaGroup,
     prompt: fullPrompt,
     cache: opts.cache === "on" ? "on" : undefined,
+    tokenUuid: opts.tokenUuid || session.tokenUuid,
   });
   eventBus.publish({ type: "message_added", payload: systemMsg });
 
@@ -522,6 +527,7 @@ export async function dispatchCreateSession(
     command,
     prompt: trimmedPrompt,
     cache: opts.cache === "on" ? "on" : undefined,
+    tokenUuid: opts.tokenUuid || session.tokenUuid,
   });
 
   await clearSessionLog(session.id, systemMsg.id);
@@ -609,6 +615,7 @@ export async function dispatchSessionScript(
     scriptName,
     command: script.command,
     createdAt: Date.now(),
+    tokenUuid: opts.tokenUuid || session.tokenUuid,
   });
 
   await clearSessionLog(sessionId, systemMsg.id);

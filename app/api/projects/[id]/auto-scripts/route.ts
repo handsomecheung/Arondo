@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getProject } from "@/lib/store";
-import { getArondoToken, verifyProjectPermission } from "@/lib/auth";
+import { getArondoToken, verifyProjectPermission, getUuidByToken } from "@/lib/auth";
 import { PROMPT_ENV_VAR } from "@/lib/agents/base";
 
 // Module-level map to track background execution state
@@ -218,6 +218,7 @@ Requirements:
 3. You MUST write your final output to the file "<temp_json_path>" as a raw valid JSON array of objects where each object has "name" (string) and "command" (string). Example format: [{"name": "test", "command": "npm run test"}].
 4. Ensure that only the valid JSON array is written to that file, without any markdown formatting wrappers (like \`\`\`json).`;
 
+  const tokenUuid = getUuidByToken(token) || undefined;
   const systemMsg = await addMessage({
     sessionId: "",
     projectId: id,
@@ -226,6 +227,7 @@ Requirements:
     type: "agent-run",
     command: "Auto Scripts Analysis",
     prompt: promptText,
+    tokenUuid,
   });
   eventBus.publish({ type: "message_added", payload: systemMsg });
 
@@ -241,6 +243,7 @@ Requirements:
     scriptName: "Auto Scripts Analysis",
     projectId: id,
     createdAt: Date.now(),
+    tokenUuid,
   });
 
   await clearSessionLog("", systemMsg.id, id);
