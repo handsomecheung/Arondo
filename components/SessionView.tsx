@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useMemo } from "react";
 import Link from "next/link";
 import ScriptExecCard from "@/components/ScriptExecCard";
 import AgentExecCard from "@/components/AgentExecCard";
@@ -103,7 +103,7 @@ interface SessionViewProps {
   onChangeTodoTrigger: (messageId: string, trigger: TodoTrigger) => void;
   onPromptChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
-  onRunScript: (name: string) => void;
+  onRunScript: (name: string, promptText?: string) => void;
   onDeleteSession: (id: string) => void;
   onOpenShellModal: () => void;
   onOpenFileBrowser: () => void;
@@ -242,6 +242,14 @@ export default function SessionView({
   const hasPendingTodo = messages.some(
     (message) => message.type === "user-todo" && message.todoStatus === "pending",
   );
+
+  const topHistoryCommands = useMemo(() => {
+    return Object.entries(scriptHistory)
+      .filter(([command]) => !sessionScripts.some((s) => s.command === command))
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([command]) => command);
+  }, [scriptHistory, sessionScripts]);
 
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const handleUploadChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -788,7 +796,11 @@ export default function SessionView({
                           <button
                             key={s.name}
                             className="menu-item"
-                            onClick={() => onRunScript(s.name)}
+                            onClick={() => {
+                              onRunScript(s.name);
+                              onSetMenuOpen(false);
+                              onSetScriptSubMenuOpen(false);
+                            }}
                             disabled={false}
                             id={`menu-run-script-${s.name.replace(/\s+/g, "-")}`}
                             title={s.command}
@@ -796,6 +808,32 @@ export default function SessionView({
                             {s.name}
                           </button>
                         ))}
+                        {topHistoryCommands.map((command) => (
+                          <button
+                            key={`history-${command}`}
+                            className="menu-item"
+                            onClick={() => {
+                              onRunScript(command, "!" + command);
+                              onSetMenuOpen(false);
+                              onSetScriptSubMenuOpen(false);
+                            }}
+                            id={`menu-run-history-${command.replace(/\s+/g, "-")}`}
+                            title={command}
+                          >
+                            {command}
+                          </button>
+                        ))}
+                        <button
+                          className="menu-item"
+                          id="menu-run-script-select"
+                          onClick={() => {
+                            onSetMenuOpen(false);
+                            onSetScriptSubMenuOpen(false);
+                            onTriggerRunFileSelector();
+                          }}
+                        >
+                          <IconFolder /> Select…
+                        </button>
                         <button
                           className="menu-item script-submenu-manage"
                           id="menu-manage-scripts"
@@ -1450,11 +1488,6 @@ export default function SessionView({
             const trigger = "!" + s.name;
             return trigger.startsWith(trimmedPrompt) || trimmedPrompt.startsWith(trigger);
           });
-          const topHistoryCommands = Object.entries(scriptHistory)
-            .filter(([command]) => !sessionScripts.some((s) => s.command === command))
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 5)
-            .map(([command]) => command);
           return (
             <div className="command-menu">
               <button

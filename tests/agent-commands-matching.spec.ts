@@ -35,4 +35,20 @@ test.describe('AgentCommand matching and UI rendering tests', () => {
     expect(result.hasUserMessageCard).toBe(true);
     expect(result.hasUserAgentCommandCard).toBe(false);
   });
+
+  test('SessionView UI should render history scripts and select button in Run Script submenu', () => {
+    const scriptPath = path.resolve(__dirname, 'helpers/renderSessionViewHelper.ts');
+    const output = execFileSync('npx', ['tsx', scriptPath], {
+      cwd: path.resolve(__dirname, '..'),
+      encoding: 'utf-8',
+    });
+
+    const result = JSON.parse(output.trim());
+
+    expect(result.hasPredefinedScript).toBe(true);
+    expect(result.hasHistoryScripts).toBe(true);
+    expect(result.hasDuplicateHistoryScriptExcluded).toBe(true);
+    expect(result.hasSelectButton).toBe(true);
+    expect(result.hasEditScriptsButton).toBe(true);
+  });
 });
