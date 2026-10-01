@@ -256,10 +256,6 @@ function getProjectFilePath(id: string): string {
   return path.join(getProjectDir(id), "project.json");
 }
 
-function getProjectSettingsDir(id: string): string {
-  return path.join(getProjectDir(id), "settings");
-}
-
 async function ensureDir(dirPath: string): Promise<void> {
   await fs.mkdir(dirPath, { recursive: true });
 }
@@ -355,13 +351,6 @@ export async function getArchivedSessionPaths(): Promise<string[]> {
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
 
-export interface ProjectScript {
-  name: string;
-  command: string;
-}
-
-// ─── Projects ─────────────────────────────────────────────────────────────────
-
 export function isTempDirProject(project: Pick<Project, "tempDir">): boolean {
   return project.tempDir === true;
 }
@@ -434,63 +423,6 @@ export async function getProject(id: string): Promise<Project | undefined> {
   const filePath = getProjectFilePath(id);
   const project = await readJson<Project | null>(filePath, null);
   return project || undefined;
-}
-
-export async function getProjectScripts(projectId: string): Promise<ProjectScript[]> {
-  const settingsDir = getProjectSettingsDir(projectId);
-  const filePath = path.join(settingsDir, "scripts.json");
-  return readJson<ProjectScript[]>(filePath, []);
-}
-
-export async function addProjectScript(
-  projectId: string,
-  script: ProjectScript,
-  oldName?: string
-): Promise<ProjectScript[]> {
-  const settingsDir = getProjectSettingsDir(projectId);
-  await ensureDir(settingsDir);
-  const filePath = path.join(settingsDir, "scripts.json");
-  return withFileLock(filePath, async () => {
-    let scripts = await readJson<ProjectScript[]>(filePath, []);
-
-    if (oldName && oldName !== script.name) {
-      scripts = scripts.filter((s) => s.name !== oldName);
-    }
-
-    const index = scripts.findIndex((s) => s.name === script.name);
-    if (index >= 0) {
-      scripts[index] = script;
-    } else {
-      scripts.push(script);
-    }
-
-    await writeJson(filePath, scripts);
-    return scripts;
-  });
-}
-
-export async function deleteProjectScript(projectId: string, scriptName: string): Promise<ProjectScript[]> {
-  const settingsDir = getProjectSettingsDir(projectId);
-  const filePath = path.join(settingsDir, "scripts.json");
-  return withFileLock(filePath, async () => {
-    const scripts = await readJson<ProjectScript[]>(filePath, []);
-    const filtered = scripts.filter((s) => s.name !== scriptName);
-    await writeJson(filePath, filtered);
-    return filtered;
-  });
-}
-
-export async function saveProjectScripts(
-  projectId: string,
-  scripts: ProjectScript[]
-): Promise<ProjectScript[]> {
-  const settingsDir = getProjectSettingsDir(projectId);
-  await ensureDir(settingsDir);
-  const filePath = path.join(settingsDir, "scripts.json");
-  return withFileLock(filePath, async () => {
-    await writeJson(filePath, scripts);
-    return scripts;
-  });
 }
 
 function getScriptHistoryFilePath(projectId: string): string {

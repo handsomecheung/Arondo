@@ -159,26 +159,6 @@ export default function TasksPage() {
       const sessionMap = new Map(sessions.map((s) => [s.id, s]));
       const visibleProjectIds = new Set(projectsList.map((project) => project.id));
 
-      const scriptProjectIds = new Set<string>();
-      for (const t of serverTasks) {
-        if (t.type === "script") {
-          const session = sessionMap.get(t.sessionId);
-          if (session?.projectId) scriptProjectIds.add(session.projectId);
-        }
-      }
-      const scriptMap = new Map<string, Map<string, string>>();
-      await Promise.all(
-        Array.from(scriptProjectIds).map(async (pid) => {
-          try {
-            const res = await fetch(`/api/projects/${pid}/scripts`);
-            const scripts: { name: string; command: string }[] = await res.json();
-            scriptMap.set(pid, new Map(scripts.map((s) => [s.name, s.command])));
-          } catch (err) {
-            console.error(`Failed to load scripts for project ${pid}:`, err);
-          }
-        }),
-      );
-
       let todoItems: TaskItem[] = [];
       try {
         const todoRes = await fetch("/api/todo-messages");
@@ -207,10 +187,6 @@ export default function TasksPage() {
           } else {
             status = "running";
           }
-          let command = t.command;
-          if (!command && t.type === "script" && t.scriptName && session?.projectId) {
-            command = scriptMap.get(session.projectId)?.get(t.scriptName);
-          }
           return {
             id: t.taskId,
             type: t.type,
@@ -221,7 +197,7 @@ export default function TasksPage() {
             createdAt: t.createdAt || (session ? new Date(session.createdAt).getTime() : Date.now()),
             completedAt: t.completedAt,
             messageId: t.messageId,
-            command,
+            command: t.command,
             scriptName: t.scriptName,
             projectId: t.projectId || session?.projectId,
             prompt: t.prompt,
@@ -599,7 +575,7 @@ export default function TasksPage() {
       await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scriptName: task.scriptName, messageId: task.messageId }),
+        body: JSON.stringify({ command: task.command || task.scriptName, messageId: task.messageId }),
       });
       // No state update needed — the runner restarts in-place, same taskId/messageId.
     } catch (err) {
@@ -611,14 +587,13 @@ export default function TasksPage() {
   const handleRerunTask = async (task: TaskItem) => {
     try {
       let res: Response;
-      if (task.type === "script" && task.scriptName) {
-        const url = task.sessionId
-          ? `/api/sessions/${task.sessionId}/restart-script`
-          : `/api/projects/${task.projectId}/restart-script`;
+      if (task.type === "script" && (task.command || task.scriptName)) {
+        if (!task.sessionId) return;
+        const url = `/api/sessions/${task.sessionId}/restart-script`;
         res = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ scriptName: task.scriptName, messageId: task.messageId }),
+          body: JSON.stringify({ command: task.command || task.scriptName, messageId: task.messageId }),
         });
       } else if (task.type === "agent" && task.sessionId) {
         res = await fetch(`/api/sessions/${task.sessionId}/rerun-agent`, {

@@ -96,9 +96,7 @@ export function useInitialLoad({
           id: t.taskId,
           type: t.type,
           name: t.type === "agent" || t.type === "detached-agent"
-            ? t.scriptName === "Auto Scripts Analysis"
-              ? "Agent: Auto Scripts Analysis"
-              : `${t.type === "detached-agent" ? "Separate Agent" : "Agent"}: ${t.command || "Agent Task"}`
+            ? `${t.type === "detached-agent" ? "Separate Agent" : "Agent"}: ${t.command || "Agent Task"}`
             : `Script: ${t.scriptName || t.command || "Script Task"}`,
           sessionId: t.sessionId || "",
           messageId: t.messageId || t.taskId,
@@ -106,6 +104,7 @@ export function useInitialLoad({
           createdAt: t.createdAt,
           projectId: t.projectId,
           scriptName: t.scriptName,
+          command: t.command,
         }));
         setTaskQueue(initTasks);
       })

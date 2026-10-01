@@ -9,7 +9,6 @@ import {
   appendAutomodelLog,
   getMessages,
   getRunningSessionScriptRuns,
-  getProjectScripts,
   recordScriptHistory,
   getSessionLog,
   readOnceCache,
@@ -564,12 +563,11 @@ export async function dispatchCreateSession(
 }
 
 /**
- * Runs a project script inside a session's context.
- * Shared by the /run-script API route and the scheduler ('at' trigger).
+ * Runs a history command inside a session's context.
  */
 export async function dispatchSessionScript(
   sessionId: string,
-  scriptName: string,
+  command: string,
   opts: { prompt?: string; tokenUuid?: string } = {},
 ): Promise<ActionResult> {
   const session = await getSession(sessionId);
@@ -577,20 +575,12 @@ export async function dispatchSessionScript(
     return { ok: false, error: "Session not found", status: 404 };
   }
   if (!session.projectId) {
-    return { ok: false, error: "Session has no project scripts", status: 400 };
+    return { ok: false, error: "Session has no project", status: 400 };
   }
-
-  const scripts = await getProjectScripts(session.projectId);
-  const script = scripts.find((s) => s.name === scriptName) ?? { name: scriptName, command: scriptName };
-
-  if (opts.prompt?.startsWith("!")) {
-    await recordScriptHistory(session.projectId, script.command);
-  }
-
   const systemMsg = await addMessage({
     sessionId,
     role: "system",
-    content: `⚙️ Running script: **${script.name}**\n\`\`\`bash\n${script.command}\n\`\`\``,
+    content: `⚙️ Running script: **${command}**\n\`\`\`bash\n${command}\n\`\`\``,
     type: "script-run",
     prompt: opts.prompt,
     tokenUuid: opts.tokenUuid,
@@ -606,6 +596,7 @@ export async function dispatchSessionScript(
   if (!runnerId) {
     return { ok: false, error: "No connected runner available", status: 503 };
   }
+  await recordScriptHistory(session.projectId, command);
 
   const taskId = `task_${crypto.randomUUID().slice(0, 8)}`;
   runnerManager.registerTask({
@@ -614,8 +605,8 @@ export async function dispatchSessionScript(
     sessionId,
     messageId: systemMsg.id,
     type: "script",
-    scriptName,
-    command: script.command,
+    scriptName: command,
+    command,
     createdAt: Date.now(),
     tokenUuid: opts.tokenUuid || session.tokenUuid,
   });
@@ -625,7 +616,7 @@ export async function dispatchSessionScript(
   runnerManager
     .sendRequest(runnerId, "exec.script", {
       taskId,
-      command: script.command,
+      command,
       workDir: session.repoPath,
       cols: 120,
       rows: 30,

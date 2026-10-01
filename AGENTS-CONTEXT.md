@@ -116,10 +116,6 @@ app/
     projects/
       route.ts          # GET: list all projects
       [id]/
-        scripts/
-          route.ts      # GET/POST/DELETE: manage project scripts
-        auto-scripts/
-          route.ts      # GET/POST: AI auto-script analysis
         script-history/
           route.ts      # GET: fetch a project's "!" quick-exec command history (script-history.json)
         run-script/
@@ -240,8 +236,7 @@ tests/                  # Playwright integration tests
     [projectId]/
       project.json      # Project metadata (id, repoPath, runnerId, createdAt, updatedAt)
       settings/
-        scripts.json    # Configured custom scripts list for the project
-      script-history.json # Usage counts of ad-hoc/history "!" commands, keyed by command string
+        script-history.json # Usage counts of ad-hoc/history "!" commands, keyed by command string
       logs/
         [taskId].log        # Project-scoped stdout execution logs
         [taskId].stderr.log # Project-scoped stderr execution logs
@@ -478,7 +473,7 @@ The application enforces token-based authentication on all API routes and WebSoc
 
 ## Project & Custom Scripts Management
 - **Project Scoping**: Sessions are mapped to projects by repository path + runnerId. Projects store metadata at `~/.arondo/projects/[projectId]/project.json`.
-- **Custom Project Scripts**: Commands (build, test, deploy) scoped to repositories, stored under `~/.arondo/projects/[projectId]/settings/scripts.json`. Can be executed globally (sessionless, directly from the project panel) or inside a session.
+- **Script History**: Commands run through `!` are recorded per project in `~/.arondo/projects/[projectId]/script-history.json` and provide the `Run Script` and quick-exec suggestions.
 - **AI Auto-Script Discovery**: Background process using `agy` to auto-detect and register project scripts. This process is executed remotely on the selected runner using the `exec.agent` API, ensuring no local execution happens on the server.
 
 <!-- BEGIN:nextjs-agent-rules -->

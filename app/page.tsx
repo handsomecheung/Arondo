@@ -17,7 +17,6 @@ import FileBrowserModal from "@/components/modals/FileBrowserModal";
 import DiffModal from "@/components/modals/DiffModal";
 import CommitsModal from "@/components/modals/CommitsModal";
 import CommandModal from "@/components/modals/CommandModal";
-import AddScriptModal from "@/components/modals/AddScriptModal";
 import ToastNotification from "@/components/modals/ToastNotification";
 import ApiErrorModal from "@/components/modals/ApiErrorModal";
 import ProjectNotReadyModal from "@/components/modals/ProjectNotReadyModal";
@@ -245,31 +244,12 @@ export default function HomePage() {
   };
 
   const {
-    projectScripts,
-    draggedIndex,
-    scriptModalOpen, setScriptModalOpen,
-    scriptName, setScriptName,
-    scriptCommand, setScriptCommand,
-    editingScriptName, setEditingScriptName,
-    sessionScripts,
     scriptHistory,
-    handleSaveScript,
-    handleDeleteScript,
-    handleCloseScriptModal,
-    handlePointerDown,
-    handlePointerMove,
-    handlePointerUp,
-    handleAutoAddScripts,
     handleRunScript,
-    handleRunGlobalScript,
   } = useScripts({
-    selectedProjectId,
     selectedSessionId,
     selectedSessionProjectId: selectedSession?.projectId || ((isNewSession || isNewDraft) ? projects.find((p) => p.runnerId === runnerId && p.repoPath === repoPath)?.id : undefined),
     setApiError,
-    setConfirmDialog,
-    setInfoDialog,
-    setToast,
     setTaskQueue,
     setMenuOpen,
     setScriptSubMenuOpen,
@@ -877,7 +857,7 @@ export default function HomePage() {
     return data.path;
   };
 
-  const { handlePromptChange, handleNewSessionCommand, handleRenameSessionCommand, handleAgentCommand, handleScriptCommand, handleSelectScriptCommand, handleSubmit, handleKeyDown, handleSendMessage, commandMenuIndex, pendingConfirmation, resolvePendingConfirmation, cancelPendingConfirmation } = useSessionSubmit({
+  const { handlePromptChange, handleNewSessionCommand, handleRenameSessionCommand, handleAgentCommand, handleSelectScriptCommand, handleSubmit, handleKeyDown, handleSendMessage, commandMenuIndex, pendingConfirmation, resolvePendingConfirmation, cancelPendingConfirmation } = useSessionSubmit({
     prompt,
     repoPath,
     agentType,
@@ -912,7 +892,6 @@ export default function HomePage() {
     setToast,
     loadProjects,
     agentCommands,
-    sessionScripts,
     onRunScript: handleRunScript,
     onDeleteSession: handleDeleteSession,
     onRenameSession: (id, newName) => handleRenameSession(id, newName),
@@ -1031,13 +1010,13 @@ export default function HomePage() {
     }
   };
 
-  const handleRestartScriptCard = async (msgId: string, scriptName: string) => {
+  const handleRestartScriptCard = async (msgId: string, command: string) => {
     if (!selectedSessionId) return;
     try {
       await fetch(`/api/sessions/${selectedSessionId}/restart-script`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scriptName, messageId: msgId }),
+        body: JSON.stringify({ command, messageId: msgId }),
       });
       // Runner restarts in-place — no state update needed.
     } catch (err) {
@@ -1092,7 +1071,7 @@ export default function HomePage() {
         const res = await fetch(`/api/sessions/${selectedSessionId}/restart-script`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ scriptName: cardInfo.commandLabel, messageId: cardInfo.runMsg.id }),
+          body: JSON.stringify({ command: cardInfo.commandLabel, messageId: cardInfo.runMsg.id }),
         });
         if (!res.ok) throw new Error(await res.text());
         if (cardInfo.returnMsg) {
@@ -1403,11 +1382,8 @@ export default function HomePage() {
               <ProjectPanel
                 project={project}
                 projectSessions={projectSessions}
-                projectScripts={projectScripts}
                 projectAgentCommands={projectAgentCommands}
-                draggedIndex={draggedIndex}
                 runners={runners}
-                isAutoAnalyzing={taskQueue.some((t) => (t.name === "Agent: Auto Scripts Analysis" || t.scriptName === "Auto Scripts Analysis") && t.status === "running" && t.projectId === project.id)}
                 menuOpen={projectMenuOpen}
                 menuRef={projectMenuRef}
                 onSetMenuOpen={setProjectMenuOpen}
@@ -1415,7 +1391,6 @@ export default function HomePage() {
                   setFileBrowserOpen(true);
                 }}
                 onOpenShellModal={() => setShellModalOpen(true)}
-                onRunScript={handleRunGlobalScript}
                 onNewSession={() => {
                   setRepoPath(project.repoPath);
                   setRunnerId(project.runnerId);
@@ -1458,16 +1433,6 @@ export default function HomePage() {
                     },
                   });
                 }}
-                onOpenScriptModal={(name, command) => {
-                  if (name) {
-                    setScriptName(name);
-                    setScriptCommand(command!);
-                    setEditingScriptName(name);
-                  }
-                  setScriptModalOpen(true);
-                }}
-                onAddScriptModal={() => setScriptModalOpen(true)}
-                onDeleteScript={handleDeleteScript}
                 onSaveAgentCommand={async (command) => {
                   const res = await fetch(`/api/projects/${project.id}/agent-commands`, {
                     method: "POST",
@@ -1510,10 +1475,6 @@ export default function HomePage() {
                     },
                   });
                 }}
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onAutoAddScripts={handleAutoAddScripts}
                 onSelectSession={handleSelectSession}
                 onShowDiff={() => setDiffModalOpen(true)}
                 onShowCommits={() => setCommitsModalOpen(true)}
@@ -1556,7 +1517,6 @@ export default function HomePage() {
             scriptSubMenuOpen={scriptSubMenuOpen}
             showCommandMenu={showCommandMenu}
             commandMenuIndex={commandMenuIndex}
-            sessionScripts={sessionScripts}
             scriptHistory={scriptHistory}
             isCheckingGitChanges={isCheckingGitChanges}
             hasGitChanges={hasGitChanges}
@@ -1619,13 +1579,6 @@ export default function HomePage() {
               if (selectedSession && selectedSessionId) {
                 setRenameModal({ sessionId: selectedSessionId, currentName: selectedSession.name || "Untitled" });
                 setRenameInput(selectedSession.name || "Untitled");
-              }
-            }}
-            onManageScripts={() => {
-              setMenuOpen(false);
-              setScriptSubMenuOpen(false);
-              if (selectedSession?.projectId) {
-                handleSelectProject(selectedSession.projectId);
               }
             }}
             onGoToProject={() => {
@@ -1734,17 +1687,6 @@ export default function HomePage() {
         text={promptModalText}
         title="Prompt"
         onClose={() => setPromptModalText(null)}
-      />
-
-      <AddScriptModal
-        open={scriptModalOpen}
-        onClose={handleCloseScriptModal}
-        editingScriptName={editingScriptName}
-        scriptName={scriptName}
-        onScriptNameChange={setScriptName}
-        scriptCommand={scriptCommand}
-        onScriptCommandChange={setScriptCommand}
-        onSave={handleSaveScript}
       />
 
       <ToastNotification

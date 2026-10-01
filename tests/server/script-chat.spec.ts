@@ -5,7 +5,7 @@ import path from 'path';
 import { execFileSync } from 'child_process';
 import { setupRunner, teardownRunner, waitForSessionNotRunning } from './resume/resume.helper';
 
-test.describe('Chat while session scripts are running', () => {
+test.describe('Chat while history-based scripts are running', () => {
   test('sends a normal message without confirmation when a manual todo is pending', async ({ request }) => {
     const mockBinDir = path.resolve(__dirname, '../mocks/bin/claude');
     const mockLogDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arondo-manual-todo-logs-'));
@@ -153,11 +153,17 @@ test.describe('Chat while session scripts are running', () => {
       const runScriptRes = await request.post(`/api/sessions/${sessionId}/run-script`, {
         headers: { 'x-arondo-token': 'test-token-123456' },
         data: {
-          scriptName: 'sleep 10',
+          command: 'sleep 10',
           prompt: '!sleep 10',
         },
       });
       expect(runScriptRes.status()).toBe(200);
+
+      const historyRes = await request.get(`/api/projects/${session.projectId}/script-history`, {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+      });
+      expect(historyRes.status()).toBe(200);
+      expect((await historyRes.json())['sleep 10']).toBe(1);
 
       const runningSessionRes = await request.get(`/api/sessions/${sessionId}`, {
         headers: { 'x-arondo-token': 'test-token-123456' },
@@ -224,7 +230,7 @@ test.describe('Chat while session scripts are running', () => {
       const runScriptRes = await request.post(`/api/sessions/${sessionId}/run-script`, {
         headers: { 'x-arondo-token': 'test-token-123456' },
         data: {
-          scriptName: 'echo "hello"',
+          command: 'echo "hello"',
           prompt: '!echo "hello"',
         },
       });
@@ -301,7 +307,7 @@ test.describe('Chat while session scripts are running', () => {
 
       const runRes = await request.post(`/api/sessions/${sessionId}/run-script`, {
         headers: { 'x-arondo-token': 'test-token-123456' },
-        data: { scriptName: 'exit 0', prompt: '!exit 0' },
+        data: { command: 'exit 0', prompt: '!exit 0' },
       });
       expect(runRes.status()).toBe(200);
       const { messageId } = await runRes.json();
@@ -309,7 +315,7 @@ test.describe('Chat while session scripts are running', () => {
 
       const rerunRes = await request.post(`/api/sessions/${sessionId}/restart-script`, {
         headers: { 'x-arondo-token': 'test-token-123456' },
-        data: { scriptName: 'exit 0', messageId },
+        data: { command: 'exit 0', messageId },
       });
       expect(rerunRes.status()).toBe(200);
       await waitForSessionNotRunning(request, sessionId);
@@ -351,7 +357,7 @@ test.describe('Chat while session scripts are running', () => {
 
       const runRes = await request.post(`/api/sessions/${sessionId}/run-script`, {
         headers: { 'x-arondo-token': 'test-token-123456' },
-        data: { scriptName: 'sleep 1', prompt: '!sleep 1' },
+        data: { command: 'sleep 1', prompt: '!sleep 1' },
       });
       expect(runRes.status()).toBe(200);
       const { messageId } = await runRes.json();
@@ -366,7 +372,7 @@ test.describe('Chat while session scripts are running', () => {
 
       const rerunRes = await request.post(`/api/sessions/${sessionId}/restart-script`, {
         headers: { 'x-arondo-token': 'test-token-123456' },
-        data: { scriptName: 'sleep 1', messageId },
+        data: { command: 'sleep 1', messageId },
       });
       expect(rerunRes.status()).toBe(200);
       await waitForSessionNotRunning(request, sessionId);
@@ -407,7 +413,7 @@ test.describe('Chat while session scripts are running', () => {
 
       const runRes = await request.post(`/api/sessions/${sessionId}/run-script`, {
         headers: { 'x-arondo-token': 'test-token-123456' },
-        data: { scriptName: 'exit 1', prompt: '!exit 1' },
+        data: { command: 'exit 1', prompt: '!exit 1' },
       });
       expect(runRes.status()).toBe(200);
       const { messageId } = await runRes.json();

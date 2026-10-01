@@ -53,11 +53,6 @@ export interface Runner {
   allowedUserTokenUuids?: string[];
 }
 
-export interface ProjectScript {
-  name: string;
-  command: string;
-}
-
 export interface Message {
   id: string;
   sessionId: string;

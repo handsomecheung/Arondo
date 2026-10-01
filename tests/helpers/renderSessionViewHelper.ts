@@ -58,7 +58,6 @@ const props: React.ComponentProps<typeof SessionView> = {
   scriptSubMenuOpen: false,
   showCommandMenu: false,
   commandMenuIndex: -1,
-  sessionScripts: [],
   scriptHistory: {},
   isCheckingGitChanges: false,
   hasGitChanges: false,
@@ -111,7 +110,6 @@ const props: React.ComponentProps<typeof SessionView> = {
   onShowCommits: () => {},
   onOpenFilePath: () => {},
   onOpenRenameModal: () => {},
-  onManageScripts: () => {},
   onGoToProject: () => {},
   onNewSession: () => {},
   agentCommands: AGENT_COMMANDS,
@@ -132,7 +130,6 @@ const menuProps = {
   ...props,
   menuOpen: true,
   scriptSubMenuOpen: true,
-  sessionScripts: [{ name: 'build', command: 'npm run build' }],
   scriptHistory: { 'npm test': 3, 'npm run lint': 5, 'npm run build': 2 },
 };
 const menuHtml = renderToStaticMarkup(React.createElement(SessionView, menuProps));
@@ -142,7 +139,7 @@ console.log(
     hasUserMessageCard: html.includes('user-message-card'),
     hasUserAgentCommandCard: html.includes('user-agent-command-card'),
     htmlSnippet: html.slice(html.indexOf('exec-card'), html.indexOf('exec-card') + 120),
-    hasPredefinedScript: menuHtml.includes('menu-run-script-build'),
+    hasHistoryScript: menuHtml.includes('menu-run-history-npm-run-build'),
     hasHistoryScripts: menuHtml.includes('menu-run-history-npm-run-lint') && menuHtml.includes('menu-run-history-npm-test'),
     hasDuplicateHistoryScriptExcluded: !menuHtml.includes('menu-run-history-npm-run-build'),
     hasSelectButton: menuHtml.includes('menu-run-script-select'),

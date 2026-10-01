@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import type { Session, TaskItem, ProjectScript } from "@/types/home";
+import type { Session, TaskItem } from "@/types/home";
 import { resolveAgentCommand, getUniqueTriggers, getTriggerWord } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
 import { parseDetachedAgentCommand } from "@/lib/detached-agent-command";
@@ -42,7 +42,6 @@ interface UseSessionSubmitParams {
   setToast: (v: { message: string; type: "success" | "info" | "error" } | null) => void;
   loadProjects: () => void;
   agentCommands: AgentCommand[];
-  sessionScripts: ProjectScript[];
   onRunScript: (name: string, promptText?: string) => void;
   onDeleteSession: (id: string) => void;
   onRenameSession: (id: string, newName: string) => void;
@@ -84,7 +83,6 @@ export function useSessionSubmit({
   setToast,
   loadProjects,
   agentCommands,
-  sessionScripts,
   onRunScript,
   onDeleteSession,
   onRenameSession,
@@ -108,15 +106,6 @@ export function useSessionSubmit({
     const v = prompt.trim();
     const items: string[] = [];
     if (prompt.startsWith("!")) {
-      for (const s of sessionScripts) {
-        const cmdTrigger = "!" + s.command;
-        const nameTrigger = "!" + s.name;
-        if (cmdTrigger.startsWith(v) || v.startsWith(cmdTrigger) || nameTrigger.startsWith(v) || v.startsWith(nameTrigger)) {
-          if (!items.includes(cmdTrigger)) {
-            items.push(cmdTrigger);
-          }
-        }
-      }
       return items;
     }
     if (("/new").startsWith(v) || v.startsWith("/new")) items.push("/new");
@@ -131,7 +120,7 @@ export function useSessionSubmit({
       if (isBrowsing || matches) items.push(slashTrigger);
     }
     return items;
-  }, [prompt, agentCommands, sessionScripts]);
+  }, [prompt, agentCommands]);
 
   const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
@@ -343,8 +332,7 @@ export function useSessionSubmit({
         const newSession: Session = await res.json();
         finalizeNewSession(newSession, "", false);
 
-        const match = sessionScripts.find((s) => s.name === rest);
-        const scriptName = match ? match.name : rest;
+        const command = rest;
 
         const tempTaskId = `script-${newSession.id}-${Date.now()}`;
         setTaskQueue((prev) => [
@@ -352,7 +340,7 @@ export function useSessionSubmit({
           {
             id: tempTaskId,
             type: "script",
-            name: `Script: ${scriptName}`,
+            name: `Script: ${command}`,
             sessionId: newSession.id,
             status: "running",
             createdAt: Date.now(),
@@ -362,7 +350,7 @@ export function useSessionSubmit({
         const runRes = await fetch(`/api/sessions/${newSession.id}/run-script`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ scriptName, prompt: promptText }),
+          body: JSON.stringify({ command, prompt: promptText }),
         });
         if (!runRes.ok) {
           const data = await runRes.json().catch(() => ({}));
@@ -373,8 +361,7 @@ export function useSessionSubmit({
         setApiError({ title: "System Error", message: err.message || String(err) });
       }
     } else {
-      const match = sessionScripts.find((s) => s.name === rest);
-      onRunScript(match ? match.name : rest, promptText);
+      onRunScript(rest, promptText);
     }
   }, [
     isNewSession,
@@ -382,7 +369,6 @@ export function useSessionSubmit({
     repoPath,
     runnerId,
     agentType,
-    sessionScripts,
     finalizeNewSession,
     setApiError,
     onRunScript,
@@ -684,7 +670,7 @@ export function useSessionSubmit({
     } catch (err) {
       console.error(err);
     }
-  }, [prompt, repoPath, agentType, runnerId, isNewSession, isNewDraft, pendingFiles, setPendingFiles, uploadPendingFile, draftTrigger, draftAt, sendScheduledAt, setSendScheduledAt, pendingSendTrigger, setPendingSendTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, setApiError, setToast, handleNewSessionCommand, handleRenameSessionCommand, sendAgentMessage, sessionScripts, handleScriptCommand, agentCommands, finalizeNewSession]);
+  }, [prompt, repoPath, agentType, runnerId, isNewSession, isNewDraft, pendingFiles, setPendingFiles, uploadPendingFile, draftTrigger, draftAt, sendScheduledAt, setSendScheduledAt, pendingSendTrigger, setPendingSendTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, setApiError, setToast, handleNewSessionCommand, handleRenameSessionCommand, sendAgentMessage, handleScriptCommand, agentCommands, finalizeNewSession]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return;

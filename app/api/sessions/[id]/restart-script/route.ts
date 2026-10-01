@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { clearSessionLog, getMessages, getSession, getProjectScripts, updateMessage, updateSession } from "@/lib/store";
+import { clearSessionLog, getMessages, getSession, updateMessage, updateSession } from "@/lib/store";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, verifySessionPermission } from "@/lib/auth";
 import { eventBus } from "@/lib/event-bus";
@@ -20,21 +20,13 @@ export async function POST(
   if (!session) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
-  if (!session.projectId) {
-    return NextResponse.json({ error: "Session has no project scripts" }, { status: 400 });
-  }
-
-  const { scriptName, messageId } = await req.json();
-  if (!scriptName) {
-    return NextResponse.json({ error: "scriptName is required" }, { status: 400 });
+  const { command, messageId } = await req.json();
+  if (!command) {
+    return NextResponse.json({ error: "command is required" }, { status: 400 });
   }
   if (!messageId) {
     return NextResponse.json({ error: "messageId is required" }, { status: 400 });
   }
-
-  const scripts = await getProjectScripts(session.projectId);
-  // Not a predefined script -> it's a raw shell command entered via "!" in chat; re-run it as-is.
-  const script = scripts.find((s) => s.name === scriptName) ?? { name: scriptName, command: scriptName };
 
   const messages = await getMessages(id);
   const runMessage = messages.find((message) => message.id === messageId && message.type === "script-run");
@@ -57,7 +49,7 @@ export async function POST(
     eventBus.publish({ type: "session_updated", payload: updatedSession });
   }
 
-  const ok = await runnerManager.restartTask(id, messageId, script.command, session.repoPath);
+  const ok = await runnerManager.restartTask(id, messageId, command, session.repoPath);
   if (!ok) {
     if (returnMessage) {
       await Promise.all([

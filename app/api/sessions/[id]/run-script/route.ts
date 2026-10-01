@@ -13,12 +13,12 @@ export async function POST(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { scriptName, prompt } = await req.json();
-  if (!scriptName) {
-    return NextResponse.json({ error: "scriptName is required" }, { status: 400 });
+  const { command, prompt } = await req.json();
+  if (!command) {
+    return NextResponse.json({ error: "command is required" }, { status: 400 });
   }
 
-  const result = await dispatchSessionScript(id, scriptName, {
+  const result = await dispatchSessionScript(id, command, {
     prompt,
     tokenUuid: getUuidByToken(token) || undefined,
   });

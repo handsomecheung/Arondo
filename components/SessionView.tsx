@@ -9,7 +9,7 @@ import UserMessageCard from "@/components/UserMessageCard";
 import UserTodoMessageCard from "@/components/UserTodoMessageCard";
 import { ScheduleDateTimeInputs, defaultScheduleTime } from "@/components/ScheduleDateTimeInputs";
 import AgentCommandArgumentsModal from "@/components/modals/AgentCommandArgumentsModal";
-import type { Session, ProjectScript, Runner, Message, Project, TodoTrigger } from "@/types/home";
+import type { Session, Runner, Message, Project, TodoTrigger } from "@/types/home";
 import type { ExecCardInfo } from "@/lib/homeUtils";
 import { formatTime, execCardInfoToItem, autoResizeTextarea } from "@/lib/homeUtils";
 import {
@@ -57,7 +57,6 @@ interface SessionViewProps {
   scriptSubMenuOpen: boolean;
   showCommandMenu: boolean;
   commandMenuIndex: number;
-  sessionScripts: ProjectScript[];
   scriptHistory: Record<string, number>;
   isCheckingGitChanges: boolean;
   hasGitChanges: boolean;
@@ -112,7 +111,6 @@ interface SessionViewProps {
   onShowCommits: () => void;
   onOpenFilePath: (path: string) => void;
   onOpenRenameModal: () => void;
-  onManageScripts: () => void;
   onGoToProject: () => void;
   onNewSession: () => void;
   agentCommands: AgentCommand[];
@@ -158,7 +156,6 @@ export default function SessionView({
   scriptSubMenuOpen,
   showCommandMenu,
   commandMenuIndex,
-  sessionScripts,
   scriptHistory,
   isCheckingGitChanges,
   hasGitChanges,
@@ -213,7 +210,6 @@ export default function SessionView({
   onShowCommits,
   onOpenFilePath,
   onOpenRenameModal,
-  onManageScripts,
   onGoToProject,
   agentCommands,
   onNewSession,
@@ -246,11 +242,10 @@ export default function SessionView({
 
   const topHistoryCommands = useMemo(() => {
     return Object.entries(scriptHistory)
-      .filter(([command]) => !sessionScripts.some((s) => s.command === command))
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([command]) => command);
-  }, [scriptHistory, sessionScripts]);
+  }, [scriptHistory]);
 
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const handleUploadChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -803,22 +798,6 @@ export default function SessionView({
                         ref={scriptSubMenuRef}
                         style={scriptSubMenuShift > 0 ? { transform: `translateX(${scriptSubMenuShift}px)` } : undefined}
                       >
-                        {sessionScripts.map((s) => (
-                          <button
-                            key={s.name}
-                            className="menu-item"
-                            onClick={() => {
-                              onRunScript(s.name);
-                              onSetMenuOpen(false);
-                              onSetScriptSubMenuOpen(false);
-                            }}
-                            disabled={false}
-                            id={`menu-run-script-${s.name.replace(/\s+/g, "-")}`}
-                            title={s.command}
-                          >
-                            {s.name}
-                          </button>
-                        ))}
                         {topHistoryCommands.map((command) => (
                           <button
                             key={`history-${command}`}
@@ -844,13 +823,6 @@ export default function SessionView({
                           }}
                         >
                           <IconFolder /> Select…
-                        </button>
-                        <button
-                          className="menu-item script-submenu-manage"
-                          id="menu-manage-scripts"
-                          onClick={onManageScripts}
-                        >
-                          ⚙ Edit Scripts
                         </button>
                       </div>
                     )}
@@ -1495,45 +1467,19 @@ export default function SessionView({
 
         {showCommandMenu && prompt.startsWith("!") && (() => {
           const trimmedPrompt = prompt.trim();
-          const visibleScripts = sessionScripts.filter((s) => {
-            const trigger = "!" + s.name;
+          const visibleHistoryCommands = topHistoryCommands.filter((command) => {
+            const trigger = "!" + command;
             return trigger.startsWith(trimmedPrompt) || trimmedPrompt.startsWith(trigger);
           });
           return (
             <div className="command-menu">
-              <button
-                className="command-menu-item"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  onManageScripts();
-                }}
-              >
-                <span className="command-menu-name">⚙ Edit Scripts</span>
-              </button>
-              {visibleScripts.map((s, idx) => {
-                const trigger = "!" + s.name;
-                const isActive = trimmedPrompt === trigger;
-                return (
-                  <button
-                    key={s.name}
-                    className={`command-menu-item${commandMenuIndex === idx ? " highlighted" : ""}${isActive ? " active" : ""}`}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      onSelectScriptCommand("!" + s.command);
-                    }}
-                  >
-                    <span className="command-menu-name">{trigger}</span>
-                    <span className="command-menu-desc">{s.command}</span>
-                  </button>
-                );
-              })}
-              {topHistoryCommands.map((command) => {
+              {visibleHistoryCommands.map((command, idx) => {
                 const trigger = "!" + command;
                 const isActive = trimmedPrompt === trigger;
                 return (
                   <button
                     key={`history-${command}`}
-                    className={`command-menu-item${isActive ? " active" : ""}`}
+                    className={`command-menu-item${commandMenuIndex === idx ? " highlighted" : ""}${isActive ? " active" : ""}`}
                     onMouseDown={(e) => {
                       e.preventDefault();
                       onSelectScriptCommand("!" + command);

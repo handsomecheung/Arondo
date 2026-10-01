@@ -238,8 +238,6 @@ class RunnerManager {
           if (m.type === "script-run") {
             const match = m.content.match(/Running script:\s*\*\*([^*]+)\*\*/i);
             scriptName = match ? match[1].trim() : undefined;
-          } else if (m.type === "agent-run" && m.command === "Auto Scripts Analysis") {
-            scriptName = "Auto Scripts Analysis";
           }
 
           const returnMsg = msgs.find((ret: any) => ret.parentId === m.id);
@@ -303,8 +301,6 @@ class RunnerManager {
           if (m.type === "script-run") {
             const match = m.content.match(/Running script:\s*\*\*([^*]+)\*\*/i);
             scriptName = match ? match[1].trim() : undefined;
-          } else if (m.type === "agent-run" && m.command === "Auto Scripts Analysis") {
-            scriptName = "Auto Scripts Analysis";
           }
 
           const returnMsg = msgs.find((ret: any) => ret.parentId === m.id);
