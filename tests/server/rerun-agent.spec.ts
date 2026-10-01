@@ -128,6 +128,47 @@ test.describe('Rerun Agent API integration tests', () => {
       // The rerun command for codex should be a resume command
       expect(thirdRunMsg.content).toContain('resume');
 
+      // 7. A user-stopped agent run can also be rerun.
+      const stoppedRunRes = await request.post(`/api/sessions/${sessionId}/messages`, {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+        data: { message: 'Stopped follow-up message STOP_MOCK' },
+      });
+      expect(stoppedRunRes.status()).toBe(200);
+
+      msgsRes = await request.get(`/api/messages?sessionId=${sessionId}`, {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+      });
+      messages = await msgsRes.json();
+      let stoppedRunMsg = messages.filter((m: any) => m.type === 'agent-run').at(-1);
+      const stopRes = await request.post('/api/tasks/kill', {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+        data: { sessionId, messageId: stoppedRunMsg.id },
+      });
+      expect(stopRes.status()).toBe(200);
+      await waitForSessionNotRunning(request, sessionId);
+
+      msgsRes = await request.get(`/api/messages?sessionId=${sessionId}`, {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+      });
+      messages = await msgsRes.json();
+      stoppedRunMsg = messages.find((m: any) => m.id === stoppedRunMsg.id);
+      const stoppedReturnMsg = messages.find((m: any) => m.parentId === stoppedRunMsg.id && m.type === 'agent-return');
+      expect(stoppedReturnMsg.content).toContain('Stopped by user');
+
+      const rerunStoppedRes = await request.post(`/api/sessions/${sessionId}/rerun-agent`, {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+        data: { messageId: stoppedRunMsg.id },
+      });
+      expect(rerunStoppedRes.status()).toBe(200);
+      const rerunStopped = await rerunStoppedRes.json();
+
+      const stopRerunRes = await request.post('/api/tasks/kill', {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+        data: { sessionId, messageId: rerunStopped.messageId },
+      });
+      expect(stopRerunRes.status()).toBe(200);
+      await waitForSessionNotRunning(request, sessionId);
+
       // Cleanup session
       await request.delete(`/api/sessions/${sessionId}`, {
         headers: { 'x-arondo-token': 'test-token-123456' }

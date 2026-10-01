@@ -1116,7 +1116,7 @@ export default function TasksPage() {
                                   ws={wsInstance}
                                   onShowCommand={task.command ? () => setCommandTask(task) : undefined}
                                   onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
-                                  onRerunTask={task.type === "agent" && task.status === "error" ? () => handleRerunTask(task) : undefined}
+                                  onRerunTask={task.type === "agent" && (task.status === "error" || task.status === "stopped") ? () => handleRerunTask(task) : undefined}
                                   onDeleteTask={!isRunning && !task.sessionId ? () => handleDeleteTask(task) : undefined}
                                   onShowPrompt={task.prompt ? () => setCommandTask({ ...task, name: `Agent Prompt`, command: task.prompt }) : undefined}
                                   onViewLog={task.messageId ? () => setTerminalTask(task) : undefined}
@@ -1287,7 +1287,7 @@ export default function TasksPage() {
                                   ws={wsInstance}
                                   onShowCommand={task.command ? () => setCommandTask(task) : undefined}
                                   onStopTask={isRunning && task.messageId ? () => handleKillTask(task) : undefined}
-                                  onRerunTask={task.type === "agent" && task.status === "error" ? () => handleRerunTask(task) : undefined}
+                                  onRerunTask={task.type === "agent" && (task.status === "error" || task.status === "stopped") ? () => handleRerunTask(task) : undefined}
                                   onDeleteTask={!isRunning && !task.sessionId ? () => handleDeleteTask(task) : undefined}
                                   onShowPrompt={task.prompt ? () => setCommandTask({ ...task, name: `Agent Prompt`, command: task.prompt }) : undefined}
                                   onViewLog={task.messageId ? () => setTerminalTask(task) : undefined}

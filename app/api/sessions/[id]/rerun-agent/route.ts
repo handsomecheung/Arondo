@@ -51,12 +51,8 @@ export async function POST(
   }
 
   const isSuccess = returnMsg.content.startsWith("✅");
-  const isStopped = returnMsg.content.startsWith("🛑");
   if (isSuccess) {
     return NextResponse.json({ error: "Only failed agent runs can be retried" }, { status: 400 });
-  }
-  if (isStopped) {
-    return NextResponse.json({ error: "Stopped agent runs cannot be retried" }, { status: 400 });
   }
 
   let prompt = targetMsg.prompt;

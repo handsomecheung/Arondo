@@ -1064,6 +1064,7 @@ export default function SessionView({
                   const cardItem = execCardInfoToItem(cardInfo);
                   const isCardRunning = cardItem.status === "running";
                   const isCardFailed = cardItem.status === "error";
+                  const isCardStopped = cardItem.status === "stopped";
                   const sharedProps = {
                     item: cardItem,
                     collapsible: !isCardRunning,
@@ -1072,7 +1073,7 @@ export default function SessionView({
                     onStopTask: isCardRunning ? () => onStopExecCard(cardInfo.runMsg.id) : undefined,
                     onRerunTask: cardInfo.isScript
                       ? !isCardRunning ? () => onRerunCard(cardInfo) : undefined
-                      : isCardFailed ? () => onRerunCard(cardInfo) : undefined,
+                      : (isCardFailed || isCardStopped) ? () => onRerunCard(cardInfo) : undefined,
                   };
                   if (cardInfo.isScript) {
                     return (

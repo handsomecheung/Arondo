@@ -25,6 +25,13 @@ if (args[0] === 'exec') {
     console.error('Mock codex execution failed!');
     process.exit(1);
   }
+  if (promptContent.includes('STOP_MOCK')) {
+    setTimeout(() => {
+      console.log('Mock codex exec');
+      process.exit(0);
+    }, 30000);
+    return;
+  }
   console.log('Mock codex exec');
   process.exit(0);
 }
