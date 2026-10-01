@@ -10,7 +10,6 @@ import {
   updateMessage,
   getMessages,
   getRunningSessionScriptRuns,
-  addTodoMessage,
   writeOnceCache,
   getProject,
   getShowTempDirSessions,
@@ -33,7 +32,6 @@ import { getConfigDir } from "./config";
 import {
   getAgentQuotaErrorMessage,
   getAgyInvalidModelErrorMessage,
-  getQuotaRetryAgentType,
   isAgentQuotaExhausted,
   isAgyInvalidModelError,
 } from "./agent-quota-errors";
@@ -1545,36 +1543,6 @@ class RunnerManager {
       }, targetUserTokenUuid).catch((err) => {
         console.error("[runner-manager] Failed to send web push for agent exit:", err);
       });
-    }
-
-    if (quotaExhausted && !stoppedByUser) {
-      const msgIdx = messages.findIndex((m) => m.id === ctx.messageId);
-      const lastUserMsg = [...messages.slice(0, msgIdx)].reverse().find((m) => m.role === "user");
-      if (lastUserMsg) {
-        try {
-          const quotaRetryAgentType = getQuotaRetryAgentType(resolvedAgentType);
-          if (!quotaRetryAgentType) return;
-
-          const todoMessage = await addTodoMessage(ctx.sessionId, {
-            content: lastUserMsg.content,
-            prompt: lastUserMsg.prompt,
-            trigger: {
-              kind: "quotaAvailable",
-              agentType: quotaRetryAgentType,
-              agyQuotaGroup: resolvedAgentType === "antigravity"
-                ? ctx.agyQuotaGroup ?? systemMsg?.resolvedAgyQuotaGroup
-                : undefined,
-            },
-            tokenUuid: lastUserMsg.tokenUuid || ctx.tokenUuid || session?.tokenUuid,
-          });
-          eventBus.publish({ type: "message_added", payload: todoMessage });
-          const withTodo = await getSession(ctx.sessionId);
-          if (withTodo) eventBus.publish({ type: "session_updated", payload: withTodo });
-          console.log(`[runner-manager] scheduled quota-wait retry for session ${ctx.sessionId}`);
-        } catch (err) {
-          console.error("[runner-manager] failed to schedule quota-wait retry:", err);
-        }
-      }
     }
   }
 

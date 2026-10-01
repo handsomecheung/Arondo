@@ -7,6 +7,7 @@ import { setupWebSocketServer } from "./lib/ws-server";
 import { setupRunnerServer } from "./lib/runner-server";
 import { startQuotaAggregator, notifyQuotaAggregatorAccess } from "./lib/quota-aggregator";
 import { startScheduler } from "./lib/scheduler";
+import { startHeartbeat } from "./lib/heartbeat";
 
 import { initializeAuth, findRunnerTokenByToken } from "./lib/auth";
 
@@ -62,6 +63,7 @@ initializeAuth().then(() => {
 
   startQuotaAggregator();
   startScheduler();
+  startHeartbeat();
 
   server.listen(port, () => {
     console.log(
