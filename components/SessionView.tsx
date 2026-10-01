@@ -844,6 +844,20 @@ export default function SessionView({
                           </button>
                         );
                       })}
+                      {selectedSession?.projectId && (
+                        <button
+                          type="button"
+                          className="menu-item command-submenu-manage"
+                          id="menu-manage-project-commands"
+                          onClick={() => {
+                            onSetMenuOpen(false);
+                            setCommandSubMenuOpen(false);
+                            onGoToProject();
+                          }}
+                        >
+                          ⚙ Edit Project Commands
+                        </button>
+                      )}
                       <Link
                         href="/admin/settings"
                         className="menu-item command-submenu-manage"
@@ -853,7 +867,7 @@ export default function SessionView({
                           setCommandSubMenuOpen(false);
                         }}
                       >
-                        ⚙ Edit Commands
+                        ⚙ Edit Global Commands
                       </Link>
                     </div>
                   )}
