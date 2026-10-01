@@ -1,7 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { execFileSync } from 'child_process';
 import path from 'path';
-import { resolveAgentCommand, AGENT_COMMANDS } from '../lib/agentCommands';
+import {
+  agentCommandAcceptsArguments,
+  agentCommandRequiresArguments,
+  resolveAgentCommand,
+  AGENT_COMMANDS,
+} from '../lib/agentCommands';
 
 test.describe('AgentCommand matching and UI rendering tests', () => {
   test('resolveAgentCommand should return null for non-command messages starting with a slash (e.g. URL paths)', () => {
@@ -9,6 +14,18 @@ test.describe('AgentCommand matching and UI rendering tests', () => {
     expect(resolveAgentCommand('/user/id', AGENT_COMMANDS)).toBeNull();
     expect(resolveAgentCommand('/api/v1/users', AGENT_COMMANDS)).toBeNull();
     expect(resolveAgentCommand('/var/log/nginx/access.log', AGENT_COMMANDS)).toBeNull();
+  });
+
+  test('identifies commands that accept and require arguments', () => {
+    const review = AGENT_COMMANDS.find((command) => command.command === 'review')!;
+    const commit = AGENT_COMMANDS.find((command) => command.command === 'commit')!;
+    const commitMessage = AGENT_COMMANDS.find((command) => command.command === 'commit message')!;
+
+    expect(agentCommandAcceptsArguments(review)).toBe(true);
+    expect(agentCommandRequiresArguments(review)).toBe(false);
+    expect(agentCommandAcceptsArguments(commit)).toBe(false);
+    expect(agentCommandAcceptsArguments(commitMessage)).toBe(true);
+    expect(agentCommandRequiresArguments(commitMessage)).toBe(true);
   });
 
   // Bug reproduction test in SessionView UI:

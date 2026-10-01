@@ -8,6 +8,7 @@ import UserAgentCommandCard from "@/components/UserAgentCommandCard";
 import UserMessageCard from "@/components/UserMessageCard";
 import UserTodoMessageCard from "@/components/UserTodoMessageCard";
 import { ScheduleDateTimeInputs, defaultScheduleTime } from "@/components/ScheduleDateTimeInputs";
+import AgentCommandArgumentsModal from "@/components/modals/AgentCommandArgumentsModal";
 import type { Session, ProjectScript, Runner, Message, Project, TodoTrigger } from "@/types/home";
 import type { ExecCardInfo } from "@/lib/homeUtils";
 import { formatTime, execCardInfoToItem, autoResizeTextarea } from "@/lib/homeUtils";
@@ -18,7 +19,7 @@ import {
   IconClaude, IconAntigravity, IconCodex, IconOpencode, IconClock,
   IconArchive, IconPin, IconPaperclip, IconX, IconCommit,
 } from "@/components/Icons";
-import { getTriggerWord, isAgentCommand } from "@/lib/agentCommands";
+import { agentCommandAcceptsArguments, getTriggerWord, isAgentCommand } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
 import { CHAT_INPUT_TIPS } from "@/lib/chatInputTips";
 
@@ -259,7 +260,17 @@ export default function SessionView({
   };
 
   const [isDragging, setIsDragging] = useState(false);
+  const [commandAwaitingArguments, setCommandAwaitingArguments] = useState<AgentCommand | null>(null);
   const dragCounterRef = useRef(0);
+
+  const runAgentCommand = (command: AgentCommand) => {
+    const trigger = `/${getTriggerWord(command)}`;
+    if (agentCommandAcceptsArguments(command)) {
+      setCommandAwaitingArguments(command);
+      return;
+    }
+    onExecuteAgentCommand(trigger);
+  };
 
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
@@ -873,7 +884,7 @@ export default function SessionView({
                             onClick={() => {
                               onSetMenuOpen(false);
                               setCommandSubMenuOpen(false);
-                              onExecuteAgentCommand(trigger);
+                              runAgentCommand(command);
                             }}
                             id={`menu-run-command-${command.command.replace(/\s+/g, "-")}`}
                             title={command.menuDescription}
@@ -1799,6 +1810,17 @@ export default function SessionView({
           </div>
         </div>
       </div>
+      )}
+      {commandAwaitingArguments && (
+        <AgentCommandArgumentsModal
+          command={commandAwaitingArguments}
+          onClose={() => setCommandAwaitingArguments(null)}
+          onSubmit={(argumentsText) => {
+            const trigger = `/${getTriggerWord(commandAwaitingArguments)}`;
+            setCommandAwaitingArguments(null);
+            onExecuteAgentCommand(argumentsText ? `${trigger} ${argumentsText}` : trigger);
+          }}
+        />
       )}
     </>
   );

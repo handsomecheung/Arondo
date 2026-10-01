@@ -55,6 +55,16 @@ export function getTriggerWord(cmd: AgentCommand): string {
   return cmd.command.split(/\s+/)[0];
 }
 
+export function agentCommandAcceptsArguments(cmd: AgentCommand): boolean {
+  if (!cmd.matcher) return false;
+  return new RegExp(cmd.matcher).test(`${getTriggerWord(cmd)} argument`);
+}
+
+export function agentCommandRequiresArguments(cmd: AgentCommand): boolean {
+  if (!agentCommandAcceptsArguments(cmd)) return false;
+  return !new RegExp(cmd.matcher!).test(getTriggerWord(cmd));
+}
+
 export function getUniqueTriggers(
   commands: AgentCommand[] = AGENT_COMMANDS,
 ): string[] {
@@ -93,4 +103,3 @@ export function isAgentCommand(
 ): boolean {
   return resolveAgentCommand(promptText, commands) !== null;
 }
-
