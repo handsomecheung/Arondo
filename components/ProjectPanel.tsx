@@ -1,14 +1,16 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import type { Project, Session, Runner } from "@/types/home";
 import type { AgentCommand } from "@/lib/agentCommands";
 import AgentCommandsManager from "@/components/AgentCommandsManager";
-import { IconPlus, IconTrash, IconMoreVertical, IconFileSearch, IconTerminal, IconCommit } from "@/components/Icons";
+import { IconPlus, IconTrash, IconMoreVertical, IconFileSearch, IconTerminal, IconCommit, IconPlay } from "@/components/Icons";
 
 interface ProjectPanelProps {
   project: Project;
   projectSessions: Session[];
   projectAgentCommands: AgentCommand[];
+  scriptHistory: Record<string, number>;
   runners: Runner[];
   menuOpen: boolean;
   menuRef: React.RefObject<HTMLDivElement | null>;
@@ -17,6 +19,9 @@ interface ProjectPanelProps {
   onDeleteProject: () => void;
   onOpenFileBrowser: () => void;
   onOpenShellModal: () => void;
+  onOpenProjectScriptCommand: (command?: string) => void;
+  onRunProjectScript: (command: string) => void;
+  onSelectProjectScriptFile: () => void;
   onSaveAgentCommand: (command: AgentCommand) => Promise<void>;
   onDeleteAgentCommand: (command: string) => Promise<void>;
   onConfirmDeleteAgentCommand: (command: string, onConfirm: () => Promise<void>) => void;
@@ -29,13 +34,18 @@ interface ProjectPanelProps {
 }
 
 export default function ProjectPanel({
-  project, projectSessions, projectAgentCommands, runners, menuOpen, menuRef, onSetMenuOpen,
+  project, projectSessions, projectAgentCommands, scriptHistory, runners, menuOpen, menuRef, onSetMenuOpen,
   onNewSession, onDeleteProject, onOpenFileBrowser, onOpenShellModal, onSaveAgentCommand,
   onDeleteAgentCommand, onConfirmDeleteAgentCommand, onSelectSession, onShowDiff, onShowCommits,
-  isCheckingGitChanges, hasGitChanges, isGitRepo,
+  isCheckingGitChanges, hasGitChanges, isGitRepo, onOpenProjectScriptCommand, onRunProjectScript, onSelectProjectScriptFile,
 }: ProjectPanelProps) {
   const folderName = project.repoPath.split("/").pop() || project.repoPath;
   const projectRunner = runners.find((runner) => runner.id === project.runnerId);
+  const [runScriptMenuOpen, setRunScriptMenuOpen] = useState(false);
+  const topHistoryCommands = useMemo(() => Object.entries(scriptHistory)
+    .sort(([, countA], [, countB]) => countB - countA)
+    .slice(0, 5)
+    .map(([command]) => command), [scriptHistory]);
 
   return <div className="project-detail-container">
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--border)", paddingBottom: 16 }}>
@@ -62,6 +72,45 @@ export default function ProjectPanel({
 
     <div className="project-section-block">
       <AgentCommandsManager title="Project Agent Commands" description="Project-specific slash commands saved to agent-commands.json in this project." commands={projectAgentCommands} canEdit onSave={onSaveAgentCommand} onDelete={onDeleteAgentCommand} onRequestDeleteConfirm={onConfirmDeleteAgentCommand} />
+    </div>
+
+    <div className="project-section-block project-scripts-section">
+      <div className="project-section-header">
+        <h3 className="project-section-title">Scripts</h3>
+        <div style={{ position: "relative" }}>
+          <button
+            className="new-task-btn"
+            onClick={() => setRunScriptMenuOpen((open) => !open)}
+            disabled={!projectRunner?.connected}
+            style={{ padding: "6px 14px", fontSize: 12 }}
+          >
+            <IconPlay /> Run Script
+          </button>
+          {runScriptMenuOpen && (
+            <div className="session-dropdown-menu" style={{ right: 0, top: "calc(100% + 6px)", zIndex: 20 }}>
+              {topHistoryCommands.map((command) => (
+                <button
+                  key={command}
+                  className="menu-item"
+                  title={command}
+                  onClick={() => { setRunScriptMenuOpen(false); onRunProjectScript(command); }}
+                >
+                  {command}
+                </button>
+              ))}
+              <button className="menu-item" onClick={() => { setRunScriptMenuOpen(false); onSelectProjectScriptFile(); }}>
+                <IconFileSearch /> Select
+              </button>
+              <button className="menu-item" onClick={() => { setRunScriptMenuOpen(false); onOpenProjectScriptCommand(); }}>
+                <IconPlay /> Enter command
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="project-section-body" style={{ color: "var(--text-secondary)", fontSize: 13 }}>
+        Run a command in this project. Commands are saved to the project script history.
+      </div>
     </div>
 
     <div className="project-section-block">

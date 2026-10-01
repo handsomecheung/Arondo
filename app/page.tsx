@@ -17,6 +17,7 @@ import FileBrowserModal from "@/components/modals/FileBrowserModal";
 import DiffModal from "@/components/modals/DiffModal";
 import CommitsModal from "@/components/modals/CommitsModal";
 import CommandModal from "@/components/modals/CommandModal";
+import ProjectScriptCommandModal from "@/components/modals/ProjectScriptCommandModal";
 import ToastNotification from "@/components/modals/ToastNotification";
 import ApiErrorModal from "@/components/modals/ApiErrorModal";
 import ProjectNotReadyModal from "@/components/modals/ProjectNotReadyModal";
@@ -160,6 +161,9 @@ export default function HomePage() {
   const [activeLogMsgId, setActiveLogMsgId] = useState<string | null>(null);
   const [logModalOpen, setLogModalOpen] = useState(false);
   const [commandModalText, setCommandModalText] = useState<string | null>(null);
+  const [projectScriptCommandOpen, setProjectScriptCommandOpen] = useState(false);
+  const [projectScriptCommand, setProjectScriptCommand] = useState("");
+  const [isRunningProjectScript, setIsRunningProjectScript] = useState(false);
   const [promptModalText, setPromptModalText] = useState<string | null>(null);
   const [shellModalOpen, setShellModalOpen] = useState(false);
   const [fileBrowserOpen, setFileBrowserOpen] = useState(false);
@@ -194,7 +198,7 @@ export default function HomePage() {
     fsCurrentPath: chatFsCurrentPath, setFsCurrentPath: setChatFsCurrentPath,
     fsEntries: chatFsEntries, fsParentPath: chatFsParentPath, fsLoading: chatFsLoading,
   } = useFileSystem(runnerId);
-  const [chatFsMode, setChatFsMode] = useState<"insert" | "run">("insert");
+  const [chatFsMode, setChatFsMode] = useState<"insert" | "run" | "project-run">("insert");
 
   const { isCheckingGitChanges, hasGitChanges, isGitRepo } = useGitHub({
     selectedSessionId,
@@ -246,8 +250,10 @@ export default function HomePage() {
   const {
     scriptHistory,
     handleRunScript,
+    loadScriptHistory,
   } = useScripts({
     selectedSessionId,
+    selectedProjectId,
     selectedSessionProjectId: selectedSession?.projectId || ((isNewSession || isNewDraft) ? projects.find((p) => p.runnerId === runnerId && p.repoPath === repoPath)?.id : undefined),
     setApiError,
     setTaskQueue,
@@ -763,7 +769,12 @@ export default function HomePage() {
   };
 
   const handleSelectChatFsItem = (absolutePath: string) => {
-    const root = selectedSession?.repoPath || repoPath;
+    const selectedProject = selectedProjectId
+      ? projects.find((project) => project.id === selectedProjectId)
+      : undefined;
+    const root = chatFsMode === "project-run"
+      ? selectedProject?.repoPath || "/"
+      : selectedSession?.repoPath || repoPath;
     let relativePath = absolutePath;
     if (root) {
       if (absolutePath === root) {
@@ -795,6 +806,21 @@ export default function HomePage() {
           el.style.height = `${Math.min(el.scrollHeight, 260)}px`;
         });
       }
+      return;
+    }
+
+    if (chatFsMode === "project-run") {
+      setChatFsModalOpen(false);
+      const runPath = relativePath === "."
+        ? "./"
+        : (!relativePath.startsWith("/") && !relativePath.startsWith("./")
+          ? `./${relativePath}`
+          : relativePath);
+      const command = /^[A-Za-z0-9_./-]+$/.test(runPath)
+        ? runPath
+        : `'${runPath.replaceAll("'", "'\"'\"")}'`;
+      setProjectScriptCommand(command);
+      setProjectScriptCommandOpen(true);
       return;
     }
 
@@ -911,6 +937,54 @@ export default function HomePage() {
     const sessionRunnerId = selectedSession?.runnerId || runnerId;
     const path = selectedSession?.repoPath || repoPath || "/";
     openChatFsModal(sessionRunnerId, path);
+  };
+
+  const handleSelectProjectScriptFile = () => {
+    const project = selectedProjectId ? projects.find((item) => item.id === selectedProjectId) : undefined;
+    if (!project) return;
+    setChatFsMode("project-run");
+    openChatFsModal(project.runnerId, project.repoPath);
+  };
+
+  const handleRunProjectScript = async (commandOverride?: string) => {
+    const command = (typeof commandOverride === "string" ? commandOverride : projectScriptCommand).trim();
+    if (!selectedProjectId || !command) return;
+    setIsRunningProjectScript(true);
+    const tempTaskId = `project-script-${selectedProjectId}-${Date.now()}`;
+    setTaskQueue((prev) => [...prev, {
+      id: tempTaskId,
+      type: "script",
+      name: `Script: ${command}`,
+      sessionId: "",
+      projectId: selectedProjectId,
+      status: "running",
+      createdAt: Date.now(),
+    }]);
+    try {
+      const response = await fetch(`/api/projects/${selectedProjectId}/run-script`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command }),
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        setApiError({ title: "Run Project Script Error", message: data.error || "Failed to run script" });
+        setTaskQueue((prev) => prev.filter((task) => task.id !== tempTaskId));
+        return;
+      }
+      const data = await response.json();
+      setTaskQueue((prev) => prev.map((task) => task.id === tempTaskId
+        ? { ...task, id: data.taskId, messageId: data.messageId }
+        : task));
+      loadScriptHistory(selectedProjectId);
+      setProjectScriptCommandOpen(false);
+      setProjectScriptCommand("");
+    } catch (error: any) {
+      setApiError({ title: "Run Project Script Error", message: error.message || "Failed to run script" });
+      setTaskQueue((prev) => prev.filter((task) => task.id !== tempTaskId));
+    } finally {
+      setIsRunningProjectScript(false);
+    }
   };
 
   const handleNewSession = () => {
@@ -1383,6 +1457,7 @@ export default function HomePage() {
                 project={project}
                 projectSessions={projectSessions}
                 projectAgentCommands={projectAgentCommands}
+                scriptHistory={scriptHistory}
                 runners={runners}
                 menuOpen={projectMenuOpen}
                 menuRef={projectMenuRef}
@@ -1391,6 +1466,12 @@ export default function HomePage() {
                   setFileBrowserOpen(true);
                 }}
                 onOpenShellModal={() => setShellModalOpen(true)}
+                onOpenProjectScriptCommand={(command = "") => {
+                  setProjectScriptCommand(command);
+                  setProjectScriptCommandOpen(true);
+                }}
+                onSelectProjectScriptFile={handleSelectProjectScriptFile}
+                onRunProjectScript={handleRunProjectScript}
                 onNewSession={() => {
                   setRepoPath(project.repoPath);
                   setRunnerId(project.runnerId);
@@ -1607,7 +1688,9 @@ export default function HomePage() {
         parentPath={chatFsParentPath}
         entries={chatFsEntries}
         loading={chatFsLoading}
-        projectRoot={selectedSession?.repoPath || repoPath || "/"}
+        projectRoot={chatFsMode === "project-run"
+          ? projects.find((project) => project.id === selectedProjectId)?.repoPath || "/"
+          : selectedSession?.repoPath || repoPath || "/"}
         onSelect={handleSelectChatFsItem}
       />
 
@@ -1681,6 +1764,15 @@ export default function HomePage() {
       <CommandModal
         text={commandModalText}
         onClose={() => setCommandModalText(null)}
+      />
+
+      <ProjectScriptCommandModal
+        open={projectScriptCommandOpen}
+        command={projectScriptCommand}
+        onCommandChange={setProjectScriptCommand}
+        onClose={() => setProjectScriptCommandOpen(false)}
+        onRun={() => handleRunProjectScript()}
+        isRunning={isRunningProjectScript}
       />
 
       <CommandModal

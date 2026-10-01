@@ -2660,6 +2660,10 @@ body {
   overflow: hidden;
 }
 
+.project-scripts-section {
+  overflow: visible;
+}
+
 .project-section-header {
   display: flex;
   align-items: center;

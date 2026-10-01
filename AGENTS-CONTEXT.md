@@ -119,9 +119,7 @@ app/
         script-history/
           route.ts      # GET: fetch a project's "!" quick-exec command history (script-history.json)
         run-script/
-          route.ts      # POST: run a global project script via runner PTY
-        restart-script/
-          route.ts      # POST: restart a global project script task via exec.restart
+          route.ts      # POST: run a history-backed project-scoped command via runner PTY
         diff/
           route.ts      # GET: generate and serve visual HTML diff for the project's working tree via runner + diff2html
         git-status/
@@ -473,10 +471,9 @@ The application enforces token-based authentication on all API routes and WebSoc
   - **PWA & iOS Support**: Works across modern browsers (Chrome, Edge, Firefox, Safari). On iOS/iPadOS 16.4+, Web Push is fully supported when Arondo is added to the Home Screen as a PWA.
 - **PWA Installability**: `app/manifest.ts` provides the web app manifest (name, icons, standalone display). `components/ClientInit.tsx` registers `public/sw.js` on load to enable standalone installation across platforms as well as background Web Push notification handling.
 
-## Project & Custom Scripts Management
+## Project & Script History Management
 - **Project Scoping**: Sessions are mapped to projects by repository path + runnerId. Projects store metadata at `~/.arondo/projects/[projectId]/project.json`.
-- **Script History**: Commands run through `!` are recorded per project in `~/.arondo/projects/[projectId]/script-history.json` and provide the `Run Script` and quick-exec suggestions.
-- **AI Auto-Script Discovery**: Background process using `agy` to auto-detect and register project scripts. This process is executed remotely on the selected runner using the `exec.agent` API, ensuring no local execution happens on the server.
+- **Script History**: Commands run through `!` or the Project Page's project-scoped Run Script action are recorded per project in `~/.arondo/projects/[projectId]/script-history.json` and provide the `Run Script` and quick-exec suggestions.
 
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know

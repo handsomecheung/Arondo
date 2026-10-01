@@ -5,6 +5,7 @@ import type { TaskItem } from "@/types/home";
 
 interface UseScriptsParams {
   selectedSessionId: string | null;
+  selectedProjectId: string | null;
   selectedSessionProjectId: string | undefined;
   setApiError: (err: { title: string; message: string } | null) => void;
   setTaskQueue: React.Dispatch<React.SetStateAction<TaskItem[]>>;
@@ -14,6 +15,7 @@ interface UseScriptsParams {
 
 export function useScripts({
   selectedSessionId,
+  selectedProjectId,
   selectedSessionProjectId,
   setApiError,
   setTaskQueue,
@@ -31,9 +33,10 @@ export function useScripts({
   }, []);
 
   useEffect(() => {
-    if (selectedSessionProjectId) loadScriptHistory(selectedSessionProjectId);
+    const projectId = selectedProjectId || selectedSessionProjectId;
+    if (projectId) loadScriptHistory(projectId);
     else setScriptHistory({});
-  }, [selectedSessionProjectId, loadScriptHistory]);
+  }, [selectedProjectId, selectedSessionProjectId, loadScriptHistory]);
 
   const handleRunScript = async (command: string, promptText?: string) => {
     if (!selectedSessionId) return;
@@ -70,5 +73,5 @@ export function useScripts({
     }
   };
 
-  return { scriptHistory, isRunningScript, handleRunScript };
+  return { scriptHistory, isRunningScript, handleRunScript, loadScriptHistory };
 }
