@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import ExecCard, { ExecCardProps } from "@/components/ExecCard";
-import { IconTerminal, IconAntigravity } from "@/components/Icons";
+import { IconAi, IconTerminal } from "@/components/Icons";
 
 function stripAnsi(text: string): string {
   return text.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/\r/g, "");
@@ -138,7 +138,7 @@ export default function ScriptExecCard({
         )}
         {canAnalyze && (
           <button className="task-menu-item" onClick={() => { closeMenu(); handleAnalyze(); }}>
-            <IconAntigravity />
+            <IconAi />
             <span>Analyze with Agent</span>
           </button>
         )}

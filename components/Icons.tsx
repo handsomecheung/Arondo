@@ -232,6 +232,16 @@ export function IconClaude() {
   );
 }
 
+export function IconAi() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m12 3-1.5 4.5L6 9l4.5 1.5L12 15l1.5-4.5L18 9l-4.5-1.5Z" />
+      <path d="m19 14-.75 2.25L16 17l2.25.75L19 20l.75-2.25L22 17l-2.25-.75Z" />
+      <path d="m5 16-.5 1.5L3 18l1.5.5L5 20l.5-1.5L7 18l-1.5-.5Z" />
+    </svg>
+  );
+}
+
 export function IconAntigravity() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -345,5 +355,4 @@ export function IconCommit({ size = 16 }: { size?: number } = {}) {
     </svg>
   );
 }
-
 
