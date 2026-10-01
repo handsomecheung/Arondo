@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken } from "@/lib/auth";
-import { getProjects, getSessions, isTempDirProject, isSessionArchived, getShowTempDirSessions } from "@/lib/store";
+import { getMessages, getProjects, getSessions, isTempDirProject, isSessionArchived, getShowTempDirSessions } from "@/lib/store";
 
 export async function GET(request: NextRequest) {
   const token = getArondoToken(request);
@@ -42,7 +42,16 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.json(filtered);
+  const tasksWithInputState = await Promise.all(
+    filtered.map(async (task) => {
+      if (task.type !== "script" || !task.messageId) return task;
+      const messages = await getMessages(task.sessionId, task.projectId);
+      const message = messages.find((item) => item.id === task.messageId);
+      return { ...task, waitingForInput: message?.waitingForInput ?? task.waitingForInput };
+    }),
+  );
+
+  return NextResponse.json(tasksWithInputState);
 }
 
 export const dynamic = "force-dynamic";

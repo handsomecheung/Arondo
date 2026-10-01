@@ -104,6 +104,7 @@ export interface TaskContext {
   detachedKind?: "review" | "btw";
   cache?: "on" | "off";
   tokenUuid?: string;
+  waitingForInput?: boolean;
 }
 
 interface PendingRequest {
@@ -268,6 +269,7 @@ class RunnerManager {
             exitCode: m.exitCode,
             stoppedByUser: m.stoppedByUser,
             tokenUuid: m.tokenUuid || s.tokenUuid,
+            waitingForInput: m.waitingForInput,
           };
           this.tasks.set(taskId, ctx);
           const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
@@ -322,6 +324,7 @@ class RunnerManager {
             exitCode: m.exitCode,
             stoppedByUser: m.stoppedByUser,
             tokenUuid: m.tokenUuid,
+            waitingForInput: m.waitingForInput,
           };
           this.tasks.set(taskId, ctx);
           const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
@@ -1265,6 +1268,7 @@ class RunnerManager {
     ctx.completedAt = Date.now();
     ctx.exitCode = payload.exitCode;
     if (ctx.type === "script" && ctx.messageId) {
+      ctx.waitingForInput = false;
       const message = await updateMessage(ctx.sessionId, ctx.messageId, { waitingForInput: false }, ctx.projectId);
       if (message) eventBus.publish({ type: "message_updated", payload: message });
     }
@@ -1306,6 +1310,7 @@ class RunnerManager {
     const ctx = this.tasks.get(payload?.taskId);
     if (!ctx || ctx.type !== "script" || ctx.completedAt || !ctx.messageId) return;
 
+    ctx.waitingForInput = !!payload.waiting;
     const message = await updateMessage(
       ctx.sessionId,
       ctx.messageId,

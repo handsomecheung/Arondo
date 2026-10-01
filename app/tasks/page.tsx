@@ -49,6 +49,7 @@ interface Message {
   todoTrigger?: TodoTrigger;
   prompt?: string;
   projectId?: string;
+  waitingForInput?: boolean;
 }
 
 interface ServerTask {
@@ -67,6 +68,7 @@ interface ServerTask {
   projectId?: string;
   prompt?: string;
   agentType?: string;
+  waitingForInput?: boolean;
 }
 
 interface TaskItem {
@@ -86,6 +88,7 @@ interface TaskItem {
   agentType?: string;
   content?: string;
   trigger?: TodoTrigger;
+  waitingForInput?: boolean;
 }
 
 function todoMessageToTaskItem(
@@ -202,6 +205,7 @@ export default function TasksPage() {
             projectId: t.projectId || session?.projectId,
             prompt: t.prompt,
             agentType: t.agentType || session?.agentType,
+            waitingForInput: t.waitingForInput,
           };
         });
 
@@ -460,7 +464,26 @@ export default function TasksPage() {
                     next[idx] = { ...next[idx], messageId: msg.id, command: cmd };
                     return next;
                   }
-                  return prev;
+                  const cmdMatch = msg.content.match(/```bash\n([\s\S]*?)```/);
+                  const command = cmdMatch ? cmdMatch[1].trim() : undefined;
+                  const scriptName = match?.[1].trim() || command || "unknown";
+                  return [
+                    {
+                      id: `script-${msg.id}`,
+                      type: "script" as const,
+                      name: `Script: ${scriptName}`,
+                      sessionId: msg.sessionId,
+                      sessionName: sessionsRef.current.find((s) => s.id === msg.sessionId)?.name || "",
+                      status: "running" as const,
+                      createdAt: new Date(msg.createdAt).getTime(),
+                      messageId: msg.id,
+                      command,
+                      scriptName,
+                      projectId: resolvedProjectId,
+                      waitingForInput: msg.waitingForInput,
+                    },
+                    ...prev,
+                  ];
                 });
               }
             }
@@ -480,6 +503,14 @@ export default function TasksPage() {
                 }
                 return prev.map((t) => (t.id === msg.id ? { ...t, trigger: msg.todoTrigger, content: msg.content, name: `Todo: ${msg.content}` } : t));
               });
+            } else if (typeof msg.waitingForInput === "boolean") {
+              setTaskQueue((prev) =>
+                prev.map((t) =>
+                  t.messageId === msg.id && t.sessionId === msg.sessionId
+                    ? { ...t, waitingForInput: msg.waitingForInput }
+                    : t,
+                ),
+              );
             }
           }
         } catch {
@@ -1080,8 +1111,12 @@ export default function TasksPage() {
 
                             let statusText: string;
                             if (isRunning) {
-                              const elapsedMs = taskTimeTicker - task.createdAt;
-                              statusText = `Running (${formatDuration(elapsedMs)})...`;
+                              if (task.type === "script" && task.waitingForInput) {
+                                statusText = "Waiting for input";
+                              } else {
+                                const elapsedMs = taskTimeTicker - task.createdAt;
+                                statusText = `Running (${formatDuration(elapsedMs)})...`;
+                              }
                             } else if (task.completedAt) {
                               const ago = formatDuration(taskTimeTicker - task.completedAt);
                               statusText = task.status === "stopped"
@@ -1135,6 +1170,7 @@ export default function TasksPage() {
                                   statusText,
                                   command: task.command,
                                   messageId: task.messageId,
+                                  waitingForInput: task.waitingForInput,
                                 }}
                                 sessionId={task.sessionId || ""}
                                 projectId={task.projectId}
@@ -1244,8 +1280,12 @@ export default function TasksPage() {
 
                             let statusText: string;
                             if (isRunning) {
-                              const elapsedMs = taskTimeTicker - task.createdAt;
-                              statusText = `Running (${formatDuration(elapsedMs)})...`;
+                              if (task.type === "script" && task.waitingForInput) {
+                                statusText = "Waiting for input";
+                              } else {
+                                const elapsedMs = taskTimeTicker - task.createdAt;
+                                statusText = `Running (${formatDuration(elapsedMs)})...`;
+                              }
                             } else if (task.completedAt) {
                               const ago = formatDuration(taskTimeTicker - task.completedAt);
                               statusText = task.status === "stopped"
@@ -1307,6 +1347,7 @@ export default function TasksPage() {
                                   statusText,
                                   command: task.command,
                                   messageId: task.messageId,
+                                  waitingForInput: task.waitingForInput,
                                 }}
                                 sessionId={task.sessionId || ""}
                                 projectId={task.projectId}
