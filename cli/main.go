@@ -53,6 +53,7 @@ const rootUsage = `Usage: cli/arondo-cli <command> [options] <message>
 Commands:
   send          Create a session or send a message to an existing session, then wait for the result
   get-messages  Print the full conversation history of a session
+  get-sessions  List active sessions
   get-projects  List all accessible projects
   get-agents    List agent availability for all accessible runners
   get-quota     List the recorded quota usage for all accessible runners
@@ -429,9 +430,9 @@ type message struct {
 }
 
 type session struct {
-	ID, RunnerID, RepoPath, Status, ErrorMessage string
-	UpdatedAt                                    time.Time
-	Raw                                          map[string]any
+	ID, Name, RunnerID, RepoPath, Status, AgentType, ErrorMessage string
+	UpdatedAt                                                     time.Time
+	Raw                                                           map[string]any
 }
 
 func (s *session) UnmarshalJSON(data []byte) error {
@@ -441,9 +442,11 @@ func (s *session) UnmarshalJSON(data []byte) error {
 	}
 	s.Raw = raw
 	s.ID, _ = raw["id"].(string)
+	s.Name, _ = raw["name"].(string)
 	s.RunnerID, _ = raw["runnerId"].(string)
 	s.RepoPath, _ = raw["repoPath"].(string)
 	s.Status, _ = raw["status"].(string)
+	s.AgentType, _ = raw["agentType"].(string)
 	s.ErrorMessage, _ = raw["errorMessage"].(string)
 	if updatedAt, ok := raw["updatedAt"].(string); ok {
 		s.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
@@ -527,7 +530,7 @@ func run(argv []string) error {
 	if len(argv) == 0 {
 		return fmt.Errorf("a command is required\n\n%s", rootUsage)
 	}
-	if argv[0] != "send" && argv[0] != "get-messages" && argv[0] != "get-projects" && argv[0] != "get-agents" && argv[0] != "get-quota" && argv[0] != "update-quota" {
+	if argv[0] != "send" && argv[0] != "get-messages" && argv[0] != "get-sessions" && argv[0] != "get-projects" && argv[0] != "get-agents" && argv[0] != "get-quota" && argv[0] != "update-quota" {
 		return fmt.Errorf("unknown command: %s\n\n%s", argv[0], rootUsage)
 	}
 	configDir, err := configDir()
@@ -548,6 +551,17 @@ func run(argv []string) error {
 			return err
 		}
 		return getMessages(&client{server: args.server, token: args.token, http: http.DefaultClient}, args)
+	}
+	if argv[0] == "get-sessions" {
+		args, err := parseGetSessionsArgs(argv[1:], config)
+		if errors.Is(err, errHelp) {
+			fmt.Fprintln(os.Stderr, getSessionsUsage)
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		return getSessions(&client{server: args.server, token: args.token, http: http.DefaultClient}, args)
 	}
 	if argv[0] == "get-projects" {
 		args, err := parseGetProjectsArgs(argv[1:], config)

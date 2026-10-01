@@ -838,3 +838,160 @@ func TestSendMessageToOnceSessionReturnsError(t *testing.T) {
 		t.Fatalf("unexpected error message: %#v", apiErr.body["error"])
 	}
 }
+
+func TestParseGetSessionsArgs(t *testing.T) {
+	args, err := parseGetSessionsArgs([]string{
+		"--server=https://arondo.example/",
+		"--client-token", "secret",
+		"--runner-id", "runner-1",
+		"--path", "/path/to/repo",
+		"--output", "json",
+	}, cliConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if args.server != "https://arondo.example/" || args.token != "secret" || args.runnerID != "runner-1" || args.repoPath != "/path/to/repo" || args.output != "json" {
+		t.Fatalf("unexpected arguments: %#v", args)
+	}
+}
+
+func TestParseGetSessionsArgsRejectsUnexpectedArgument(t *testing.T) {
+	_, err := parseGetSessionsArgs([]string{"--server", "http://localhost", "--client-token", "secret", "unexpected"}, cliConfig{})
+	if err == nil || err.Error() != "unexpected argument: unexpected" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseGetSessionsArgsRejectsInvalidOutput(t *testing.T) {
+	_, err := parseGetSessionsArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--output", "xml"}, cliConfig{})
+	if err == nil || err.Error() != "--output must be plain or json" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseGetSessionsArgsReturnsHelp(t *testing.T) {
+	_, err := parseGetSessionsArgs([]string{"--help"}, cliConfig{})
+	if !errors.Is(err, errHelp) {
+		t.Fatalf("expected help error, got %v", err)
+	}
+	_, err = parseGetSessionsArgs([]string{"-h"}, cliConfig{})
+	if !errors.Is(err, errHelp) {
+		t.Fatalf("expected help error, got %v", err)
+	}
+}
+
+func TestGetSessions(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/sessions" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Header.Get("x-arondo-token") != "token-xyz" {
+			t.Fatalf("unexpected token: %s", r.Header.Get("x-arondo-token"))
+		}
+		_ = json.NewEncoder(w).Encode([]map[string]any{
+			{
+				"id":        "sess-1",
+				"name":      "Test Session 1",
+				"status":    "done",
+				"agentType": "codex",
+				"runnerId":  "runner-1",
+				"repoPath":  "/path/to/repo1",
+			},
+			{
+				"id":           "sess-2",
+				"name":         "Test Session 2",
+				"status":       "error",
+				"errorMessage": "failed to execute",
+				"agentType":    "claude",
+				"runnerId":     "runner-2",
+				"repoPath":     "/path/to/repo2",
+			},
+		})
+	}))
+	defer server.Close()
+
+	c := &client{server: server.URL, token: "token-xyz", http: server.Client()}
+
+	// Test plain output
+	err := getSessions(c, getSessionsArguments{server: server.URL, token: "token-xyz", output: "plain"})
+	if err != nil {
+		t.Fatalf("getSessions failed: %v", err)
+	}
+
+	// Test JSON output
+	err = getSessions(c, getSessionsArguments{server: server.URL, token: "token-xyz", output: "json"})
+	if err != nil {
+		t.Fatalf("getSessions JSON failed: %v", err)
+	}
+
+	// Test filtering by runner-id
+	err = getSessions(c, getSessionsArguments{server: server.URL, token: "token-xyz", runnerID: "runner-1", output: "plain"})
+	if err != nil {
+		t.Fatalf("getSessions with runner filter failed: %v", err)
+	}
+
+	// Test filtering by path
+	err = getSessions(c, getSessionsArguments{server: server.URL, token: "token-xyz", repoPath: "/path/to/repo2", output: "plain"})
+	if err != nil {
+		t.Fatalf("getSessions with path filter failed: %v", err)
+	}
+
+	// Test filtering matching nothing (no sessions)
+	err = getSessions(c, getSessionsArguments{server: server.URL, token: "token-xyz", runnerID: "nonexistent", output: "plain"})
+	if err != nil {
+		t.Fatalf("getSessions with unmatched filter failed: %v", err)
+	}
+
+	// Test limiting with count
+	err = getSessions(c, getSessionsArguments{server: server.URL, token: "token-xyz", count: 1, output: "json"})
+	if err != nil {
+		t.Fatalf("getSessions with count limit failed: %v", err)
+	}
+}
+
+func TestParseGetSessionsArgsCount(t *testing.T) {
+	args, err := parseGetSessionsArgs([]string{
+		"--server=https://arondo.example/",
+		"--client-token", "secret",
+		"--count", "5",
+	}, cliConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if args.count != 5 {
+		t.Fatalf("expected count 5, got %d", args.count)
+	}
+
+	// Test inline --count=10
+	argsInline, err := parseGetSessionsArgs([]string{
+		"--server=https://arondo.example/",
+		"--client-token", "secret",
+		"--count=10",
+	}, cliConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if argsInline.count != 10 {
+		t.Fatalf("expected count 10, got %d", argsInline.count)
+	}
+
+	// Test invalid count
+	_, err = parseGetSessionsArgs([]string{
+		"--server=https://arondo.example/",
+		"--client-token", "secret",
+		"--count", "-1",
+	}, cliConfig{})
+	if err == nil || err.Error() != "--count must be a non-negative integer" {
+		t.Fatalf("unexpected error for negative count: %v", err)
+	}
+
+	_, err = parseGetSessionsArgs([]string{
+		"--server=https://arondo.example/",
+		"--client-token", "secret",
+		"--count", "abc",
+	}, cliConfig{})
+	if err == nil || err.Error() != "--count must be a non-negative integer" {
+		t.Fatalf("unexpected error for non-integer count: %v", err)
+	}
+}
+
