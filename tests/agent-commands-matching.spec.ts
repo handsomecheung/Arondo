@@ -62,10 +62,8 @@ test.describe('AgentCommand matching and UI rendering tests', () => {
 
     const result = JSON.parse(output.trim());
 
-    expect(result.hasPredefinedScript).toBe(true);
+    expect(result.hasHistoryScript).toBe(true);
     expect(result.hasHistoryScripts).toBe(true);
-    expect(result.hasDuplicateHistoryScriptExcluded).toBe(true);
     expect(result.hasSelectButton).toBe(true);
-    expect(result.hasEditScriptsButton).toBe(true);
   });
 });

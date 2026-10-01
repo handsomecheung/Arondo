@@ -82,7 +82,7 @@ test.describe('Runner Exec API integration tests', () => {
     const runRes = await request.post(`/api/sessions/${sessionId}/run-script`, {
       headers: { 'x-arondo-token': 'test-token-123456' },
       data: {
-        scriptName: 'echo "hello from tests"',
+        command: 'echo "hello from tests"',
         prompt: 'test execution'
       }
     });
