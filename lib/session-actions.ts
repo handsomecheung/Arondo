@@ -13,6 +13,7 @@ import {
   recordScriptHistory,
   getSessionLog,
   readOnceCache,
+  getPromptHash,
   type DetachedAgentKind,
 } from "./store";
 import { getAgent, resolveAgentType, PROMPT_ENV_VAR, type ConcreteAgentType } from "./agents";
@@ -400,14 +401,15 @@ export async function dispatchCreateSession(
       });
       eventBus.publish({ type: "message_added", payload: userMessage });
 
+      const promptHash = getPromptHash(trimmedPrompt);
       const systemMessageId = crypto.randomUUID();
       const systemMsg = await addMessage({
         id: systemMessageId,
         sessionId: session.id,
         role: "system",
-        content: `⚙️ Executing command:\n\`\`\`bash\n[cached]\n\`\`\``,
+        content: `⚙️ Executing command:\n\`\`\`bash\n[cached: ${promptHash}]\n\`\`\``,
         type: "agent-run",
-        command: "[cached]",
+        command: `[cached: ${promptHash}]`,
         resolvedAgentType: agentType,
         prompt: trimmedPrompt,
         cache: "on",

@@ -323,9 +323,11 @@ test.describe('Temp dir project task visibility', () => {
       expect(msg.cache).toBe('on');
     }
 
-    // 6. Check log contains cached output
+    // 6. Check log contains cached output and command contains cache hash
     const agentRunMsg = messages.find((m: any) => m.type === 'agent-run');
     expect(agentRunMsg).toBeDefined();
+    expect(agentRunMsg.command).toBe(`[cached: ${promptHash}]`);
+    expect(agentRunMsg.content).toContain(`[cached: ${promptHash}]`);
     const logRes = await request.get(`/api/sessions/${session.id}/log?messageId=${agentRunMsg.id}`, {
       headers: { 'x-arondo-token': 'test-token-123456' }
     });
