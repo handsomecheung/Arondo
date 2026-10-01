@@ -11,7 +11,7 @@ import {
   deleteSession,
   getPendingTodoMessages,
 } from '../../lib/store';
-import { heartbeatTick } from '../../lib/heartbeat';
+import { processQuotaErrorRetries } from '../../lib/heartbeat';
 import { getAgentQuotaErrorMessage } from '../../lib/agent-quota-errors';
 import { runnerManager } from '../../lib/runner-manager';
 
@@ -85,7 +85,7 @@ test.describe('Heartbeat quota error handling tests', () => {
     };
 
     try {
-      await heartbeatTick();
+      await processQuotaErrorRetries();
 
       // Should have attempted to refresh quota
       // And should NOT have created a scheduled message yet
@@ -148,7 +148,7 @@ test.describe('Heartbeat quota error handling tests', () => {
     await fs.writeFile(quotaFilePath, JSON.stringify(freshQuotas, null, 2), 'utf-8');
 
     try {
-      await heartbeatTick();
+      await processQuotaErrorRetries();
 
       // Verify scheduled message was created
       const pendingTodos = await getPendingTodoMessages(session.id);
@@ -221,7 +221,7 @@ test.describe('Heartbeat quota error handling tests', () => {
 
     const beforeTickMs = Date.now();
     try {
-      await heartbeatTick();
+      await processQuotaErrorRetries();
       const afterTickMs = Date.now();
 
       const pendingTodos = await getPendingTodoMessages(session.id);
@@ -277,7 +277,7 @@ test.describe('Heartbeat quota error handling tests', () => {
     });
 
     try {
-      await heartbeatTick();
+      await processQuotaErrorRetries();
 
       const todos1 = await getPendingTodoMessages(session1.id);
       expect(todos1.length).toBe(0);

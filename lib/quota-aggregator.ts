@@ -134,10 +134,3 @@ export function notifyQuotaAggregatorAccess(): void {
   if (Date.now() - lastAggregateAt <= MIN_ACCESS_INTERVAL_MS) return;
   aggregateQuota().catch((err) => console.error("[quota-aggregator] access-triggered run failed:", err));
 }
-
-export function startQuotaAggregator(): void {
-  aggregateQuota().catch((err) => console.error("[quota-aggregator] initial run failed:", err));
-  setInterval(() => {
-    aggregateQuota().catch((err) => console.error("[quota-aggregator] periodic run failed:", err));
-  }, 6 * 60 * 60 * 1000);
-}

@@ -1729,12 +1729,6 @@ if (p.__arondoRunnerMgr) {
   p.__arondoRunnerMgr.restoreTasks().catch((err) => {
     console.error("[runner-manager] failed to restore tasks:", err);
   });
-  setInterval(
-    () => {
-      p.__arondoRunnerMgr!.purgeExpiredTasks();
-    },
-    60 * 60 * 1000,
-  );
 }
 
 export const runnerManager = p.__arondoRunnerMgr;

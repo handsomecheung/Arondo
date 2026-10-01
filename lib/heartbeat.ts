@@ -12,7 +12,6 @@ import { eventBus } from "./event-bus";
 import { runnerManager } from "./runner-manager";
 import { isQuotaErrorMessage } from "./agent-quota-errors";
 
-const HEARTBEAT_INTERVAL_MS = 60 * 1000;
 const STALE_QUOTA_THRESHOLD_S = 5 * 60;
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
 
@@ -167,7 +166,7 @@ async function processQuotaErrorSession(
     if (runner && runner.info.connected && runner.info.agents.includes(binary)) {
       runnerManager.sendFire(runnerId, "info.fetch", { agent: binary });
       console.log(
-        `[heartbeat] Stale quota for ${agentType} (session ${session.id}) — requested info.fetch on runner ${runnerId}`
+        `[quota-retry] Stale quota for ${agentType} (session ${session.id}) — requested info.fetch on runner ${runnerId}`
       );
     } else {
       const fallbackRunner = runnerManager
@@ -176,7 +175,7 @@ async function processQuotaErrorSession(
       if (fallbackRunner) {
         runnerManager.sendFire(fallbackRunner.id, "info.fetch", { agent: binary });
         console.log(
-          `[heartbeat] Stale quota for ${agentType} (session ${session.id}) — requested info.fetch on fallback runner ${fallbackRunner.id}`
+          `[quota-retry] Stale quota for ${agentType} (session ${session.id}) — requested info.fetch on fallback runner ${fallbackRunner.id}`
         );
       }
     }
@@ -215,7 +214,7 @@ async function processQuotaErrorSession(
   }
 
   console.log(
-    `[heartbeat] Converted quota error session ${session.id} to scheduled message at ${new Date(
+    `[quota-retry] Converted quota error session ${session.id} to scheduled message at ${new Date(
       scheduledTimestamp
     ).toISOString()}`
   );
@@ -223,7 +222,7 @@ async function processQuotaErrorSession(
 
 let isTicking = false;
 
-export async function heartbeatTick(): Promise<void> {
+export async function processQuotaErrorRetries(): Promise<void> {
   if (isTicking) return;
   isTicking = true;
   try {
@@ -240,27 +239,15 @@ export async function heartbeatTick(): Promise<void> {
           await processQuotaErrorSession(session, quotas);
         } catch (err) {
           console.error(
-            `[heartbeat] Failed to process quota error for session ${session.id}:`,
+            `[quota-retry] Failed to process quota error for session ${session.id}:`,
             err
           );
         }
       }
     }
   } catch (err) {
-    console.error("[heartbeat] tick failed:", err);
+    console.error("[quota-retry] processing failed:", err);
   } finally {
     isTicking = false;
   }
-}
-
-export function startHeartbeat(): void {
-  const p = process as typeof process & { __arondoHeartbeatStarted?: boolean };
-  if (p.__arondoHeartbeatStarted) return;
-  p.__arondoHeartbeatStarted = true;
-
-  setInterval(() => {
-    heartbeatTick().catch((err) => console.error("[heartbeat] periodic tick failed:", err));
-  }, HEARTBEAT_INTERVAL_MS);
-  heartbeatTick().catch((err) => console.error("[heartbeat] initial tick failed:", err));
-  console.log("[heartbeat] started");
 }

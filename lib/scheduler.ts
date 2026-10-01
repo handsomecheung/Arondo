@@ -13,10 +13,7 @@ import { dispatchFollowupMessage } from "./session-actions";
 import { isQuotaAvailable } from "./autoagent";
 import { getProjectReadiness } from "./project-readiness";
 
-const TICK_MS = 30_000;
-
-// Guards against the event-bus fast-path and the periodic tick racing to
-// dispatch the same todo message twice (single-process, but both paths are async).
+// Guards against concurrent attempts to dispatch the same todo message.
 const dispatching = new Set<string>();
 
 async function resolveAndBroadcast(
@@ -89,7 +86,7 @@ async function evaluateTodo(session: Session, todo: Message): Promise<void> {
   // "manual" never auto-fires.
 }
 
-async function tick(): Promise<void> {
+export async function processPendingTodoMessages(): Promise<void> {
   let sessions: Session[];
   try {
     sessions = await getSessions();
@@ -116,54 +113,6 @@ async function tick(): Promise<void> {
   }
 }
 
-// Fast-path: react immediately when a session's agent stops running, instead
-// of waiting up to TICK_MS for an "afterSession" follow-up or another
-// session's "codebaseReady" todo to fire.
-function onSessionUpdated(session: Session): void {
-  if (session.status === "running") return;
-
-  getPendingTodoMessages(session.id)
-    .then(async (todos) => {
-      // Success-only: an "error" status leaves the afterSession todo pending.
-      const followup = canDispatchAfterSessionTodo(session) ? todos.find((t) => t.todoTrigger?.kind === "afterSession") : undefined;
-      if (followup) {
-        await executeAction(session, followup).catch((err) =>
-          console.error("[scheduler] fast-path dispatch failed:", err),
-        );
-      }
-    })
-    .catch((err) => console.error("[scheduler] fast-path afterSession lookup failed:", err));
-
-  if (!session.runnerId || !session.repoPath) return;
-
-  getSessions()
-    .then(async (sessions) => {
-      const targets = sessions
-        .filter(
-          (s) =>
-            s.id !== session.id &&
-            s.runnerId === session.runnerId &&
-            s.repoPath === session.repoPath &&
-            s.pendingTodoMessageIds &&
-            s.pendingTodoMessageIds.length > 0,
-        )
-        // Oldest pending todo first, so todos targeting the same codebase
-        // dispatch in FIFO order instead of newest-first.
-        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-
-      for (const target of targets) {
-        const todos = await getPendingTodoMessages(target.id);
-        const draft = todos.find((t) => t.todoTrigger?.kind === "codebaseReady");
-        if (draft && (await isCodebaseReady(target))) {
-          await executeAction(target, draft).catch((err) =>
-            console.error("[scheduler] fast-path dispatch failed:", err),
-          );
-        }
-      }
-    })
-    .catch((err) => console.error("[scheduler] fast-path codebaseReady lookup failed:", err));
-}
-
 // "triggered" only exists transiently while executeAction is running within
 // this process — nothing else advances it. If the process dies (crash,
 // restart) between marking a todo "triggered" and it resolving to
@@ -172,7 +121,7 @@ function onSessionUpdated(session: Session): void {
 // again and the UI would show "Sending…" indefinitely. Resolve any such
 // leftovers to a terminal "failed" state on startup so the user gets a clear
 // notification instead of a stuck spinner, and can resend manually.
-async function recoverStuckTriggeredTodos(): Promise<void> {
+export async function recoverInterruptedTodoDispatches(): Promise<void> {
   let sessions: Session[];
   try {
     sessions = await getSessions();
@@ -194,25 +143,4 @@ async function recoverStuckTriggeredTodos(): Promise<void> {
       console.error(`[scheduler] startup recovery failed for session ${session.id}:`, err);
     }
   }
-}
-
-export function startScheduler(): void {
-  const p = process as typeof process & { __arondoSchedulerStarted?: boolean };
-  if (p.__arondoSchedulerStarted) return;
-  p.__arondoSchedulerStarted = true;
-
-  eventBus.subscribe((event) => {
-    if (event.type === "session_updated" && event.payload?.id) {
-      onSessionUpdated(event.payload as Session);
-    }
-  });
-  recoverStuckTriggeredTodos()
-    .catch((err) => console.error("[scheduler] startup recovery failed:", err))
-    .finally(() => {
-      setInterval(() => {
-        tick().catch((err) => console.error("[scheduler] tick failed:", err));
-      }, TICK_MS);
-      tick().catch((err) => console.error("[scheduler] initial tick failed:", err));
-    });
-  console.log("[scheduler] started");
 }
