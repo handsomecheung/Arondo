@@ -76,7 +76,9 @@ test.describe('Heartbeat quota error handling tests', () => {
 
     let fetchCalled = false;
     let requestedAgent = '';
+    const origGetRunner = runnerManager.getRunner;
     const origSendFire = runnerManager.sendFire;
+    runnerManager.getRunner = ((_id: string) => ({ info: { connected: true, agents: ['agy'] } })) as any;
     runnerManager.sendFire = (runnerId: string, method: string, payload: any) => {
       if (method === 'info.fetch') {
         fetchCalled = true;
@@ -88,10 +90,13 @@ test.describe('Heartbeat quota error handling tests', () => {
       await processQuotaErrorRetries();
 
       // Should have attempted to refresh quota
+      expect(fetchCalled).toBe(true);
+      expect(requestedAgent).toBe('agy');
       // And should NOT have created a scheduled message yet
       const pendingTodos = await getPendingTodoMessages(session.id);
       expect(pendingTodos.length).toBe(0);
     } finally {
+      runnerManager.getRunner = origGetRunner;
       runnerManager.sendFire = origSendFire;
       await deleteSession(session.id);
     }
@@ -231,7 +236,7 @@ test.describe('Heartbeat quota error handling tests', () => {
       expect(todo.todoTrigger?.kind).toBe('at');
 
       // Scheduled timestamp should be approximately now + 5 minutes
-      const scheduledTimestamp = todo.todoTrigger?.timestamp!;
+      const scheduledTimestamp = todo.todoTrigger!.timestamp;
       expect(scheduledTimestamp).toBeGreaterThanOrEqual(beforeTickMs + 5 * 60 * 1000);
       expect(scheduledTimestamp).toBeLessThanOrEqual(afterTickMs + 5 * 60 * 1000 + 1000);
     } finally {
