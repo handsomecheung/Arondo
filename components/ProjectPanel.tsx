@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { Project, Session, Runner } from "@/types/home";
 import type { AgentCommand } from "@/lib/agentCommands";
 import AgentCommandsManager from "@/components/AgentCommandsManager";
-import { IconPlus, IconTrash, IconMoreVertical, IconFileSearch, IconTerminal, IconCommit, IconPlay } from "@/components/Icons";
+import { IconPlus, IconTrash, IconMoreVertical, IconFileSearch, IconTerminal, IconCommit, IconPlay, IconFolder } from "@/components/Icons";
 
 interface ProjectPanelProps {
   project: Project;
@@ -47,26 +47,88 @@ export default function ProjectPanel({
     .slice(0, 5)
     .map(([command]) => command), [scriptHistory]);
 
+  const { pathStart, pathEnd } = useMemo(() => {
+    const raw = project.repoPath;
+    const segments = raw.split("/").filter(Boolean);
+    if (segments.length <= 1) {
+      return { pathStart: raw, pathEnd: "" };
+    }
+    const lastTwo = `/${segments[segments.length - 2]}/${segments[segments.length - 1]}`;
+    const end = (segments.length >= 3 && lastTwo.length <= 25)
+      ? lastTwo
+      : `/${segments[segments.length - 1]}`;
+    const start = raw.slice(0, raw.length - end.length);
+    return { pathStart: start, pathEnd: end };
+  }, [project.repoPath]);
+
   return <div className="project-detail-container">
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--border)", paddingBottom: 16 }}>
-      <div>
-        <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-primary)" }}>{folderName}</h2>
-        <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Project details</p>
-      </div>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <button className="new-task-btn" onClick={onNewSession} style={{ padding: "8px 16px", fontSize: 13 }}><IconPlus /> New Session</button>
-        <div ref={menuRef} style={{ position: "relative" }}>
-          <button className="menu-trigger-btn" onClick={() => onSetMenuOpen(!menuOpen)} id="project-menu-btn" title="Project Menu"><IconMoreVertical /></button>
-          {menuOpen && <div className="session-dropdown-menu">
-            <button className="menu-item" disabled={!isGitRepo || isCheckingGitChanges || !hasGitChanges} onClick={() => { onSetMenuOpen(false); onShowDiff(); }} id="menu-show-diff">
-              🔍 {isCheckingGitChanges ? "Show Changes" : hasGitChanges ? "Show Changes" : "No Changes"}
-            </button>
-            {isGitRepo && <button className="menu-item" onClick={() => { onSetMenuOpen(false); onShowCommits(); }} id="menu-show-commits"><IconCommit /> Show Commits</button>}
-            <button className="menu-item" disabled={!projectRunner?.connected} onClick={() => { onOpenFileBrowser(); onSetMenuOpen(false); }}><IconFileSearch /> File Browser</button>
-            <button className="menu-item" disabled={!projectRunner?.connected} onClick={() => { onOpenShellModal(); onSetMenuOpen(false); }}><IconTerminal /> Open Terminal</button>
-            <button className="menu-item danger" onClick={() => { onSetMenuOpen(false); onDeleteProject(); }}><IconTrash /> Delete Project</button>
-          </div>}
+    <div style={{ borderBottom: "1px solid var(--border)", paddingBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{folderName}</h2>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+          <button className="new-task-btn" onClick={onNewSession} style={{ padding: "8px 16px", fontSize: 13 }}><IconPlus /> New Session</button>
+          <div ref={menuRef} style={{ position: "relative" }}>
+            <button className="menu-trigger-btn" onClick={() => onSetMenuOpen(!menuOpen)} id="project-menu-btn" title="Project Menu"><IconMoreVertical /></button>
+            {menuOpen && <div className="session-dropdown-menu">
+              <button className="menu-item" disabled={!isGitRepo || isCheckingGitChanges || !hasGitChanges} onClick={() => { onSetMenuOpen(false); onShowDiff(); }} id="menu-show-diff">
+                🔍 {isCheckingGitChanges ? "Show Changes" : hasGitChanges ? "Show Changes" : "No Changes"}
+              </button>
+              {isGitRepo && <button className="menu-item" onClick={() => { onSetMenuOpen(false); onShowCommits(); }} id="menu-show-commits"><IconCommit /> Show Commits</button>}
+              <button className="menu-item" disabled={!projectRunner?.connected} onClick={() => { onOpenFileBrowser(); onSetMenuOpen(false); }}><IconFileSearch /> File Browser</button>
+              <button className="menu-item" disabled={!projectRunner?.connected} onClick={() => { onOpenShellModal(); onSetMenuOpen(false); }}><IconTerminal /> Open Terminal</button>
+              <button className="menu-item danger" onClick={() => { onSetMenuOpen(false); onDeleteProject(); }}><IconTrash /> Delete Project</button>
+            </div>}
+          </div>
         </div>
+      </div>
+      <div style={{ marginTop: 8 }}>
+        <button
+          type="button"
+          onClick={onOpenFileBrowser}
+          disabled={!projectRunner?.connected}
+          title={!projectRunner?.connected ? "Runner is offline" : `Browse ${project.repoPath}`}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "2px 6px",
+            marginLeft: -6,
+            background: "none",
+            border: "none",
+            borderRadius: "var(--radius-sm)",
+            color: projectRunner?.connected ? "var(--text-muted)" : "var(--text-disabled, #888)",
+            fontSize: 12,
+            fontFamily: "monospace",
+            cursor: projectRunner?.connected ? "pointer" : "not-allowed",
+            textAlign: "left",
+            maxWidth: "100%",
+            transition: "color 0.15s, background 0.15s",
+          }}
+          onMouseEnter={(e) => {
+            if (projectRunner?.connected) {
+              e.currentTarget.style.color = "var(--text-primary)";
+              e.currentTarget.style.background = "var(--bg-elevated)";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (projectRunner?.connected) {
+              e.currentTarget.style.color = "var(--text-muted)";
+              e.currentTarget.style.background = "none";
+            }
+          }}
+        >
+          <span style={{ display: "inline-flex", flexShrink: 0 }}><IconFolder /></span>
+          <span style={{ display: "inline-flex", minWidth: 0, overflow: "hidden", maxWidth: "100%" }}>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 1, minWidth: 0 }}>
+              {pathStart}
+            </span>
+            {pathEnd && (
+              <span style={{ flexShrink: 0, whiteSpace: "nowrap" }}>
+                {pathEnd}
+              </span>
+            )}
+          </span>
+        </button>
       </div>
     </div>
 

@@ -1463,6 +1463,7 @@ export default function HomePage() {
                 menuRef={projectMenuRef}
                 onSetMenuOpen={setProjectMenuOpen}
                 onOpenFileBrowser={() => {
+                  setFileBrowserTargetPath(undefined);
                   setFileBrowserOpen(true);
                 }}
                 onOpenShellModal={() => setShellModalOpen(true)}
