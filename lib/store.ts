@@ -656,6 +656,13 @@ function withoutLegacyRunningScripts(session: Session): Session {
 export type LogKind = "agent" | "script";
 export type LogStream = "stdout" | "stderr";
 
+const EXECUTION_LOG_SUFFIXES = [
+  ".agent.stdout.md",
+  ".agent.stderr.md",
+  ".script.stdout.md",
+  ".script.stderr.md",
+];
+
 function getLogFilePath(sessionId: string, messageId: string, kind: LogKind, projectId?: string, stream: LogStream = "stdout"): string {
   const filename = `${messageId}.${kind}.${stream}.md`;
   if (!sessionId) {
@@ -698,6 +705,24 @@ export async function getSessionLog(sessionId: string, messageId: string, kind: 
   } catch {
     return "";
   }
+}
+
+export async function sessionExecutionLogsContain(sessionId: string, query: string): Promise<boolean> {
+  const logDir = path.join(getSessionDir(sessionId), "logs");
+  let entries: fsSync.Dirent[];
+  try {
+    entries = await fs.readdir(logDir, { withFileTypes: true });
+  } catch {
+    return false;
+  }
+
+  const normalizedQuery = query.toLocaleLowerCase();
+  for (const entry of entries) {
+    if (!entry.isFile() || !EXECUTION_LOG_SUFFIXES.some((suffix) => entry.name.endsWith(suffix))) continue;
+    const content = await fs.readFile(path.join(logDir, entry.name), "utf-8");
+    if (content.toLocaleLowerCase().includes(normalizedQuery)) return true;
+  }
+  return false;
 }
 
 function getHtmlFilePath(sessionId: string, messageId: string, projectId?: string): string {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getArchivedSessions, getMessages, getProjects, getSessions, getShowTempDirSessions, isTempDirProject } from "@/lib/store";
+import { getArchivedSessions, getMessages, getProjects, getSessions, getShowTempDirSessions, isTempDirProject, sessionExecutionLogsContain } from "@/lib/store";
 import { getArondoToken, isValidToken } from "@/lib/auth";
 import { runnerManager } from "@/lib/runner-manager";
 
@@ -44,6 +44,10 @@ export async function GET(request: NextRequest) {
 
     const messages = await getMessages(session.id);
     if (messages.some((message) => !message.deleted && message.content.toLocaleLowerCase().includes(normalizedQuery))) {
+      sessionIds.add(session.id);
+      return;
+    }
+    if (await sessionExecutionLogsContain(session.id, normalizedQuery)) {
       sessionIds.add(session.id);
     }
   }));
