@@ -39,6 +39,7 @@ export async function executeAction(session: Session, todo: Message): Promise<vo
     const result = await dispatchFollowupMessage(session.id, todo.content, {
       prompt: todo.prompt,
       tokenUuid: todo.tokenUuid,
+      files: todo.files,
     });
 
     if (result.ok) {

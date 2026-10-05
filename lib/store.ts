@@ -144,6 +144,13 @@ export type DetachedAgentKind = "review" | "btw";
 
 export type TodoStatus = "pending" | "triggered" | "done" | "failed" | "cancelled" | "expired";
 
+export interface MessageFile {
+  name: string;
+  serverFilename?: string;
+  size?: number;
+  mimeType?: string;
+}
+
 export interface Message {
   id: string;
   sessionId: string;
@@ -169,6 +176,7 @@ export interface Message {
   userColor?: string;
   cache?: "on" | "off";
   waitingForInput?: boolean;
+  files?: MessageFile[];
   // Detached agent runs use a fresh agent conversation and never participate
   // in the parent session's normal conversation history.
   detachedKind?: DetachedAgentKind;
@@ -764,7 +772,7 @@ async function syncPendingTodoPointer(sessionId: string): Promise<void> {
 
 export async function addTodoMessage(
   sessionId: string,
-  data: { content: string; prompt?: string; trigger: TodoTrigger; tokenUuid?: string }
+  data: { content: string; prompt?: string; trigger: TodoTrigger; tokenUuid?: string; files?: MessageFile[] }
 ): Promise<Message> {
   let userName: string | undefined;
   let userColor: string | undefined;
@@ -793,6 +801,7 @@ export async function addTodoMessage(
     tokenUuid: data.tokenUuid,
     userName,
     userColor,
+    files: data.files,
   });
   await syncPendingTodoPointer(sessionId);
   return message;

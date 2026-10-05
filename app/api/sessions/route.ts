@@ -1,6 +1,6 @@
 import path from "path";
 import { NextRequest, NextResponse } from "next/server";
-import { getSessions, getProjects, deleteSession, archiveSession, createSession, addTodoMessage, getSession, getSessionArchiveAgeMs, isTempDirProject, getShowTempDirSessions } from "@/lib/store";
+import { getSessions, getProjects, deleteSession, archiveSession, createSession, addTodoMessage, getSession, getSessionArchiveAgeMs, isTempDirProject, getShowTempDirSessions, type MessageFile } from "@/lib/store";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken, getUuidByToken } from "@/lib/auth";
@@ -83,7 +83,7 @@ async function pickRandomAllowedRunnerId(token: string | null): Promise<string |
 export async function POST(req: NextRequest) {
   const token = getArondoToken(req);
   const body = await req.json();
-  const { id: idInput, prompt, message, repoPath: repoPathInput, tempDir, noProject, once, cache, agentType = "auto", runnerId: runnerIdInput, name, isDraft, draftTrigger = "codebaseReady", draftAt, force } = body as {
+  const { id: idInput, prompt, message, repoPath: repoPathInput, tempDir, noProject, once, cache, agentType = "auto", runnerId: runnerIdInput, name, isDraft, draftTrigger = "codebaseReady", draftAt, force, files } = body as {
     id?: string;
     prompt: string;
     message?: string;
@@ -99,6 +99,7 @@ export async function POST(req: NextRequest) {
     draftTrigger?: "manual" | "codebaseReady" | "at";
     draftAt?: number;
     force?: boolean;
+    files?: MessageFile[];
   };
 
   if (once && !tempDir) {
@@ -207,6 +208,7 @@ export async function POST(req: NextRequest) {
           ? { kind: "at", timestamp: draftAt }
           : { kind: draftTrigger === "manual" ? "manual" : "codebaseReady" },
       tokenUuid: getUuidByToken(token) || undefined,
+      files,
     });
     const updated = (await getSession(session.id)) || session;
     eventBus.publish({ type: "session_updated", payload: updated });
@@ -230,6 +232,7 @@ export async function POST(req: NextRequest) {
     noProject,
     once,
     cache,
+    files,
   });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });

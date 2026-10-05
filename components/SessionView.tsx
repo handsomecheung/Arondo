@@ -1169,6 +1169,8 @@ export default function SessionView({
                 renderContent={renderMessageContent}
                 userName={msg.userName}
                 userColor={msg.userColor}
+                sessionId={selectedSessionId || msg.sessionId}
+                files={msg.files}
               />
             );
           }

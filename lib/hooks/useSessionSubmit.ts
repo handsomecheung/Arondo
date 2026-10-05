@@ -16,7 +16,7 @@ interface UseSessionSubmitParams {
   isNewDraft: boolean;
   pendingFiles: File[];
   setPendingFiles: (v: File[] | ((prev: File[]) => File[])) => void;
-  uploadPendingFile: (file: File, runnerId: string, sessionId?: string) => Promise<string>;
+  uploadPendingFile: (file: File, runnerId: string, sessionId?: string) => Promise<string | { path: string; serverFilename?: string; name?: string; size?: number; mimeType?: string }>;
   draftTrigger: "manual" | "codebaseReady" | "at";
   draftAt: number | null;
   sendScheduledAt: number | null;
@@ -102,6 +102,7 @@ export function useSessionSubmit({
     reason: { dirty: boolean; busy: boolean; queued?: boolean };
     existingSessionId?: string;
     isFollowup?: boolean;
+    files?: Array<{ name: string; serverFilename?: string; size?: number; mimeType?: string }>;
   } | null>(null);
 
   const getVisibleMenuItems = useCallback((): string[] => {
@@ -411,7 +412,7 @@ export function useSessionSubmit({
           const res = await fetch(`/api/sessions/${existingSessionId}/messages`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: displayMessage, prompt: agentPrompt, type: "chat-user", force: true }),
+            body: JSON.stringify({ message: displayMessage, prompt: agentPrompt, type: "chat-user", force: true, files: pendingConfirmation.files }),
           });
           if (!res.ok) {
             const data = await res.json().catch(() => ({}));
@@ -427,6 +428,7 @@ export function useSessionSubmit({
               message: displayMessage,
               prompt: agentPrompt,
               trigger: { kind: choice === "pendingAuto" ? autoTriggerKind : "manual" },
+              files: pendingConfirmation.files,
             }),
           });
           if (!res.ok) {
@@ -452,6 +454,7 @@ export function useSessionSubmit({
       repoPath: pendingRepoPath,
       agentType: pendingAgentType,
       runnerId: pendingRunnerId,
+      ...(pendingConfirmation.files ? { files: pendingConfirmation.files } : {}),
     };
     if (choice === "force") body.force = true;
     else if (choice === "pendingAuto") { body.isDraft = true; body.draftTrigger = "codebaseReady"; }
@@ -542,14 +545,23 @@ export function useSessionSubmit({
     // the agent, which does include the path so it can read the file.
     let displayMessage = trimmed;
     let agentPrompt = trimmed;
+    const uploadedFiles: Array<{ name: string; serverFilename?: string; size?: number; mimeType?: string }> = [];
     if (pendingFiles.length > 0) {
       try {
         const uploadedPaths: string[] = [];
         const fileNames: string[] = [];
         for (const file of pendingFiles) {
-          const path = await uploadPendingFile(file, targetRunnerId, targetSessionId);
+          const res = await uploadPendingFile(file, targetRunnerId, targetSessionId);
+          const path = typeof res === "string" ? res : res.path;
+          const serverFilename = typeof res === "string" ? undefined : res.serverFilename;
           uploadedPaths.push(path);
           fileNames.push(file.name);
+          uploadedFiles.push({
+            name: file.name,
+            serverFilename,
+            size: file.size,
+            mimeType: file.type || undefined,
+          });
         }
         const attachmentNote = fileNames.map((n) => `📎 Uploaded a file: ${n}`).join("\n");
         const pathNote = uploadedPaths.map((p) => `Uploaded file path: ${p}`).join("\n");
@@ -595,6 +607,7 @@ export function useSessionSubmit({
             ...(trimmedRepoPath ? { repoPath: trimmedRepoPath } : { noProject: true }),
             agentType,
             runnerId,
+            ...(uploadedFiles.length > 0 ? { files: uploadedFiles } : {}),
             ...(isNewDraft
               ? { isDraft: true, draftTrigger, ...(draftTrigger === "at" ? { draftAt } : {}) }
               : useSchedule
@@ -606,7 +619,7 @@ export function useSessionSubmit({
         });
         if (res.status === 409) {
           const data = await res.json();
-          setPendingConfirmation({ id: targetSessionId, rawText: trimmed, displayMessage, agentPrompt, repoPath: trimmedRepoPath, agentType, runnerId, reason: data.reason });
+          setPendingConfirmation({ id: targetSessionId, rawText: trimmed, displayMessage, agentPrompt, repoPath: trimmedRepoPath, agentType, runnerId, reason: data.reason, files: uploadedFiles.length > 0 ? uploadedFiles : undefined });
           return;
         }
         const newSession: Session = await res.json();
@@ -623,7 +636,7 @@ export function useSessionSubmit({
           const res = await fetch(`/api/sessions/${selectedSessionId}/todo-messages`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: displayMessage, prompt: agentPrompt, trigger }),
+            body: JSON.stringify({ message: displayMessage, prompt: agentPrompt, trigger, ...(uploadedFiles.length > 0 ? { files: uploadedFiles } : {}) }),
           });
           if (!res.ok) {
             const data = await res.json().catch(() => ({}));
@@ -645,7 +658,7 @@ export function useSessionSubmit({
           const res = await fetch(`/api/sessions/${selectedSessionId}/messages`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: displayMessage, prompt: agentPrompt, type: "chat-user" }),
+            body: JSON.stringify({ message: displayMessage, prompt: agentPrompt, type: "chat-user", ...(uploadedFiles.length > 0 ? { files: uploadedFiles } : {}) }),
           });
           if (res.status === 409) {
             setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
@@ -660,6 +673,7 @@ export function useSessionSubmit({
               reason: data.reason,
               existingSessionId: selectedSessionId,
               isFollowup: !!data.reason?.isFollowup,
+              files: uploadedFiles.length > 0 ? uploadedFiles : undefined,
             });
             return;
           }

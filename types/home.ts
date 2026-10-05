@@ -75,6 +75,7 @@ export interface Message {
   agentSessionKey?: string;
   deleted?: boolean;
   waitingForInput?: boolean;
+  files?: Array<{ name: string; serverFilename?: string; size?: number; mimeType?: string }>;
 }
 
 export interface TaskItem {

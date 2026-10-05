@@ -38,7 +38,7 @@ export async function POST(
     }
   }
 
-  const { message, type, prompt, force } = await req.json();
+  const { message, type, prompt, force, files } = await req.json();
   if (!message || !message.trim()) {
     return NextResponse.json({ error: "message is required" }, { status: 400 });
   }
@@ -89,6 +89,7 @@ export async function POST(
       prompt,
       type,
       tokenUuid: getUuidByToken(token) || undefined,
+      files,
     });
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status });

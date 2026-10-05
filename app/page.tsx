@@ -865,7 +865,11 @@ export default function HomePage() {
   const handleSelectFile = (files: File[]) => setPendingFiles((prev) => [...prev, ...files]);
   const handleRemovePendingFile = (index: number) => setPendingFiles((prev) => prev.filter((_, i) => i !== index));
 
-  const uploadPendingFile = async (file: File, targetRunnerId: string, targetSessionId?: string): Promise<string> => {
+  const uploadPendingFile = async (
+    file: File,
+    targetRunnerId: string,
+    targetSessionId?: string
+  ): Promise<{ path: string; serverFilename?: string; name: string; size: number; mimeType?: string }> => {
     if (!targetRunnerId) {
       throw new Error("Select a runner before uploading a file");
     }
@@ -881,7 +885,13 @@ export default function HomePage() {
     if (!res.ok) {
       throw new Error(data.error || "Failed to upload file");
     }
-    return data.path;
+    return {
+      path: data.path,
+      serverFilename: data.serverFilename,
+      name: file.name,
+      size: file.size,
+      mimeType: file.type || undefined,
+    };
   };
 
   const { handlePromptChange, handleNewSessionCommand, handleRenameSessionCommand, handleAgentCommand, handleSelectScriptCommand, handleSubmit, handleKeyDown, handleSendMessage, commandMenuIndex, pendingConfirmation, resolvePendingConfirmation, cancelPendingConfirmation } = useSessionSubmit({

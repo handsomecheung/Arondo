@@ -14,6 +14,7 @@ import {
   readOnceCache,
   getPromptHash,
   type DetachedAgentKind,
+  type MessageFile,
 } from "./store";
 import { getAgent, resolveAgentType, PROMPT_ENV_VAR, type ConcreteAgentType } from "./agents";
 import { buildCrossAgentContext } from "./autoagent";
@@ -171,7 +172,7 @@ export async function dispatchDetachedAgent(
 export async function dispatchFollowupMessage(
   sessionId: string,
   message: string,
-  opts: { prompt?: string; type?: string; tokenUuid?: string } = {},
+  opts: { prompt?: string; type?: string; tokenUuid?: string; files?: MessageFile[] } = {},
 ): Promise<ActionResult> {
   const taskStartedAt = Date.now();
   const session = await getSession(sessionId);
@@ -224,6 +225,7 @@ export async function dispatchFollowupMessage(
     tokenUuid: opts.tokenUuid,
     userName,
     userColor,
+    files: opts.files,
   });
   eventBus.publish({ type: "message_added", payload: userMsg });
 
@@ -378,7 +380,7 @@ export async function dispatchCreateSession(
   repoPath: string,
   agentType: string,
   prompt: string,
-  opts: { id?: string; name?: string; tokenUuid?: string; displayMessage?: string; tempDir?: boolean; noProject?: boolean; once?: boolean; cache?: "on" | "off" } = {},
+  opts: { id?: string; name?: string; tokenUuid?: string; displayMessage?: string; tempDir?: boolean; noProject?: boolean; once?: boolean; cache?: "on" | "off"; files?: MessageFile[] } = {},
 ): Promise<ActionResult> {
   const taskStartedAt = Date.now();
   const trimmedPrompt = prompt.trim();
@@ -412,6 +414,7 @@ export async function dispatchCreateSession(
         type: "chat-user",
         tokenUuid: opts.tokenUuid,
         cache: "on",
+        files: opts.files,
       });
       eventBus.publish({ type: "message_added", payload: userMessage });
 
@@ -512,6 +515,7 @@ export async function dispatchCreateSession(
     type: "chat-user",
     tokenUuid: opts.tokenUuid,
     cache: opts.cache === "on" ? "on" : undefined,
+    files: opts.files,
   });
   eventBus.publish({ type: "message_added", payload: userMessage });
 

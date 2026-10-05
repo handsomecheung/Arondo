@@ -47,12 +47,14 @@ export async function POST(request: NextRequest) {
   const validSessionId = typeof sessionId === "string" && sessionId.trim() ? path.basename(sessionId.trim()) : undefined;
 
   // Save a copy in the session's directory on the server
+  let serverFilename: string | undefined;
   if (validSessionId) {
     try {
       const sessionFilesDir = path.join(getConfigDir(), "sessions", validSessionId, "files");
       await fs.mkdir(sessionFilesDir, { recursive: true });
       const prefixedFilename = `${Date.now()}_${path.basename(file.name)}`;
       await fs.writeFile(path.join(sessionFilesDir, prefixedFilename), buffer);
+      serverFilename = prefixedFilename;
     } catch {
       // Best-effort local copy
     }
@@ -66,7 +68,14 @@ export async function POST(request: NextRequest) {
       60_000
     );
 
-    return NextResponse.json({ path: result.path, dir: result.dir });
+    return NextResponse.json({
+      path: result.path,
+      dir: result.dir,
+      serverFilename,
+      filename: file.name,
+      size: file.size,
+      mimeType: file.type || undefined,
+    });
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || "Failed to upload file" },

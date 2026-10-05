@@ -28,10 +28,11 @@ export async function POST(
     return NextResponse.json({ error: "Session only allows a single message" }, { status: 400 });
   }
 
-  const { message, prompt, trigger } = (await req.json()) as {
+  const { message, prompt, trigger, files } = (await req.json()) as {
     message?: string;
     prompt?: string;
     trigger?: TodoTrigger;
+    files?: any[];
   };
   if (!message || !message.trim()) {
     return NextResponse.json({ error: "message is required" }, { status: 400 });
@@ -48,6 +49,7 @@ export async function POST(
     prompt: prompt?.trim() || undefined,
     trigger,
     tokenUuid: getUuidByToken(token) || undefined,
+    files,
   });
   eventBus.publish({ type: "message_added", payload: todoMessage });
   const updated = await getSession(id);
