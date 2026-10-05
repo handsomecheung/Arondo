@@ -236,4 +236,84 @@ test.describe('Sessions API integration tests', () => {
       headers: { 'x-arondo-token': 'test-token-123456' }
     });
   });
+
+  test('handles deleted session path: disables chat and hides path from projects', async ({ request }) => {
+    const testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arondo-deleted-path-test-'));
+
+    // 1. Create a session with this test directory
+    const createRes = await request.post('/api/sessions', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        repoPath: testDir,
+        runnerId,
+        agentType: 'antigravity',
+      }
+    });
+    expect(createRes.status()).toBe(201);
+    const session = await createRes.json();
+    const sessionId = session.id;
+
+    // 2. Check path status while directory exists
+    const pathStatusRes1 = await request.get(`/api/sessions/${sessionId}/path-status`, {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+    expect(pathStatusRes1.status()).toBe(200);
+    const statusData1 = await pathStatusRes1.json();
+    expect(statusData1.exists).toBe(true);
+    expect(statusData1.runnerConnected).toBe(true);
+
+    // Verify project appears in GET /api/projects
+    const projectsRes1 = await request.get('/api/projects', {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+    expect(projectsRes1.status()).toBe(200);
+    const projectsList1 = await projectsRes1.json();
+    const foundProject1 = projectsList1.find((p: any) => p.repoPath === testDir);
+    expect(foundProject1).toBeDefined();
+
+    // 3. Delete the directory on runner
+    await fs.rm(testDir, { recursive: true, force: true });
+
+    // 4. Verify path status reports exists: false
+    const pathStatusRes2 = await request.get(`/api/sessions/${sessionId}/path-status`, {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+    expect(pathStatusRes2.status()).toBe(200);
+    const statusData2 = await pathStatusRes2.json();
+    expect(statusData2.exists).toBe(false);
+    expect(statusData2.runnerConnected).toBe(true);
+
+    // 5. Sending message must fail with 400
+    const msgRes = await request.post(`/api/sessions/${sessionId}/messages`, {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        message: 'Hello world',
+        force: true,
+      }
+    });
+    expect(msgRes.status()).toBe(400);
+    const msgData = await msgRes.json();
+    expect(msgData.error).toContain('Session path does not exist on runner');
+
+    // 6. Verify deleted path is excluded from GET /api/projects
+    const projectsRes2 = await request.get('/api/projects', {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+    expect(projectsRes2.status()).toBe(200);
+    const projectsList2 = await projectsRes2.json();
+    const foundProject2 = projectsList2.find((p: any) => p.repoPath === testDir);
+    expect(foundProject2).toBeUndefined();
+
+    // 7. Session still exists and is not deleted
+    const sessionCheck = await request.get(`/api/sessions/${sessionId}`, {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+    expect(sessionCheck.status()).toBe(200);
+
+    // Cleanup session
+    await request.delete(`/api/sessions/${sessionId}`, {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+  });
 });
+

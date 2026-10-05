@@ -26,6 +26,7 @@ test.describe('Heartbeat quota error handling tests', () => {
   test('refreshes stale quota (>5m) and does not schedule message immediately', async () => {
     const session = await createSession({
       name: 'Stale Quota Session',
+      status: 'idle',
       agentType: 'antigravity',
       repoPath: '/tmp/test-repo-stale',
       runnerId: 'test-runner-1',
@@ -105,6 +106,7 @@ test.describe('Heartbeat quota error handling tests', () => {
   test('converts message to scheduled message at resetTime + 5m when quota is fresh', async () => {
     const session = await createSession({
       name: 'Fresh Quota Session',
+      status: 'idle',
       agentType: 'claude',
       repoPath: '/tmp/test-repo-fresh',
       runnerId: 'test-runner-1',
@@ -179,6 +181,7 @@ test.describe('Heartbeat quota error handling tests', () => {
   test('falls back to now + 5m when reset time is in the past or missing', async () => {
     const session = await createSession({
       name: 'Past Reset Time Session',
+      status: 'idle',
       agentType: 'antigravity',
       repoPath: '/tmp/test-repo-past',
       runnerId: 'test-runner-1',
@@ -247,6 +250,7 @@ test.describe('Heartbeat quota error handling tests', () => {
   test('ignores non-quota error sessions and sessions that already have pending todos', async () => {
     const session1 = await createSession({
       name: 'Normal Error Session',
+      status: 'idle',
       agentType: 'antigravity',
       repoPath: '/tmp/test-repo-normal-err',
       runnerId: 'test-runner-1',
@@ -263,6 +267,7 @@ test.describe('Heartbeat quota error handling tests', () => {
 
     const session2 = await createSession({
       name: 'Already Pending Session',
+      status: 'idle',
       agentType: 'antigravity',
       repoPath: '/tmp/test-repo-already-pending',
       runnerId: 'test-runner-1',

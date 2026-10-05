@@ -97,6 +97,7 @@ type fsExistsRequest struct {
 
 type FileInfo struct {
 	Exists bool   `json:"exists"`
+	IsDir  bool   `json:"isDir,omitempty"`
 	Diff   string `json:"diff,omitempty"`
 }
 
@@ -120,8 +121,12 @@ func (h *Handler) handleFsInfos(msg *Message) {
 			continue
 		}
 		info, statErr := os.Stat(absPath)
-		if statErr != nil || info.IsDir() {
+		if statErr != nil {
 			results[p] = FileInfo{Exists: false}
+			continue
+		}
+		if info.IsDir() {
+			results[p] = FileInfo{Exists: true, IsDir: true}
 			continue
 		}
 

@@ -46,6 +46,7 @@ interface UseSessionSubmitParams {
   onDeleteSession: (id: string) => void;
   onRenameSession: (id: string, newName: string) => void;
   onTriggerFsModal?: () => void;
+  isSessionPathMissing?: boolean;
 }
 
 export function useSessionSubmit({
@@ -87,6 +88,7 @@ export function useSessionSubmit({
   onDeleteSession,
   onRenameSession,
   onTriggerFsModal,
+  isSessionPathMissing,
 }: UseSessionSubmitParams) {
   const [commandMenuIndex, setCommandMenuIndex] = useState(-1);
   const [pendingConfirmation, setPendingConfirmation] = useState<{
@@ -502,6 +504,10 @@ export function useSessionSubmit({
       setShowCommandMenu(false);
       if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
       onDeleteSession(selectedSessionId);
+      return;
+    }
+
+    if (isSessionPathMissing && !isNewSession && !isNewDraft) {
       return;
     }
 

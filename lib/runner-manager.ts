@@ -805,6 +805,62 @@ class RunnerManager {
     await this.sendRequest(runnerId, "runner.shutdown", {}, 10_000);
   }
 
+  async checkPathExists(runnerId: string, path: string): Promise<boolean> {
+    const connectedId = this.resolveRunnerId(runnerId);
+    if (!connectedId) return false;
+    try {
+      const res = await this.sendRequest(connectedId, "fs.infos", { paths: [path] }, 5_000);
+      const info = res?.results?.[path];
+      if (info && typeof info.exists === "boolean") {
+        return info.exists;
+      }
+    } catch {
+      // Fall through to fs.list
+    }
+    try {
+      await this.sendRequest(connectedId, "fs.list", { path }, 5_000);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async checkPathsExist(runnerId: string, paths: string[]): Promise<Record<string, boolean>> {
+    if (paths.length === 0) return {};
+    const connectedId = this.resolveRunnerId(runnerId);
+    if (!connectedId) return {};
+
+    const results: Record<string, boolean> = {};
+    try {
+      const res = await this.sendRequest(connectedId, "fs.infos", { paths }, 5_000);
+      if (res?.results) {
+        for (const p of paths) {
+          if (res.results[p] && typeof res.results[p].exists === "boolean") {
+            results[p] = res.results[p].exists;
+          }
+        }
+      }
+    } catch {
+      // Fall through to fs.list
+    }
+
+    const remaining = paths.filter((p) => results[p] === undefined);
+    if (remaining.length > 0) {
+      await Promise.all(
+        remaining.map(async (p) => {
+          try {
+            await this.sendRequest(connectedId, "fs.list", { path: p }, 5_000);
+            results[p] = true;
+          } catch {
+            results[p] = false;
+          }
+        })
+      );
+    }
+
+    return results;
+  }
+
   // ─── Task management ─────────────────────────────────────────────────
 
   async registerTask(ctx: TaskContext): Promise<void> {

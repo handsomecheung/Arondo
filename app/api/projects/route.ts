@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   const tempDirProjectRetentionHours = await getTempDirProjectRetentionHours();
   const tempDirProjectMaxAgeMs = tempDirProjectRetentionHours * 60 * 60 * 1000;
 
-  const valid: typeof projects = [];
+  const candidates: typeof projects = [];
   for (const project of projects) {
     const isAllowed = await runnerManager.isTokenAllowedForRunnerId(project.runnerId, token);
     if (!isAllowed) {
@@ -41,8 +41,35 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    valid.push(project);
+    candidates.push(project);
   }
+
+  const projectsByRunner = new Map<string, typeof projects>();
+  for (const p of candidates) {
+    const list = projectsByRunner.get(p.runnerId) || [];
+    list.push(p);
+    projectsByRunner.set(p.runnerId, list);
+  }
+
+  const existenceResults = new Map<string, boolean>();
+  await Promise.all(
+    Array.from(projectsByRunner.entries()).map(async ([runnerId, runnerProjects]) => {
+      if (!runnerManager.getRunner(runnerId)) return;
+      const paths = runnerProjects.map((p) => p.repoPath);
+      const res = await runnerManager.checkPathsExist(runnerId, paths);
+      for (const [pathStr, exists] of Object.entries(res)) {
+        existenceResults.set(`${runnerId}:${pathStr}`, exists);
+      }
+    })
+  );
+
+  const valid = candidates.filter((project) => {
+    const key = `${project.runnerId}:${project.repoPath}`;
+    if (existenceResults.has(key)) {
+      return existenceResults.get(key) === true;
+    }
+    return true;
+  });
 
   return NextResponse.json(valid);
 }

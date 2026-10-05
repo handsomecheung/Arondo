@@ -83,6 +83,12 @@ export async function dispatchDetachedAgent(
   ].join("\n");
 
   const runner = runnerManager.getRunner(runnerId);
+  if (!session.noProject && session.repoPath && runner) {
+    const exists = await runnerManager.checkPathExists(runnerId, session.repoPath);
+    if (!exists) {
+      return { ok: false, error: "Session path does not exist on runner", status: 400 };
+    }
+  }
   const selectedAgentType = agentType || session.agentType;
   const runMessageId = crypto.randomUUID();
   const resolved = await resolveAgentType(selectedAgentType, runner?.info.agents ?? [], {
@@ -174,6 +180,15 @@ export async function dispatchFollowupMessage(
   }
   if (session.status === "running") {
     return { ok: false, error: "Agent is already running for this session", status: 400 };
+  }
+  if (!session.noProject && session.repoPath) {
+    const runner = runnerManager.getRunner(session.runnerId);
+    if (runner) {
+      const exists = await runnerManager.checkPathExists(session.runnerId, session.repoPath);
+      if (!exists) {
+        return { ok: false, error: "Session path does not exist on runner", status: 400 };
+      }
+    }
   }
 
   const trimmedMessage = message.trim();
@@ -576,6 +591,15 @@ export async function dispatchSessionScript(
   }
   if (!session.projectId) {
     return { ok: false, error: "Session has no project", status: 400 };
+  }
+  if (!session.noProject && session.repoPath) {
+    const runner = runnerManager.getRunner(session.runnerId);
+    if (runner) {
+      const exists = await runnerManager.checkPathExists(session.runnerId, session.repoPath);
+      if (!exists) {
+        return { ok: false, error: "Session path does not exist on runner", status: 400 };
+      }
+    }
   }
   const systemMsg = await addMessage({
     sessionId,

@@ -109,6 +109,7 @@ export default function HomePage() {
 
   // Project states
   const [projects, setProjects] = useState<Project[]>([]);
+  const [isSessionPathMissing, setIsSessionPathMissing] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     initUrl.project,
   );
@@ -927,6 +928,7 @@ export default function HomePage() {
       const path = selectedSession?.repoPath || repoPath || "/";
       openChatFsModal(sessionRunnerId, path);
     },
+    isSessionPathMissing,
   });
 
   const handleTriggerRunFileSelector = () => {
@@ -1000,6 +1002,7 @@ export default function HomePage() {
     setActiveLogMsgId(null);
     setLogModalOpen(false);
     setMenuOpen(false);
+    loadProjects();
   };
 
   // The pending todo message backing the current draft/pending session (if any).
@@ -1250,12 +1253,67 @@ export default function HomePage() {
     return r ? r.connected : false;
   }, [runners, runnerId, selectedSession]);
 
+  useEffect(() => {
+    if (
+      !selectedSessionId ||
+      !selectedSession ||
+      selectedSession.noProject ||
+      !selectedSession.repoPath ||
+      !selectedRunnerConnected
+    ) {
+      setIsSessionPathMissing(false);
+      return;
+    }
+
+    let active = true;
+    fetch(`/api/sessions/${selectedSessionId}/path-status`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!active || !data) return;
+        if (data.runnerConnected) {
+          setIsSessionPathMissing(!data.exists);
+        } else {
+          setIsSessionPathMissing(false);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to check session path status:", err);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [
+    selectedSessionId,
+    selectedSession?.repoPath,
+    selectedSession?.runnerId,
+    selectedSession?.noProject,
+    selectedRunnerConnected,
+  ]);
+
+  useEffect(() => {
+    if (isNewSession || isNewDraft) {
+      loadProjects();
+    }
+  }, [isNewSession, isNewDraft, runnerId, loadProjects]);
+
+  useEffect(() => {
+    if ((isNewSession || isNewDraft) && repoPath && runnerId) {
+      const runnerProjects = projects.filter((p) => p.runnerId === runnerId);
+      const existsInProjects = runnerProjects.some((p) => p.repoPath === repoPath);
+      if (!existsInProjects && runnerProjects.length > 0) {
+        setRepoPath("");
+      }
+    }
+  }, [isNewSession, isNewDraft, projects, runnerId, repoPath]);
+
   const isDraftSession = !!pendingDraftTodoId;
   const isDraftAutoSend = messages.find((m) => m.id === pendingDraftTodoId)?.todoTrigger?.kind === "codebaseReady";
 
   const canSubmit =
     selectedRunnerConnected &&
     !isArchivedSession &&
+    !isSessionPathMissing &&
     (isNewDraft
       ? !!runnerId && prompt.trim().length > 0
       : isNewSession
@@ -1267,6 +1325,9 @@ export default function HomePage() {
   const getSendTooltip = () => {
     if (!selectedRunnerConnected) {
       return "Runner is offline";
+    }
+    if (isSessionPathMissing) {
+      return "Path does not exist on runner. Chat is disabled.";
     }
     if (isArchivedSession) {
       return "Session is archived. Unarchive it to send messages.";
@@ -1595,6 +1656,7 @@ export default function HomePage() {
             pendingSendTrigger={pendingSendTrigger}
             onSetPendingSendTrigger={setPendingSendTrigger}
             canSubmit={canSubmit}
+            isSessionPathMissing={isSessionPathMissing}
             menuOpen={menuOpen}
             scriptSubMenuOpen={scriptSubMenuOpen}
             showCommandMenu={showCommandMenu}

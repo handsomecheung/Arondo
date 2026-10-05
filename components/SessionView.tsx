@@ -53,6 +53,7 @@ interface SessionViewProps {
   pendingSendTrigger: "manual" | "codebaseReady" | null;
   onSetPendingSendTrigger: (v: "manual" | "codebaseReady" | null) => void;
   canSubmit: boolean;
+  isSessionPathMissing?: boolean;
   menuOpen: boolean;
   scriptSubMenuOpen: boolean;
   showCommandMenu: boolean;
@@ -152,6 +153,7 @@ export default function SessionView({
   pendingSendTrigger,
   onSetPendingSendTrigger,
   canSubmit,
+  isSessionPathMissing = false,
   menuOpen,
   scriptSubMenuOpen,
   showCommandMenu,
@@ -226,6 +228,7 @@ export default function SessionView({
   const activeRunnerId = selectedSession ? selectedSession.runnerId : runnerId;
   const activeRunner = runners.find((r) => r.id === activeRunnerId) ?? null;
   const isRunnerOffline = !activeRunner || !activeRunner.connected;
+  const isPathMissing = Boolean(isSessionPathMissing && !isNewSession && !isNewDraft);
   const sessionProjectExists = selectedSession?.projectId
     ? projects.some((p) => p.id === selectedSession.projectId)
     : true;
@@ -270,7 +273,7 @@ export default function SessionView({
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (isRunnerOffline || isArchived) return;
+    if (isRunnerOffline || isArchived || isPathMissing) return;
     if (e.dataTransfer.types && Array.from(e.dataTransfer.types).includes("Files")) {
       dragCounterRef.current += 1;
       setIsDragging(true);
@@ -280,7 +283,7 @@ export default function SessionView({
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (isRunnerOffline || isArchived) return;
+    if (isRunnerOffline || isArchived || isPathMissing) return;
     if (e.dataTransfer.types && Array.from(e.dataTransfer.types).includes("Files")) {
       e.dataTransfer.dropEffect = "copy";
     }
@@ -289,7 +292,7 @@ export default function SessionView({
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (isRunnerOffline || isArchived) return;
+    if (isRunnerOffline || isArchived || isPathMissing) return;
     dragCounterRef.current -= 1;
     if (dragCounterRef.current <= 0) {
       dragCounterRef.current = 0;
@@ -302,7 +305,7 @@ export default function SessionView({
     e.stopPropagation();
     dragCounterRef.current = 0;
     setIsDragging(false);
-    if (isRunnerOffline || isArchived) return;
+    if (isRunnerOffline || isArchived || isPathMissing) return;
     const files = Array.from(e.dataTransfer.files ?? []);
     if (files.length > 0) {
       onSelectFiles(files);
@@ -396,6 +399,8 @@ export default function SessionView({
     ? "This session is archived. Unarchive it to send messages."
     : isRunnerOffline
     ? "Runner is offline. Chat is disabled."
+    : isPathMissing
+    ? "Path does not exist on runner. Chat is disabled."
     : isDraftSession
       ? "This session has a pending Todo message — type to queue another, or hit Send to dispatch it now."
       : isNewDraft
@@ -581,6 +586,11 @@ export default function SessionView({
                   {selectedSession.repoPath
                     ? (selectedSession.repoPath.split("/").pop() || selectedSession.repoPath)
                     : "None"}
+                  {isPathMissing && (
+                    <span style={{ color: "var(--error, #ef4444)", marginLeft: 6, fontSize: 11, fontWeight: 500 }}>
+                      (Path not found)
+                    </span>
+                  )}
                 </span>
               )}
               <div ref={agentSwitchRef} style={{ position: "relative", flexShrink: 0 }}>
@@ -870,11 +880,18 @@ export default function SessionView({
                           type="button"
                           className="menu-item command-submenu-manage"
                           id="menu-manage-project-commands"
+                          disabled={isPathMissing || !sessionProjectExists}
                           onClick={() => {
+                            if (isPathMissing || !sessionProjectExists) return;
                             onSetMenuOpen(false);
                             setCommandSubMenuOpen(false);
                             onGoToProject();
                           }}
+                          title={
+                            isPathMissing || !sessionProjectExists
+                              ? "Path does not exist on runner"
+                              : undefined
+                          }
                         >
                           ⚙ Edit Project Commands
                         </button>
@@ -931,10 +948,17 @@ export default function SessionView({
                 {selectedSession.projectId && (
                   <button
                     className="menu-item"
+                    disabled={isPathMissing || !sessionProjectExists}
                     onClick={() => {
+                      if (isPathMissing || !sessionProjectExists) return;
                       onGoToProject();
                       onSetMenuOpen(false);
                     }}
+                    title={
+                      isPathMissing || !sessionProjectExists
+                        ? "Path does not exist on runner"
+                        : undefined
+                    }
                     id="menu-go-to-project"
                   >
                     <IconFolder /> Go to Project
@@ -1656,7 +1680,7 @@ export default function SessionView({
             value={chatInputValue}
             onChange={onPromptChange}
             onKeyDown={onKeyDown}
-            disabled={isRunnerOffline || isArchived}
+            disabled={isRunnerOffline || isArchived || isPathMissing}
             readOnly={isArchived}
             rows={1}
             id="chat-input"
@@ -1666,7 +1690,7 @@ export default function SessionView({
               <button
                 className="upload-btn"
                 onClick={() => setAttachMenuOpen((v) => (v === "closed" ? "menu" : "closed"))}
-                disabled={isRunnerOffline || isArchived}
+                disabled={isRunnerOffline || isArchived || isPathMissing}
                 title="Attach a file or schedule this message"
                 type="button"
               >

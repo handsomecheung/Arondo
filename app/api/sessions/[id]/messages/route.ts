@@ -4,6 +4,7 @@ import { getSession, getMessages, isSessionArchived } from "@/lib/store";
 import { getArondoToken, verifySessionPermission, getUuidByToken } from "@/lib/auth";
 import { getProjectReadiness } from "@/lib/project-readiness";
 import { isDetachedAgentType, parseDetachedAgentCommand } from "@/lib/detached-agent-command";
+import { runnerManager } from "@/lib/runner-manager";
 
 export async function POST(
   req: NextRequest,
@@ -25,6 +26,16 @@ export async function POST(
   }
   if (session.once) {
     return NextResponse.json({ error: "Session only allows a single message" }, { status: 400 });
+  }
+
+  if (!session.noProject && session.repoPath) {
+    const runner = runnerManager.getRunner(session.runnerId);
+    if (runner) {
+      const exists = await runnerManager.checkPathExists(session.runnerId, session.repoPath);
+      if (!exists) {
+        return NextResponse.json({ error: "Session path does not exist on runner" }, { status: 400 });
+      }
+    }
   }
 
   const { message, type, prompt, force } = await req.json();
