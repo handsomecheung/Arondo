@@ -935,7 +935,7 @@ class RunnerManager {
       ctx.stoppedByUser = true;
 
       const separator = "\r\n\x1b[90m─── stopped by user ───\x1b[0m\r\n";
-      await appendSessionLog(ctx.sessionId, ctx.messageId, separator, true, ctx.projectId, "stdout");
+      await appendSessionLog(ctx.sessionId, ctx.messageId, ctx.type === "script" ? "script" : "agent", separator, true, ctx.projectId, "stdout");
       eventBus.publish({
         type: "terminal_output",
         payload: {
@@ -1258,7 +1258,7 @@ class RunnerManager {
     );
     const previous = this.execOutputWrites.get(payload.taskId) ?? Promise.resolve();
     const writeOutput = async () => {
-      await appendSessionLog(ctx.sessionId, ctx.messageId, data, true, ctx.projectId, stream);
+      await appendSessionLog(ctx.sessionId, ctx.messageId, ctx.type === "script" ? "script" : "agent", data, true, ctx.projectId, stream);
 
       if (stream === "stdout") {
         const decoderKey = `${payload.taskId}:${stream}`;
@@ -1463,7 +1463,7 @@ class RunnerManager {
 
     if (resolvedAgentType === "codex") {
       try {
-        const log = await getSessionLog(ctx.sessionId, ctx.messageId, ctx.projectId, "stderr");
+        const log = await getSessionLog(ctx.sessionId, ctx.messageId, "agent", ctx.projectId, "stderr");
         const codexId = extractCodexSessionId(log);
         if (codexId) {
           await saveCodexSessionId(ctx.sessionId, codexId);
@@ -1491,8 +1491,8 @@ class RunnerManager {
     let invalidModelSelection = false;
     if (resolvedAgentType === "antigravity" || resolvedAgentType === "claude") {
       const [stdoutLog, stderrLog] = await Promise.all([
-        getSessionLog(ctx.sessionId, ctx.messageId, ctx.projectId),
-        getSessionLog(ctx.sessionId, ctx.messageId, ctx.projectId, "stderr"),
+        getSessionLog(ctx.sessionId, ctx.messageId, "agent", ctx.projectId),
+        getSessionLog(ctx.sessionId, ctx.messageId, "agent", ctx.projectId, "stderr"),
       ]);
       const log = `${stdoutLog}\n${stderrLog}`;
       if (resolvedAgentType === "antigravity" && isAgyInvalidModelError(log)) {
@@ -1532,7 +1532,7 @@ class RunnerManager {
       const promptToCache = ctx.prompt || lastUserMsg?.prompt || lastUserMsg?.content;
       if (promptToCache) {
         try {
-          const log = await getSessionLog(ctx.sessionId, ctx.messageId);
+          const log = await getSessionLog(ctx.sessionId, ctx.messageId, "agent");
           await writeOnceCache(promptToCache, log);
         } catch (err) {
           console.error("[runner-manager] failed to write once cache:", err);

@@ -653,34 +653,35 @@ function withoutLegacyRunningScripts(session: Session): Session {
 
 // ─── Logs ─────────────────────────────────────────────────────────────────────
 
+export type LogKind = "agent" | "script";
 export type LogStream = "stdout" | "stderr";
 
-function getLogFilePath(sessionId: string, messageId: string, projectId?: string, stream?: LogStream): string {
-  const suffix = stream === "stderr" ? ".stderr" : "";
+function getLogFilePath(sessionId: string, messageId: string, kind: LogKind, projectId?: string, stream: LogStream = "stdout"): string {
+  const filename = `${messageId}.${kind}.${stream}.md`;
   if (!sessionId) {
     if (!projectId) {
       throw new Error("getLogFilePath: projectId is required for project-scoped (sessionless) logs");
     }
-    return path.join(getProjectDir(projectId), "logs", `${messageId}${suffix}.log`);
+    return path.join(getProjectDir(projectId), "logs", filename);
   }
-  return path.join(getSessionDir(sessionId), "logs", `${messageId}${suffix}.log`);
+  return path.join(getSessionDir(sessionId), "logs", filename);
 }
 
 function getAutomodelLogFilePath(sessionId: string, messageId: string): string {
   return path.join(getSessionDir(sessionId), "logs", `${messageId}.automodel.log`);
 }
 
-export async function clearSessionLog(sessionId: string, messageId: string, projectId?: string): Promise<void> {
+export async function clearSessionLog(sessionId: string, messageId: string, kind: LogKind, projectId?: string): Promise<void> {
   const paths = [
-    getLogFilePath(sessionId, messageId, projectId),
-    getLogFilePath(sessionId, messageId, projectId, "stderr"),
+    getLogFilePath(sessionId, messageId, kind, projectId),
+    getLogFilePath(sessionId, messageId, kind, projectId, "stderr"),
   ];
   await ensureDir(path.dirname(paths[0]));
   await Promise.all(paths.map((logPath) => fs.writeFile(logPath, "", "utf-8")));
 }
 
-export async function appendSessionLog(sessionId: string, messageId: string, text: string | Uint8Array, raw = false, projectId?: string, stream?: LogStream): Promise<void> {
-  const logPath = getLogFilePath(sessionId, messageId, projectId, stream);
+export async function appendSessionLog(sessionId: string, messageId: string, kind: LogKind, text: string | Uint8Array, raw = false, projectId?: string, stream: LogStream = "stdout"): Promise<void> {
+  const logPath = getLogFilePath(sessionId, messageId, kind, projectId, stream);
   await ensureDir(path.dirname(logPath));
   await fs.appendFile(logPath, raw ? text : `${text}\n`, "utf-8");
 }
@@ -691,9 +692,9 @@ export async function appendAutomodelLog(sessionId: string, messageId: string, t
   await fs.appendFile(logPath, text.endsWith("\n") ? text : `${text}\n`, "utf-8");
 }
 
-export async function getSessionLog(sessionId: string, messageId: string, projectId?: string, stream: LogStream = "stdout"): Promise<string> {
+export async function getSessionLog(sessionId: string, messageId: string, kind: LogKind, projectId?: string, stream: LogStream = "stdout"): Promise<string> {
   try {
-    return await fs.readFile(getLogFilePath(sessionId, messageId, projectId, stream), "utf-8");
+    return await fs.readFile(getLogFilePath(sessionId, messageId, kind, projectId, stream), "utf-8");
   } catch {
     return "";
   }
@@ -704,9 +705,9 @@ function getHtmlFilePath(sessionId: string, messageId: string, projectId?: strin
     if (!projectId) {
       throw new Error("getHtmlFilePath: projectId is required for project-scoped (sessionless) logs");
     }
-    return path.join(getProjectDir(projectId), "logs", `${messageId}.html`);
+    return path.join(getProjectDir(projectId), "logs", `${messageId}.agent.stdout.html`);
   }
-  return path.join(getSessionDir(sessionId), "logs", `${messageId}.html`);
+  return path.join(getSessionDir(sessionId), "logs", `${messageId}.agent.stdout.html`);
 }
 
 export async function saveSessionHtml(sessionId: string, messageId: string, html: string, projectId?: string): Promise<void> {

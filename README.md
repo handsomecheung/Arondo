@@ -253,6 +253,20 @@ Open [http://localhost:3251](http://localhost:3251) in your browser. Select the 
 - Global application configuration settings are stored under the top-level `setitngs` field in `arondo.json`.
 - `agent-sessions.json` – Agent conversation/session continuity map, stored as `{ "agy": {}, "codex": {}, "opencode": {} }`.
 
+### Data Migrations
+
+Server-side data migrations live in the repository's `migration/` directory. On every server startup, Arondo finds files named `YYYY-MM-DD-description.mjs`, sorts them by filename, and executes them in that order before accepting requests.
+
+Each migration must export a default function (or a named `migrate` function) that accepts `{ configDir }`. `configDir` is the active `ARONDO_CONFIG_DIR` directory, or `~/.arondo/` when that environment variable is unset.
+
+```js
+export default async function migrateExample({ configDir }) {
+  // Apply an idempotent data migration under configDir.
+}
+```
+
+Because every migration runs again after each restart, migrations must be idempotent: do not overwrite existing destination data, and make a completed migration safe to run again. Use a date prefix based on the day the migration is added so execution order remains explicit.
+
 ## Automation API
 
 Scripts and external programs can drive Arondo directly over HTTP using the same REST endpoints as the UI. Three endpoints cover the full create → message → poll lifecycle:

@@ -131,7 +131,7 @@ export async function POST(
     tokenUuid,
   });
 
-  await clearSessionLog(id, systemMsg.id);
+  await clearSessionLog(id, systemMsg.id, "agent");
 
   runnerManager
     .sendRequest(runnerId, "exec.agent", {

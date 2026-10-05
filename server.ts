@@ -7,6 +7,7 @@ import { setupWebSocketServer } from "./lib/ws-server";
 import { setupRunnerServer } from "./lib/runner-server";
 import { notifyQuotaAggregatorAccess } from "./lib/quota-aggregator";
 import { startMaintenance } from "./lib/maintenance";
+import { runMigrations } from "./lib/migrations";
 
 import { initializeAuth, findRunnerTokenByToken } from "./lib/auth";
 
@@ -15,7 +16,8 @@ const dev = process.env.NODE_ENV !== "production";
 const app = next({ dev, port });
 const handle = app.getRequestHandler();
 
-initializeAuth().then(() => {
+initializeAuth().then(async () => {
+  await runMigrations();
   app.prepare().then(() => {
     const server = createServer((req, res) => {
     notifyQuotaAggregatorAccess();

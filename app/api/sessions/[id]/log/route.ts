@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionLog } from "@/lib/store";
+import { getMessages, getSessionLog, type LogKind } from "@/lib/store";
 import { getArondoToken, verifySessionPermission, verifyProjectPermission, isValidToken } from "@/lib/auth";
 
 export async function GET(
@@ -33,8 +33,19 @@ export async function GET(
     return NextResponse.json({ error: "messageId query parameter is required" }, { status: 400 });
   }
 
+  const messages = await getMessages(id === "global" ? "" : id, projectId);
+  const message = messages.find((entry) => entry.id === messageId);
+  const kind: LogKind | undefined = message?.type === "script-run"
+    ? "script"
+    : message?.type === "agent-run" || message?.type === "detached-agent-run"
+      ? "agent"
+      : undefined;
+  if (!kind) {
+    return NextResponse.json({ error: "Message does not have an execution log" }, { status: 404 });
+  }
+
   const stream = streamParam === "stderr" ? "stderr" : "stdout";
-  const log = await getSessionLog(id === "global" ? "" : id, messageId, projectId, stream);
+  const log = await getSessionLog(id === "global" ? "" : id, messageId, kind, projectId, stream);
   return NextResponse.json({ log });
 }
 

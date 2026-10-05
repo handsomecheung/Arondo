@@ -517,7 +517,7 @@ export async function buildCrossAgentContext(
     if (msg.type === "chat-user") {
       parts.push(`User: ${msg.content}`);
     } else if (msg.type === "agent-run" && msg.resolvedAgentType === prevAgentType) {
-      const raw = await getSessionLog(sessionId, msg.id);
+      const raw = await getSessionLog(sessionId, msg.id, "agent");
       const text = stripAnsi(raw).trim();
       if (text) {
         const label = AGENT_LABEL[prevAgentType] ?? prevAgentType;

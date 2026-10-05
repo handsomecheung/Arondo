@@ -1,9 +1,6 @@
-import fs from "fs/promises";
-import path from "path";
-import { addMessage, clearSessionLog, getProject, recordScriptHistory } from "./store";
+import { addMessage, appendSessionLog, clearSessionLog, getProject, recordScriptHistory } from "./store";
 import { eventBus } from "./event-bus";
 import { runnerManager } from "./runner-manager";
-import { getConfigDir } from "./config";
 import type { ActionResult } from "./session-actions";
 
 export async function dispatchProjectCommand(
@@ -41,7 +38,7 @@ export async function dispatchProjectCommand(
     createdAt: Date.now(),
     tokenUuid: opts.tokenUuid,
   });
-  await clearSessionLog("", systemMsg.id, projectId);
+  await clearSessionLog("", systemMsg.id, "script", projectId);
 
   runnerManager.sendRequest(runnerId, "exec.script", {
     taskId,
@@ -62,9 +59,7 @@ export async function dispatchProjectCommand(
       parentId: systemMsg.id,
     });
     eventBus.publish({ type: "message_added", payload: errorMessageRecord });
-    const logPath = path.join(getConfigDir(), "projects", projectId, "logs", `${systemMsg.id}.log`);
-    await fs.mkdir(path.dirname(logPath), { recursive: true });
-    await fs.appendFile(logPath, `\r\n❌ Error: ${errorMessage}\r\n`, "utf-8");
+    await appendSessionLog("", systemMsg.id, "script", `\r\n❌ Error: ${errorMessage}\r\n`, true, projectId);
   });
 
   return { ok: true, taskId, messageId: systemMsg.id };

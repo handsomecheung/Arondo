@@ -40,7 +40,7 @@ export async function POST(
     await Promise.all([
       updateMessage(id, returnMessage.id, { deleted: true }),
       updateMessage(id, messageId, { exitCode: undefined, stoppedByUser: false }),
-      clearSessionLog(id, messageId),
+      clearSessionLog(id, messageId, "script"),
     ]);
     const updatedSession = await updateSession(id, {
       status: "script-running",

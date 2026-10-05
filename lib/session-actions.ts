@@ -44,7 +44,7 @@ export async function buildDetachedAgentContext(sessionId: string): Promise<stri
       continue;
     }
     if (message.type === "agent-run") {
-      const output = stripAnsi(await getSessionLog(sessionId, message.id)).trim();
+      const output = stripAnsi(await getSessionLog(sessionId, message.id, "agent")).trim();
       if (output) parts.push(`Agent (${message.resolvedAgentType || "unknown"}):\n${output}`);
     }
   }
@@ -137,7 +137,7 @@ export async function dispatchDetachedAgent(
     detachedKind: kind,
     tokenUuid: session.tokenUuid,
   });
-  await clearSessionLog(sessionId, runMessage.id);
+  await clearSessionLog(sessionId, runMessage.id, "agent");
 
   runnerManager.sendRequest(runnerId, "exec.agent", {
     taskId,
@@ -329,7 +329,7 @@ export async function dispatchFollowupMessage(
     tokenUuid: opts.tokenUuid || session.tokenUuid,
   });
 
-  await clearSessionLog(sessionId, systemMsg.id);
+  await clearSessionLog(sessionId, systemMsg.id, "agent");
 
   runnerManager
     .sendRequest(runnerId, "exec.agent", {
@@ -433,8 +433,8 @@ export async function dispatchCreateSession(
       });
       eventBus.publish({ type: "message_added", payload: systemMsg });
 
-      await clearSessionLog(session.id, systemMessageId);
-      await appendSessionLog(session.id, systemMessageId, cachedOutput, true);
+      await clearSessionLog(session.id, systemMessageId, "agent");
+      await appendSessionLog(session.id, systemMessageId, "agent", cachedOutput, true);
 
       const agentMsg = await addMessage({
         sessionId: session.id,
@@ -550,7 +550,7 @@ export async function dispatchCreateSession(
     tokenUuid: opts.tokenUuid || session.tokenUuid,
   });
 
-  await clearSessionLog(session.id, systemMsg.id);
+  await clearSessionLog(session.id, systemMsg.id, "agent");
 
   runnerManager
     .sendRequest(runnerId, "exec.agent", {
@@ -639,7 +639,7 @@ export async function dispatchSessionScript(
     tokenUuid: opts.tokenUuid || session.tokenUuid,
   });
 
-  await clearSessionLog(sessionId, systemMsg.id);
+  await clearSessionLog(sessionId, systemMsg.id, "script");
 
   runnerManager
     .sendRequest(runnerId, "exec.script", {
