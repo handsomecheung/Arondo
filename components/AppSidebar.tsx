@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { IconPlus, IconInbox, IconSettings, IconServer, IconMoreVertical, IconArchive, IconArrowLeft, IconTrash, IconPin, IconEdit, IconLogout } from "@/components/Icons";
+import { IconPlus, IconInbox, IconSettings, IconServer, IconMoreVertical, IconArchive, IconArrowLeft, IconTrash, IconPin, IconEdit, IconLogout, IconSearch, IconX } from "@/components/Icons";
 import { formatRelative, isUnviewedCompletion } from "@/lib/homeUtils";
 import type { Session, Project, Runner } from "@/types/home";
 
@@ -61,6 +61,46 @@ export default function AppSidebar({
   const sessionMenuPortalRef = useRef<HTMLDivElement>(null);
   const [selectedRunnerFilter, setSelectedRunnerFilter] = useState<string | null>(null);
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<{ query: string; sessionIds: Set<string> } | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
+
+  useEffect(() => {
+    const query = searchQuery.trim().toLocaleLowerCase();
+    if (!query) {
+      setSearchResults(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => {
+      fetch(`/api/sessions/search?q=${encodeURIComponent(query)}`, { signal: controller.signal })
+        .then((response) => response.json())
+        .then((data: { sessionIds?: string[] }) => {
+          if (Array.isArray(data.sessionIds)) setSearchResults({ query, sessionIds: new Set(data.sessionIds) });
+        })
+        .catch((error: unknown) => {
+          if ((error as { name?: string }).name !== "AbortError") console.error(error);
+        });
+    }, 200);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [searchQuery]);
+
+  const matchesSearch = (session: Session) => {
+    const query = searchQuery.trim().toLocaleLowerCase();
+    if (!query) return true;
+    if (searchResults?.query === query) return searchResults.sessionIds.has(session.id);
+    return (session.name || "Untitled").toLocaleLowerCase().includes(query);
+  };
 
   const handleSwipeTouchStart = (id: string) => (e: React.TouchEvent) => {
     setSwipe({ id, startX: e.touches[0].clientX, dx: 0 });
@@ -199,11 +239,52 @@ export default function AppSidebar({
               )}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button
+                className={`sidebar-search-btn${searchOpen ? " active" : ""}`}
+                onClick={() => setSearchOpen((open) => !open)}
+                aria-label={searchOpen ? "Close session search" : "Search sessions"}
+                aria-expanded={searchOpen}
+                aria-controls="sidebar-session-search"
+                title="Search sessions"
+                id="sidebar-session-search-btn"
+              >
+                <IconSearch />
+              </button>
               <button className="new-task-btn" onClick={onNewSession} id="new-session-btn">
                 <IconPlus /> Session
               </button>
             </div>
           </div>
+          {searchOpen && (
+            <div className="sidebar-search-field">
+              <IconSearch size={15} />
+              <input
+                ref={searchInputRef}
+                id="sidebar-session-search"
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setSearchQuery("");
+                    setSearchOpen(false);
+                  }
+                }}
+                placeholder="Search sessions"
+                aria-label="Search sessions"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  aria-label="Clear session search"
+                  title="Clear search"
+                >
+                  <IconX />
+                </button>
+              )}
+            </div>
+          )}
           {archivedView && (
             <button
               className="sidebar-settings-link"
@@ -301,7 +382,8 @@ export default function AppSidebar({
               const filtered = archivedSessions.filter(
                 (s) =>
                   (!selectedRunnerFilter || s.runnerId === selectedRunnerFilter) &&
-                  (!selectedProjectFilter || s.projectId === selectedProjectFilter)
+                  (!selectedProjectFilter || s.projectId === selectedProjectFilter) &&
+                  matchesSearch(s)
               );
               if (filtered.length === 0) {
                 return (
@@ -370,7 +452,8 @@ export default function AppSidebar({
               const filtered = sortedSessions.filter(
                 (s) =>
                   (!selectedRunnerFilter || s.runnerId === selectedRunnerFilter) &&
-                  (!selectedProjectFilter || s.projectId === selectedProjectFilter)
+                  (!selectedProjectFilter || s.projectId === selectedProjectFilter) &&
+                  matchesSearch(s)
               );
               if (filtered.length === 0) {
                 return (
