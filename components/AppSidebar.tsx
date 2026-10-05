@@ -302,7 +302,8 @@ export default function AppSidebar({
           )}
           {(() => {
             const targetSessions = archivedView ? archivedSessions : sortedSessions;
-            const sessionRunnerIds = new Set(targetSessions.map((s) => s.runnerId).filter(Boolean) as string[]);
+            const searchResultSessions = targetSessions.filter(matchesSearch);
+            const sessionRunnerIds = new Set(searchResultSessions.map((s) => s.runnerId).filter(Boolean) as string[]);
             const runnersMap = new Map(runners.map((r) => [r.id, r]));
             const availableRunners = Array.from(sessionRunnerIds).map((rId) => {
               const r = runnersMap.get(rId);
@@ -310,8 +311,8 @@ export default function AppSidebar({
             });
 
             const runnerFilteredSessions = selectedRunnerFilter
-              ? targetSessions.filter((s) => s.runnerId === selectedRunnerFilter)
-              : targetSessions;
+              ? searchResultSessions.filter((s) => s.runnerId === selectedRunnerFilter)
+              : searchResultSessions;
             const sessionProjectIds = new Set(runnerFilteredSessions.map((s) => s.projectId).filter(Boolean) as string[]);
 
             const knownProjectsMap = new Map<string, { id: string; name: string }>();
@@ -379,11 +380,11 @@ export default function AppSidebar({
                 <p>No archived sessions.</p>
               </div>
             ) : (() => {
-              const filtered = archivedSessions.filter(
+              const searchResultSessions = archivedSessions.filter(matchesSearch);
+              const filtered = searchResultSessions.filter(
                 (s) =>
                   (!selectedRunnerFilter || s.runnerId === selectedRunnerFilter) &&
-                  (!selectedProjectFilter || s.projectId === selectedProjectFilter) &&
-                  matchesSearch(s)
+                  (!selectedProjectFilter || s.projectId === selectedProjectFilter)
               );
               if (filtered.length === 0) {
                 return (
@@ -449,11 +450,11 @@ export default function AppSidebar({
                 <p>No sessions yet.<br />Start by creating a new session.</p>
               </div>
             ) : (() => {
-              const filtered = sortedSessions.filter(
+              const searchResultSessions = sortedSessions.filter(matchesSearch);
+              const filtered = searchResultSessions.filter(
                 (s) =>
                   (!selectedRunnerFilter || s.runnerId === selectedRunnerFilter) &&
-                  (!selectedProjectFilter || s.projectId === selectedProjectFilter) &&
-                  matchesSearch(s)
+                  (!selectedProjectFilter || s.projectId === selectedProjectFilter)
               );
               if (filtered.length === 0) {
                 return (
