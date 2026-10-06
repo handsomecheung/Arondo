@@ -1,12 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProjects, deleteProject, getTempDirProjectRetentionHours, isTempDirProject, getShowTempDirSessions } from "@/lib/store";
+import { getProjects, deleteProject, getTempDirProjectRetentionHours, isTempDirProject, getShowTempDirSessions, getSessions, getArchivedSessions } from "@/lib/store";
 import { runnerManager } from "@/lib/runner-manager";
-import { getArondoToken, isValidToken } from "@/lib/auth";
+import { getArondoToken, isValidToken, getUuidByToken } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
   const token = getArondoToken(request);
   if (!isValidToken(token)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const clientUuid = getUuidByToken(token);
+  const clientProjectIds = new Set<string>();
+  if (clientUuid) {
+    const [activeSessions, archivedSessions] = await Promise.all([
+      getSessions(),
+      getArchivedSessions(),
+    ]);
+    for (const s of activeSessions) {
+      if (s.tokenUuid === clientUuid && s.projectId) {
+        clientProjectIds.add(s.projectId);
+      }
+    }
+    for (const s of archivedSessions) {
+      if (s.tokenUuid === clientUuid && s.projectId) {
+        clientProjectIds.add(s.projectId);
+      }
+    }
   }
 
   const projects = await getProjects();
@@ -39,6 +58,10 @@ export async function GET(request: NextRequest) {
       if (!showTempDirSessions) {
         continue;
       }
+    }
+
+    if (!clientProjectIds.has(project.id)) {
+      continue;
     }
 
     candidates.push(project);
