@@ -193,3 +193,22 @@ export function execCardInfoToItem(info: ExecCardInfo): ExecCardItem {
     waitingForInput: !isDone && info.isScript && !!info.runMsg.waitingForInput,
   };
 }
+
+export function splitPathForMiddleTruncate(fullPath: string): { prefix: string; suffix: string } {
+  if (!fullPath) return { prefix: "", suffix: "" };
+  const sep = fullPath.includes("\\") ? "\\" : "/";
+  const normalized = fullPath.endsWith(sep) && fullPath.length > 1 ? fullPath.slice(0, -1) : fullPath;
+  const segments = normalized.split(sep).filter(Boolean);
+  if (segments.length <= 1) {
+    const mid = Math.ceil(fullPath.length / 2);
+    return { prefix: fullPath.slice(0, mid), suffix: fullPath.slice(mid) };
+  }
+  if (segments.length === 2) {
+    const prefix = (fullPath.startsWith(sep) ? sep : "") + segments[0];
+    const suffix = sep + segments[1] + (fullPath.endsWith(sep) && fullPath.length > 1 ? sep : "");
+    return { prefix, suffix };
+  }
+  const prefix = (fullPath.startsWith(sep) ? sep : "") + segments.slice(0, -2).join(sep);
+  const suffix = sep + segments.slice(-2).join(sep) + (fullPath.endsWith(sep) && fullPath.length > 1 ? sep : "");
+  return { prefix, suffix };
+}

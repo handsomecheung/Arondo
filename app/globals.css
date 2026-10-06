@@ -3542,6 +3542,103 @@ body {
   padding-left: 10px;
 }
 
+.project-meta-row .new-session-dropdown-menu {
+  width: min(380px, calc(100vw - 32px));
+}
+
+.custom-dropdown-trigger .project-trigger-label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  flex: 1;
+  margin-right: 8px;
+  overflow: hidden;
+  text-align: left;
+}
+
+.project-trigger-label .project-trigger-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+  line-height: 1.25;
+  margin-right: 0;
+  flex: none;
+}
+
+.project-trigger-label .project-trigger-path {
+  font-size: 11px;
+  color: var(--text-muted);
+  width: 100%;
+  min-width: 0;
+  line-height: 1.25;
+  margin-right: 0;
+  flex: none;
+  font-family: var(--font-mono, monospace);
+  opacity: 0.85;
+}
+
+.project-dropdown-item {
+  display: flex !important;
+  align-items: center;
+}
+
+.project-dropdown-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+
+.project-dropdown-item-name {
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.25;
+}
+
+.project-dropdown-item-path {
+  font-size: 11px;
+  color: var(--text-muted);
+  width: 100%;
+  min-width: 0;
+  font-family: var(--font-mono, monospace);
+  line-height: 1.25;
+  opacity: 0.85;
+}
+
+/* Middle Truncation for Long Directory Paths */
+.middle-truncate {
+  display: flex;
+  align-items: baseline;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.middle-truncate-prefix {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.middle-truncate-suffix {
+  white-space: nowrap;
+  flex-shrink: 0;
+  max-width: 75%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ─── Terminal scrollbar: hide scrollbar, keep touch scrolling ────────────── */
 .modal-body .xterm .xterm-viewport {
   scrollbar-width: none;

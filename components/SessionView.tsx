@@ -11,7 +11,7 @@ import { ScheduleDateTimeInputs, defaultScheduleTime } from "@/components/Schedu
 import AgentCommandArgumentsModal from "@/components/modals/AgentCommandArgumentsModal";
 import type { Session, Runner, Message, Project, TodoTrigger } from "@/types/home";
 import type { ExecCardInfo } from "@/lib/homeUtils";
-import { formatTime, execCardInfoToItem, autoResizeTextarea } from "@/lib/homeUtils";
+import { formatTime, execCardInfoToItem, autoResizeTextarea, splitPathForMiddleTruncate } from "@/lib/homeUtils";
 import {
   IconLogo, IconPlus, IconSend, IconCheck,
   IconPlay, IconTerminal, IconEdit, IconTrash,
@@ -22,6 +22,16 @@ import {
 import { agentCommandAcceptsArguments, getTriggerWord, isAgentCommand } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
 import { CHAT_INPUT_TIPS } from "@/lib/chatInputTips";
+
+function MiddleTruncatePath({ path, className }: { path: string; className?: string }) {
+  const { prefix, suffix } = splitPathForMiddleTruncate(path);
+  return (
+    <span className={`middle-truncate ${className || ""}`} title={path}>
+      <span className="middle-truncate-prefix">{prefix}</span>
+      <span className="middle-truncate-suffix">{suffix}</span>
+    </span>
+  );
+}
 
 const CHAT_INPUT_TIP_INTERVAL_MS = 30000;
 
@@ -1289,15 +1299,29 @@ export default function SessionView({
                   disabled={isRunning || !runnerId}
                   id="project-select-trigger"
                 >
-                  <span>
+                  <div className="project-trigger-label">
                     {(() => {
                       const runnerProjects = projects.filter((p) => p.runnerId === runnerId);
                       const matched = runnerProjects.find((p) => p.repoPath === repoPath);
-                      if (matched) return matched.repoPath.split("/").pop() || matched.repoPath;
-                      if (repoPath.trim()) return repoPath.split("/").pop() || repoPath;
-                      return runnerId ? "No Project" : "Select runner first";
+                      const currentPath = matched?.repoPath || (repoPath.trim() ? repoPath : "");
+                      if (currentPath) {
+                        const folder = currentPath.split("/").filter(Boolean).pop() || currentPath;
+                        return (
+                          <>
+                            <span className="project-trigger-name">{folder}</span>
+                            <span className="project-trigger-path" title={currentPath}>
+                              <MiddleTruncatePath path={currentPath} />
+                            </span>
+                          </>
+                        );
+                      }
+                      return (
+                        <span className="project-trigger-name">
+                          {runnerId ? "No Project" : "Select runner first"}
+                        </span>
+                      );
                     })()}
-                  </span>
+                  </div>
                   <IconChevronDown
                     className={`arrow-icon ${projectDropdownOpen ? "open" : ""}`}
                   />
@@ -1306,13 +1330,18 @@ export default function SessionView({
                   <div className="custom-dropdown-menu new-session-dropdown-menu">
                     <button
                       type="button"
-                      className={`custom-dropdown-item ${!repoPath ? "active" : ""}`}
+                      className={`custom-dropdown-item project-dropdown-item ${!repoPath ? "active" : ""}`}
                       onClick={() => {
                         onSetRepoPath("");
                         setProjectDropdownOpen(false);
                       }}
                     >
-                      No Project
+                      <div className="project-dropdown-item-content">
+                        <span className="project-dropdown-item-name">No Project</span>
+                        <span className="project-dropdown-item-path">
+                          Run in dedicated temporary directory
+                        </span>
+                      </div>
                     </button>
                     {projects.filter((p) => p.runnerId === runnerId).length === 0 ? (
                       <div className="custom-dropdown-item disabled">
@@ -1321,20 +1350,30 @@ export default function SessionView({
                     ) : (
                       projects
                         .filter((p) => p.runnerId === runnerId)
-                        .map((p) => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            className={`custom-dropdown-item ${p.repoPath === repoPath ? "active" : ""}`}
-                            onClick={() => {
-                              onSetRepoPath(p.repoPath);
-                              setProjectDropdownOpen(false);
-                            }}
-                            title={p.repoPath}
-                          >
-                            {p.repoPath.split("/").pop() || p.repoPath}
-                          </button>
-                        ))
+                        .map((p) => {
+                          const folder = p.repoPath.split("/").filter(Boolean).pop() || p.repoPath;
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              className={`custom-dropdown-item project-dropdown-item ${p.repoPath === repoPath ? "active" : ""}`}
+                              onClick={() => {
+                                onSetRepoPath(p.repoPath);
+                                setProjectDropdownOpen(false);
+                              }}
+                              title={p.repoPath}
+                            >
+                              <div className="project-dropdown-item-content">
+                                <span className="project-dropdown-item-name">
+                                  {folder}
+                                </span>
+                                <span className="project-dropdown-item-path" title={p.repoPath}>
+                                  <MiddleTruncatePath path={p.repoPath} />
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })
                     )}
                   </div>
                 )}
