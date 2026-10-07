@@ -147,6 +147,14 @@ test.describe('Rerun Agent API integration tests', () => {
       expect(stopRes.status()).toBe(200);
       await waitForSessionNotRunning(request, sessionId);
 
+      const stoppedSessionRes = await request.get(`/api/sessions/${sessionId}`, {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+      });
+      expect(stoppedSessionRes.status()).toBe(200);
+      const stoppedSession = await stoppedSessionRes.json();
+      expect(stoppedSession.status).toBe('done');
+      expect(stoppedSession.errorMessage).toBeUndefined();
+
       msgsRes = await request.get(`/api/messages?sessionId=${sessionId}`, {
         headers: { 'x-arondo-token': 'test-token-123456' },
       });

@@ -1502,27 +1502,26 @@ class RunnerManager {
       }
     }
 
+    const stoppedByUser = !!ctx.stoppedByUser;
     const hasRunningScripts = (await getRunningSessionScriptRuns(ctx.sessionId)).length > 0;
     let nextStatus: string;
     if (hasRunningScripts) {
       nextStatus = "script-running";
     } else {
-      nextStatus = success && !quotaExhausted && !invalidModelSelection ? "done" : "error";
+      nextStatus = stoppedByUser || (success && !quotaExhausted && !invalidModelSelection) ? "done" : "error";
     }
-
-    const stoppedByUser = !!ctx.stoppedByUser;
 
     const updated = await updateSession(ctx.sessionId, {
       status: nextStatus as any,
-      errorMessage: invalidModelSelection
+      errorMessage: stoppedByUser
+        ? undefined
+        : invalidModelSelection
         ? getAgyInvalidModelErrorMessage()
         : quotaExhausted
           ? getAgentQuotaErrorMessage(resolvedAgentType)
           : success
             ? undefined
-            : stoppedByUser
-              ? "Stopped by user"
-              : `Agent exited with code ${exitCode}`,
+            : `Agent exited with code ${exitCode}`,
     });
 
     const shouldCache = (ctx.cache === "on" || session?.cache === "on");
@@ -1540,15 +1539,15 @@ class RunnerManager {
       }
     }
 
-    const content = invalidModelSelection
+    const content = stoppedByUser
+      ? "🛑 Stopped by user"
+      : invalidModelSelection
       ? `⚠️ ${getAgyInvalidModelErrorMessage()}`
       : quotaExhausted
         ? `⚠️ ${getAgentQuotaErrorMessage(resolvedAgentType)}`
         : success
           ? "✅ Done!"
-          : stoppedByUser
-            ? "🛑 Stopped by user"
-            : `❌ Error: Agent exited with code ${exitCode}`;
+          : `❌ Error: Agent exited with code ${exitCode}`;
     const agentMsg = await addMessage({
       sessionId: ctx.sessionId,
       role: success && !quotaExhausted && !invalidModelSelection ? "agent" : "system",
