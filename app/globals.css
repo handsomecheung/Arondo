@@ -3388,7 +3388,7 @@ body {
   cursor: not-allowed;
 }
 
-.custom-dropdown-trigger span {
+.custom-dropdown-trigger > span {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3629,14 +3629,18 @@ body {
   white-space: nowrap;
   flex: 0 1 auto;
   min-width: 0;
+  margin: 0;
+  padding: 0;
 }
 
 .middle-truncate-suffix {
   white-space: nowrap;
-  flex-shrink: 0;
+  flex: 0 0 auto;
   max-width: 75%;
   overflow: hidden;
   text-overflow: ellipsis;
+  margin: 0;
+  padding: 0;
 }
 
 /* ─── Terminal scrollbar: hide scrollbar, keep touch scrolling ────────────── */

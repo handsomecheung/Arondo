@@ -27,8 +27,7 @@ function MiddleTruncatePath({ path, className }: { path: string; className?: str
   const { prefix, suffix } = splitPathForMiddleTruncate(path);
   return (
     <span className={`middle-truncate ${className || ""}`} title={path}>
-      <span className="middle-truncate-prefix">{prefix}</span>
-      <span className="middle-truncate-suffix">{suffix}</span>
+      <span className="middle-truncate-prefix">{prefix}</span><span className="middle-truncate-suffix">{suffix}</span>
     </span>
   );
 }
