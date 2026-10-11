@@ -1307,15 +1307,13 @@ export default function HomePage() {
     }
   }, [isNewSession, isNewDraft, runnerId, loadProjects]);
 
+  const prevRunnerIdRef = useRef(runnerId);
   useEffect(() => {
-    if ((isNewSession || isNewDraft) && repoPath && runnerId) {
-      const runnerProjects = projects.filter((p) => p.runnerId === runnerId);
-      const existsInProjects = runnerProjects.some((p) => p.repoPath === repoPath);
-      if (!existsInProjects && runnerProjects.length > 0) {
-        setRepoPath("");
-      }
+    if (prevRunnerIdRef.current && prevRunnerIdRef.current !== runnerId) {
+      setRepoPath("");
     }
-  }, [isNewSession, isNewDraft, projects, runnerId, repoPath]);
+    prevRunnerIdRef.current = runnerId;
+  }, [runnerId]);
 
   const isDraftSession = !!pendingDraftTodoId;
   const isDraftAutoSend = messages.find((m) => m.id === pendingDraftTodoId)?.todoTrigger?.kind === "codebaseReady";
@@ -1775,8 +1773,8 @@ export default function HomePage() {
         parentPath={fsParentPath}
         directories={fsDirectories}
         loading={fsLoading}
-        onSelect={() => {
-          setRepoPath(fsCurrentPath);
+        onSelect={(path) => {
+          setRepoPath(path || fsCurrentPath);
           setFsModalOpen(false);
         }}
       />
