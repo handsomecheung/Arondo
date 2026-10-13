@@ -40,17 +40,15 @@ export {
   parseModelList,
 };
 
+import type { LlmApiKeyName } from "./llm/config";
+
 export interface AppSettings {
   sessionArchiveDays?: number;
   tempDirProjectRetentionHours?: number;
   showHiddenFiles?: boolean;
   showTempDirSessions?: boolean;
   enableAutomodel?: boolean;
-  llmApiKeys?: {
-    ANTHROPIC_API_KEY?: string;
-    OPENAI_API_KEY?: string;
-    GOOGLE_GENERATIVE_AI_API_KEY?: string;
-  };
+  llmApiKeys?: Partial<Record<LlmApiKeyName, string>>;
   agentModels?: AgentModelsConfig;
 }
 
@@ -697,6 +695,14 @@ export async function appendAutomodelLog(sessionId: string, messageId: string, t
   const logPath = getAutomodelLogFilePath(sessionId, messageId);
   await ensureDir(path.dirname(logPath));
   await fs.appendFile(logPath, text.endsWith("\n") ? text : `${text}\n`, "utf-8");
+}
+
+export async function getAutomodelLog(sessionId: string, messageId: string): Promise<string> {
+  try {
+    return await fs.readFile(getAutomodelLogFilePath(sessionId, messageId), "utf-8");
+  } catch {
+    return "";
+  }
 }
 
 export async function getSessionLog(sessionId: string, messageId: string, kind: LogKind, projectId?: string, stream: LogStream = "stdout"): Promise<string> {

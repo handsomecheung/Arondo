@@ -9,5 +9,6 @@ ps aux | grep -v grep | grep "$(pwd)" | grep 'server.ts' | awk '{print $2}' | xa
 cd ..
 
 export ARONDO_INNER_RUNNER_QUOTA_METHOD=LLM
+export ARONDO_INNER_AUTOMODEL_METHOD=DM
 
 npm run dev

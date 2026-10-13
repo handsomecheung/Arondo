@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getMessages, getSessionLog, type LogKind } from "@/lib/store";
+import { getMessages, getSessionLog, getAutomodelLog, type LogKind } from "@/lib/store";
 import { getArondoToken, verifySessionPermission, verifyProjectPermission, isValidToken } from "@/lib/auth";
 
 export async function GET(
@@ -42,6 +42,11 @@ export async function GET(
       : undefined;
   if (!kind) {
     return NextResponse.json({ error: "Message does not have an execution log" }, { status: 404 });
+  }
+
+  if (streamParam === "automodel") {
+    const log = await getAutomodelLog(id === "global" ? "" : id, messageId);
+    return NextResponse.json({ log });
   }
 
   const stream = streamParam === "stderr" ? "stderr" : "stdout";

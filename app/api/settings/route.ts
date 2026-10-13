@@ -7,6 +7,7 @@ import fs from "fs/promises";
 import path from "path";
 
 const LLM_API_KEY_NAMES: LlmApiKeyName[] = [
+  "TYPESAFE_API_KEY",
   "ANTHROPIC_API_KEY",
   "OPENAI_API_KEY",
   "GOOGLE_GENERATIVE_AI_API_KEY",

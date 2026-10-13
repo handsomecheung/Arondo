@@ -51,7 +51,11 @@ interface RunnerTokenInfo {
   connected?: boolean;
 }
 
-type LlmApiKeyName = "ANTHROPIC_API_KEY" | "OPENAI_API_KEY" | "GOOGLE_GENERATIVE_AI_API_KEY";
+type LlmApiKeyName =
+  | "TYPESAFE_API_KEY"
+  | "ANTHROPIC_API_KEY"
+  | "OPENAI_API_KEY"
+  | "GOOGLE_GENERATIVE_AI_API_KEY";
 
 interface AutoModelApiKeyStatus {
   configured: boolean;
@@ -65,29 +69,36 @@ const LLM_API_KEYS: {
   description: string;
 }[] = [
   {
+    name: "TYPESAFE_API_KEY",
+    label: "Jev (TypeSafe AI)",
+    description: "Highest priority System One router for choosing model and effort.",
+  },
+  {
     name: "ANTHROPIC_API_KEY",
     label: "Anthropic",
-    description: "First priority provider for choosing model and effort.",
+    description: "Standard LLM router (first priority when Jev is unconfigured).",
   },
   {
     name: "OPENAI_API_KEY",
     label: "OpenAI",
-    description: "Second priority provider for choosing model and effort.",
+    description: "Standard LLM router (second priority).",
   },
   {
     name: "GOOGLE_GENERATIVE_AI_API_KEY",
     label: "Google",
-    description: "Third priority provider for choosing model and effort.",
+    description: "Standard LLM router (third priority).",
   },
 ];
 
 const EMPTY_LLM_KEYS: Record<LlmApiKeyName, string> = {
+  TYPESAFE_API_KEY: "",
   ANTHROPIC_API_KEY: "",
   OPENAI_API_KEY: "",
   GOOGLE_GENERATIVE_AI_API_KEY: "",
 };
 
 const EMPTY_LLM_STATUS: Record<LlmApiKeyName, AutoModelApiKeyStatus> = {
+  TYPESAFE_API_KEY: { configured: false, source: "none", env: false },
   ANTHROPIC_API_KEY: { configured: false, source: "none", env: false },
   OPENAI_API_KEY: { configured: false, source: "none", env: false },
   GOOGLE_GENERATIVE_AI_API_KEY: { configured: false, source: "none", env: false },

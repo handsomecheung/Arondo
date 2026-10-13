@@ -22,3 +22,18 @@ export function getInnerRunnerQuotaMethod(): InnerRunnerQuotaMethod {
   );
 }
 
+export type InnerAutomodelMethod = "LLM" | "DM";
+
+export function getInnerAutomodelMethod(): InnerAutomodelMethod {
+  const val = process.env.ARONDO_INNER_AUTOMODEL_METHOD?.trim().toUpperCase();
+  if (!val || val === "DM") {
+    return "DM";
+  }
+  if (val === "LLM") {
+    return "LLM";
+  }
+  throw new Error(
+    `Invalid ARONDO_INNER_AUTOMODEL_METHOD: "${process.env.ARONDO_INNER_AUTOMODEL_METHOD}". Allowed values are "LLM" or "DM".`,
+  );
+}
+
