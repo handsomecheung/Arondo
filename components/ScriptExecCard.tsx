@@ -8,6 +8,57 @@ function stripAnsi(text: string): string {
   return text.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/\r/g, "");
 }
 
+function renderWithLinks(text: string): React.ReactNode {
+  const urlRegex = /(https?:\/\/[^\s<>"'{}|\\^`]+)/g;
+  if (!urlRegex.test(text)) {
+    return text;
+  }
+  urlRegex.lastIndex = 0;
+
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = urlRegex.exec(text)) !== null) {
+    let url = match[0];
+    let trailing = "";
+
+    const punctuationMatch = url.match(/[.,:;!?)]+$/);
+    if (punctuationMatch) {
+      trailing = punctuationMatch[0];
+      url = url.slice(0, -trailing.length);
+    }
+
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+
+    parts.push(
+      <a
+        key={match.index}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {url}
+      </a>
+    );
+
+    if (trailing) {
+      parts.push(trailing);
+    }
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts;
+}
+
 interface ScriptExecCardProps extends ExecCardProps {
   onViewLog?: () => void;
   onAnalyze?: (message: string) => void | Promise<void>;
@@ -151,8 +202,17 @@ export default function ScriptExecCard({
   return (
     <ExecCard {...props} onInputWait={onViewLog} extraMenuItems={extraMenuItems} className={className}>
       {showLogInline && hasLogSource && (
-        <pre ref={outputRef} className="agent-exec-output" style={{ maxHeight: "250px" }}>
-          {log || "Running command..."}
+        <pre
+          ref={outputRef}
+          className="agent-exec-output"
+          style={{
+            maxHeight: "250px",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            overflowWrap: "anywhere",
+          }}
+        >
+          {log ? renderWithLinks(log) : "Running command..."}
         </pre>
       )}
     </ExecCard>
