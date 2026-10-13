@@ -397,7 +397,7 @@ func TestAgentQuotas(t *testing.T) {
 
 	// 1. Fetch Agi/Agy Quota
 	t.Run("AgyQuota", func(t *testing.T) {
-		go fetchAgyQuota(client)
+		go fetchAgyQuota(client, "AUTO")
 
 		select {
 		case msg := <-quotaUpdates:
@@ -429,7 +429,7 @@ func TestAgentQuotas(t *testing.T) {
 
 	// 2. Fetch Claude Quota
 	t.Run("ClaudeQuota", func(t *testing.T) {
-		go fetchClaudeQuota(client)
+		go fetchClaudeQuota(client, "AUTO")
 
 		select {
 		case msg := <-quotaUpdates:
@@ -461,7 +461,7 @@ func TestAgentQuotas(t *testing.T) {
 
 	// 3. Fetch Codex Quota
 	t.Run("CodexQuota", func(t *testing.T) {
-		go fetchCodexQuota(client)
+		go fetchCodexQuota(client, "AUTO")
 
 		select {
 		case msg := <-quotaUpdates:
@@ -498,4 +498,89 @@ func TestAgentQuotas(t *testing.T) {
 			t.Fatal("timed out waiting for codex quota.update")
 		}
 	})
+
+	// 4. Test interactiveLlmQuotaLoop with mock server
+	t.Run("InteractiveLlmQuotaLoop", func(t *testing.T) {
+		llmServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			conn, err := upgrader.Upgrade(w, r, nil)
+			if err != nil {
+				return
+			}
+			defer conn.Close()
+
+			for {
+				_, message, err := conn.ReadMessage()
+				if err != nil {
+					break
+				}
+				var msg Message
+				if err := json.Unmarshal(message, &msg); err != nil {
+					continue
+				}
+				if msg.Type == TypeRequest && msg.Method == "quota.interactiveStep" {
+					var payload struct {
+						Agent    string `json:"agent"`
+						Step     int    `json:"step"`
+						PaneText string `json:"paneText"`
+					}
+					_ = json.Unmarshal(msg.Payload, &payload)
+					if payload.Step == 1 {
+						// Step 1: Request Enter
+						resp, _ := NewResponse(msg.ID, map[string]any{
+							"ok": true,
+							"decision": map[string]any{
+								"status":     "need_action",
+								"keysToSend": "\n",
+								"delayMs":    50,
+								"reason":     "Dismissing prompt",
+							},
+						})
+						respData, _ := json.Marshal(resp)
+						_ = conn.WriteMessage(websocket.TextMessage, respData)
+					} else {
+						// Step 2: Quota extracted
+						resp, _ := NewResponse(msg.ID, map[string]any{
+							"ok": true,
+							"decision": map[string]any{
+								"status": "quota_extracted",
+								"reason": "Quota extracted successfully",
+							},
+						})
+						respData, _ := json.Marshal(resp)
+						_ = conn.WriteMessage(websocket.TextMessage, respData)
+					}
+				}
+			}
+		}))
+		defer llmServer.Close()
+
+		llmWsURL := strings.Replace(llmServer.URL, "http://", "ws://", 1)
+		llmClient := NewClient(llmWsURL, "test-token")
+		if err := llmClient.connect(); err != nil {
+			t.Fatalf("failed to connect llm client: %v", err)
+		}
+		go llmClient.readLoop()
+		defer llmClient.Stop()
+
+		// Case A: LLM not available -> returns false immediately
+		llmClient.SetLlmAvailable(false)
+		if interactiveLlmQuotaLoop(llmClient, "dummy", "non-existent-session") {
+			t.Fatal("expected false when LLM is not available")
+		}
+
+		// Case B: LLM available -> starts dummy session and succeeds
+		llmClient.SetLlmAvailable(true)
+		dummySession := tmuxSessionName("test_llm")
+		_ = run("tmux", "kill-session", "-t", dummySession)
+		if err := run("tmux", "new-session", "-d", "-s", dummySession, "sleep 30"); err != nil {
+			t.Fatalf("failed to create dummy tmux session: %v", err)
+		}
+		defer run("tmux", "kill-session", "-t", dummySession) //nolint
+
+		ok := interactiveLlmQuotaLoop(llmClient, "test_agent", dummySession)
+		if !ok {
+			t.Fatal("expected interactiveLlmQuotaLoop to succeed")
+		}
+	})
 }
+

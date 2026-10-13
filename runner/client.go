@@ -28,13 +28,16 @@ const (
 )
 
 type Client struct {
-	serverURL string
-	token     string
-	conn      *websocket.Conn
-	handler   *Handler
-	sendMu    sync.Mutex
-	done      chan struct{}
-	stopOnce  sync.Once
+	serverURL    string
+	token        string
+	conn         *websocket.Conn
+	handler      *Handler
+	sendMu       sync.Mutex
+	done         chan struct{}
+	stopOnce     sync.Once
+	llmAvailable bool
+	pendingMu    sync.Mutex
+	pending      map[string]chan *Message
 }
 
 func NewClient(serverURL, token string) *Client {
@@ -42,7 +45,9 @@ func NewClient(serverURL, token string) *Client {
 		serverURL: serverURL,
 		token:     token,
 		done:      make(chan struct{}),
+		pending:   make(map[string]chan *Message),
 	}
+
 	c.handler = NewHandler(c)
 	return c
 }
@@ -225,6 +230,40 @@ func (c *Client) Send(msg *Message) error {
 	return c.conn.WriteMessage(websocket.TextMessage, data)
 }
 
+func (c *Client) SendRequest(msg *Message, timeout time.Duration) (*Message, error) {
+	ch := make(chan *Message, 1)
+	c.pendingMu.Lock()
+	c.pending[msg.ID] = ch
+	c.pendingMu.Unlock()
+
+	defer func() {
+		c.pendingMu.Lock()
+		delete(c.pending, msg.ID)
+		c.pendingMu.Unlock()
+	}()
+
+	if err := c.Send(msg); err != nil {
+		return nil, err
+	}
+
+	select {
+	case res := <-ch:
+		return res, nil
+	case <-time.After(timeout):
+		return nil, fmt.Errorf("request %s timed out after %v", msg.Method, timeout)
+	case <-c.done:
+		return nil, fmt.Errorf("client stopped")
+	}
+}
+
+func (c *Client) IsLlmAvailable() bool {
+	return c.llmAvailable
+}
+
+func (c *Client) SetLlmAvailable(available bool) {
+	c.llmAvailable = available
+}
+
 func (c *Client) readLoop() {
 	for {
 		_, data, err := c.conn.ReadMessage()
@@ -243,9 +282,20 @@ func (c *Client) readLoop() {
 			continue
 		}
 
+		if msg.Type == TypeResponse {
+			c.pendingMu.Lock()
+			ch, ok := c.pending[msg.ID]
+			c.pendingMu.Unlock()
+			if ok {
+				ch <- &msg
+				continue
+			}
+		}
+
 		c.handler.HandleMessage(&msg)
 	}
 }
+
 
 func (c *Client) heartbeatLoop() {
 	ticker := time.NewTicker(pingPeriod)

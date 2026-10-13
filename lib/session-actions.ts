@@ -18,7 +18,7 @@ import {
 } from "./store";
 import { getAgent, resolveAgentType, PROMPT_ENV_VAR, type ConcreteAgentType } from "./agents";
 import { buildCrossAgentContext } from "./autoagent";
-import type { AutoModelEffort } from "./automodel";
+import type { AutoModelEffort } from "./llm/automodel";
 import { eventBus } from "./event-bus";
 import { runnerManager } from "./runner-manager";
 import { readTokensConfig } from "./auth";

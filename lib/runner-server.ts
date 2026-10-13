@@ -73,6 +73,7 @@ export function setupRunnerServer(wss: WebSocketServer): void {
                   // Inform the runner which binaries to detect on its PATH.
                   // The runner responds with an agent.status event.
                   queryAgents: getAgentBinaryNames(),
+                  llmAvailable: runnerManager.isLlmAvailable(),
                 },
               });
               ws.send(ack);

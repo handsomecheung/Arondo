@@ -183,10 +183,15 @@ lib/
   autoagent.ts          # Auto Mode agent selector; reads quota from ~/.arondo/autoagent/agent/quota.json and returns agent plus allowed model options
   project-actions.ts    # Extracted action helpers for executing project-scoped scripts
   session-actions.ts    # Extracted action helpers for session messages, normal agent runs, and detached review/side-question runs
-  automodel/
-    config.ts           # Automodel provider/key lookup: env first, then arondo.json settings, fixed provider priority/model/timeout
-    index.ts            # Vercel AI SDK structured-output classifier that chooses model/effort from caller-provided options only
-    types.ts            # Shared automodel provider, model option, and decision types
+  llm/
+    index.ts            # Re-exports LLM configuration and model creation helpers
+    config.ts           # Pure LLM provider/key lookup: env first, then arondo.json settings, fixed provider priority/model/timeout
+    model.ts            # Model creation via @ai-sdk providers (createLlmModel)
+    automodel/
+      index.ts          # Vercel AI SDK structured-output classifier that chooses model/effort from caller-provided options only
+      types.ts          # Shared automodel provider, model option, and decision types
+    quota/
+      index.ts          # LLM interactive loop decision logic (decideQuotaStep) with agent-specific Zod schemas
   agents/
     base.ts             # Abstract BaseAgent interface
     antigravity.ts      # Antigravity CLI (agy) adapter
@@ -277,6 +282,9 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 | `git.diff` | S→R request | Run `git diff HEAD` |
 | `rules.sync` | S→R request | Write global agent rules block into `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` |
 | `rules.remove` | S→R request | Strip the previously synced rules block from `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` |
+| `info.fetch` | S→R request | Request quota/info fetch for an agent binary on the runner (includes `method: "AUTO" \| "LLM"`) |
+| `quota.interactiveStep` | R→S request | Runner sends captured terminal screen during LLM interactive quota loop; server returns action decision (`need_action` with keysToSend, `quota_extracted`, `failed`) |
+| `quota.update` | R→S event | Runner reports parsed quota data to server |
 
 ## Runner Manager
 
@@ -439,6 +447,8 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **Invalid Model Selection Error Detection**: Scans Antigravity execution logs for `invalid model selection` errors (such as when an unsupported or renamed model is passed to `agy`). When detected, the session status is set to `error` and users are presented with a clear, actionable message: `⚠️ Invalid model selection for Antigravity — please update the model in Settings, or temporarily switch away from Auto mode.`
 - **Agent Models & Defaults Configuration**: In **Settings → Agent Models & Defaults**, admins can customize the default model and available model choices for Antigravity (split into **Gemini Group** and **Others Group**), Claude Code, and Codex CLI. Stored in `~/.arondo/arondo.json` (`setitngs.agentModels`). If unconfigured, Arondo populates the default models automatically. Auto Mode choices (Choice A: Gemini, Choice B: Others, Choice C: Claude, Choice D: Codex) dynamically draw their default models and available model lists from this configuration.
 - **AI Agent Quota Monitoring**: Runners collect agent quota usage from Claude, Antigravity, and Codex via tmux pane capture, which is saved locally under `~/.arondo/agents/` on the server and displayed in the Runners dashboard. API-key billed accounts are identified so they are not presented as exhausted subscription quotas; unavailable readings are displayed as unknown rather than fabricated values.
+  - **LLM-assisted Quota Extraction**: When default regex matching fails (or when forced via configuration) and a server-side LLM API key is present, the Runner falls back to an interactive LLM loop (`quota.interactiveStep`). The runner sends captured pane text to the server, and the server LLM analyzes the terminal screen to dismiss welcome prompts, disclaimers, or workspace trust dialogs, send slash commands (e.g. `/usage`, `/status`), and extract structured quota data using agent-specific Zod schemas (`lib/llm/quota/`).
+  - **ARONDO_INNER_RUNNER_QUOTA_METHOD**: Controls runner quota extraction method on the server (`AUTO` [default] vs `LLM`). When set to `LLM`, the runner skips the regex fast path and starts directly with the interactive LLM loop from the initial screen upon agent launch. This setting is strictly configured via server environment variable (validated on startup, throwing an error if set to an invalid value) and propagated to runners in the `info.fetch` request payload.
 - **Secure Prompt Passing**: Instead of command line arguments, prompts are passed to agents using temporary files on the runner. The file path is stored in the `ARONDO_PROMPT_FILE` environment variable (and resolved using shell redirection `$(< "$ARONDO_PROMPT_FILE")`), which mitigates command length constraints and process command argument exposure. The UI "Show Prompt" panel displays the real resolved prompt instead of the original raw inputs.
 - **autoagent (Auto Mode)**: Automatically selects the best agent based on hourly and weekly quota availability retrieved from the runner, then optionally lets `automodel` choose the model/effort from the selected choice's allowed model options. New chat sessions default to using the Auto agent mode.
   - **Choices**:

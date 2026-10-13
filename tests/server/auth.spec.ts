@@ -249,7 +249,7 @@ test.describe('Authentication API tests', () => {
       },
     });
 
-    const { getAutomodelConfig, isAutomodelEnabled } = await import('../../lib/automodel/config');
+    const { getAutomodelConfig, isAutomodelEnabled } = await import('../../lib/llm/config');
 
     expect(isAutomodelEnabled()).toBe(false);
     expect(getAutomodelConfig()).toBeNull();

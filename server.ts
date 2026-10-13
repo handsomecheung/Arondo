@@ -10,6 +10,10 @@ import { startMaintenance } from "./lib/maintenance";
 import { runMigrations } from "./lib/migrations";
 
 import { initializeAuth, findRunnerTokenByToken } from "./lib/auth";
+import { getInnerRunnerQuotaMethod } from "./lib/config";
+
+// Validate ARONDO_INNER_RUNNER_QUOTA_METHOD environment variable on startup
+getInnerRunnerQuotaMethod();
 
 const port = parseInt(process.env.PORT || (process.env.NODE_ENV === "production" ? "3250" : "3251"), 10);
 const dev = process.env.NODE_ENV !== "production";

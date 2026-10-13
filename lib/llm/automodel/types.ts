@@ -1,4 +1,4 @@
-import type { ConcreteAgentType } from "../agents";
+import type { ConcreteAgentType } from "../../agents";
 
 export type AutoModelProvider = "openai" | "google" | "anthropic";
 export type AutoModelEffort = "minimal" | "low" | "medium" | "high";

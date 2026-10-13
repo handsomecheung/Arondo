@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -11,22 +12,121 @@ import (
 	"time"
 )
 
+type InteractiveQuotaDecision struct {
+	Status     string `json:"status"` // "need_action", "quota_extracted", "failed"
+	KeysToSend string `json:"keysToSend,omitempty"`
+	DelayMs    int    `json:"delayMs,omitempty"`
+	Reason     string `json:"reason,omitempty"`
+}
+
+// interactiveLlmQuotaLoop interacts with the agent starting from the initial screen
+// using the server-side LLM until quota is extracted or max steps reached.
+func interactiveLlmQuotaLoop(client *Client, agent, session string) bool {
+	if !client.IsLlmAvailable() {
+		return false
+	}
+	log.Printf("[quota/%s] fallback to interactive LLM loop", agent)
+
+	for step := 1; step <= 5; step++ {
+		text, err := captureTmuxPane(session)
+		if err != nil {
+			log.Printf("[quota/%s] interactive step %d: failed to capture pane: %v", agent, step, err)
+			return false
+		}
+		cleanText := stripAnsi(text)
+
+		reqPayload := map[string]any{
+			"agent":    agent,
+			"step":     step,
+			"paneText": cleanText,
+		}
+		reqMsg, err := NewRequest("quota.interactiveStep", reqPayload)
+		if err != nil {
+			log.Printf("[quota/%s] interactive step %d: build request error: %v", agent, step, err)
+			return false
+		}
+
+		resMsg, err := client.SendRequest(reqMsg, 30*time.Second)
+		if err != nil {
+			log.Printf("[quota/%s] interactive step %d: LLM request error: %v", agent, step, err)
+			return false
+		}
+
+		var resp struct {
+			OK       bool                      `json:"ok"`
+			Decision *InteractiveQuotaDecision `json:"decision"`
+			Error    *ErrorPayload             `json:"error,omitempty"`
+		}
+		if err := json.Unmarshal(resMsg.Payload, &resp); err != nil || !resp.OK || resp.Decision == nil {
+			log.Printf("[quota/%s] interactive step %d: invalid LLM response: %v", agent, step, err)
+			return false
+		}
+
+		decision := resp.Decision
+		log.Printf("[quota/%s] interactive step %d: status=%s, reason=%s", agent, step, decision.Status, decision.Reason)
+
+		if decision.Status == "quota_extracted" {
+			log.Printf("[quota/%s] quota successfully extracted by LLM", agent)
+			return true
+		}
+
+		if decision.Status == "failed" {
+			log.Printf("[quota/%s] LLM indicated failure: %s", agent, decision.Reason)
+			return false
+		}
+
+		if decision.Status == "need_action" {
+			if decision.KeysToSend != "" {
+				keys := decision.KeysToSend
+				hasEnter := strings.HasSuffix(keys, "\n")
+				keys = strings.TrimSuffix(keys, "\n")
+				if keys != "" {
+					if err := run("tmux", "send-keys", "-t", session, keys); err != nil {
+						log.Printf("[quota/%s] send-keys error: %v", agent, err)
+						return false
+					}
+					time.Sleep(500 * time.Millisecond)
+				}
+				if hasEnter {
+					if err := run("tmux", "send-keys", "-t", session, "Enter"); err != nil {
+						log.Printf("[quota/%s] send-keys Enter error: %v", agent, err)
+						return false
+					}
+				}
+			}
+			waitDuration := 4 * time.Second
+			if decision.DelayMs > 0 {
+				waitDuration = time.Duration(decision.DelayMs) * time.Millisecond
+			}
+			time.Sleep(waitDuration)
+		}
+	}
+
+	return false
+}
+
+
 func (h *Handler) handleInfoFetch(msg *Message) {
 	var payload struct {
-		Agent string `json:"agent"`
+		Agent  string `json:"agent"`
+		Method string `json:"method"` // "AUTO" | "LLM"
 	}
 	if err := parsePayloadInto(msg.Payload, &payload); err != nil || payload.Agent == "" {
 		h.sendError(msg.ID, "BAD_REQUEST", "missing agent field")
 		return
 	}
 	h.sendResponse(msg.ID, map[string]any{"ok": true})
+	method := strings.ToUpper(strings.TrimSpace(payload.Method))
+	if method != "LLM" {
+		method = "AUTO"
+	}
 	switch payload.Agent {
 	case "claude":
-		go fetchClaudeQuota(h.client)
+		go fetchClaudeQuota(h.client, method)
 	case "agy":
-		go fetchAgyQuota(h.client)
+		go fetchAgyQuota(h.client, method)
 	case "codex":
-		go fetchCodexQuota(h.client)
+		go fetchCodexQuota(h.client, method)
 	default:
 		log.Printf("[quota.fetch] unknown agent: %s", payload.Agent)
 	}

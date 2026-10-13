@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func fetchAgyQuota(client *Client) {
+func fetchAgyQuota(client *Client, method string) {
 	session := tmuxSessionName("agy")
 	run("tmux", "kill-session", "-t", session) //nolint
 
@@ -26,6 +26,12 @@ func fetchAgyQuota(client *Client) {
 	defer run("tmux", "kill-session", "-t", session) //nolint
 
 	time.Sleep(10 * time.Second)
+
+	if method == "LLM" {
+		log.Printf("[quota/agy] method is LLM; using interactive LLM loop directly from initial screen")
+		interactiveLlmQuotaLoop(client, "agy", session)
+		return
+	}
 
 	if _, err := captureTmuxPane(session); err != nil {
 		log.Printf("[quota/agy] failed to capture initial pane: %v", err)
@@ -62,7 +68,11 @@ func fetchAgyQuota(client *Client) {
 		log.Printf("[quota/agy] other  weekly  refreshes : %s", fmtI(q.OtherWeeklyResetsAt))
 		log.Printf("[quota/agy] other  hour    remaining : %s", fmtF(q.OtherHourRemain))
 		log.Printf("[quota/agy] other  hour    refreshes : %s", fmtI(q.OtherHourResetsAt))
+		return
 	}
+
+	log.Printf("[quota/agy] default quota parsing failed; checking LLM fallback")
+	interactiveLlmQuotaLoop(client, "agy", session)
 }
 
 // AgyQuota holds parsed quota data from the /usage command.

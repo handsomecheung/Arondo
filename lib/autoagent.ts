@@ -4,7 +4,7 @@ import type { ConcreteAgentType } from "./agents/index";
 import { getSessionLog, getAgentModelsConfig, getDefaultAgentModels, parseModelLine, parseModelList, type AgentModelsConfig, type Message } from "./store";
 import { getConfigDir } from "./config";
 import { stripAnsi } from "./ansi";
-import type { AutoModelCostTier, AutoModelEffort, AutoModelOption } from "./automodel";
+import type { AutoModelCostTier, AutoModelEffort, AutoModelOption } from "./llm/automodel";
 import { getAutoagentQuotaScore, getAutoagentWeekTimeRemain } from "./autoagent-score";
 
 const CONFIG_DIR = getConfigDir();

@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func fetchClaudeQuota(client *Client) {
+func fetchClaudeQuota(client *Client, method string) {
 	session := tmuxSessionName("claude")
 	run("tmux", "kill-session", "-t", session) //nolint
 
@@ -26,7 +26,14 @@ func fetchClaudeQuota(client *Client) {
 
 	time.Sleep(10 * time.Second)
 
+	if method == "LLM" {
+		log.Printf("[quota/claude] method is LLM; using interactive LLM loop directly from initial screen")
+		interactiveLlmQuotaLoop(client, "claude", session)
+		return
+	}
+
 	confirmClaudePrompts(session)
+
 
 	if err := run("tmux", "send-keys", "-t", session, "/status", "Enter"); err != nil {
 		log.Printf("[quota/claude] failed to send /status: %v", err)
@@ -47,6 +54,12 @@ func fetchClaudeQuota(client *Client) {
 	}
 
 	sq := parseClaudeStatus(statusOutput)
+	if sq.Account == "" || sq.Plan == "" {
+		log.Printf("[quota/claude] default status parsing failed; checking LLM fallback")
+		interactiveLlmQuotaLoop(client, "claude", session)
+		return
+	}
+
 	if sq.IsAPIKey {
 		sendQuotaUpdate(client, "claude", sq)
 		log.Printf("[quota/claude] API Key billing detected; skipping quota fetch")
@@ -76,6 +89,12 @@ func fetchClaudeQuota(client *Client) {
 	}
 
 	uq := parseClaudeUsage(usageOutput)
+	if uq.HourRemain == nil && uq.WeekRemain == nil {
+		log.Printf("[quota/claude] default usage parsing failed; checking LLM fallback")
+		interactiveLlmQuotaLoop(client, "claude", session)
+		return
+	}
+
 	merged := *sq
 	merged.HourRemain = uq.HourRemain
 	merged.HourResetAt = uq.HourResetAt

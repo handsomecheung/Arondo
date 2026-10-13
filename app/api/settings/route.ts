@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getArondoToken, getRoleByToken, isValidToken } from "@/lib/auth";
 import { updateAppSettings, getAppSettings, getSessionArchiveDays, getTempDirProjectRetentionHours, getShowHiddenFiles, getShowTempDirSessions, getEnableAutomodel, getAgentModelsConfig, type AgentModelsConfig } from "@/lib/store";
-import { getLlmApiKeyEnvStatus, type LlmApiKeyName } from "@/lib/automodel/config";
+import { getLlmApiKeyEnvStatus, type LlmApiKeyName } from "@/lib/llm/config";
 import { getWebPushContactEmail, updateWebPushContactEmail } from "@/lib/web-push-server";
 import fs from "fs/promises";
 import path from "path";

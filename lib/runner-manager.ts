@@ -28,7 +28,7 @@ import {
 import fs from "fs/promises";
 import path from "path";
 import { StringDecoder } from "string_decoder";
-import { getConfigDir } from "./config";
+import { getConfigDir, getInnerRunnerQuotaMethod } from "./config";
 import {
   getAgentQuotaErrorMessage,
   getAgyInvalidModelErrorMessage,
@@ -37,6 +37,8 @@ import {
 } from "./agent-quota-errors";
 import { sendWebPushNotification, type WebPushPayload } from "./web-push-server";
 import { shouldSendTaskNotification } from "./task-notifications";
+import { getAnyLlmConfig } from "./llm";
+import { decideQuotaStep } from "./llm/quota";
 
 const CONFIG_DIR = getConfigDir();
 const RUNNERS_DIR = path.join(CONFIG_DIR, "runners");
@@ -773,6 +775,13 @@ class RunnerManager {
       throw new Error(`Runner ${runnerId} not found or disconnected`);
     }
 
+    if (method === "info.fetch") {
+      payload = {
+        ...payload,
+        method: getInnerRunnerQuotaMethod(),
+      };
+    }
+
     const id = this.nextId();
     const msg: MessageEnvelope = { id, type: "request", method, payload };
 
@@ -794,6 +803,13 @@ class RunnerManager {
         `[runner-manager] sendFire ${method}: runner ${runnerId} not found`,
       );
       return;
+    }
+
+    if (method === "info.fetch") {
+      payload = {
+        ...payload,
+        method: getInnerRunnerQuotaMethod(),
+      };
     }
 
     const id = this.nextId();
@@ -1091,6 +1107,9 @@ class RunnerManager {
     }
 
     switch (msg.type) {
+      case "request":
+        this.handleRunnerRequest(runnerId, msg);
+        break;
       case "response":
         this.handleResponse(msg);
         break;
@@ -1102,6 +1121,93 @@ class RunnerManager {
         break;
       default:
         console.warn(`[runner-manager] unknown message type: ${msg.type}`);
+    }
+  }
+
+  isLlmAvailable(): boolean {
+    return !!getAnyLlmConfig();
+  }
+
+  private sendResponse(runnerId: string, reqId: string, payload: any): void {
+    const conn = this.runners.get(runnerId);
+    if (!conn || conn.ws.readyState !== 1) return;
+    conn.ws.send(
+      JSON.stringify({
+        id: reqId,
+        type: "response",
+        payload,
+      }),
+    );
+  }
+
+  private async handleRunnerRequest(runnerId: string, msg: MessageEnvelope): Promise<void> {
+    switch (msg.method) {
+      case "quota.interactiveStep": {
+        try {
+          const decision = await decideQuotaStep({
+            agent: msg.payload?.agent || "",
+            step: msg.payload?.step || 0,
+            paneText: msg.payload?.paneText || "",
+          });
+          if (!decision) {
+            this.sendResponse(runnerId, msg.id, { ok: false, error: { code: "NO_LLM", message: "No LLM available" } });
+            return;
+          }
+          if (decision.status === "quota_extracted" && decision.quota) {
+            // Convert decision quota to match Arondo quota payload format
+            const q = decision.quota;
+            const agent = msg.payload?.agent;
+            let formattedQuota: Record<string, unknown> | null = null;
+            if (agent === "agy") {
+              formattedQuota = {
+                Account: q.account || "unknown",
+                Plan: q.plan || "unknown",
+                DefaultModel: q.defaultModel || "",
+                GeminiWeeklyRemain: q.geminiWeeklyRemain ?? null,
+                GeminiWeeklyResetsAt: q.geminiWeeklyResetsAt ?? null,
+                GeminiHourRemain: q.geminiHourRemain ?? null,
+                GeminiHourResetsAt: q.geminiHourResetsAt ?? null,
+                OtherWeeklyRemain: q.otherWeeklyRemain ?? null,
+                OtherWeeklyResetsAt: q.otherWeeklyResetsAt ?? null,
+                OtherHourRemain: q.otherHourRemain ?? null,
+                OtherHourResetsAt: q.otherHourResetsAt ?? null,
+              };
+            } else if (agent === "claude") {
+              formattedQuota = {
+                Account: q.account || "unknown",
+                Plan: q.plan || "unknown",
+                DefaultModel: q.defaultModel || "",
+                IsAPIKey: q.isApiKey || false,
+                HourRemain: q.hourRemain ?? null,
+                HourResetAt: q.hourResetsAt ?? null,
+                WeekRemain: q.weekRemain ?? null,
+                WeekResetsAt: q.weekResetsAt ?? null,
+              };
+            } else if (agent === "codex") {
+              formattedQuota = {
+                Account: q.account || "unknown",
+                Plan: q.plan || "unknown",
+                DefaultModel: q.defaultModel || "",
+                FiveHourRemain: q.fiveHourRemain ?? null,
+                FiveHourResetAt: q.fiveHourResetsAt ?? null,
+                WeeklyRemain: q.weeklyRemain ?? null,
+                WeeklyResetAt: q.weeklyResetsAt ?? null,
+              };
+            }
+            if (formattedQuota) {
+              await this.onQuotaUpdate(runnerId, { agent, quota: formattedQuota });
+            }
+          }
+          this.sendResponse(runnerId, msg.id, { ok: true, decision });
+        } catch (err: any) {
+          console.error(`[runner-manager] quota.interactiveStep error:`, err);
+          this.sendResponse(runnerId, msg.id, { ok: false, error: { code: "LLM_ERROR", message: err?.message || String(err) } });
+        }
+        break;
+      }
+      default:
+        this.sendResponse(runnerId, msg.id, { ok: false, error: { code: "NOT_FOUND", message: `unknown method: ${msg.method}` } });
+        break;
     }
   }
 

@@ -6,3 +6,19 @@ export function getConfigDir(): string {
     ? path.resolve(process.env.ARONDO_CONFIG_DIR)
     : path.join(os.homedir(), ".arondo");
 }
+
+export type InnerRunnerQuotaMethod = "AUTO" | "LLM";
+
+export function getInnerRunnerQuotaMethod(): InnerRunnerQuotaMethod {
+  const val = process.env.ARONDO_INNER_RUNNER_QUOTA_METHOD?.trim().toUpperCase();
+  if (!val || val === "AUTO") {
+    return "AUTO";
+  }
+  if (val === "LLM") {
+    return "LLM";
+  }
+  throw new Error(
+    `Invalid ARONDO_INNER_RUNNER_QUOTA_METHOD: "${process.env.ARONDO_INNER_RUNNER_QUOTA_METHOD}". Allowed values are "AUTO" or "LLM".`,
+  );
+}
+

@@ -1,10 +1,10 @@
-import { generateObject, type LanguageModel } from "ai";
-import { createAnthropic } from "@ai-sdk/anthropic";
-import { createGoogle } from "@ai-sdk/google";
-import { createOpenAI } from "@ai-sdk/openai";
+import { generateObject } from "ai";
 import { z } from "zod";
-import { getAutomodelConfig, isAutomodelEnabled } from "./config";
+import { isAutomodelEnabled, getAnyLlmConfig } from "../config";
+import { createLlmModel } from "../model";
 import type { AutoModelDecision, AutoModelInput, AutoModelOption } from "./types";
+
+export * from "./types";
 
 const DecisionSchema = z.object({
   choiceId: z.string(),
@@ -13,12 +13,6 @@ const DecisionSchema = z.object({
   confidence: z.number().min(0).max(1),
   reason: z.string().max(240),
 });
-
-function createModel(provider: string, model: string, apiKey: string): LanguageModel {
-  if (provider === "openai") return createOpenAI({ apiKey })(model);
-  if (provider === "google") return createGoogle({ apiKey })(model);
-  return createAnthropic({ apiKey })(model);
-}
 
 function withTimeout<T>(run: (signal: AbortSignal) => Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -59,42 +53,53 @@ function buildPrompt(input: AutoModelInput, choices: AutoModelOption[]): string 
   ].join("\n");
 }
 
-function normalizeDecision(choice: AutoModelOption, object: z.infer<typeof DecisionSchema>): AutoModelDecision {
+function normalizeDecision(
+  selected: AutoModelOption,
+  rawDecision: z.infer<typeof DecisionSchema>,
+): AutoModelDecision {
   return {
-    model: choice.model,
-    effort: choice.effort,
-    taskClass: object.taskClass,
-    costTier: object.costTier,
-    confidence: object.confidence,
-    reason: object.reason,
+    model: selected.model,
+    effort: selected.effort,
+    taskClass: rawDecision.taskClass,
+    costTier: rawDecision.costTier,
+    confidence: rawDecision.confidence,
+    reason: rawDecision.reason,
   };
 }
 
-interface RouteModelOptions {
+function formatLogSection(title: string, value: unknown): string {
+  if (typeof value === "string") {
+    return `## ${title}\n${value}`;
+  }
+  return `## ${title}\n\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``;
+}
+
+export interface RouteModelOptions {
   writeLog?: (text: string) => void | Promise<void>;
 }
 
-function formatLogSection(title: string, value: unknown): string {
-  const body = typeof value === "string" ? value : JSON.stringify(value, null, 2);
-  return [`## ${title}`, body, ""].join("\n");
-}
-
-export async function routeModel(input: AutoModelInput, options: RouteModelOptions = {}): Promise<AutoModelDecision | null> {
+export async function routeModel(
+  input: AutoModelInput,
+  options?: RouteModelOptions,
+): Promise<AutoModelDecision | null> {
   const startedAt = Date.now();
   const logParts: string[] = [
     `# automodel ${new Date(startedAt).toISOString()}`,
-    "",
     formatLogSection("Input", {
       agentType: input.agentType,
-      defaultModel: input.defaultModel ?? null,
-      modelOptions: input.modelOptions,
+      defaultModel: input.defaultModel,
       message: input.message,
+      modelOptions: input.modelOptions,
     }),
   ];
+
   const flushLog = async () => {
-    if (!options.writeLog) return;
-    logParts.push(formatLogSection("Elapsed", `${Date.now() - startedAt}ms`));
-    await options.writeLog(logParts.join("\n"));
+    if (!options?.writeLog) return;
+    try {
+      await options.writeLog(`${logParts.join("\n\n")}\n`);
+    } catch (err) {
+      console.warn("[automodel] failed to write automodel log:", err);
+    }
   };
 
   if (!isAutomodelEnabled()) {
@@ -103,7 +108,7 @@ export async function routeModel(input: AutoModelInput, options: RouteModelOptio
     return null;
   }
 
-  const config = getAutomodelConfig();
+  const config = getAnyLlmConfig(2000);
   if (!config) {
     logParts.push(formatLogSection("Result", "skipped: no automodel API key configured"));
     await flushLog();
@@ -124,7 +129,7 @@ export async function routeModel(input: AutoModelInput, options: RouteModelOptio
   }
 
   try {
-    const model = createModel(config.provider, config.model, config.apiKey);
+    const model = createLlmModel(config.provider, config.model, config.apiKey);
     const prompt = buildPrompt(input, choices);
     logParts.push(formatLogSection("Prompt", prompt));
     const result = await withTimeout(
@@ -156,5 +161,3 @@ export async function routeModel(input: AutoModelInput, options: RouteModelOptio
     return null;
   }
 }
-
-export type { AutoModelCostTier, AutoModelDecision, AutoModelEffort, AutoModelInput, AutoModelOption, AutoModelProvider } from "./types";

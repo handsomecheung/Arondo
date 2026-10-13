@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func fetchCodexQuota(client *Client) {
+func fetchCodexQuota(client *Client, method string) {
 	session := tmuxSessionName("codex")
 	run("tmux", "kill-session", "-t", session) //nolint
 
@@ -28,7 +28,14 @@ func fetchCodexQuota(client *Client) {
 
 	time.Sleep(10 * time.Second)
 
+	if method == "LLM" {
+		log.Printf("[quota/codex] method is LLM; using interactive LLM loop directly from initial screen")
+		interactiveLlmQuotaLoop(client, "codex", session)
+		return
+	}
+
 	confirmCodexPrompts(session)
+
 
 	// Typing "/status" opens a slash-command autocomplete popup (it also
 	// matches "/statusline"); sending Enter in the same send-keys call arrives
@@ -58,8 +65,9 @@ func fetchCodexQuota(client *Client) {
 	}
 
 	q := parseCodexQuota(output)
-	if q == nil {
-		log.Printf("[quota/codex] failed to parse status output")
+	if q == nil || q.Account == "" || q.Plan == "" {
+		log.Printf("[quota/codex] default status parsing failed; checking LLM fallback")
+		interactiveLlmQuotaLoop(client, "codex", session)
 		return
 	}
 	sendQuotaUpdate(client, "codex", q)

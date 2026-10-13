@@ -96,11 +96,15 @@ func (h *Handler) handleEvent(msg *Message) {
 		// Extract queryAgents from the payload and report which ones are
 		// available on this runner's PATH.
 		var connPayload struct {
-			QueryAgents []string `json:"queryAgents"`
+			QueryAgents  []string `json:"queryAgents"`
+			LlmAvailable bool     `json:"llmAvailable"`
 		}
-		if err := parsePayloadInto(msg.Payload, &connPayload); err == nil && len(connPayload.QueryAgents) > 0 {
-			if err := h.client.sendAgentStatus(connPayload.QueryAgents); err != nil {
-				log.Printf("warning: failed to send agent.status: %v", err)
+		if err := parsePayloadInto(msg.Payload, &connPayload); err == nil {
+			h.client.SetLlmAvailable(connPayload.LlmAvailable)
+			if len(connPayload.QueryAgents) > 0 {
+				if err := h.client.sendAgentStatus(connPayload.QueryAgents); err != nil {
+					log.Printf("warning: failed to send agent.status: %v", err)
+				}
 			}
 		}
 	default:

@@ -39,6 +39,20 @@ func NewResponse(reqID string, payload any) (*Message, error) {
 	}, nil
 }
 
+func NewRequest(method string, payload any) (*Message, error) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	return &Message{
+		ID:      NewID(),
+		Type:    TypeRequest,
+		Method:  method,
+		Payload: data,
+	}, nil
+}
+
+
 func NewStream(method string, payload any) (*Message, error) {
 	data, err := json.Marshal(payload)
 	if err != nil {

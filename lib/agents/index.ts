@@ -4,7 +4,7 @@ import { ClaudeCodeAgent } from "./claude";
 import { CodexAgent } from "./codex";
 import { OpencodeAgent } from "./opencode";
 import { getAgyQuotaGroupForModel, getModelOptionsForAgent, selectAgent, type AgyQuotaGroup } from "../autoagent";
-import { routeModel, type AutoModelEffort, type AutoModelOption } from "../automodel";
+import { routeModel, type AutoModelEffort, type AutoModelOption } from "../llm/automodel";
 import { getAgentModelsConfig, parseModelLine, type AgentModelsConfig } from "../store";
 
 export type ConcreteAgentType = "antigravity" | "claude" | "codex" | "opencode";
