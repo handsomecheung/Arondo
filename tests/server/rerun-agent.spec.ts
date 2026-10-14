@@ -94,7 +94,14 @@ test.describe('Rerun Agent API integration tests', () => {
       expect(secondReturnMsg).toBeDefined();
       expect(secondReturnMsg.content).toContain('Error');
 
-      // 5. Trigger rerun-agent with secondRunMsg.id (simulating user clicking Retry on the failed card)
+      // 5. Change the session's selected agent after the card failed.
+      const changeAgentRes = await request.patch(`/api/sessions/${sessionId}`, {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+        data: { agentType: 'claude' },
+      });
+      expect(changeAgentRes.status()).toBe(200);
+
+      // 6. Trigger rerun-agent with secondRunMsg.id (simulating user clicking Retry on the failed card)
       console.log('[rerun-test] Triggering rerun-agent on failed run...');
       const rerunRes = await request.post(`/api/sessions/${sessionId}/rerun-agent`, {
         headers: { 'x-arondo-token': 'test-token-123456' },
@@ -105,7 +112,7 @@ test.describe('Rerun Agent API integration tests', () => {
       // Wait for rerun to complete
       await waitForSessionNotRunning(request, sessionId);
 
-      // 6. Retrieve messages and inspect all agent-run messages
+      // 7. Retrieve messages and inspect all agent-run messages
       msgsRes = await request.get(`/api/messages?sessionId=${sessionId}`, {
         headers: { 'x-arondo-token': 'test-token-123456' }
       });
@@ -125,10 +132,20 @@ test.describe('Rerun Agent API integration tests', () => {
       expect(thirdRunMsg.prompt).toContain('Second follow-up message FAIL_MOCK');
       expect(thirdRunMsg.prompt).not.toContain('First initial prompt');
 
-      // The rerun command for codex should be a resume command
+      // Rerunning a card must preserve the card's original resolved agent,
+      // even when the session's selected agent has since changed.
+      expect(thirdRunMsg.resolvedAgentType).toBe('codex');
+
+      // The rerun command for the original Codex card should resume its session.
       expect(thirdRunMsg.content).toContain('resume');
 
-      // 7. A user-stopped agent run can also be rerun.
+      const restoreAgentRes = await request.patch(`/api/sessions/${sessionId}`, {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+        data: { agentType: 'codex' },
+      });
+      expect(restoreAgentRes.status()).toBe(200);
+
+      // 8. A user-stopped agent run can also be rerun.
       const stoppedRunRes = await request.post(`/api/sessions/${sessionId}/messages`, {
         headers: { 'x-arondo-token': 'test-token-123456' },
         data: { message: 'Stopped follow-up message STOP_MOCK' },
