@@ -406,6 +406,8 @@ export default function SessionView({
 
   const chatInputPlaceholder = isArchived
     ? "This session is archived. Unarchive it to send messages."
+    : isOnceSession
+    ? "This is a single-use session. Chat is disabled."
     : isRunnerOffline
     ? "Runner is offline. Chat is disabled."
     : isPathMissing
@@ -1720,7 +1722,7 @@ export default function SessionView({
             value={chatInputValue}
             onChange={onPromptChange}
             onKeyDown={onKeyDown}
-            disabled={isRunnerOffline || isArchived || isPathMissing}
+            disabled={isRunnerOffline || isArchived || isPathMissing || isOnceSession}
             readOnly={isArchived}
             rows={1}
             id="chat-input"
@@ -1730,7 +1732,7 @@ export default function SessionView({
               <button
                 className="upload-btn"
                 onClick={() => setAttachMenuOpen((v) => (v === "closed" ? "menu" : "closed"))}
-                disabled={isRunnerOffline || isArchived || isPathMissing}
+                disabled={isRunnerOffline || isArchived || isPathMissing || isOnceSession}
                 title="Attach a file or schedule this message"
                 type="button"
               >
