@@ -188,6 +188,8 @@ test.describe('Authentication API tests', () => {
       data: {
         llmApiKeys: {
           ANTHROPIC_API_KEY: null,
+          OPENAI_API_KEY: null,
+          GOOGLE_GENERATIVE_AI_API_KEY: null,
         },
       },
     });
@@ -253,6 +255,16 @@ test.describe('Authentication API tests', () => {
 
     expect(isAutomodelEnabled()).toBe(false);
     expect(getAutomodelConfig()).toBeNull();
+
+    // Clean up to prevent polluting subsequent tests
+    await request.post('/api/settings', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        llmApiKeys: {
+          ANTHROPIC_API_KEY: '',
+        },
+      },
+    });
   });
 
   test('agentModels default configuration is provided and can be updated via settings API', async ({ request }) => {

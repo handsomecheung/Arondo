@@ -1,4 +1,5 @@
 import path from "path";
+import os from "os";
 import { NextRequest, NextResponse } from "next/server";
 import { getSessions, getProjects, deleteSession, archiveSession, createSession, addTodoMessage, getSession, getSessionArchiveAgeMs, isTempDirProject, getShowTempDirSessions, type MessageFile } from "@/lib/store";
 import { eventBus } from "@/lib/event-bus";
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
       continue;
     }
 
-    if (!showTempDirSessions && project && isTempDirProject(project)) {
+    if (!showTempDirSessions && (session.tempDir || (project && isTempDirProject(project)))) {
       continue;
     }
 
@@ -133,40 +134,48 @@ export async function POST(req: NextRequest) {
 
   let runnerId = runnerIdInput;
   if (!runnerId) {
-    if (!tempDir && !noProject) {
+    if (!tempDir && !noProject && agentType !== "decision") {
       return NextResponse.json({ error: "runnerId is required" }, { status: 400 });
     }
-    runnerId = await pickRandomAllowedRunnerId(token);
-    if (!runnerId) {
-      return NextResponse.json({ error: "No available runners" }, { status: 400 });
+    if (agentType !== "decision") {
+      runnerId = await pickRandomAllowedRunnerId(token);
+      if (!runnerId) {
+        return NextResponse.json({ error: "No available runners" }, { status: 400 });
+      }
     }
   }
 
-  const isAllowed = await runnerManager.isTokenAllowedForRunnerId(runnerId, token);
-  if (!isAllowed) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (runnerId) {
+    const isAllowed = await runnerManager.isTokenAllowedForRunnerId(runnerId, token);
+    if (!isAllowed) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
   }
 
-  const run = runnerManager.getRunner(runnerId);
-  if (!run) {
+  const run = runnerId ? runnerManager.getRunner(runnerId) : null;
+  if (!run && agentType !== "decision") {
     return NextResponse.json({ error: "Runner not found or disconnected" }, { status: 400 });
   }
 
   let repoPath = repoPathInput as string;
   if (tempDir || noProject) {
-    try {
-      const sessions = await getSessions();
-      const busyPaths = sessions
-        .filter((s) => s.runnerId === runnerId && (s.status === "running" || s.status === "script-running") && s.repoPath)
-        .map((s) => s.repoPath);
-      const result = await runnerManager.sendRequest(
-        runnerId,
-        "fs.mkdtemp",
-        noProject ? { purpose: "no-project-session" } : { excludePaths: busyPaths },
-      );
-      repoPath = result.path;
-    } catch (error: any) {
-      return NextResponse.json({ error: error.message || "Failed to create temp directory" }, { status: 500 });
+    if (agentType === "decision") {
+      repoPath = os.tmpdir();
+    } else {
+      try {
+        const sessions = await getSessions();
+        const busyPaths = sessions
+          .filter((s) => s.runnerId === runnerId && (s.status === "running" || s.status === "script-running") && s.repoPath)
+          .map((s) => s.repoPath);
+        const result = await runnerManager.sendRequest(
+          runnerId!,
+          "fs.mkdtemp",
+          noProject ? { purpose: "no-project-session" } : { excludePaths: busyPaths },
+        );
+        repoPath = result.path;
+      } catch (error: any) {
+        return NextResponse.json({ error: error.message || "Failed to create temp directory" }, { status: 500 });
+      }
     }
   }
 
@@ -177,7 +186,7 @@ export async function POST(req: NextRequest) {
       name: name?.trim() || deriveSessionName("", repoPath),
       agentType,
       repoPath,
-      runnerId,
+      runnerId: runnerId || "",
       tokenUuid: getUuidByToken(token) || undefined,
       once: once ? true : undefined,
       cache: cache === "on" ? "on" : undefined,
@@ -195,7 +204,7 @@ export async function POST(req: NextRequest) {
       name: name?.trim() || deriveSessionName(trimmedMessage, repoPath),
       agentType,
       repoPath,
-      runnerId,
+      runnerId: runnerId || "",
       tokenUuid: getUuidByToken(token) || undefined,
       once: once ? true : undefined,
       cache: cache === "on" ? "on" : undefined,
@@ -216,14 +225,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(updated, { status: 201 });
   }
 
-  if (!force && !noProject) {
-    const { dirty, busy } = await getProjectReadiness(runnerId, repoPath);
+  if (!force && !noProject && agentType !== "decision") {
+    const { dirty, busy } = await getProjectReadiness(runnerId!, repoPath);
     if (dirty || busy) {
       return NextResponse.json({ needsConfirmation: true, reason: { dirty, busy } }, { status: 409 });
     }
   }
 
-  const result = await dispatchCreateSession(runnerId, repoPath, agentType, prompt, {
+  const result = await dispatchCreateSession(runnerId || "", repoPath, agentType, prompt, {
     id: typeof idInput === "string" && idInput.trim() ? idInput.trim() : undefined,
     name,
     tokenUuid: getUuidByToken(token) || undefined,

@@ -8,7 +8,7 @@ import { routeModel, type AutoModelEffort, type AutoModelOption } from "../llm/a
 import { getAgentModelsConfig, parseModelLine, type AgentModelsConfig } from "../store";
 
 export type ConcreteAgentType = "antigravity" | "claude" | "codex" | "opencode";
-export type AgentType = ConcreteAgentType | "auto";
+export type AgentType = ConcreteAgentType | "auto" | "decision";
 
 /**
  * Registry entry: maps an agent type to its factory and the binary name

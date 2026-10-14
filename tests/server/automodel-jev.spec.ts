@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
 import http from 'http';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import { routeModel } from '../../lib/llm/automodel';
 import { getJevConfig } from '../../lib/llm/config';
 import { getInnerAutomodelMethod } from '../../lib/config';
@@ -198,6 +201,20 @@ test.describe('Jev System One Automodel Tests', () => {
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
     const port = (server.address() as any).port;
 
+    const configDir = process.env.ARONDO_CONFIG_DIR || path.join(os.homedir(), '.arondo');
+    const configFile = path.join(configDir, 'arondo.json');
+    let originalConfig: string | null = null;
+    if (fs.existsSync(configFile)) {
+      originalConfig = fs.readFileSync(configFile, 'utf-8');
+      try {
+        const parsed = JSON.parse(originalConfig);
+        if (parsed.setitngs?.llmApiKeys) {
+          delete parsed.setitngs.llmApiKeys;
+          fs.writeFileSync(configFile, JSON.stringify(parsed, null, 2));
+        }
+      } catch {}
+    }
+
     try {
       process.env.ARONDO_ENABLE_AUTOMODEL = 'true';
       process.env.ARONDO_INNER_AUTOMODEL_METHOD = 'DM';
@@ -229,6 +246,12 @@ test.describe('Jev System One Automodel Tests', () => {
       expect(logOutput).toContain('Jev Fallback');
       expect(logOutput).toContain('no automodel API key configured');
     } finally {
+      if (originalConfig !== null) {
+        try {
+          const configDir = process.env.ARONDO_CONFIG_DIR || path.join(os.homedir(), '.arondo');
+          fs.writeFileSync(path.join(configDir, 'arondo.json'), originalConfig);
+        } catch {}
+      }
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
   });

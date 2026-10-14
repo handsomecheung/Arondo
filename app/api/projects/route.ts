@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       continue;
     }
 
-    if (!runnerIds.has(project.runnerId)) {
+    if (project.runnerId && !runnerIds.has(project.runnerId)) {
       console.log(`[projects] runner ${project.runnerId} for project ${project.id} no longer exists, deleting project`);
       await deleteProject(project.id);
       continue;

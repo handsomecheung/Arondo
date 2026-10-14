@@ -358,6 +358,12 @@ export async function verifySessionPermission(
   if (!sessionId) return false;
   const session = await getSession(sessionId);
   if (!session) return false;
+  if (!isValidToken(token)) return false;
+  if (!session.runnerId) {
+    if (getRoleByToken(token) === "admin") return true;
+    if (session.tokenUuid && getUuidByToken(token) === session.tokenUuid) return true;
+    return !session.tokenUuid;
+  }
   return verifyRunnerPermission(session.runnerId, token);
 }
 

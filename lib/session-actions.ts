@@ -25,6 +25,7 @@ import { readTokensConfig } from "./auth";
 import { isQuotaErrorMessage } from "./agent-quota-errors";
 import { stripAnsi } from "./ansi";
 import { shouldSendTaskNotification } from "./task-notifications";
+import { executeDecisionSession } from "./decision/runner";
 
 const MAX_SESSION_NAME_LENGTH = 80;
 
@@ -228,6 +229,37 @@ export async function dispatchFollowupMessage(
     files: opts.files,
   });
   eventBus.publish({ type: "message_added", payload: userMsg });
+
+  if (session.agentType === "decision") {
+    const patch: Record<string, any> = { status: "running" };
+    if (!session.name) {
+      const firstLine = trimmedMessage.split("\n")[0];
+      patch.name = firstLine.length > MAX_SESSION_NAME_LENGTH
+        ? firstLine.slice(0, MAX_SESSION_NAME_LENGTH) + "…"
+        : firstLine;
+    }
+    const updatedSession = await updateSession(sessionId, patch);
+    eventBus.publish({ type: "session_updated", payload: updatedSession });
+
+    const systemMessageId = crypto.randomUUID();
+    const systemMsg = await addMessage({
+      id: systemMessageId,
+      sessionId,
+      role: "system",
+      content: "⚙️ Evaluating decision via Jev System One...",
+      type: "agent-run",
+      resolvedAgentType: "decision",
+      prompt: trimmedPrompt || trimmedMessage,
+      tokenUuid: opts.tokenUuid || session.tokenUuid,
+    });
+    eventBus.publish({ type: "message_added", payload: systemMsg });
+
+    executeDecisionSession(updatedSession || session, systemMessageId, trimmedPrompt || trimmedMessage).catch((err) => {
+      console.error("[decision] execution error:", err);
+    });
+
+    return { ok: true, message: userMsg };
+  }
 
   const runnerConn = runnerManager.getRunner(session.runnerId);
 
@@ -460,6 +492,52 @@ export async function dispatchCreateSession(
       }
       return { ok: true, session: updated };
     }
+  }
+
+  if (agentType === "decision") {
+    const session = await createSession({
+      id: opts.id,
+      status: "running",
+      name: opts.name?.trim() || deriveSessionName(displayMessage, repoPath),
+      agentType,
+      repoPath,
+      runnerId,
+      tokenUuid: opts.tokenUuid,
+      once: opts.once ? true : undefined,
+      cache: opts.cache === "on" ? "on" : undefined,
+    }, { tempDir: opts.tempDir, noProject: opts.noProject });
+
+    const userMessage = await addMessage({
+      sessionId: session.id,
+      role: "user",
+      content: displayMessage,
+      prompt: trimmedPrompt,
+      type: "chat-user",
+      tokenUuid: opts.tokenUuid,
+      cache: opts.cache === "on" ? "on" : undefined,
+      files: opts.files,
+    });
+    eventBus.publish({ type: "message_added", payload: userMessage });
+
+    const systemMessageId = crypto.randomUUID();
+    const systemMsg = await addMessage({
+      id: systemMessageId,
+      sessionId: session.id,
+      role: "system",
+      content: "⚙️ Evaluating decision via Jev System One...",
+      type: "agent-run",
+      resolvedAgentType: "decision",
+      prompt: trimmedPrompt,
+      cache: opts.cache === "on" ? "on" : undefined,
+      tokenUuid: opts.tokenUuid || session.tokenUuid,
+    });
+    eventBus.publish({ type: "message_added", payload: systemMsg });
+
+    executeDecisionSession(session, systemMessageId, trimmedPrompt).catch((err) => {
+      console.error("[decision] execution error:", err);
+    });
+
+    return { ok: true, session };
   }
 
   const run = runnerManager.getRunner(runnerId);

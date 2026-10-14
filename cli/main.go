@@ -42,7 +42,7 @@ Options:
   --session-id <id>            Send the message to an existing session
   --resume                     Resume the most recently updated session for the runner and repository path
   --confirmation <value>       Resolve a needs-confirmation response: auto, draft, or force
-  --agent <type>               auto, antigravity, claude, codex, or opencode (default: auto)
+  --agent <type>               auto, antigravity, claude, codex, opencode, or decision (default: auto)
   --poll-interval <seconds>    Seconds between status polls (default: 3)
   --timeout <seconds>          Maximum seconds to wait for completion (default: 600)
   --output <format>            Output format: plain or json (default: plain)
@@ -52,6 +52,7 @@ const rootUsage = `Usage: cli/arondo-cli <command> [options] <message>
 
 Commands:
   send          Create a session or send a message to an existing session, then wait for the result
+  decide        Run a fast categorical decision or classification using Jev System One
   get-messages  Print the full conversation history of a session
   get-sessions  List active sessions
   get-projects  List all accessible projects
@@ -247,8 +248,11 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 		}
 		args.repoPath = workingDirectory
 	}
-	if !map[string]bool{"auto": true, "antigravity": true, "claude": true, "codex": true, "opencode": true}[args.agentType] {
-		return arguments{}, errors.New("--agent must be auto, antigravity, claude, codex, or opencode")
+	if args.agentType == "jev" {
+		args.agentType = "decision"
+	}
+	if !map[string]bool{"auto": true, "antigravity": true, "claude": true, "codex": true, "opencode": true, "decision": true}[args.agentType] {
+		return arguments{}, errors.New("--agent must be auto, antigravity, claude, codex, opencode, or decision")
 	}
 	if args.output != "plain" && args.output != "json" {
 		return arguments{}, errors.New("--output must be plain or json")
@@ -530,7 +534,7 @@ func run(argv []string) error {
 	if len(argv) == 0 {
 		return fmt.Errorf("a command is required\n\n%s", rootUsage)
 	}
-	if argv[0] != "send" && argv[0] != "get-messages" && argv[0] != "get-sessions" && argv[0] != "get-projects" && argv[0] != "get-agents" && argv[0] != "get-quota" && argv[0] != "update-quota" {
+	if argv[0] != "send" && argv[0] != "decide" && argv[0] != "get-messages" && argv[0] != "get-sessions" && argv[0] != "get-projects" && argv[0] != "get-agents" && argv[0] != "get-quota" && argv[0] != "update-quota" {
 		return fmt.Errorf("unknown command: %s\n\n%s", argv[0], rootUsage)
 	}
 	configDir, err := configDir()
@@ -540,6 +544,17 @@ func run(argv []string) error {
 	config, err := loadConfig(filepath.Join(configDir, "arondo.json"))
 	if err != nil {
 		return err
+	}
+	if argv[0] == "decide" {
+		args, err := parseDecideArgs(argv[1:], config)
+		if errors.Is(err, errHelp) {
+			fmt.Fprintln(os.Stderr, decideUsage)
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		return runDecide(&client{server: args.server, token: args.token, http: http.DefaultClient}, args)
 	}
 	if argv[0] == "get-messages" {
 		args, err := parseGetMessagesArgs(argv[1:], config)

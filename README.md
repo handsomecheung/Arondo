@@ -366,6 +366,55 @@ When the server returns `needsConfirmation: true`, the CLI prints a hint with th
 The final JSON result uses `sessionId` and includes the agent's stdout as `rawOutput`.
 The final JSON result is written to stdout; progress messages and errors are written to stderr.
 
+#### Fast Categorical Decisions (`decide`)
+
+Run fast categorical decisions, classifications, triage, or probability evaluations powered by TypeSafe AI's System One model (`jev-latest`) without spawning a coding agent or connecting a runner:
+
+```bash
+cli/arondo-cli decide '{
+  "state": "Our API integration started returning 500 errors on every request about 20 minutes ago, and we can'\''t process any customer orders until this is fixed.",
+  "questions": {
+    "department": {
+      "type": "choice",
+      "instructions": "Which team should handle this",
+      "criteria": {
+        "billing": "Payment or subscription issues",
+        "technical": "Bugs or integration problems",
+        "sales": "Pricing or account questions"
+      }
+    },
+    "frustration": {
+      "type": "score",
+      "instructions": "How frustrated the customer appears",
+      "criteria": [
+        "Calm, just stating facts",
+        "Frustrated but civil",
+        "Very angry, strong language"
+      ]
+    },
+    "is_urgent": {
+      "type": "noul",
+      "instructions": "The message conveys urgency or time-sensitivity"
+    }
+  }
+}'
+```
+
+Or pipe JSON directly via standard input:
+
+```bash
+cat payload.json | cli/arondo-cli decide
+```
+
+- **Input Format**: Expects a valid JSON object containing a `questions` map. Supported question primitives:
+  - `choice`: Categorical selection among string options (`choices` array or `criteria` map with descriptions).
+  - `score`: Ordered evaluation scale between 2 and 10 levels (`criteria` array).
+  - `noul`: Bernoulli truth probability estimation between 0.0 and 1.0 (True/False or Yes/No propositions).
+  - The `model` field is optional (defaults to `jev-latest` on the server). The `state` field is optional context.
+- **Server-Side Execution**: Runs directly on the server via `TYPESAFE_API_KEY` (in ~180ms) without requiring a connected runner or git repository.
+- **Ephemeral & Web-Clean**: Automatically runs with `--temp-dir` and `--once` semantics, so sessions auto-destruct upon completion and do not appear in the Web UI session list by default.
+- **Output**: Formatted plain text by default, or structured JSON when using `--output json`.
+
 Additional CLI commands help inspect runner readiness before sending work:
 
 ```bash
