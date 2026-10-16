@@ -23,6 +23,8 @@
 
 6. **Settings vs Admin Settings Separation**: `/settings` is accessible to all users for device-level and personal preferences (such as enabling Web Push notifications on the current device). All server-level settings and configuration file modifications (`arondo.json`, `web-push.json`, agent models, tokens, global rules, etc.) must strictly be implemented in `/admin/settings` (Admin role only).
 
+7. **Sync CLI Skill Documentation**: Whenever modifications, new flags, new subcommands, or behavioral changes are made to the Arondo CLI (`cli/`) or its documentation in `README.md`, always update `cli/skills/arondo-cli/SKILL.md` to keep the bundled agent skill documentation in sync.
+
 ---
 
 Before starting work, ensure you have read the `README.md` in current directory to understand the project's background, objectives, and overall architecture. If a `README.md` exists in your current working directory (the project subdirectory you are modifying), refer to it for specific instructions and project details.
@@ -58,7 +60,7 @@ runner/                  # Go runner binary
   handler_pty.go        # pty.input (write to PTY), pty.resize
   pty.go                # TaskManager: spawn processes with PTY, scrollback buffer, auto-cleanup on exit
 cli/
-  main.go               # Dependency-free Go CLI: send/get-messages/get-sessions/get-projects/get-agents/get-quota/update-quota
+  main.go               # Dependency-free Go CLI: send/decide/get-messages/get-sessions/get-projects/get-agents/get-quota/update-quota
   install-skill         # Installs the bundled arondo-cli skill for supported agents
 app/
   page.tsx              # Main UI (runner selector, chat, status tracking, terminal modals, 3-dot dropdown)
@@ -316,7 +318,7 @@ Uses the `process` singleton pattern (shared across tsx and Turbopack contexts).
 cd cli && go build -o arondo-cli . && cd ..  # Build the Go CLI
 ```
 
-The CLI reads connection settings in this order: command flags (`--server`, `--client-token`), then `ARONDO_SERVER` / `ARONDO_CLIENT_TOKEN`, then `cli.server` / `cli.clientToken` in `~/.arondo/arondo.json`. `send` creates or resumes sessions and waits for completion (`--once` restricts `--temp-dir` sessions to a single message, and `--cache on` caches output by prompt hash for seven days). `get-sessions` lists active sessions, `get-projects` lists accessible projects, `get-agents` reports Antigravity, Claude, Codex, and OpenCode availability per runner, `get-quota` prints recorded quota data, and `update-quota` queues an asynchronous quota refresh via `/api/agents/quota`.
+The CLI reads connection settings in this order: command flags (`--server`, `--client-token`), then `ARONDO_SERVER` / `ARONDO_CLIENT_TOKEN`, then `cli.server` / `cli.clientToken` in `~/.arondo/arondo.json`. `send` creates or resumes sessions and waits for completion (`--once` restricts `--temp-dir` sessions to a single message, and `--cache on` caches output by prompt hash for seven days). `decide` executes fast categorical decisions using Jev System One without spawning an agent. `get-sessions` lists active sessions, `get-projects` lists accessible projects, `get-agents` reports Antigravity, Claude, Codex, and OpenCode availability per runner, `get-quota` prints recorded quota data, and `update-quota` queues an asynchronous quota refresh via `/api/agents/quota`.
 
 ## Real-time Communication
 
