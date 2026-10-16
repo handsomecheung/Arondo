@@ -96,6 +96,7 @@ export async function dispatchDetachedAgent(
   const resolved = await resolveAgentType(selectedAgentType, runner?.info.agents ?? [], {
     prompt,
     automodelLog: (text) => appendAutomodelLog(sessionId, runMessageId, text),
+    once: session.once,
   });
 
   const agentSessionKey = crypto.randomUUID();
@@ -280,6 +281,7 @@ export async function dispatchFollowupMessage(
         agyQuotaGroup: session.autoLockedAgyQuotaGroup,
       }
       : undefined,
+    once: session.once,
   });
   const resolvedType = resolved.agentType;
 
@@ -561,6 +563,7 @@ export async function dispatchCreateSession(
   const resolved = await resolveAgentType(agentType, run.info.agents, {
     prompt: trimmedPrompt,
     automodelLog: (text) => appendAutomodelLog(session.id, systemMessageId, text),
+    once: opts.once,
   });
   const resolvedType = resolved.agentType;
   const agent = getAgent(resolvedType);

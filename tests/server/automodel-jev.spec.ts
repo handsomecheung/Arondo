@@ -255,4 +255,26 @@ test.describe('Jev System One Automodel Tests', () => {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
   });
+
+  test('routeModel skips and logs when once is false', async () => {
+    process.env.ARONDO_ENABLE_AUTOMODEL = 'true';
+    let logOutput = '';
+    const decision = await routeModel(
+      {
+        agentType: 'antigravity',
+        defaultModel: 'gemini-flash',
+        message: 'Quick test',
+        modelOptions: [{ id: 'gemini-flash', model: 'gemini-flash', costTier: 'cheap', description: 'Fast' }],
+        once: false,
+      },
+      {
+        writeLog: (text) => {
+          logOutput += text;
+        },
+      },
+    );
+
+    expect(decision).toBeNull();
+    expect(logOutput).toContain('skipped: automodel only applies to once sessions');
+  });
 });

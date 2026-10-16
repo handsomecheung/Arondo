@@ -1104,7 +1104,7 @@ export default function AdminSettingsPage() {
                   lineHeight: 1.5,
                 }}
               >
-                Automodel dynamically chooses the model and reasoning effort after Auto Mode has selected an agent. These keys are optional; if automodel is disabled or no key is configured, Arondo uses the default model. Keys are checked in priority order: Anthropic, OpenAI, then Google. Environment variables take precedence over values saved here.
+                Automodel dynamically chooses the model and reasoning effort after Auto Mode has selected an agent. Note that automodel only applies to single-use (--once) sessions; standard multi-turn resume sessions use the agent's default model to prevent frequent model switching. These keys are optional; if automodel is disabled or no key is configured, Arondo uses the default model. Keys are checked in priority order: Anthropic, OpenAI, then Google. Environment variables take precedence over values saved here.
               </p>
               <label
                 style={{

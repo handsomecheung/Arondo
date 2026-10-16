@@ -8,7 +8,7 @@ import remarkFileLinks, { extractCandidatePaths, candidateToPath, isPathCandidat
 import remarkSoftLineBreaks from "@/lib/remarkSoftLineBreaks";
 import { resolveRepoFilePath } from "@/lib/homeUtils";
 import ExecCard, { ExecCardProps } from "@/components/ExecCard";
-import { IconTerminal, IconFileText, IconCopy, IconCode, IconAi } from "@/components/Icons";
+import { IconTerminal, IconFileText, IconCopy, IconCode } from "@/components/Icons";
 import DiffModal from "@/components/modals/DiffModal";
 import CommandModal from "@/components/modals/CommandModal";
 
@@ -48,7 +48,6 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
   const [diffModalOpen, setDiffModalOpen] = useState(false);
   const [selectedDiffPath, setSelectedDiffPath] = useState("");
   const [stderrText, setStderrText] = useState<string | null>(null);
-  const [automodelText, setAutomodelText] = useState<string | null>(null);
   const outputRef = useRef<HTMLDivElement>(null);
 
   // Fetch cached HTML if exists
@@ -261,19 +260,6 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
       .catch(() => setStderrText("(failed to load stderr log)"));
   };
 
-  const showAutomodel = () => {
-    const url = sessionId
-      ? `/api/sessions/${sessionId}/log?messageId=${props.item.messageId}&stream=automodel`
-      : `/api/sessions/global/log?messageId=${props.item.messageId}&projectId=${projectId || ""}&stream=automodel`;
-
-    fetch(url)
-      .then((r) => r.json())
-      .then(({ log: autoLog }: { log: string }) => {
-        setAutomodelText(autoLog ? stripAnsi(autoLog) : "(no automodel log found for this task)");
-      })
-      .catch(() => setAutomodelText("(failed to load automodel log)"));
-  };
-
   const extraMenuItems = (onShowPrompt || (hasLog && onViewLog) || canCopy || hasLog)
     ? (closeMenu: () => void) => (
         <>
@@ -320,15 +306,6 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
             >
               <IconCode />
               <span>Show Stderr</span>
-            </button>
-          )}
-          {hasLog && (
-            <button
-              className="task-menu-item"
-              onClick={() => { closeMenu(); showAutomodel(); }}
-            >
-              <IconAi />
-              <span>Show Automodel Log</span>
             </button>
           )}
         </>
@@ -429,11 +406,6 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
         text={stderrText}
         onClose={() => setStderrText(null)}
         title="Stderr Log"
-      />
-      <CommandModal
-        text={automodelText}
-        onClose={() => setAutomodelText(null)}
-        title="Automodel Log"
       />
     </>
   );

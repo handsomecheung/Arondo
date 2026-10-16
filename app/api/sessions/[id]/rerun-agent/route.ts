@@ -77,6 +77,7 @@ export async function POST(
   const resolved = await resolveAgentType(rerunAgentType, runnerConn?.info.agents ?? [], {
     prompt,
     automodelLog: (text) => appendAutomodelLog(id, systemMessageId, text),
+    once: session.once,
   });
   const resolvedType = resolved.agentType;
 

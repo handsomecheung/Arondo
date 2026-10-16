@@ -55,6 +55,7 @@ interface ResolveAgentOptions {
   prompt?: string;
   automodelLog?: (text: string) => void | Promise<void>;
   lockedAgent?: Pick<ResolvedAgent, "agentType" | "model" | "effort" | "agyQuotaGroup">;
+  once?: boolean;
 }
 
 /**
@@ -101,6 +102,7 @@ export async function resolveAgentType(
       message: options.prompt,
       defaultModel: selected.model,
       modelOptions: selected.modelOptions,
+      once: options.once ?? false,
     }, {
       writeLog: options.automodelLog,
     })

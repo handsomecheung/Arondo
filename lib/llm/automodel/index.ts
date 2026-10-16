@@ -223,6 +223,7 @@ export async function routeModel(
       defaultModel: input.defaultModel,
       message: input.message,
       modelOptions: input.modelOptions,
+      once: input.once,
     }),
   ];
 
@@ -237,6 +238,13 @@ export async function routeModel(
 
   if (!isAutomodelEnabled()) {
     logParts.push(formatLogSection("Result", "skipped: automodel is disabled"));
+    await flushLog();
+    return null;
+  }
+
+  // Automodel only applies to single-use (--once) sessions to avoid frequent model switching in resume sessions
+  if (input.once === false) {
+    logParts.push(formatLogSection("Result", "skipped: automodel only applies to once sessions"));
     await flushLog();
     return null;
   }

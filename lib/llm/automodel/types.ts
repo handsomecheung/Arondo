@@ -27,4 +27,5 @@ export interface AutoModelInput {
   message: string;
   defaultModel?: string;
   modelOptions: AutoModelOption[];
+  once?: boolean;
 }
