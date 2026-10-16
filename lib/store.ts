@@ -229,6 +229,15 @@ export async function writeOnceCache(prompt: string, output: string): Promise<vo
   await writeJsonAtomic(getOnceCacheMetadataFilePath(prompt), { createdAt: Date.now() } satisfies OnceCacheMetadata);
 }
 
+export async function deleteOnceCache(prompt: string): Promise<void> {
+  const filePath = getOnceCacheFilePath(prompt);
+  const metadataPath = getOnceCacheMetadataFilePath(prompt);
+  await Promise.all([
+    fs.rm(filePath, { force: true }),
+    fs.rm(metadataPath, { force: true }),
+  ]);
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getSessionDir(id: string): string {
@@ -865,6 +874,23 @@ export async function getPendingTodoMessages(sessionId: string): Promise<Message
 }
 
 export async function deleteSession(id: string): Promise<void> {
+  try {
+    const session = await getSession(id);
+    const messages = await getMessages(id);
+    const hasCache = session?.cache === "on" || messages.some((m) => m.cache === "on");
+    if (hasCache) {
+      for (const m of messages) {
+        if (m.role === "user") {
+          const prompt = m.prompt || m.content;
+          if (prompt) {
+            await deleteOnceCache(prompt);
+          }
+        }
+      }
+    }
+  } catch {
+    // Ignore errors reading session or messages during deletion
+  }
   const sessionDir = getSessionDir(id);
   await fs.rm(sessionDir, { recursive: true, force: true });
 }

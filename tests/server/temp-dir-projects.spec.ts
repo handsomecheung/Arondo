@@ -353,4 +353,42 @@ test.describe('Temp dir project task visibility', () => {
     await expect(fs.stat(path.join(CONFIG_DIR, 'cache', 'once', promptHash))).resolves.toBeDefined();
     await expect(readOnceCache(prompt)).resolves.toBeNull();
   });
+
+  test('deletes once cache when cached session is deleted', async ({ request }) => {
+    const prompt = 'delete cache test ' + crypto.randomUUID();
+    const promptHash = crypto.createHash('sha256').update(prompt.trim()).digest('hex');
+    const cacheDir = path.join(CONFIG_DIR, 'cache', 'once');
+    await fs.mkdir(cacheDir, { recursive: true });
+    await fs.writeFile(path.join(cacheDir, promptHash), 'CACHED AGENT OUTPUT TO DELETE\n', 'utf-8');
+    await fs.writeFile(
+      path.join(cacheDir, `${promptHash}.meta.json`),
+      JSON.stringify({ createdAt: Date.now() }),
+      'utf-8',
+    );
+
+    const cachedSessionRes = await request.post('/api/sessions', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: {
+        prompt,
+        tempDir: true,
+        runnerId,
+        once: true,
+        cache: 'on',
+      }
+    });
+    expect(cachedSessionRes.status()).toBe(201);
+    const session = await cachedSessionRes.json();
+
+    await expect(fs.stat(path.join(cacheDir, promptHash))).resolves.toBeDefined();
+    await expect(fs.stat(path.join(cacheDir, `${promptHash}.meta.json`))).resolves.toBeDefined();
+
+    const deleteRes = await request.delete(`/api/sessions/${session.id}`, {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+    expect(deleteRes.status()).toBe(200);
+
+    await expect(fs.stat(path.join(cacheDir, promptHash))).rejects.toThrow();
+    await expect(fs.stat(path.join(cacheDir, `${promptHash}.meta.json`))).rejects.toThrow();
+    await expect(readOnceCache(prompt)).resolves.toBeNull();
+  });
 });
