@@ -33,6 +33,8 @@ func (h *Handler) handleRequest(msg *Message) {
 	switch msg.Method {
 	case "fs.list":
 		h.handleFsList(msg)
+	case "fs.mkdir":
+		h.handleFsMkdir(msg)
 	case "fs.read":
 		h.handleFsRead(msg)
 	case "fs.infos":

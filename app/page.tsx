@@ -190,7 +190,7 @@ export default function HomePage() {
     fsModalOpen, setFsModalOpen,
     setFsRunnerId,
     fsCurrentPath, setFsCurrentPath,
-    fsDirectories, fsParentPath, fsLoading,
+    fsDirectories, fsParentPath, fsLoading, createDirectory: createProjectDirectory,
   } = useFileSystem(runnerId);
 
   const {
@@ -1773,6 +1773,7 @@ export default function HomePage() {
         parentPath={fsParentPath}
         directories={fsDirectories}
         loading={fsLoading}
+        onCreateDirectory={createProjectDirectory}
         onSelect={(path) => {
           setRepoPath(path || fsCurrentPath);
           setFsModalOpen(false);

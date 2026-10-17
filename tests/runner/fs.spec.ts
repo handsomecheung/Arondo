@@ -66,6 +66,31 @@ test.describe('Runner File System API integration tests', () => {
     expect(hasThisFile).toBeTruthy();
   });
 
+  test('should create a directory', async ({ request }) => {
+    const parentPath = path.resolve(__dirname);
+    const name = `arondo-fs-test-${Date.now()}`;
+    const directoryPath = path.join(parentPath, name);
+
+    try {
+      const response = await request.post('/api/fs', {
+        headers: { 'x-arondo-token': 'test-token-123456' },
+        data: { runnerId, parentPath, name },
+      });
+      expect(response.status()).toBe(200);
+      const result = await response.json();
+      expect(result.path).toBe(directoryPath);
+
+      const listResponse = await request.get(
+        `/api/fs?path=${encodeURIComponent(parentPath)}&runner=${runnerId}`,
+        { headers: { 'x-arondo-token': 'test-token-123456' } },
+      );
+      const list = await listResponse.json();
+      expect(list.directories.some((entry: any) => entry.path === directoryPath)).toBeTruthy();
+    } finally {
+      await import('fs/promises').then((fs) => fs.rm(directoryPath, { recursive: true, force: true }));
+    }
+  });
+
   test('should read content of a valid file', async ({ request }) => {
     const targetFile = path.resolve(__filename);
     const response = await request.get(`/api/fs/file?path=${encodeURIComponent(targetFile)}&runner=${runnerId}`, {

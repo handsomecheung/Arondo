@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { IconX, IconCornerLeftUp, IconFolder } from "@/components/Icons";
+import { IconX, IconCornerLeftUp, IconFolder, IconPlus } from "@/components/Icons";
 
 interface Props {
   open: boolean;
@@ -10,6 +10,7 @@ interface Props {
   directories: { name: string; path: string }[];
   loading: boolean;
   onSelect: (path: string) => void;
+  onCreateDirectory: (name: string) => Promise<void>;
 }
 
 export default function FileExplorerModal({
@@ -21,11 +22,19 @@ export default function FileExplorerModal({
   directories,
   loading,
   onSelect,
+  onCreateDirectory,
 }: Props) {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [isDirectoryFormOpen, setIsDirectoryFormOpen] = useState(false);
+  const [isCreatingDirectory, setIsCreatingDirectory] = useState(false);
+  const [directoryName, setDirectoryName] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
 
   useEffect(() => {
     setSelectedPath(null);
+    setIsDirectoryFormOpen(false);
+    setDirectoryName("");
+    setCreateError(null);
   }, [currentPath, open]);
 
   if (!open) return null;
@@ -59,6 +68,23 @@ export default function FileExplorerModal({
     onSelect(selectedPath || currentPath);
   };
 
+  const handleCreateDirectory = async () => {
+    const name = directoryName.trim();
+    if (!name) return;
+
+    setIsCreatingDirectory(true);
+    setCreateError(null);
+    try {
+      await onCreateDirectory(name);
+      setIsDirectoryFormOpen(false);
+      setDirectoryName("");
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : "Failed to create directory");
+    } finally {
+      setIsCreatingDirectory(false);
+    }
+  };
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -70,6 +96,37 @@ export default function FileExplorerModal({
         </div>
         <div className="modal-body">
           <div className="fs-current-path">{currentPath}</div>
+          {isDirectoryFormOpen ? (
+            <div className="fs-create-directory">
+              <input
+                autoFocus
+                className="fs-create-directory-input"
+                value={directoryName}
+                onChange={(e) => setDirectoryName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void handleCreateDirectory();
+                }}
+                placeholder="New directory name"
+                aria-label="New directory name"
+                disabled={isCreatingDirectory}
+              />
+              <button
+                className="modal-btn-primary fs-create-directory-button"
+                onClick={handleCreateDirectory}
+                disabled={!directoryName.trim() || isCreatingDirectory}
+              >
+                {isCreatingDirectory ? "Creating…" : "Create"}
+              </button>
+            </div>
+          ) : (
+            <button
+              className="modal-btn-primary fs-create-directory-button"
+              onClick={() => setIsDirectoryFormOpen(true)}
+            >
+              <IconPlus /> New Directory
+            </button>
+          )}
+          {createError && <div className="fs-create-directory-error">{createError}</div>}
           <div className="fs-list">
             {parentPath !== null && (
               <div className="fs-item fs-parent" onClick={handleGoUp}>

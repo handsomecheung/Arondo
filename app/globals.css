@@ -1578,6 +1578,39 @@ body {
   line-height: 1.4;
 }
 
+.fs-create-directory {
+  display: flex;
+  gap: 8px;
+}
+.fs-create-directory-input {
+  min-width: 0;
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.fs-create-directory-input:focus {
+  outline: none;
+  border-color: var(--border-accent);
+}
+.fs-create-directory-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.fs-create-directory-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.fs-create-directory-error {
+  color: var(--error);
+  font-size: 12px;
+}
+
 .fs-list {
   display: flex;
   flex-direction: column;

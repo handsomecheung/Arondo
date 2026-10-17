@@ -284,6 +284,44 @@ func (h *Handler) handleFsList(msg *Message) {
 	h.sendResponse(msg.ID, resp)
 }
 
+type fsMkdirRequest struct {
+	ParentPath string `json:"parentPath"`
+	Name       string `json:"name"`
+}
+
+type fsMkdirResponse struct {
+	OK   bool   `json:"ok"`
+	Path string `json:"path"`
+}
+
+func (h *Handler) handleFsMkdir(msg *Message) {
+	req, err := parsePayload[fsMkdirRequest](msg)
+	if err != nil {
+		h.sendError(msg.ID, "BAD_REQUEST", "invalid payload: "+err.Error())
+		return
+	}
+
+	name := strings.TrimSpace(req.Name)
+	if name == "" || name == "." || name == ".." || filepath.Base(name) != name {
+		h.sendError(msg.ID, "BAD_REQUEST", "directory name must be a single non-empty path component")
+		return
+	}
+
+	parentPath, err := filepath.Abs(req.ParentPath)
+	if err != nil {
+		h.sendError(msg.ID, "BAD_REQUEST", "invalid parent path: "+err.Error())
+		return
+	}
+
+	path := filepath.Join(parentPath, name)
+	if err := os.Mkdir(path, 0o755); err != nil {
+		h.sendError(msg.ID, "INTERNAL", "failed to create directory: "+err.Error())
+		return
+	}
+
+	h.sendResponse(msg.ID, fsMkdirResponse{OK: true, Path: path})
+}
+
 type fsMkdtempRequest struct {
 	ExcludePaths []string `json:"excludePaths,omitempty"`
 	Purpose      string   `json:"purpose,omitempty"`

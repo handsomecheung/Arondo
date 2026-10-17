@@ -15,6 +15,17 @@ export function useFileSystem(defaultRunnerId: string) {
     setFsModalOpen(true);
   };
 
+  const createDirectory = async (name: string) => {
+    const response = await fetch("/api/fs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ runnerId: fsRunnerId, parentPath: fsCurrentPath, name }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Failed to create directory");
+    setFsCurrentPath(data.path);
+  };
+
   useEffect(() => {
     if (!fsModalOpen || !fsRunnerId) return;
 
@@ -52,6 +63,6 @@ export function useFileSystem(defaultRunnerId: string) {
     fsDirectories,
     fsEntries, setFsEntries,
     fsParentPath,
-    fsLoading,
+    fsLoading, createDirectory,
   };
 }
