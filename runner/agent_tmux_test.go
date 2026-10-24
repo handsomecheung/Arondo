@@ -99,6 +99,36 @@ GEMINI MODELS
 	}
 }
 
+func TestParseAgyQuotaWithSeparateInitialPane(t *testing.T) {
+	initialPane := `
+      ▄▀▀▄        Antigravity CLI 1.4.6
+     ▀▀▀▀▀▀       arondo@gmail.com (Google AI Pro)
+    ▀▀▀▀▀▀▀▀      Gemini 3.8 Flash (Medium)
+   ▄▀▀    ▀▀▄     /mnt/test
+  ▄▀▀      ▀▀▄
+`
+	usageText := `
+└ Models & Quota
+
+  Account: arondo@gmail.com
+
+GEMINI MODELS
+  Weekly Limit Remaining
+    [██████████████████████████████████████████████████] 100.00%
+    Quota available
+  Five Hour Limit Remaining
+    [██████████████████████████████████████████████████] 100.00%
+    Quota available
+`
+	q := parseAgyQuota(usageText, initialPane)
+	if q.Account != "arondo@gmail.com" {
+		t.Fatalf("Account = %q, want arondo@gmail.com", q.Account)
+	}
+	if q.Plan != "Google AI Pro" {
+		t.Fatalf("Plan = %q, want Google AI Pro", q.Plan)
+	}
+}
+
 func assertAgyRemain(t *testing.T, name string, got *float64, want float64) {
 	t.Helper()
 	if got == nil || math.Abs(*got-want) > 1e-9 {

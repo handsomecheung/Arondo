@@ -19,7 +19,7 @@ func fetchAgyQuota(client *Client, method string) {
 		return
 	}
 	agyCmd := fmt.Sprintf("agy --add-dir %q", cwd)
-	if err := run("tmux", "new-session", "-d", "-s", session, "-x", "220", "-y", "50", agyCmd); err != nil {
+	if err := run("tmux", "new-session", "-d", "-s", session, "-x", "220", "-y", "100", agyCmd); err != nil {
 		log.Printf("[quota/agy] failed to start tmux session: %v", err)
 		return
 	}
@@ -33,7 +33,8 @@ func fetchAgyQuota(client *Client, method string) {
 		return
 	}
 
-	if _, err := captureTmuxPane(session); err != nil {
+	initialPane, err := captureTmuxPane(session)
+	if err != nil {
 		log.Printf("[quota/agy] failed to capture initial pane: %v", err)
 	}
 
@@ -55,7 +56,7 @@ func fetchAgyQuota(client *Client, method string) {
 		log.Printf("[quota/agy] usage output saved to: %s", path)
 	}
 
-	if q := parseAgyQuota(output); q != nil {
+	if q := parseAgyQuota(output, initialPane); q != nil {
 		sendQuotaUpdate(client, "agy", q)
 		log.Printf("[quota/agy] account       : %s", q.Account)
 		log.Printf("[quota/agy] plan          : %s", q.Plan)
@@ -99,15 +100,31 @@ var (
 	refreshOnlyRe  = regexp.MustCompile(`^Refreshes in\s+(.+)`)
 )
 
-func parseAgyQuota(text string) *AgyQuota {
+func parseAgyQuota(text string, initialText ...string) *AgyQuota {
 	q := &AgyQuota{}
 
 	if m := accountPlanRe.FindStringSubmatch(text); m != nil {
 		q.Account = m[1]
 		q.Plan = m[2]
 	}
-	if m := accountRe.FindStringSubmatch(text); m != nil {
-		q.Account = m[1]
+	if len(initialText) > 0 && initialText[0] != "" {
+		if m := accountPlanRe.FindStringSubmatch(initialText[0]); m != nil {
+			if q.Account == "" {
+				q.Account = m[1]
+			}
+			if q.Plan == "" {
+				q.Plan = m[2]
+			}
+		}
+	}
+	if q.Account == "" {
+		if m := accountRe.FindStringSubmatch(text); m != nil {
+			q.Account = m[1]
+		} else if len(initialText) > 0 && initialText[0] != "" {
+			if m := accountRe.FindStringSubmatch(initialText[0]); m != nil {
+				q.Account = m[1]
+			}
+		}
 	}
 	if m := defaultModelRe.FindStringSubmatch(text); m != nil {
 		q.DefaultModel = strings.TrimSpace(m[1])
