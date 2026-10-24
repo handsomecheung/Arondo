@@ -17,6 +17,7 @@ export interface TokenInfo {
   name: string;
   type: "admin" | "user";
   color?: string;
+  runnerLastUsedAt?: Record<string, number>;
 }
 
 const PRESET_COLORS = [
@@ -304,6 +305,19 @@ export function getUuidByToken(token: string | null): string | null {
   const foundCached = cachedTokens.find((t) => t.token === token);
   if (foundCached) return foundCached.uuid;
   return null;
+}
+
+export async function recordRunnerUse(token: string | null, runnerId: string): Promise<void> {
+  if (!token || !runnerId) return;
+
+  await updateTokensConfig((config) => {
+    const client = config.clients.find((entry) => entry.token === token);
+    if (!client) return;
+    client.runnerLastUsedAt = {
+      ...client.runnerLastUsedAt,
+      [runnerId]: Date.now(),
+    };
+  });
 }
 
 // Looks up a runner token by value using a constant-time comparison against

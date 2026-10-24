@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runnerManager } from "@/lib/runner-manager";
-import { getArondoToken, getRoleByToken, isValidToken } from "@/lib/auth";
+import { getArondoToken, getRoleByToken, getUuidByToken, isValidToken, readTokensConfig } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
   const token = getArondoToken(request);
@@ -16,6 +16,10 @@ export async function GET(request: NextRequest) {
     })
   );
   const filtered = results.filter((res) => res.allowed).map((res) => res.r);
+  const clientId = getUuidByToken(token);
+  const { clients } = await readTokensConfig();
+  const runnerLastUsedAt = clients.find((client) => client.uuid === clientId)?.runnerLastUsedAt ?? {};
+  filtered.sort((a, b) => (runnerLastUsedAt[b.id] ?? 0) - (runnerLastUsedAt[a.id] ?? 0));
   return NextResponse.json(filtered);
 }
 

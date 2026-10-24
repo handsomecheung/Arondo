@@ -489,6 +489,19 @@ export default function HomePage() {
       .catch(console.error);
   }, [runnerId]);
 
+  const handleSelectRunner = useCallback((id: string) => {
+    setRunnerId(id);
+    setRunners((current) => [
+      ...current.filter((runner) => runner.id === id),
+      ...current.filter((runner) => runner.id !== id),
+    ]);
+    fetch("/api/runners/recent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ runnerId: id }),
+    }).catch(console.error);
+  }, []);
+
   const loadProjects = useCallback(() => {
     fetch("/api/projects")
       .then((r) => r.json())
@@ -1685,7 +1698,7 @@ export default function HomePage() {
             isAgentAvailable={isAgentAvailable}
             onSetMenuOpen={setMenuOpen}
             onSetScriptSubMenuOpen={setScriptSubMenuOpen}
-            onSetRunnerId={setRunnerId}
+            onSetRunnerId={handleSelectRunner}
             onSetRepoPath={setRepoPath}
             onSetAgentType={setAgentType}
             onSetIsNewDraft={setIsNewDraft}
