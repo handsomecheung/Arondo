@@ -1,6 +1,24 @@
 import { spawn, ChildProcess } from 'child_process';
 import path from 'path';
 
+export async function waitForRunMessages(request: any, sessionId: string, minRuns = 1) {
+  const maxRetries = 50;
+  for (let i = 0; i < maxRetries; i++) {
+    const res = await request.get(`/api/messages?sessionId=${sessionId}`, {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+    if (res.ok()) {
+      const messages = await res.json();
+      const runMsgs = messages.filter((m: any) => m.type === 'agent-run');
+      if (runMsgs.length >= minRuns) {
+        return { messages, runMsgs };
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`Timed out waiting for at least ${minRuns} agent-run message(s) in session ${sessionId}`);
+}
+
 export async function waitForSessionNotRunning(request: any, sessionId: string) {
   const maxRetries = 50;
   for (let i = 0; i < maxRetries; i++) {
@@ -63,7 +81,7 @@ export async function setupRunner(request: any, name: string, mockBinDir: string
     });
     if (response.ok()) {
       const list = await response.json();
-      const found = list.find((r: any) => r.name === name);
+      const found = list.find((r: any) => r.name === name && r.connected);
       if (found) {
         runnerId = found.id;
         break;
@@ -83,10 +101,12 @@ export async function setupRunner(request: any, name: string, mockBinDir: string
 export async function teardownRunner(runnerProcess: ChildProcess) {
   if (runnerProcess) {
     console.log('[resume-test] Stopping Go runner process...');
-    runnerProcess.kill('SIGTERM');
-    await new Promise<void>((resolve) => {
-      runnerProcess.on('exit', () => resolve());
-    });
+    if (runnerProcess.exitCode === null && runnerProcess.signalCode === null) {
+      runnerProcess.kill('SIGTERM');
+      await new Promise<void>((resolve) => {
+        runnerProcess.on('exit', () => resolve());
+      });
+    }
     console.log('[resume-test] Go runner stopped.');
   }
 }

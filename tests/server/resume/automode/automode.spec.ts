@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
-import { setupRunner, teardownRunner, waitForSessionNotRunning } from '../resume.helper';
+import { setupRunner, teardownRunner, waitForSessionNotRunning, waitForRunMessages } from '../resume.helper';
 import { getModelOptionsForAgent, isQuotaAvailable, selectAgent } from '../../../../lib/autoagent';
 import { resolveAgentType } from '../../../../lib/agents';
 
@@ -109,6 +109,51 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
     await expect(selectAgent(['claude', 'codex'])).resolves.toMatchObject({
       agentType: 'claude',
     });
+  });
+
+  test('selects codex when its hour quota is plentiful, but avoids codex when hour quota is exhausted', async () => {
+    const baseQuota = {
+      "claude_arondo@gmail.com_Claude Pro account": {
+        "Type": "claude",
+        "Account": "arondo@gmail.com",
+        "Plan": "Claude Pro account",
+        "DefaultModel": "claude-sonnet-4-6",
+        "HourRemain": 0.8,
+        "HourResetAt": null,
+        "WeekRemain": 0.2,
+        "WeekResetsAt": null,
+        "updatedAt": Math.floor(Date.now() / 1000),
+      },
+      "codex_arondo@gmail.com_Plus": {
+        "Type": "codex",
+        "Account": "arondo@gmail.com",
+        "Plan": "Plus",
+        "DefaultModel": "gpt-5.6-terra",
+        "FiveHourRemain": 1.0,
+        "FiveHourResetAt": null,
+        "WeeklyRemain": 1.0,
+        "WeeklyResetAt": null,
+        "updatedAt": Math.floor(Date.now() / 1000),
+      },
+    };
+
+    // 1. When Codex hour quota is plentiful, Auto Mode definitely selects Codex
+    await fs.writeFile(quotaPath, JSON.stringify(baseQuota, null, 2), 'utf-8');
+    const selectedWhenPlentiful = await selectAgent(['claude', 'codex']);
+    expect(selectedWhenPlentiful?.agentType).toBe('codex');
+
+    // 2. The ONLY change is that Codex hour quota is exhausted (0)
+    const quotaWithCodexHourExhausted = {
+      ...baseQuota,
+      "codex_arondo@gmail.com_Plus": {
+        ...baseQuota["codex_arondo@gmail.com_Plus"],
+        "FiveHourRemain": 0,
+      },
+    };
+    await fs.writeFile(quotaPath, JSON.stringify(quotaWithCodexHourExhausted, null, 2), 'utf-8');
+    const selectedWhenExhausted = await selectAgent(['claude', 'codex']);
+    expect(selectedWhenExhausted?.agentType).not.toBe('codex');
+    expect(selectedWhenExhausted?.agentType).toBe('claude');
   });
 
   test('prefers unknown Codex quota over Claude and agy API Key billing', async () => {
@@ -393,7 +438,7 @@ async function runTransitionTest(
   // Write initial quota
   await fs.writeFile(quotaPath, JSON.stringify(getQuotaForChoice(fromChoice), null, 2), 'utf-8');
 
-  const name = `runner-${fromChoice}-to-${toChoice}${runnerNameSuffix}`;
+  const name = `runner-${fromChoice}-to-${toChoice}${runnerNameSuffix}-${Math.random().toString(36).slice(2)}`;
   console.log(`[automode-test] Spawning runner for ${fromChoice} -> ${toChoice}...`);
   const result = await setupRunner(request, name, mockBinDir, {
     AGY_DIR_LOG: agyLogDir,
@@ -422,12 +467,7 @@ async function runTransitionTest(
     await waitForSessionNotRunning(request, sessionId);
 
     // Verify the first run selected expectedFromAgent
-    const msgsRes1 = await request.get(`/api/messages?sessionId=${sessionId}`, {
-      headers: { 'x-arondo-token': 'test-token-123456' }
-    });
-    expect(msgsRes1.status()).toBe(200);
-    const messages1 = await msgsRes1.json();
-    const runMsgs1 = messages1.filter((m: any) => m.type === 'agent-run');
+    const { runMsgs: runMsgs1 } = await waitForRunMessages(request, sessionId, 1);
     expect(runMsgs1.length).toBe(1);
     expect(runMsgs1[0].resolvedAgentType).toBe(expectedFromAgent);
     await expectAutomodelLog(sessionId, runMsgs1[0].id);
@@ -449,12 +489,7 @@ async function runTransitionTest(
     await waitForSessionNotRunning(request, sessionId);
 
     // Verify that the second run selected expectedToAgent
-    const msgsRes2 = await request.get(`/api/messages?sessionId=${sessionId}`, {
-      headers: { 'x-arondo-token': 'test-token-123456' }
-    });
-    expect(msgsRes2.status()).toBe(200);
-    const messages2 = await msgsRes2.json();
-    const runMsgs2 = messages2.filter((m: any) => m.type === 'agent-run');
+    const { runMsgs: runMsgs2 } = await waitForRunMessages(request, sessionId, 2);
     expect(runMsgs2.length).toBe(2);
     expect(runMsgs2[1].resolvedAgentType).toBe(expectedToAgent);
     await expectAutomodelLog(sessionId, runMsgs2[1].id);
@@ -519,7 +554,7 @@ async function runSameChoiceResumeTest(
   // Fix quota so the same choice wins both times
   await fs.writeFile(quotaPath, JSON.stringify(getQuotaForChoice(choice), null, 2), 'utf-8');
 
-  const name = `runner-${choice}-to-${choice}`;
+  const name = `runner-${choice}-to-${choice}-${Math.random().toString(36).slice(2)}`;
   const result = await setupRunner(request, name, mockBinDir, {
     AGY_DIR_LOG: agyLogDir,
     CLAUDE_DIR_LOG: claudeLogDir,
@@ -545,11 +580,7 @@ async function runSameChoiceResumeTest(
     await waitForSessionNotRunning(request, sessionId);
 
     // Verify first run chose the expected choice and has no resume flag yet
-    const msgsRes1 = await request.get(`/api/messages?sessionId=${sessionId}`, {
-      headers: { 'x-arondo-token': 'test-token-123456' }
-    });
-    const messages1 = await msgsRes1.json();
-    const runMsgs1 = messages1.filter((m: any) => m.type === 'agent-run');
+    const { runMsgs: runMsgs1 } = await waitForRunMessages(request, sessionId, 1);
     expect(runMsgs1.length).toBe(1);
 
     const expectedAgent = choice === 'C' ? 'claude' : 'antigravity';
@@ -575,11 +606,7 @@ async function runSameChoiceResumeTest(
 
     await waitForSessionNotRunning(request, sessionId);
 
-    const msgsRes2 = await request.get(`/api/messages?sessionId=${sessionId}`, {
-      headers: { 'x-arondo-token': 'test-token-123456' }
-    });
-    const messages2 = await msgsRes2.json();
-    const runMsgs2 = messages2.filter((m: any) => m.type === 'agent-run');
+    const { runMsgs: runMsgs2 } = await waitForRunMessages(request, sessionId, 2);
     expect(runMsgs2.length).toBe(2);
     expect(runMsgs2[1].resolvedAgentType).toBe(expectedAgent);
 
@@ -632,7 +659,7 @@ async function runXXYXTest(
   // Setup runner with choice X first
   await fs.writeFile(quotaPath, JSON.stringify(getQuotaForChoice(X), null, 2), 'utf-8');
 
-  const name = `runner-${X}-${Y}`;
+  const name = `runner-${X}-${Y}-${Math.random().toString(36).slice(2)}`;
   const result = await setupRunner(request, name, mockBinDir, {
     AGY_DIR_LOG: agyLogDir,
     CLAUDE_DIR_LOG: claudeLogDir,
@@ -658,11 +685,7 @@ async function runXXYXTest(
     await waitForSessionNotRunning(request, sessionId);
 
     // Verify Call 1 ran X
-    const msgsRes1 = await request.get(`/api/messages?sessionId=${sessionId}`, {
-      headers: { 'x-arondo-token': 'test-token-123456' }
-    });
-    const messages1 = await msgsRes1.json();
-    const runMsgs1 = messages1.filter((m: any) => m.type === 'agent-run');
+    const { runMsgs: runMsgs1 } = await waitForRunMessages(request, sessionId, 1);
     expect(runMsgs1.length).toBe(1);
     expect(runMsgs1[0].resolvedAgentType).toBe(xInfo.agent);
     if (xInfo.model) {
@@ -682,11 +705,7 @@ async function runXXYXTest(
     await waitForSessionNotRunning(request, sessionId);
 
     // Verify Call 2 carried X's conversation ID or session ID
-    const msgsRes2 = await request.get(`/api/messages?sessionId=${sessionId}`, {
-      headers: { 'x-arondo-token': 'test-token-123456' }
-    });
-    const messages2 = await msgsRes2.json();
-    const runMsgs2 = messages2.filter((m: any) => m.type === 'agent-run');
+    const { runMsgs: runMsgs2 } = await waitForRunMessages(request, sessionId, 2);
     expect(runMsgs2.length).toBe(2);
     if (xInfo.agent === 'antigravity') {
       expect(runMsgs2[1].content).toContain('--conversation');
@@ -706,11 +725,7 @@ async function runXXYXTest(
     await waitForSessionNotRunning(request, sessionId);
 
     // Verify Call 3 retained X.
-    const msgsRes3 = await request.get(`/api/messages?sessionId=${sessionId}`, {
-      headers: { 'x-arondo-token': 'test-token-123456' }
-    });
-    const messages3 = await msgsRes3.json();
-    const runMsgs3 = messages3.filter((m: any) => m.type === 'agent-run');
+    const { runMsgs: runMsgs3 } = await waitForRunMessages(request, sessionId, 3);
     expect(runMsgs3.length).toBe(3);
     expect(runMsgs3[2].resolvedAgentType).toBe(xInfo.agent);
     if (xInfo.model) {
@@ -729,11 +744,7 @@ async function runXXYXTest(
     await waitForSessionNotRunning(request, sessionId);
 
     // Verify Call 4 continues X's conversation.
-    const msgsRes4 = await request.get(`/api/messages?sessionId=${sessionId}`, {
-      headers: { 'x-arondo-token': 'test-token-123456' }
-    });
-    const messages4 = await msgsRes4.json();
-    const runMsgs4 = messages4.filter((m: any) => m.type === 'agent-run');
+    const { runMsgs: runMsgs4 } = await waitForRunMessages(request, sessionId, 4);
     expect(runMsgs4.length).toBe(4);
 
     expect(runMsgs4[3].resolvedAgentType).toBe(xInfo.agent);
