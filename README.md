@@ -96,7 +96,7 @@ Configure default models and available model lists in **Settings → Agent Model
 - **Claude Code (claude)**: Customize default models and recognized model options passed via `--model`.
 - **Codex CLI (codex)**: Customize default model and reasoning effort options passed to OpenAI Codex.
 
-Arondo automatically detects `invalid model selection` errors from CLI outputs (such as when a model is deprecated or misspelled) and guides you to update the model in Settings.
+When an agent fails, Arondo uses Jev System One to classify the failure, including invalid model selections, quota exhaustion, agent-side failures, and invalid invocation parameters. Configure Jev in Admin Settings to enable this classification and its quota retry follow-up.
 
 ## Access Control
 
@@ -139,7 +139,7 @@ All execution goes through a Runner — there is no local fallback on the server
 - **Mobile Terminal Keyboard Bar**: Includes a mobile-specific special-keys bar (ESC, TAB, CTRL, ALT, arrows, and an FN layer for F1-F12) for the terminal modal. It dynamically tracks visualViewport to pin itself above the virtual keyboard, preventing keyboard obstruction.
 - **Dedicated Execution Cards & Rich Markdown View**: Script execution uses `ScriptExecCard` (supporting inline log streaming for quick-run commands), while agent execution uses `AgentExecCard` which renders output as Markdown with syntax highlighting (`rehype-highlight`) and clickable file/URL links. Clicking a verified file path automatically opens the Remote File Browser. Users can copy the formatted markdown output or raw text output directly from the card's menu. Users can also copy chat messages using the Copy action on user chat cards.
 - **Terminal Session Persistence & Reattaching**: Terminal sessions persist across browser refreshes or close events. Re-opening a terminal automatically reattaches to the active PTY session on the runner and replays the output buffer.
-- **Quota & Session Limit Detection**: Automatically detects AI agent API limits (such as Claude's session limit hit, Codex limits, or `agy` quota errors including individual quota exhaustion and subscription upgrade warnings by scanning both stdout and stderr logs) and displays human-readable error messages.
+- **Quota & Session Limit Detection**: Uses Jev System One to classify agent failures, including quota exhaustion, from the execution context and displays human-readable error messages. Confirmed quota exhaustion continues through the automatic retry flow.
 - **AI Agent Quota Monitoring**: Automatically collects quota usage data for Claude, Antigravity, and Codex via tmux on the runners, recognizes API-key billing accounts, and displays known remaining quota or an explicit unknown state in the Runners dashboard. Supports an interactive LLM fallback loop to handle agent UI changes, modals, and slash commands.
 - **autoagent (Auto Mode)**: Automatically selects the best agent from known subscription quotas, preferring available capacity over unknown data and using API-key billed choices only as a last fallback. When configured, automodel makes a second-stage model/effort choice from only the quota-filtered options that Auto Mode passes to it.
 - **Manual Agent Switching**: Switch the active agent (Antigravity CLI, Claude Code, Codex, OpenCode, or Auto) on-the-fly within an existing session when the agent is idle.

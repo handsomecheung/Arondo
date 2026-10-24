@@ -31,10 +31,8 @@ import { StringDecoder } from "string_decoder";
 import { getConfigDir, getInnerRunnerQuotaMethod } from "./config";
 import {
   getAgentQuotaErrorMessage,
-  getAgyInvalidModelErrorMessage,
-  isAgentQuotaExhausted,
-  isAgyInvalidModelError,
 } from "./agent-quota-errors";
+import { classifyAgentFailure, type AgentFailureKind } from "./agent-failure-classifier";
 import { sendWebPushNotification, type WebPushPayload } from "./web-push-server";
 import { shouldSendTaskNotification } from "./task-notifications";
 import { getAnyLlmConfig } from "./llm";
@@ -1593,20 +1591,33 @@ class RunnerManager {
       }
     }
 
-    let quotaExhausted = false;
-    let invalidModelSelection = false;
-    if (resolvedAgentType === "antigravity" || resolvedAgentType === "claude") {
+    let failureKind: AgentFailureKind | undefined;
+    let classificationUnavailable: "not_configured" | "request_failed" | undefined;
+    if (!success && !ctx.stoppedByUser) {
       const [stdoutLog, stderrLog] = await Promise.all([
         getSessionLog(ctx.sessionId, ctx.messageId, "agent", ctx.projectId),
         getSessionLog(ctx.sessionId, ctx.messageId, "agent", ctx.projectId, "stderr"),
       ]);
-      const log = `${stdoutLog}\n${stderrLog}`;
-      if (resolvedAgentType === "antigravity" && isAgyInvalidModelError(log)) {
-        invalidModelSelection = true;
-      } else {
-        quotaExhausted = isAgentQuotaExhausted(resolvedAgentType, log, success);
-      }
+      const classification = await classifyAgentFailure({
+        agentType: resolvedAgentType,
+        exitCode,
+        command: ctx.command || "",
+        stdout: stdoutLog,
+        stderr: stderrLog,
+      });
+      if (classification.status === "classified") failureKind = classification.kind;
+      else classificationUnavailable = classification.reason;
+    } else if (resolvedAgentType === "antigravity") {
+      const [stdoutLog, stderrLog] = await Promise.all([
+        getSessionLog(ctx.sessionId, ctx.messageId, "agent", ctx.projectId),
+        getSessionLog(ctx.sessionId, ctx.messageId, "agent", ctx.projectId, "stderr"),
+      ]);
+      if (!`${stdoutLog}${stderrLog}`.trim()) failureKind = "unknown";
     }
+
+    const quotaExhausted = failureKind === "quota_exhausted";
+    const invalidModelSelection = failureKind === "invalid_model";
+    const emptySuccessfulOutput = success && failureKind === "unknown";
 
     const stoppedByUser = !!ctx.stoppedByUser;
     const hasRunningScripts = (await getRunningSessionScriptRuns(ctx.sessionId)).length > 0;
@@ -1614,7 +1625,7 @@ class RunnerManager {
     if (hasRunningScripts) {
       nextStatus = "script-running";
     } else {
-      nextStatus = stoppedByUser || (success && !quotaExhausted && !invalidModelSelection) ? "done" : "error";
+      nextStatus = stoppedByUser || (success && !quotaExhausted && !invalidModelSelection && !emptySuccessfulOutput) ? "done" : "error";
     }
 
     const updated = await updateSession(ctx.sessionId, {
@@ -1622,16 +1633,28 @@ class RunnerManager {
       errorMessage: stoppedByUser
         ? undefined
         : invalidModelSelection
-        ? getAgyInvalidModelErrorMessage()
+        ? "Invalid model selection. Update the model in Admin Settings."
         : quotaExhausted
           ? getAgentQuotaErrorMessage(resolvedAgentType)
+          : classificationUnavailable === "not_configured"
+            ? "Jev System One is not configured, so Arondo cannot determine why the agent failed or perform follow-up actions. Configure Jev in Admin Settings."
+            : classificationUnavailable === "request_failed"
+              ? "Jev System One could not determine why the agent failed, so Arondo cannot perform follow-up actions."
+              : emptySuccessfulOutput
+                ? "The agent exited successfully but produced no output. Arondo cannot determine the cause, so no follow-up action will be performed."
+                : failureKind === "agent_error"
+                  ? "The agent itself failed. Please try again later."
+                  : failureKind === "arondo_parameter_error"
+                    ? "Arondo may have passed invalid parameters to the agent."
+                    : failureKind === "unknown"
+                      ? "Arondo could not determine why the agent failed."
           : success
             ? undefined
             : `Agent exited with code ${exitCode}`,
     });
 
     const shouldCache = (ctx.cache === "on" || session?.cache === "on");
-    if (success && shouldCache && !quotaExhausted && !invalidModelSelection) {
+    if (success && shouldCache && !quotaExhausted && !invalidModelSelection && !emptySuccessfulOutput) {
       const msgIdx = messages.findIndex((m) => m.id === ctx.messageId);
       const lastUserMsg = [...messages.slice(0, msgIdx)].reverse().find((m) => m.role === "user");
       const promptToCache = ctx.prompt || lastUserMsg?.prompt || lastUserMsg?.content;
@@ -1648,15 +1671,27 @@ class RunnerManager {
     const content = stoppedByUser
       ? "🛑 Stopped by user"
       : invalidModelSelection
-      ? `⚠️ ${getAgyInvalidModelErrorMessage()}`
+      ? "⚠️ Invalid model selection. Update the model in Admin Settings."
       : quotaExhausted
         ? `⚠️ ${getAgentQuotaErrorMessage(resolvedAgentType)}`
+        : classificationUnavailable === "not_configured"
+          ? "⚠️ Error: Jev System One is not configured, so Arondo cannot determine the failure cause or perform follow-up actions. Configure Jev in Admin Settings."
+          : classificationUnavailable === "request_failed"
+            ? "⚠️ Error: Jev System One could not determine the failure cause, so Arondo cannot perform follow-up actions."
+            : emptySuccessfulOutput
+              ? "⚠️ Agent exited successfully but produced no output. No follow-up action will be performed."
+              : failureKind === "agent_error"
+                ? "⚠️ The agent itself failed. Please try again later."
+                : failureKind === "arondo_parameter_error"
+                  ? "⚠️ Arondo may have passed invalid parameters to the agent."
+                  : failureKind === "unknown"
+                    ? "⚠️ Arondo could not determine why the agent failed."
         : success
           ? "✅ Done!"
           : `❌ Error: Agent exited with code ${exitCode}`;
     const agentMsg = await addMessage({
       sessionId: ctx.sessionId,
-      role: success && !quotaExhausted && !invalidModelSelection ? "agent" : "system",
+      role: success && !quotaExhausted && !invalidModelSelection && !emptySuccessfulOutput ? "agent" : "system",
       content,
       type: "agent-return",
       parentId: ctx.messageId,
@@ -1677,7 +1712,7 @@ class RunnerManager {
         ? "⚠️ Invalid Model"
         : quotaExhausted
           ? "⚠️ Quota Exhausted"
-          : success
+          : success && !emptySuccessfulOutput
             ? "✅ Task Completed"
             : "❌ Task Failed";
       const pushBody = invalidModelSelection
@@ -1688,7 +1723,7 @@ class RunnerManager {
           ? promptPreview
             ? `${promptPreview}: Quota exhausted for ${resolvedAgentType}.`
             : `Session "${sessionTitle}": Quota exhausted for ${resolvedAgentType}.`
-          : success
+          : success && !emptySuccessfulOutput
             ? promptPreview
               ? `${promptPreview}: Agent finished successfully.`
               : `Session "${sessionTitle}": Agent finished successfully.`
