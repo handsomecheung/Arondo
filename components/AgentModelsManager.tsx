@@ -16,6 +16,7 @@ interface GroupFormState {
 interface FormState {
   antigravityGemini: GroupFormState;
   antigravityOther: GroupFormState;
+  antigravityArgon: GroupFormState;
   claude: GroupFormState;
   codex: GroupFormState;
 }
@@ -29,6 +30,10 @@ function configToFormState(config?: AgentModelsConfig): FormState {
     antigravityOther: {
       defaultModel: config?.antigravity?.other?.defaultModel ?? DEFAULT_AGENT_MODELS.antigravity.other.defaultModel ?? "",
       availableModelsText: (config?.antigravity?.other?.availableModels ?? DEFAULT_AGENT_MODELS.antigravity.other.availableModels ?? []).join("\n"),
+    },
+    antigravityArgon: {
+      defaultModel: config?.antigravity?.argon?.defaultModel ?? DEFAULT_AGENT_MODELS.antigravity.argon?.defaultModel ?? "",
+      availableModelsText: (config?.antigravity?.argon?.availableModels ?? DEFAULT_AGENT_MODELS.antigravity.argon?.availableModels ?? []).join("\n"),
     },
     claude: {
       defaultModel: config?.claude?.defaultModel ?? DEFAULT_AGENT_MODELS.claude.defaultModel ?? "",
@@ -62,14 +67,18 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
     }));
   };
 
-  const handleResetAgyGroup = (group: "gemini" | "other") => {
+  const handleResetAgyGroup = (group: "gemini" | "other" | "argon") => {
     const def = DEFAULT_AGENT_MODELS.antigravity[group];
-    const fieldKey: keyof FormState = group === "gemini" ? "antigravityGemini" : "antigravityOther";
+    const fieldKey: keyof FormState = group === "gemini"
+      ? "antigravityGemini"
+      : group === "other"
+        ? "antigravityOther"
+        : "antigravityArgon";
     setForm((prev) => ({
       ...prev,
       [fieldKey]: {
-        defaultModel: def.defaultModel ?? "",
-        availableModelsText: (def.availableModels ?? []).join("\n"),
+        defaultModel: def?.defaultModel ?? "",
+        availableModelsText: (def?.availableModels ?? []).join("\n"),
       },
     }));
   };
@@ -102,6 +111,13 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
         other: {
           defaultModel: form.antigravityOther.defaultModel.trim(),
           availableModels: form.antigravityOther.availableModelsText
+            .split("\n")
+            .map((m) => m.trim())
+            .filter(Boolean),
+        },
+        argon: {
+          defaultModel: form.antigravityArgon.defaultModel.trim(),
+          availableModels: form.antigravityArgon.availableModelsText
             .split("\n")
             .map((m) => m.trim())
             .filter(Boolean),
@@ -324,6 +340,16 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
               "e.g. Claude Sonnet 4.6 (Thinking)",
               "Claude Sonnet 4.6 (Thinking) # Default thinking model\nClaude Opus 4.6 (Thinking)",
               "agy-other",
+            )}
+            {renderGroupCard(
+              "Gemini 4 Argon Group",
+              "Gemini 4 Argon models counted against Antigravity Argon quota tier.",
+              form.antigravityArgon,
+              (k, v) => handleChange("antigravityArgon", k, v),
+              () => handleResetAgyGroup("argon"),
+              "e.g. Gemini 4 Argon (Medium)",
+              "Gemini 4 Argon (High) # Best for complex tasks with deep reasoning in Gemini 4\nGemini 4 Argon (Medium) # Default recommended Argon model\nGemini 4 Argon (Low) # Fast and lightweight for simple requests",
+              "agy-argon",
             )}
           </div>
         </div>

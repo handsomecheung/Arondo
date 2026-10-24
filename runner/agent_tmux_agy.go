@@ -38,6 +38,8 @@ func fetchAgyQuota(client *Client, method string) {
 		log.Printf("[quota/agy] failed to capture initial pane: %v", err)
 	}
 
+	_ = run("tmux", "resize-window", "-t", session, "-x", "220", "-y", "100")
+
 	if err := run("tmux", "send-keys", "-t", session, "/usage", "Enter"); err != nil {
 		log.Printf("[quota/agy] failed to send /usage: %v", err)
 		return
@@ -69,6 +71,8 @@ func fetchAgyQuota(client *Client, method string) {
 		log.Printf("[quota/agy] other  weekly  refreshes : %s", fmtI(q.OtherWeeklyResetsAt))
 		log.Printf("[quota/agy] other  hour    remaining : %s", fmtF(q.OtherHourRemain))
 		log.Printf("[quota/agy] other  hour    refreshes : %s", fmtI(q.OtherHourResetsAt))
+		log.Printf("[quota/agy] argon  weekly  remaining : %s", fmtF(q.ArgonWeeklyRemain))
+		log.Printf("[quota/agy] argon  weekly  refreshes : %s", fmtI(q.ArgonWeeklyResetsAt))
 		return
 	}
 
@@ -89,6 +93,8 @@ type AgyQuota struct {
 	OtherWeeklyResetsAt  *int64
 	OtherHourRemain      *float64
 	OtherHourResetsAt    *int64
+	ArgonWeeklyRemain    *float64
+	ArgonWeeklyResetsAt  *int64
 }
 
 var (
@@ -139,7 +145,9 @@ func parseAgyQuota(text string, initialText ...string) *AgyQuota {
 			section, limitType, pendingRemain = "gemini", "", nil
 		case strings.HasSuffix(line, "MODELS") && line != "GEMINI MODELS":
 			section, limitType, pendingRemain = "other", "", nil
-		case strings.HasPrefix(line, "Weekly Limit"):
+		case line == "GEMINI 4 ARGON" || strings.HasPrefix(line, "GEMINI 4 ARGON"):
+			section, limitType, pendingRemain = "argon", "", nil
+		case strings.Contains(line, "Weekly Limit"):
 			limitType, pendingRemain = "weekly", nil
 		case strings.HasPrefix(line, "Five Hour Limit"):
 			limitType, pendingRemain = "fivehour", nil
@@ -187,5 +195,7 @@ func applyAgyLimit(q *AgyQuota, section, limitType string, remain *float64, refr
 		q.OtherWeeklyRemain, q.OtherWeeklyResetsAt = remain, refresh
 	case "other+fivehour":
 		q.OtherHourRemain, q.OtherHourResetsAt = remain, refresh
+	case "argon+weekly":
+		q.ArgonWeeklyRemain, q.ArgonWeeklyResetsAt = remain, refresh
 	}
 }

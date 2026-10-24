@@ -100,7 +100,7 @@ export interface TaskContext {
   projectId?: string;
   prompt?: string;
   agentType?: string;
-  agyQuotaGroup?: "gemini" | "other";
+  agyQuotaGroup?: "gemini" | "other" | "argon";
   detachedKind?: "review" | "btw";
   cache?: "on" | "off";
   tokenUuid?: string;
@@ -1169,6 +1169,8 @@ class RunnerManager {
                 OtherWeeklyResetsAt: q.otherWeeklyResetsAt ?? null,
                 OtherHourRemain: q.otherHourRemain ?? null,
                 OtherHourResetsAt: q.otherHourResetsAt ?? null,
+                ArgonWeeklyRemain: q.argonWeeklyRemain ?? null,
+                ArgonWeeklyResetsAt: q.argonWeeklyResetsAt ?? null,
               };
             } else if (agent === "claude") {
               formattedQuota = {

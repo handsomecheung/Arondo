@@ -83,6 +83,66 @@ func TestParseAgyQuotaLatestUsageFormat(t *testing.T) {
 	}
 }
 
+func TestParseAgyQuotaWithGemini4Argon(t *testing.T) {
+	usageText := `
+GEMINI MODELS
+  Models within this group: Gemini Flash, Gemini Pro
+
+  Weekly Limit Remaining
+    [███████████████████████████████████████░░░░░░░░░░░] 77.69%
+    Refreshes in 109h 48m
+
+  Five Hour Limit Remaining
+    [████████████████████████████████████░░░░░░░░░░░░░░] 71.78%
+    Refreshes in 3h 3m
+
+
+CLAUDE AND GPT MODELS
+  Models within this group: Claude Opus, Claude Sonnet, GPT-OSS
+
+  Weekly Limit Remaining
+    [██████████████████████████████████████████████████] 99.66%
+    Refreshes in 164h 34m
+
+  Five Hour Limit Remaining
+    [██████████████████████████████████████████████████] 99.31%
+    Refreshes in 1h 34m
+
+
+GEMINI 4 ARGON
+  For paid Pro plans, Argon quota is separate. Higher Argon quota (included as part of the larger Gemini quota bucket) is available on Ultra plans.
+
+  Gemini 4 Argon Weekly Limit
+    [██████████████████████████████████████████████████] 100.00%
+    Quota available
+`
+	q := parseAgyQuota(usageText)
+	assertAgyRemain(t, "GeminiWeeklyRemain", q.GeminiWeeklyRemain, 0.7769)
+	assertAgyRemain(t, "GeminiHourRemain", q.GeminiHourRemain, 0.7178)
+	assertAgyRemain(t, "OtherWeeklyRemain", q.OtherWeeklyRemain, 0.9966)
+	assertAgyRemain(t, "OtherHourRemain", q.OtherHourRemain, 0.9931)
+	assertAgyRemain(t, "ArgonWeeklyRemain", q.ArgonWeeklyRemain, 1.0)
+	if q.ArgonWeeklyResetsAt != nil {
+		t.Fatal("available Argon quota must not have a reset timestamp")
+	}
+	if q.GeminiWeeklyResetsAt == nil || q.GeminiHourResetsAt == nil || q.OtherWeeklyResetsAt == nil || q.OtherHourResetsAt == nil {
+		t.Fatal("expected reset timestamps for non-full quotas")
+	}
+
+	// Also test when Argon is partially consumed with a reset timer
+	usageTextWithReset := `
+GEMINI 4 ARGON
+  Gemini 4 Argon Weekly Limit
+    [███████████████████████████████████████░░░░░░░░░░░] 85.50%
+    Refreshes in 42h 10m
+`
+	q2 := parseAgyQuota(usageTextWithReset)
+	assertAgyRemain(t, "ArgonWeeklyRemain", q2.ArgonWeeklyRemain, 0.855)
+	if q2.ArgonWeeklyResetsAt == nil {
+		t.Fatal("expected reset timestamp for consumed Argon quota")
+	}
+}
+
 func TestParseAgyQuotaLegacyUsageFormat(t *testing.T) {
 	q := parseAgyQuota(`
 GEMINI MODELS

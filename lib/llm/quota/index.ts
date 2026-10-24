@@ -47,6 +47,16 @@ const AgyQuotaDetailsSchema = z.object({
     .number()
     .nullable()
     .describe("Unix timestamp in seconds for CLAUDE AND GPT MODELS five hour reset, or null"),
+  argonWeeklyRemain: z
+    .number()
+    .min(0)
+    .max(1)
+    .nullable()
+    .describe("Float 0.0-1.0 for GEMINI 4 ARGON Weekly Limit Remaining (e.g. 100% or Quota available -> 1.0)"),
+  argonWeeklyResetsAt: z
+    .number()
+    .nullable()
+    .describe("Unix timestamp in seconds for GEMINI 4 ARGON weekly reset, or null"),
 });
 
 const ClaudeQuotaDetailsSchema = z.object({
@@ -119,6 +129,8 @@ export interface QuotaDecision {
     otherWeeklyResetsAt?: number | null;
     otherHourRemain?: number | null;
     otherHourResetsAt?: number | null;
+    argonWeeklyRemain?: number | null;
+    argonWeeklyResetsAt?: number | null;
     hourRemain?: number | null;
     hourResetsAt?: number | null;
     weekRemain?: number | null;
@@ -159,12 +171,13 @@ export async function decideQuotaStep(input: QuotaStepInput): Promise<QuotaDecis
     });
     agentInstructions = [
       "- If usage/quota is not yet shown, send '/usage\\n' on step 1. Do NOT set status='quota_extracted' on step 1 before /usage has been run!",
-      "- Set status='quota_extracted' ONLY when the 'Models & Quota' panel with 'GEMINI MODELS' and 'CLAUDE AND GPT MODELS' is visible.",
+      "- Set status='quota_extracted' ONLY when the 'Models & Quota' panel with 'GEMINI MODELS', 'CLAUDE AND GPT MODELS', or 'GEMINI 4 ARGON' is visible.",
       "- In quota:",
       "  * geminiWeeklyRemain: 'Weekly Limit Remaining' under 'GEMINI MODELS' as float 0.0-1.0.",
       "  * geminiHourRemain: 'Five Hour Limit Remaining' under 'GEMINI MODELS' as float 0.0-1.0.",
       "  * otherWeeklyRemain: 'Weekly Limit Remaining' under 'CLAUDE AND GPT MODELS' as float 0.0-1.0.",
       "  * otherHourRemain: 'Five Hour Limit Remaining' under 'CLAUDE AND GPT MODELS' as float 0.0-1.0. If shows 'Quota available' or 100%, use 1.0.",
+      "  * argonWeeklyRemain: 'Gemini 4 Argon Weekly Limit' under 'GEMINI 4 ARGON' as float 0.0-1.0. If shows 'Quota available' or 100%, use 1.0. Note that Argon has no five-hour limit.",
       "  * resets timestamps: unix timestamp in seconds computed from 'Refreshes in Xh Ym' + current unix timestamp, or null.",
     ].join("\n");
   } else if (input.agent === "claude") {

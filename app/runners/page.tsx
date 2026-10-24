@@ -18,6 +18,8 @@ interface AgyQuota {
   OtherWeeklyResetsAt: number | null;
   OtherHourRemain: number | null;
   OtherHourResetsAt: number | null;
+  ArgonWeeklyRemain?: number | null;
+  ArgonWeeklyResetsAt?: number | null;
   updatedAt: number | null;
   IsAPIKey?: boolean;
 }
@@ -125,6 +127,7 @@ interface QuotaScoreColors {
   claude?: string;
   gemini?: string;
   other?: string;
+  argon?: string;
   codex?: string;
 }
 
@@ -135,6 +138,7 @@ function getQuotaScoreColors(quota: AgentsQuota | null): QuotaScoreColors {
     claude: quota.claude?.IsAPIKey ? null : getAutoagentQuotaScore(quota.claude?.WeekRemain ?? null, quota.claude?.WeekResetsAt ?? null),
     gemini: quota.antigravity?.IsAPIKey ? null : getAutoagentQuotaScore(quota.antigravity?.GeminiWeeklyRemain ?? null, quota.antigravity?.GeminiWeeklyResetsAt ?? null),
     other: quota.antigravity?.IsAPIKey ? null : getAutoagentQuotaScore(quota.antigravity?.OtherWeeklyRemain ?? null, quota.antigravity?.OtherWeeklyResetsAt ?? null),
+    argon: quota.antigravity?.IsAPIKey ? null : getAutoagentQuotaScore(quota.antigravity?.ArgonWeeklyRemain ?? null, quota.antigravity?.ArgonWeeklyResetsAt ?? null),
     codex: quota.codex?.IsAPIKey ? null : getAutoagentQuotaScore(quota.codex?.WeeklyRemain ?? null, quota.codex?.WeeklyResetAt ?? null),
   };
   const knownScores = Object.values(scores).filter((score): score is number => score != null);
@@ -152,6 +156,7 @@ function getQuotaScoreColors(quota: AgentsQuota | null): QuotaScoreColors {
     claude: colorFor(scores.claude),
     gemini: colorFor(scores.gemini),
     other: colorFor(scores.other),
+    argon: colorFor(scores.argon),
     codex: colorFor(scores.codex),
   };
 }
@@ -931,6 +936,9 @@ export default function RunnersPage() {
                                       { label: "Gemini Weekly", used: agentsQuota.antigravity.GeminiWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.GeminiWeeklyRemain, remaining: agentsQuota.antigravity.GeminiWeeklyRemain, resetsAt: agentsQuota.antigravity.GeminiWeeklyResetsAt, scoreColor: quotaScoreColors.gemini },
                                       { label: "Other Hour", used: agentsQuota.antigravity.OtherHourRemain == null ? null : 1 - agentsQuota.antigravity.OtherHourRemain, remaining: agentsQuota.antigravity.OtherHourRemain, resetsAt: agentsQuota.antigravity.OtherHourResetsAt, scoreColor: quotaScoreColors.other },
                                       { label: "Other Weekly", used: agentsQuota.antigravity.OtherWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.OtherWeeklyRemain, remaining: agentsQuota.antigravity.OtherWeeklyRemain, resetsAt: agentsQuota.antigravity.OtherWeeklyResetsAt, scoreColor: quotaScoreColors.other },
+                                      ...(agentsQuota.antigravity.ArgonWeeklyRemain !== undefined && agentsQuota.antigravity.ArgonWeeklyRemain !== null
+                                        ? [{ label: "Argon Weekly", used: 1 - agentsQuota.antigravity.ArgonWeeklyRemain, remaining: agentsQuota.antigravity.ArgonWeeklyRemain, resetsAt: agentsQuota.antigravity.ArgonWeeklyResetsAt ?? null, scoreColor: quotaScoreColors.argon }]
+                                        : []),
                                     ]}
                                     onRefresh={r.connected && !agentsQuota.antigravity.IsAPIKey ? () => refreshQuota(r.id, "agy") : undefined}
                                     isRefreshing={refreshingQuota[`${r.id}:agy`]}

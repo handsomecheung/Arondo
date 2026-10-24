@@ -250,6 +250,7 @@ test.describe('Decision Mode integration tests', () => {
       );
 
       expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("Expected session creation to succeed");
       expect(result.session.agentType).toBe('decision');
 
       await new Promise((r) => setTimeout(r, 100));

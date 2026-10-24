@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
       if (typeof agy !== "object" || agy === null || Array.isArray(agy)) {
         return NextResponse.json({ error: "agentModels.antigravity must be an object" }, { status: 400 });
       }
-      for (const grp of ["gemini", "other"] as const) {
+      for (const grp of ["gemini", "other", "argon"] as const) {
         if (grp in agy) {
           const cfg = agy[grp];
           if (typeof cfg !== "object" || cfg === null || Array.isArray(cfg)) {
@@ -193,6 +193,14 @@ export async function POST(request: NextRequest) {
           availableModels: Array.isArray(agyInput?.other?.availableModels)
             ? agyInput.other.availableModels.map((m: string) => m.trim()).filter(Boolean)
             : current.antigravity.other.availableModels,
+        },
+        argon: {
+          defaultModel: agyInput?.argon?.defaultModel !== undefined
+            ? agyInput.argon.defaultModel.trim()
+            : current.antigravity.argon?.defaultModel,
+          availableModels: Array.isArray(agyInput?.argon?.availableModels)
+            ? agyInput.argon.availableModels.map((m: string) => m.trim()).filter(Boolean)
+            : current.antigravity.argon?.availableModels,
         },
       },
       claude: {

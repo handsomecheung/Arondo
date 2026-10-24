@@ -6,6 +6,7 @@ export interface AgentModelConfig {
 export interface AntigravityModelsConfig {
   gemini: AgentModelConfig;
   other: AgentModelConfig;
+  argon?: AgentModelConfig;
 }
 
 export interface AgentModelsConfig {
@@ -35,6 +36,14 @@ export const DEFAULT_AGENT_MODELS: AgentModelsConfig = {
         "Claude Sonnet 4.6 (Thinking) # Strong general coding model in Antigravity",
         "Claude Opus 4.6 (Thinking) # Highest capability for the hardest tasks",
         "# GPT-OSS 120B (Medium) # Open-source 120B model · Coding performance may be suboptimal; remove '#' to enable",
+      ],
+    },
+    argon: {
+      defaultModel: "Gemini 4 Argon (Medium)",
+      availableModels: [
+        "Gemini 4 Argon (High) # Best for complex tasks with deep reasoning in Gemini 4",
+        "Gemini 4 Argon (Medium) # Default recommended Argon model",
+        "Gemini 4 Argon (Low) # Fast and lightweight for simple requests",
       ],
     },
   },

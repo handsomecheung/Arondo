@@ -65,7 +65,7 @@ export interface TodoTrigger {
   kind: TodoTriggerKind;
   timestamp?: number; // "at" only
   agentType?: string; // "quotaAvailable" only
-  agyQuotaGroup?: "gemini" | "other"; // agy "quotaAvailable" only
+  agyQuotaGroup?: "gemini" | "other" | "argon"; // agy "quotaAvailable" only
 }
 
 export interface Project {
@@ -114,7 +114,7 @@ export interface Session {
   autoLockedAgentType?: string;
   autoLockedAgentModel?: string;
   autoLockedAgentEffort?: string;
-  autoLockedAgyQuotaGroup?: "gemini" | "other";
+  autoLockedAgyQuotaGroup?: "gemini" | "other" | "argon";
   tokenUuid?: string;
   // Set to true if the session only allows a single message (must be created with tempDir).
   once?: boolean;
@@ -167,7 +167,7 @@ export interface Message {
   taskDeleted?: boolean;
   deleted?: boolean;
   resolvedAgentType?: string;
-  resolvedAgyQuotaGroup?: "gemini" | "other";
+  resolvedAgyQuotaGroup?: "gemini" | "other" | "argon";
   prompt?: string;
   tokenUuid?: string;
   userName?: string;
@@ -926,6 +926,7 @@ export async function getAppSettings(): Promise<AppSettings> {
   // Handle migration if antigravity was stored in flat format
   let rawAgyGemini = rawAgentModels?.antigravity?.gemini;
   let rawAgyOther = rawAgentModels?.antigravity?.other;
+  let rawAgyArgon = rawAgentModels?.antigravity?.argon;
   if (!rawAgyGemini && !rawAgyOther && rawAgentModels?.antigravity) {
     const flatModels: string[] = Array.isArray(rawAgentModels.antigravity.availableModels)
       ? rawAgentModels.antigravity.availableModels
@@ -935,7 +936,11 @@ export async function getAppSettings(): Promise<AppSettings> {
       : "";
     rawAgyGemini = {
       defaultModel: flatDefault || defaults.antigravity.gemini.defaultModel,
-      availableModels: flatModels.filter((m) => m.toLowerCase().includes("gemini")),
+      availableModels: flatModels.filter((m) => m.toLowerCase().includes("gemini") && !m.toLowerCase().includes("argon")),
+    };
+    rawAgyArgon = {
+      defaultModel: defaults.antigravity.argon?.defaultModel,
+      availableModels: flatModels.filter((m) => m.toLowerCase().includes("argon")),
     };
     rawAgyOther = {
       defaultModel: defaults.antigravity.other.defaultModel,
@@ -960,6 +965,14 @@ export async function getAppSettings(): Promise<AppSettings> {
         availableModels: Array.isArray(rawAgyOther?.availableModels)
           ? rawAgyOther.availableModels
           : defaults.antigravity.other.availableModels,
+      },
+      argon: {
+        defaultModel: rawAgyArgon?.defaultModel !== undefined
+          ? rawAgyArgon.defaultModel
+          : defaults.antigravity.argon?.defaultModel,
+        availableModels: Array.isArray(rawAgyArgon?.availableModels)
+          ? rawAgyArgon.availableModels
+          : defaults.antigravity.argon?.availableModels,
       },
     },
     claude: {

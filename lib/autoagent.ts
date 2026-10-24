@@ -19,7 +19,7 @@ export interface ResolvedAgent {
   agyQuotaGroup?: AgyQuotaGroup;
 }
 
-export type AgyQuotaGroup = "gemini" | "other";
+export type AgyQuotaGroup = "gemini" | "other" | "argon";
 
 interface ClaudeQuota {
   Type: "claude";
@@ -47,6 +47,8 @@ interface AntigravityQuota {
   OtherWeeklyResetsAt: number | null;
   OtherHourRemain: number | null;
   OtherHourResetsAt: number | null;
+  ArgonWeeklyRemain?: number | null;
+  ArgonWeeklyResetsAt?: number | null;
   updatedAt: number | null;
   IsAPIKey?: boolean;
 }
@@ -76,7 +78,7 @@ async function readQuota(): Promise<Record<string, QuotaEntry>> {
 }
 
 interface AgentChoice {
-  id: "A" | "B" | "C" | "D";
+  id: "A" | "B" | "C" | "D" | "E";
   agentType: ConcreteAgentType;
   model?: string;
   modelOptions: AutoModelOption[];
@@ -84,6 +86,9 @@ interface AgentChoice {
 }
 
 const PREDEFINED_MODEL_OPTIONS: Record<string, Omit<AutoModelOption, "model">> = {
+  "Gemini 4 Argon (High)": { id: "gemini-4-argon-high", costTier: "strong", description: "Gemini 4 Argon with high thinking for complex tasks." },
+  "Gemini 4 Argon (Medium)": { id: "gemini-4-argon-medium", costTier: "standard", description: "Gemini 4 Argon balanced option." },
+  "Gemini 4 Argon (Low)": { id: "gemini-4-argon-low", costTier: "cheap", description: "Gemini 4 Argon low thinking for small tasks." },
   "Gemini 3.7 Flash (High)": { id: "gemini-3.7-flash-high", costTier: "standard", description: "Gemini Flash 3.7 with high thinking for harder work." },
   "Gemini 3.7 Flash (Medium)": { id: "gemini-3.7-flash-medium", costTier: "standard", description: "Gemini Flash 3.7 balanced option." },
   "Gemini 3.7 Flash (Low)": { id: "gemini-3.7-flash-low", costTier: "cheap", description: "Gemini Flash 3.7 low thinking for small tasks." },
@@ -164,15 +169,20 @@ export function getModelOptionsForAgent(
   if (agentType === "antigravity") {
     const geminiModels = parseModelList(configs.antigravity?.gemini?.availableModels);
     const otherModels = parseModelList(configs.antigravity?.other?.availableModels);
+    const argonModels = parseModelList(configs.antigravity?.argon?.availableModels);
     if (agyQuotaGroup === "gemini") {
       return geminiModels.map((m) => buildModelOption(m, "antigravity"));
     }
     if (agyQuotaGroup === "other") {
       return otherModels.map((m) => buildModelOption(m, "antigravity"));
     }
+    if (agyQuotaGroup === "argon") {
+      return argonModels.map((m) => buildModelOption(m, "antigravity"));
+    }
     return [
       ...geminiModels.map((m) => buildModelOption(m, "antigravity")),
       ...otherModels.map((m) => buildModelOption(m, "antigravity")),
+      ...argonModels.map((m) => buildModelOption(m, "antigravity")),
     ];
   }
   if (agentType === "claude") {
@@ -203,6 +213,7 @@ export function getAgyQuotaGroupForModel(model?: string): AgyQuotaGroup | undefi
   const cleaned = parseModelLine(model);
   if (!cleaned) return undefined;
   const lower = cleaned.toLowerCase();
+  if (lower.includes("argon")) return "argon";
   if (lower.includes("gemini")) return "gemini";
   if (lower.includes("gpt-oss") || lower.includes("claude") || lower.includes("opus") || lower.includes("sonnet")) return "other";
   return "gemini";
@@ -221,12 +232,15 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
   // B: agy + Other (Claude) models
   // C: claude
   // D: codex + gpt-5.6-terra
+  // E: agy + Gemini 4 Argon models
   const choices: AgentChoice[] = [];
   if (hasAgy) {
     const geminiOptions = getModelOptionsForAgent("antigravity", "gemini", agentModels);
     const otherOptions = getModelOptionsForAgent("antigravity", "other", agentModels);
+    const argonOptions = getModelOptionsForAgent("antigravity", "argon", agentModels);
     const agyDefault = parseModelLine(agentModels.antigravity?.gemini?.defaultModel) || geminiOptions[0]?.model || "Gemini 3.7 Flash (Medium)";
     const otherDefault = parseModelLine(agentModels.antigravity?.other?.defaultModel) || otherOptions[0]?.model || "Claude Sonnet 4.6 (Thinking)";
+    const argonDefault = parseModelLine(agentModels.antigravity?.argon?.defaultModel) || argonOptions[0]?.model || "Gemini 4 Argon (Medium)";
 
     choices.push({
       id: "A",
@@ -241,6 +255,13 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
       model: otherDefault,
       modelOptions: otherOptions,
       agyQuotaGroup: "other",
+    });
+    choices.push({
+      id: "E",
+      agentType: "antigravity",
+      model: argonDefault,
+      modelOptions: argonOptions,
+      agyQuotaGroup: "argon",
     });
   }
   if (hasClaude) {
@@ -325,9 +346,16 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
         weekRemain = q.WeeklyRemain;
         resetsAt = q.WeeklyResetAt;
       }
+    } else if (choice.id === "E") {
+      const q = latestEntryByType.get("antigravity") as AntigravityQuota | undefined;
+      if (q) {
+        hourRemain = null;
+        weekRemain = q.ArgonWeeklyRemain ?? null;
+        resetsAt = q.ArgonWeeklyResetsAt ?? null;
+      }
     }
 
-    const entry = choice.id === "A" || choice.id === "B"
+    const entry = choice.id === "A" || choice.id === "B" || choice.id === "E"
       ? latestEntryByType.get("antigravity")
       : choice.id === "C"
         ? latestEntryByType.get("claude")
@@ -448,7 +476,8 @@ export async function isQuotaAvailable(
     } else if (e.Type === "antigravity") {
       if (agyQuotaGroup === "gemini" && (e.GeminiHourRemain ?? 1) >= 0.15) return true;
       if (agyQuotaGroup === "other" && (e.OtherHourRemain ?? 1) >= 0.15) return true;
-      if (!agyQuotaGroup && ((e.GeminiHourRemain ?? 1) >= 0.15 || (e.OtherHourRemain ?? 1) >= 0.15)) return true;
+      if (agyQuotaGroup === "argon" && (e.ArgonWeeklyRemain ?? 1) > 0) return true;
+      if (!agyQuotaGroup && ((e.GeminiHourRemain ?? 1) >= 0.15 || (e.OtherHourRemain ?? 1) >= 0.15 || (e.ArgonWeeklyRemain ?? 1) > 0)) return true;
     } else if (e.Type === "codex") {
       if ((e.FiveHourRemain ?? 1) >= 0.15) return true;
     }
