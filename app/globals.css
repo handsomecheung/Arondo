@@ -1876,6 +1876,24 @@ body {
   -webkit-user-select: none;
 }
 
+@media (min-width: 768px) {
+  .exec-card {
+    max-width: 720px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .exec-card {
+    max-width: 960px;
+  }
+}
+
+@media (min-width: 1600px) {
+  .exec-card {
+    max-width: 1200px;
+  }
+}
+
 /* Allow text selection in messages and log outputs */
 .user-message-card-content,
 .agent-exec-output,
