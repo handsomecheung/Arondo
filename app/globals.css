@@ -1164,16 +1164,20 @@ body {
   order: 2;
 }
 
+.model-meta-row {
+  order: 3;
+}
+
 .runner-meta-row {
   order: 1;
 }
 
 .project-meta-row {
-  order: 3;
+  order: 4;
 }
 
 .project-optional-hint {
-  order: 4;
+  order: 5;
   margin: -2px 0 0 60px;
   color: var(--text-muted);
   font-size: 11px;
@@ -3617,6 +3621,27 @@ pre.agent-exec-output {
   width: min(240px, calc(100vw - 32px));
   max-height: 300px;
   transform-origin: bottom left;
+}
+
+.new-session-dropdown-container .new-session-model-dropdown-menu {
+  width: min(320px, calc(100vw - 32px));
+  max-height: 280px;
+}
+
+.custom-dropdown-group-header {
+  padding: 8px 10px 4px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  user-select: none;
+}
+
+.custom-dropdown-group:not(:first-child) {
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  padding-top: 4px;
 }
 
 .new-session-dropdown-container .custom-dropdown-trigger {

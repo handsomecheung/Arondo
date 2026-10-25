@@ -33,6 +33,7 @@ import type { ExecCardInfo } from "@/lib/homeUtils";
 import { useFileSystem } from "@/lib/hooks/useFileSystem";
 import { useGitHub } from "@/lib/hooks/useGitHub";
 import { useWebSocket } from "@/lib/hooks/useWebSocket";
+import type { AgentModelsConfig } from "@/lib/agentModels";
 import { useScripts } from "@/lib/hooks/useScripts";
 import { useInitialLoad } from "@/lib/hooks/useInitialLoad";
 import { useSessionSubmit } from "@/lib/hooks/useSessionSubmit";
@@ -108,8 +109,12 @@ export default function HomePage() {
   // Custom dropdown states & refs
   const [runnerDropdownOpen, setRunnerDropdownOpen] = useState(false);
   const [agentDropdownOpen, setAgentDropdownOpen] = useState(false);
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [agentModelsConfig, setAgentModelsConfig] = useState<AgentModelsConfig | null>(null);
   const runnerSelectRef = useRef<HTMLDivElement>(null);
   const agentSelectRef = useRef<HTMLDivElement>(null);
+  const modelSelectRef = useRef<HTMLDivElement>(null);
 
   // Task Queue states
   const [taskQueue, setTaskQueue] = useState<TaskItem[]>([]);
@@ -401,6 +406,17 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.agentModels) {
+          setAgentModelsConfig(data.agentModels);
+        }
+      })
+      .catch(console.error);
+  }, []);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
         runnerSelectRef.current &&
@@ -413,6 +429,12 @@ export default function HomePage() {
         !agentSelectRef.current.contains(event.target as Node)
       ) {
         setAgentDropdownOpen(false);
+      }
+      if (
+        modelSelectRef.current &&
+        !modelSelectRef.current.contains(event.target as Node)
+      ) {
+        setModelDropdownOpen(false);
       }
     };
     document.addEventListener("click", handleClickOutside);
@@ -1087,6 +1109,8 @@ export default function HomePage() {
       openChatFsModal(sessionRunnerId, path);
     },
     isSessionPathMissing,
+    selectedModel,
+    onClearSelectedModel: () => setSelectedModel(""),
   });
 
   const handleTriggerRunFileSelector = () => {
@@ -1152,6 +1176,7 @@ export default function HomePage() {
     setSelectedProjectId(null);
     setIsNewSession(true);
     setIsNewDraft(false);
+    setSelectedModel("");
     setDraftTrigger("codebaseReady");
     setDraftAt(null);
     setMessages([]);
@@ -1826,9 +1851,13 @@ export default function HomePage() {
             isGitRepo={isGitRepo}
             runnerDropdownOpen={runnerDropdownOpen}
             agentDropdownOpen={agentDropdownOpen}
+            modelDropdownOpen={modelDropdownOpen}
+            selectedModel={selectedModel}
+            agentModelsConfig={agentModelsConfig}
             menuRef={menuRef}
             runnerSelectRef={runnerSelectRef}
             agentSelectRef={agentSelectRef}
+            modelSelectRef={modelSelectRef}
             chatBottomRef={chatBottomRef}
             textareaRef={textareaRef}
             renderMessageContent={renderMessageContent}
@@ -1838,12 +1867,17 @@ export default function HomePage() {
             onSetScriptSubMenuOpen={setScriptSubMenuOpen}
             onSetRunnerId={handleSelectRunner}
             onSetRepoPath={setRepoPath}
-            onSetAgentType={setAgentType}
+            onSetAgentType={(type) => {
+              setAgentType(type);
+              setSelectedModel("");
+            }}
             onSetIsNewDraft={setIsNewDraft}
             onSetDraftTrigger={setDraftTrigger}
             onSetDraftAt={setDraftAt}
             onSetRunnerDropdownOpen={setRunnerDropdownOpen}
             onSetAgentDropdownOpen={setAgentDropdownOpen}
+            onSetModelDropdownOpen={setModelDropdownOpen}
+            onSetSelectedModel={setSelectedModel}
             onSetFsCurrentPath={setFsCurrentPath}
             onSetFsModalOpen={setFsModalOpen}
             onSetFsRunnerId={setFsRunnerId}

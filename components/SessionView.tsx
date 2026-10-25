@@ -22,6 +22,7 @@ import {
 import { agentCommandAcceptsArguments, getTriggerWord, isAgentCommand } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
 import { CHAT_INPUT_TIPS } from "@/lib/chatInputTips";
+import { DEFAULT_AGENT_MODELS, parseModelList, type AgentModelsConfig } from "@/lib/agentModels";
 
 function MiddleTruncatePath({ path, className }: { path: string; className?: string }) {
   const { prefix, suffix } = splitPathForMiddleTruncate(path);
@@ -73,9 +74,13 @@ interface SessionViewProps {
   isGitRepo: boolean;
   runnerDropdownOpen: boolean;
   agentDropdownOpen: boolean;
+  modelDropdownOpen?: boolean;
+  selectedModel?: string;
+  agentModelsConfig?: AgentModelsConfig | null;
   menuRef: React.RefObject<HTMLDivElement | null>;
   runnerSelectRef: React.RefObject<HTMLDivElement | null>;
   agentSelectRef: React.RefObject<HTMLDivElement | null>;
+  modelSelectRef?: React.RefObject<HTMLDivElement | null>;
   chatBottomRef: React.RefObject<HTMLDivElement | null>;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   renderMessageContent: (content: string) => React.ReactNode;
@@ -91,6 +96,8 @@ interface SessionViewProps {
   onSetDraftAt: (v: number | null) => void;
   onSetRunnerDropdownOpen: (v: boolean) => void;
   onSetAgentDropdownOpen: (v: boolean) => void;
+  onSetModelDropdownOpen?: (v: boolean) => void;
+  onSetSelectedModel?: (model: string) => void;
   onSetFsCurrentPath: (path: string) => void;
   onSetFsModalOpen: (v: boolean) => void;
   onSetFsRunnerId: (id: string) => void;
@@ -173,9 +180,13 @@ export default function SessionView({
   isGitRepo,
   runnerDropdownOpen,
   agentDropdownOpen,
+  modelDropdownOpen = false,
+  selectedModel = "",
+  agentModelsConfig,
   menuRef,
   runnerSelectRef,
   agentSelectRef,
+  modelSelectRef,
   chatBottomRef,
   textareaRef,
   renderMessageContent,
@@ -191,6 +202,8 @@ export default function SessionView({
   onSetDraftAt,
   onSetRunnerDropdownOpen,
   onSetAgentDropdownOpen,
+  onSetModelDropdownOpen,
+  onSetSelectedModel,
   onSetFsCurrentPath,
   onSetFsModalOpen,
   onSetFsRunnerId,
@@ -1211,7 +1224,7 @@ export default function SessionView({
 
       {showComposer && (
       <div
-        className={`input-area${isNewSession || isNewDraft ? " new-session-input-area" : ""}${runnerDropdownOpen || projectDropdownOpen || agentDropdownOpen || attachMenuOpen !== "closed" ? " has-open-popup" : ""}${isDragging ? " drag-over" : ""}`}
+        className={`input-area${isNewSession || isNewDraft ? " new-session-input-area" : ""}${runnerDropdownOpen || projectDropdownOpen || agentDropdownOpen || modelDropdownOpen || attachMenuOpen !== "closed" ? " has-open-popup" : ""}${isDragging ? " drag-over" : ""}`}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -1462,6 +1475,100 @@ export default function SessionView({
                 )}
               </div>
             </div>
+
+            {(agentType === "antigravity" || agentType === "codex" || agentType === "claude") && (
+              <div className="input-meta-row model-meta-row">
+                <span className="input-label input-meta-row-label">Model:</span>
+                <div
+                  className="custom-dropdown-container new-session-dropdown-container"
+                  ref={modelSelectRef}
+                >
+                  <button
+                    type="button"
+                    className="custom-dropdown-trigger"
+                    onClick={() =>
+                      onSetModelDropdownOpen?.(!modelDropdownOpen)
+                    }
+                    id="model-select-trigger"
+                  >
+                    <span>{selectedModel || "Default"}</span>
+                    <IconChevronDown
+                      className={`arrow-icon ${modelDropdownOpen ? "open" : ""}`}
+                    />
+                  </button>
+                  {modelDropdownOpen && (
+                    <div className="custom-dropdown-menu new-session-dropdown-menu new-session-model-dropdown-menu">
+                      <button
+                        type="button"
+                        className={`custom-dropdown-item ${!selectedModel ? "active" : ""}`}
+                        onClick={() => {
+                          onSetSelectedModel?.("");
+                          onSetModelDropdownOpen?.(false);
+                        }}
+                      >
+                        <span style={{ flex: 1, textAlign: "left" }}>Default</span>
+                      </button>
+                      {(() => {
+                        if (agentType === "antigravity") {
+                          const agyConfig = agentModelsConfig?.antigravity ?? DEFAULT_AGENT_MODELS.antigravity;
+                          const groups = [
+                            {
+                              name: "Gemini",
+                              models: parseModelList(agyConfig.gemini?.availableModels ?? DEFAULT_AGENT_MODELS.antigravity.gemini.availableModels),
+                            },
+                            {
+                              name: "Anthropic & Other",
+                              models: parseModelList(agyConfig.other?.availableModels ?? DEFAULT_AGENT_MODELS.antigravity.other.availableModels),
+                            },
+                            {
+                              name: "Gemini 4 Argon",
+                              models: parseModelList(agyConfig.argon?.availableModels ?? DEFAULT_AGENT_MODELS.antigravity.argon?.availableModels),
+                            },
+                          ];
+                          return groups.map((grp) => {
+                            if (grp.models.length === 0) return null;
+                            return (
+                              <div key={grp.name} className="custom-dropdown-group">
+                                <div className="custom-dropdown-group-header">{grp.name}</div>
+                                {grp.models.map((model) => (
+                                  <button
+                                    key={model}
+                                    type="button"
+                                    className={`custom-dropdown-item ${selectedModel === model ? "active" : ""}`}
+                                    onClick={() => {
+                                      onSetSelectedModel?.(model);
+                                      onSetModelDropdownOpen?.(false);
+                                    }}
+                                  >
+                                    <span style={{ flex: 1, textAlign: "left" }}>{model}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            );
+                          });
+                        }
+                        const models = agentType === "claude"
+                          ? parseModelList(agentModelsConfig?.claude?.availableModels ?? DEFAULT_AGENT_MODELS.claude.availableModels)
+                          : parseModelList(agentModelsConfig?.codex?.availableModels ?? DEFAULT_AGENT_MODELS.codex.availableModels);
+                        return models.map((model) => (
+                          <button
+                            key={model}
+                            type="button"
+                            className={`custom-dropdown-item ${selectedModel === model ? "active" : ""}`}
+                            onClick={() => {
+                              onSetSelectedModel?.(model);
+                              onSetModelDropdownOpen?.(false);
+                            }}
+                          >
+                            <span style={{ flex: 1, textAlign: "left" }}>{model}</span>
+                          </button>
+                        ));
+                      })()}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             <label className="todo-message-switch" htmlFor="todo-message-toggle">
               <span>TODO Message</span>

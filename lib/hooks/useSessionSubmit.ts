@@ -47,6 +47,8 @@ interface UseSessionSubmitParams {
   onRenameSession: (id: string, newName: string) => void;
   onTriggerFsModal?: () => void;
   isSessionPathMissing?: boolean;
+  selectedModel?: string;
+  onClearSelectedModel?: () => void;
 }
 
 export function useSessionSubmit({
@@ -89,6 +91,8 @@ export function useSessionSubmit({
   onRenameSession,
   onTriggerFsModal,
   isSessionPathMissing,
+  selectedModel,
+  onClearSelectedModel,
 }: UseSessionSubmitParams) {
   const [commandMenuIndex, setCommandMenuIndex] = useState(-1);
   const [pendingConfirmation, setPendingConfirmation] = useState<{
@@ -98,6 +102,7 @@ export function useSessionSubmit({
     agentPrompt: string;
     repoPath: string;
     agentType: string;
+    model?: string;
     runnerId: string;
     reason: { dirty: boolean; busy: boolean; queued?: boolean };
     existingSessionId?: string;
@@ -292,7 +297,8 @@ export function useSessionSubmit({
     setActiveLogMsgId(null);
     setLogModalOpen(false);
     loadProjects();
-  }, [setTaskQueue, setSessions, setSelectedSessionId, setIsNewSession, setIsNewDraft, setSessionLog, setActiveLogMsgId, setLogModalOpen, loadProjects]);
+    onClearSelectedModel?.();
+  }, [setTaskQueue, setSessions, setSelectedSessionId, setIsNewSession, setIsNewDraft, setSessionLog, setActiveLogMsgId, setLogModalOpen, loadProjects, onClearSelectedModel]);
 
   // Called from SessionView with the name typed after "/rename". Requires a
   // non-empty name — unlike "/new", renaming to a blank name is not allowed.
@@ -454,6 +460,7 @@ export function useSessionSubmit({
       repoPath: pendingRepoPath,
       agentType: pendingAgentType,
       runnerId: pendingRunnerId,
+      ...(pendingConfirmation.model ? { model: pendingConfirmation.model } : {}),
       ...(pendingConfirmation.files ? { files: pendingConfirmation.files } : {}),
     };
     if (choice === "force") body.force = true;
@@ -607,6 +614,7 @@ export function useSessionSubmit({
             ...(trimmedRepoPath ? { repoPath: trimmedRepoPath } : { noProject: true }),
             agentType,
             runnerId,
+            ...(selectedModel ? { model: selectedModel } : {}),
             ...(uploadedFiles.length > 0 ? { files: uploadedFiles } : {}),
             ...(isNewDraft
               ? { isDraft: true, draftTrigger, ...(draftTrigger === "at" ? { draftAt } : {}) }
@@ -619,7 +627,7 @@ export function useSessionSubmit({
         });
         if (res.status === 409) {
           const data = await res.json();
-          setPendingConfirmation({ id: targetSessionId, rawText: trimmed, displayMessage, agentPrompt, repoPath: trimmedRepoPath, agentType, runnerId, reason: data.reason, files: uploadedFiles.length > 0 ? uploadedFiles : undefined });
+          setPendingConfirmation({ id: targetSessionId, rawText: trimmed, displayMessage, agentPrompt, repoPath: trimmedRepoPath, agentType, runnerId, model: selectedModel, reason: data.reason, files: uploadedFiles.length > 0 ? uploadedFiles : undefined });
           return;
         }
         const newSession: Session = await res.json();
@@ -690,7 +698,7 @@ export function useSessionSubmit({
     } catch (err) {
       console.error(err);
     }
-  }, [prompt, repoPath, agentType, runnerId, isNewSession, isNewDraft, pendingFiles, setPendingFiles, uploadPendingFile, draftTrigger, draftAt, sendScheduledAt, setSendScheduledAt, pendingSendTrigger, setPendingSendTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, setApiError, setToast, handleNewSessionCommand, handleRenameSessionCommand, sendAgentMessage, handleScriptCommand, agentCommands, finalizeNewSession]);
+  }, [prompt, repoPath, agentType, runnerId, selectedModel, isNewSession, isNewDraft, pendingFiles, setPendingFiles, uploadPendingFile, draftTrigger, draftAt, sendScheduledAt, setSendScheduledAt, pendingSendTrigger, setPendingSendTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, setApiError, setToast, handleNewSessionCommand, handleRenameSessionCommand, sendAgentMessage, handleScriptCommand, agentCommands, finalizeNewSession]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return;

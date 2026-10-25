@@ -272,6 +272,7 @@ export async function dispatchFollowupMessage(
   const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? [], {
     prompt: trimmedPrompt || trimmedMessage,
     automodelLog: (text) => appendAutomodelLog(sessionId, systemMessageId, text),
+    model: session.model,
     lockedAgent: session.agentType === "auto" && session.autoLockedAgentType &&
       (!prevQuotaError || session.autoLockedAgentType === "antigravity")
       ? {
@@ -414,7 +415,7 @@ export async function dispatchCreateSession(
   repoPath: string,
   agentType: string,
   prompt: string,
-  opts: { id?: string; name?: string; tokenUuid?: string; displayMessage?: string; tempDir?: boolean; noProject?: boolean; once?: boolean; cache?: "on" | "off"; files?: MessageFile[] } = {},
+  opts: { id?: string; name?: string; tokenUuid?: string; displayMessage?: string; tempDir?: boolean; noProject?: boolean; once?: boolean; cache?: "on" | "off"; files?: MessageFile[]; model?: string } = {},
 ): Promise<ActionResult> {
   const taskStartedAt = Date.now();
   const trimmedPrompt = prompt.trim();
@@ -431,6 +432,7 @@ export async function dispatchCreateSession(
         status: "done",
         name: opts.name?.trim() || deriveSessionName(displayMessage, repoPath),
         agentType,
+        model: opts.model?.trim() || undefined,
         repoPath,
         runnerId,
         tokenUuid: opts.tokenUuid,
@@ -502,6 +504,7 @@ export async function dispatchCreateSession(
       status: "running",
       name: opts.name?.trim() || deriveSessionName(displayMessage, repoPath),
       agentType,
+      model: opts.model?.trim() || undefined,
       repoPath,
       runnerId,
       tokenUuid: opts.tokenUuid,
@@ -552,6 +555,7 @@ export async function dispatchCreateSession(
     status: "running",
     name: opts.name?.trim() || deriveSessionName(displayMessage, repoPath),
     agentType,
+    model: opts.model?.trim() || undefined,
     repoPath,
     runnerId,
     tokenUuid: opts.tokenUuid,
@@ -564,6 +568,7 @@ export async function dispatchCreateSession(
     prompt: trimmedPrompt,
     automodelLog: (text) => appendAutomodelLog(session.id, systemMessageId, text),
     once: opts.once,
+    model: opts.model,
   });
   const resolvedType = resolved.agentType;
   const agent = getAgent(resolvedType);

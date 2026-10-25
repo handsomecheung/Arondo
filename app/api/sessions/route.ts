@@ -84,7 +84,7 @@ async function pickRandomAllowedRunnerId(token: string | null): Promise<string |
 export async function POST(req: NextRequest) {
   const token = getArondoToken(req);
   const body = await req.json();
-  const { id: idInput, prompt, message, repoPath: repoPathInput, tempDir, noProject, once, cache, agentType = "auto", runnerId: runnerIdInput, name, isDraft, draftTrigger = "codebaseReady", draftAt, force, files } = body as {
+  const { id: idInput, prompt, message, repoPath: repoPathInput, tempDir, noProject, once, cache, agentType = "auto", runnerId: runnerIdInput, name, isDraft, draftTrigger = "codebaseReady", draftAt, force, files, model } = body as {
     id?: string;
     prompt: string;
     message?: string;
@@ -101,6 +101,7 @@ export async function POST(req: NextRequest) {
     draftAt?: number;
     force?: boolean;
     files?: MessageFile[];
+    model?: string;
   };
 
   if (once && !tempDir) {
@@ -185,6 +186,7 @@ export async function POST(req: NextRequest) {
       status: "idle",
       name: name?.trim() || deriveSessionName("", repoPath),
       agentType,
+      model: model?.trim() || undefined,
       repoPath,
       runnerId: runnerId || "",
       tokenUuid: getUuidByToken(token) || undefined,
@@ -203,6 +205,7 @@ export async function POST(req: NextRequest) {
       status: "idle",
       name: name?.trim() || deriveSessionName(trimmedMessage, repoPath),
       agentType,
+      model: model?.trim() || undefined,
       repoPath,
       runnerId: runnerId || "",
       tokenUuid: getUuidByToken(token) || undefined,
@@ -242,6 +245,7 @@ export async function POST(req: NextRequest) {
     once,
     cache,
     files,
+    model: model?.trim() || undefined,
   });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });

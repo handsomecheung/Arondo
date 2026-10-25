@@ -115,6 +115,7 @@ export interface Session {
   autoLockedAgentModel?: string;
   autoLockedAgentEffort?: string;
   autoLockedAgyQuotaGroup?: "gemini" | "other" | "argon";
+  model?: string;
   tokenUuid?: string;
   // Set to true if the session only allows a single message (must be created with tempDir).
   once?: boolean;

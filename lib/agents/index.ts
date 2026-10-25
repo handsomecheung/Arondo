@@ -5,7 +5,7 @@ import { CodexAgent } from "./codex";
 import { OpencodeAgent } from "./opencode";
 import { getAgyQuotaGroupForModel, getModelOptionsForAgent, selectAgent, type AgyQuotaGroup } from "../autoagent";
 import { routeModel, type AutoModelEffort, type AutoModelOption } from "../llm/automodel";
-import { getAgentModelsConfig, parseModelLine, type AgentModelsConfig } from "../store";
+import { getAgentModelsConfig, parseModelLine } from "../store";
 
 export type ConcreteAgentType = "antigravity" | "claude" | "codex" | "opencode";
 export type AgentType = ConcreteAgentType | "auto" | "decision";
@@ -56,6 +56,7 @@ interface ResolveAgentOptions {
   automodelLog?: (text: string) => void | Promise<void>;
   lockedAgent?: Pick<ResolvedAgent, "agentType" | "model" | "effort" | "agyQuotaGroup">;
   once?: boolean;
+  model?: string;
 }
 
 /**
@@ -70,13 +71,15 @@ export async function resolveAgentType(
 ): Promise<ResolvedAgent> {
   const agentModels = await getAgentModelsConfig();
   if (agentType !== "auto") {
-    let defaultModel: string | undefined;
-    if (agentType === "antigravity") {
-      defaultModel = parseModelLine(agentModels.antigravity?.gemini?.defaultModel) || undefined;
-    } else if (agentType === "claude") {
-      defaultModel = parseModelLine(agentModels.claude?.defaultModel) || undefined;
-    } else if (agentType === "codex") {
-      defaultModel = parseModelLine(agentModels.codex?.defaultModel) || undefined;
+    let defaultModel: string | undefined = options.model?.trim() || undefined;
+    if (!defaultModel) {
+      if (agentType === "antigravity") {
+        defaultModel = parseModelLine(agentModels.antigravity?.gemini?.defaultModel) || undefined;
+      } else if (agentType === "claude") {
+        defaultModel = parseModelLine(agentModels.claude?.defaultModel) || undefined;
+      } else if (agentType === "codex") {
+        defaultModel = parseModelLine(agentModels.codex?.defaultModel) || undefined;
+      }
     }
     return {
       agentType: agentType as ConcreteAgentType,
