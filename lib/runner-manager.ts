@@ -348,9 +348,17 @@ class RunnerManager {
 
   private async reconcileSessions(): Promise<void> {
     try {
+      const processStartTime = Date.now() - (process.uptime() * 1000);
       const sessions = await getSessions();
       for (const s of sessions) {
         if (s.status === "running" || s.status === "script-running") {
+          const updatedAtMs = new Date(s.updatedAt || s.createdAt).getTime();
+          // Never reconcile sessions that were created or updated very recently
+          // or after this process started — they are active in the current server instance.
+          if (Date.now() - updatedAtMs < 30_000 || updatedAtMs >= processStartTime - 5000) {
+            continue;
+          }
+
           const messages = await getMessages(s.id);
           const executionRuns = messages.filter(
             (message) =>

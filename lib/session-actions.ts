@@ -264,6 +264,11 @@ export async function dispatchFollowupMessage(
 
   const runnerConn = runnerManager.getRunner(session.runnerId);
 
+  const lastAgentRun = [...messages].reverse().find((m) => m.type === "agent-run" && m.resolvedAgentType);
+  const autoLockedType = session.autoLockedAgentType || lastAgentRun?.resolvedAgentType;
+  const autoLockedGroup = session.autoLockedAgyQuotaGroup || lastAgentRun?.resolvedAgyQuotaGroup;
+  const autoLockedModel = session.autoLockedAgentModel || (session.autoLockedAgentType ? undefined : lastAgentRun?.model);
+
   const prevQuotaError = session.agentType === "auto" &&
     session.errorMessage != null &&
     isQuotaErrorMessage(session.errorMessage);
@@ -273,20 +278,19 @@ export async function dispatchFollowupMessage(
     prompt: trimmedPrompt || trimmedMessage,
     automodelLog: (text) => appendAutomodelLog(sessionId, systemMessageId, text),
     model: session.model,
-    lockedAgent: session.agentType === "auto" && session.autoLockedAgentType &&
-      (!prevQuotaError || session.autoLockedAgentType === "antigravity")
+    lockedAgent: session.agentType === "auto" && autoLockedType &&
+      (!prevQuotaError || autoLockedType === "antigravity")
       ? {
-        agentType: session.autoLockedAgentType as ConcreteAgentType,
-        model: session.autoLockedAgentModel,
+        agentType: autoLockedType as ConcreteAgentType,
+        model: autoLockedModel,
         effort: session.autoLockedAgentEffort as AutoModelEffort | undefined,
-        agyQuotaGroup: session.autoLockedAgyQuotaGroup,
+        agyQuotaGroup: autoLockedGroup,
       }
       : undefined,
     once: session.once,
   });
   const resolvedType = resolved.agentType;
 
-  const lastAgentRun = [...messages].reverse().find((m) => m.type === "agent-run" && m.resolvedAgentType);
   const prevResolvedType = lastAgentRun?.resolvedAgentType;
   const isAgentSwitch = !!prevResolvedType && prevResolvedType !== resolvedType;
 
@@ -550,23 +554,11 @@ export async function dispatchCreateSession(
     return { ok: false, error: "Runner not found or disconnected", status: 503 };
   }
 
-  const session = await createSession({
-    id: opts.id,
-    status: "running",
-    name: opts.name?.trim() || deriveSessionName(displayMessage, repoPath),
-    agentType,
-    model: opts.model?.trim() || undefined,
-    repoPath,
-    runnerId,
-    tokenUuid: opts.tokenUuid,
-    once: opts.once ? true : undefined,
-    cache: opts.cache === "on" ? "on" : undefined,
-  }, { tempDir: opts.tempDir, noProject: opts.noProject });
-
+  const sessionId = opts.id || crypto.randomUUID();
   const systemMessageId = crypto.randomUUID();
   const resolved = await resolveAgentType(agentType, run.info.agents, {
     prompt: trimmedPrompt,
-    automodelLog: (text) => appendAutomodelLog(session.id, systemMessageId, text),
+    automodelLog: (text) => appendAutomodelLog(sessionId, systemMessageId, text),
     once: opts.once,
     model: opts.model,
   });
@@ -576,22 +568,30 @@ export async function dispatchCreateSession(
   const command = agent.getCommand({
     prompt: trimmedPrompt,
     repoPath,
-    sessionId: session.id,
+    sessionId: sessionId,
     isResume: false,
     model: resolved.model,
     effort: resolved.effort,
   });
 
-  const autoLockPatch = agentType === "auto"
-    ? {
+  const session = await createSession({
+    id: sessionId,
+    status: "running",
+    name: opts.name?.trim() || deriveSessionName(displayMessage, repoPath),
+    agentType,
+    model: opts.model?.trim() || undefined,
+    repoPath,
+    runnerId,
+    tokenUuid: opts.tokenUuid,
+    once: opts.once ? true : undefined,
+    cache: opts.cache === "on" ? "on" : undefined,
+    ...(agentType === "auto" ? {
       autoLockedAgentType: resolvedType,
       autoLockedAgentModel: resolved.model ?? undefined,
       autoLockedAgentEffort: resolved.effort ?? undefined,
       autoLockedAgyQuotaGroup: resolved.agyQuotaGroup,
-    }
-    : {};
-  const updatedSession = await updateSession(session.id, autoLockPatch);
-  eventBus.publish({ type: "session_updated", payload: updatedSession });
+    } : {}),
+  }, { tempDir: opts.tempDir, noProject: opts.noProject });
 
   const userMessage = await addMessage({
     sessionId: session.id,
@@ -664,7 +664,7 @@ export async function dispatchCreateSession(
       eventBus.publish({ type: "session_updated", payload: updated });
     });
 
-  return { ok: true, session: updatedSession, messageId: systemMsg.id };
+  return { ok: true, session, messageId: systemMsg.id };
 }
 
 /**
