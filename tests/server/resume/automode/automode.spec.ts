@@ -5,6 +5,7 @@ import os from 'os';
 import { setupRunner, teardownRunner, waitForSessionNotRunning, waitForRunMessages } from '../resume.helper';
 import { getModelOptionsForAgent, isQuotaAvailable, selectAgent } from '../../../../lib/autoagent';
 import { resolveAgentType } from '../../../../lib/agents';
+import { getDefaultAgentModels } from '../../../../lib/agentModels';
 
 const CONFIG_DIR_RUNTIME = process.env.ARONDO_CONFIG_DIR || path.join(os.tmpdir(), 'arondo-test-config');
 const AGENTS_SESSION_MAP_FILE = path.join(CONFIG_DIR_RUNTIME, 'agent-sessions.json');
@@ -27,8 +28,13 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
   const CONFIG_DIR = process.env.ARONDO_CONFIG_DIR || path.join(os.tmpdir(), 'arondo-test-config');
   const quotaPath = path.join(CONFIG_DIR, 'autoagent', 'agent', 'quota.json');
 
-  test.beforeEach(async () => {
+  test.beforeEach(async ({ request }) => {
     await fs.mkdir(path.dirname(quotaPath), { recursive: true }).catch(() => {});
+    const response = await request.post('/api/settings', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+      data: { agentModels: getDefaultAgentModels() },
+    });
+    expect(response.status()).toBe(200);
   });
 
   test.afterEach(async () => {
@@ -67,7 +73,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
         "Type": "codex",
         "Account": "arondo@gmail.com",
         "Plan": "Plus",
-        "DefaultModel": "gpt-5.6-terra",
+        "DefaultModel": "gpt-6-sol",
         "WeeklyRemain": 0.5,
         "WeeklyResetAt": null,
         "updatedAt": Math.floor(Date.now() / 1000),
@@ -76,7 +82,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
 
     await expect(selectAgent(['agy', 'claude', 'codex'])).resolves.toMatchObject({
       agentType: 'codex',
-      model: 'gpt-5.6-terra',
+      model: 'gpt-6-sol',
     });
   });
 
@@ -97,7 +103,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
         "Type": "codex",
         "Account": "arondo@gmail.com",
         "Plan": "Plus",
-        "DefaultModel": "gpt-5.6-terra",
+        "DefaultModel": "gpt-6-sol",
         "FiveHourRemain": 0.1,
         "FiveHourResetAt": null,
         "WeeklyRemain": 0.9,
@@ -128,7 +134,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
         "Type": "codex",
         "Account": "arondo@gmail.com",
         "Plan": "Plus",
-        "DefaultModel": "gpt-5.6-terra",
+        "DefaultModel": "gpt-6-sol",
         "FiveHourRemain": 1.0,
         "FiveHourResetAt": null,
         "WeeklyRemain": 1.0,
@@ -190,7 +196,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
         "Type": "codex",
         "Account": "arondo@gmail.com",
         "Plan": "Plus",
-        "DefaultModel": "gpt-5.6-terra",
+        "DefaultModel": "gpt-6-sol",
         "WeeklyRemain": null,
         "WeeklyResetAt": null,
         "updatedAt": Math.floor(Date.now() / 1000),
@@ -199,7 +205,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
 
     await expect(selectAgent(['agy', 'claude', 'codex'])).resolves.toMatchObject({
       agentType: 'codex',
-      model: 'gpt-5.6-terra',
+      model: 'gpt-6-sol',
     });
   });
 
@@ -235,10 +241,10 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
     const selected = await selectAgent(['agy']);
     expect(selected).toMatchObject({
       agentType: 'antigravity',
-      model: 'Claude Sonnet 4.6 (Thinking)',
+      model: 'Claude Sonnet 5.5 (Medium)',
     });
     const optionIds = selected?.modelOptions?.map((option) => option.id) ?? [];
-    expect(optionIds).toContain('claude-sonnet-4-6');
+    expect(optionIds).toContain('claude-sonnet-5-5-medium');
     expect(optionIds.some((id) => id.startsWith('gemini-'))).toBeFalsy();
   });
 
@@ -281,7 +287,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
       request,
       'A', 'B',
       'antigravity', 'antigravity',
-      'Gemini 3.7 Flash (Medium)', 'Gemini 3.7 Flash (Medium)',
+      'Gemini 3.8 Flash (Medium)', 'Gemini 3.8 Flash (Medium)',
       false,
       quotaPath
     );
@@ -292,7 +298,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
       request,
       'A', 'C',
       'antigravity', 'antigravity',
-      'Gemini 3.7 Flash (Medium)', 'Gemini 3.7 Flash (Medium)',
+      'Gemini 3.8 Flash (Medium)', 'Gemini 3.8 Flash (Medium)',
       false,
       quotaPath
     );
@@ -303,7 +309,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
       request,
       'B', 'C',
       'antigravity', 'antigravity',
-      'Claude Sonnet 4.6 (Thinking)', 'Claude Sonnet 4.6 (Thinking)',
+      'Claude Sonnet 5.5 (Medium)', 'Claude Sonnet 5.5 (Medium)',
       false,
       quotaPath
     );
@@ -314,7 +320,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
       request,
       'B', 'A',
       'antigravity', 'antigravity',
-      'Claude Sonnet 4.6 (Thinking)', 'Claude Sonnet 4.6 (Thinking)',
+      'Claude Sonnet 5.5 (Medium)', 'Claude Sonnet 5.5 (Medium)',
       false,
       quotaPath
     );
@@ -351,7 +357,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
       request,
       'A', 'C',
       'antigravity', 'antigravity',
-      'Gemini 3.7 Flash (Medium)', undefined,
+      'Gemini 3.8 Flash (Medium)', undefined,
       false,
       quotaPath,
       '-locked'
@@ -377,7 +383,7 @@ function getQuotaForChoice(choiceId: 'A' | 'B' | 'C') {
       "Type": "antigravity",
       "Account": "arondo@gmail.com",
       "Plan": "Google AI Pro",
-      "DefaultModel": "Gemini 3.7 Flash (Medium)",
+      "DefaultModel": "Gemini 3.8 Flash (Medium)",
       "GeminiWeeklyRemain": choiceId === 'A' ? 0.9 : 0.1,
       "GeminiWeeklyResetsAt": null,
       "GeminiHourRemain": 1.0,
@@ -406,7 +412,7 @@ function getQuotaForChoice(choiceId: 'A' | 'B' | 'C') {
       "Type": "codex",
       "Account": "arondo@gmail.com",
       "Plan": "Plus",
-      "DefaultModel": "gpt-5.6-terra",
+      "DefaultModel": "gpt-6-sol",
       "WeeklyRemain": 0.1,
       "WeeklyResetAt": null,
       "updatedAt": Math.floor(Date.now() / 1000)
@@ -650,8 +656,8 @@ async function runXXYXTest(
 
   const getAgentInfo = (choice: 'A' | 'B' | 'C') => {
     if (choice === 'C') return { agent: 'claude', model: undefined };
-    if (choice === 'A') return { agent: 'antigravity', model: 'Gemini 3.7 Flash (Medium)' };
-    return { agent: 'antigravity', model: 'Claude Sonnet 4.6 (Thinking)' };
+    if (choice === 'A') return { agent: 'antigravity', model: 'Gemini 3.8 Flash (Medium)' };
+    return { agent: 'antigravity', model: 'Claude Sonnet 5.5 (Medium)' };
   };
 
   const xInfo = getAgentInfo(X);

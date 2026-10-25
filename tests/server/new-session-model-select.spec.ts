@@ -22,7 +22,7 @@ test.describe('New Session Model Select UI & Logic', () => {
     expect(result.agy.hasGeminiModel).toBe(true);
     expect(result.agy.hasClaudeModel).toBe(true);
     expect(result.agy.hasArgonModel).toBe(true);
-    expect(result.agy.hasCommentedModelExcluded).toBe(true);
+    expect(result.agy.hasGptOssModel).toBe(true);
     expect(result.agy.hasInlineCommentExcluded).toBe(true);
 
     // 2. Claude Code
@@ -44,10 +44,10 @@ test.describe('New Session Model Select UI & Logic', () => {
 
   test('resolveAgentType respects custom model option when provided', async () => {
     const agyResolved = await resolveAgentType('antigravity', [], {
-      model: 'Gemini 3.7 Flash (High)',
+      model: 'Gemini 3.8 Flash (High)',
     });
     expect(agyResolved.agentType).toBe('antigravity');
-    expect(agyResolved.model).toBe('Gemini 3.7 Flash (High)');
+    expect(agyResolved.model).toBe('Gemini 3.8 Flash (High)');
 
     const claudeResolved = await resolveAgentType('claude', [], {
       model: 'haiku',
@@ -56,9 +56,9 @@ test.describe('New Session Model Select UI & Logic', () => {
     expect(claudeResolved.model).toBe('haiku');
 
     const codexResolved = await resolveAgentType('codex', [], {
-      model: 'gpt-5.6-sol',
+      model: 'gpt-6-sol',
     });
     expect(codexResolved.agentType).toBe('codex');
-    expect(codexResolved.model).toBe('gpt-5.6-sol');
+    expect(codexResolved.model).toBe('gpt-6-sol');
   });
 });

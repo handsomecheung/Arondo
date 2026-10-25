@@ -377,12 +377,12 @@ The application enforces token-based authentication on all API routes and WebSoc
       "agentModels": {
         "antigravity": {
           "gemini": {
-            "defaultModel": "Gemini 3.7 Flash (Medium)",
-            "availableModels": ["Gemini 3.7 Flash (High)", "Gemini 3.7 Flash (Medium)", "..."]
+            "defaultModel": "Gemini 3.8 Flash (Medium)",
+            "availableModels": ["Gemini 3.8 Flash (High)", "Gemini 3.8 Flash (Medium)", "..."]
           },
           "other": {
-            "defaultModel": "Claude Sonnet 4.6 (Thinking)",
-            "availableModels": ["Claude Sonnet 4.6 (Thinking)", "Claude Opus 4.6 (Thinking)"]
+            "defaultModel": "Claude Sonnet 5.5 (Medium)",
+            "availableModels": ["Claude Opus 5.5 (Low)", "Claude Sonnet 5.5 (Medium)", "..."]
           }
         },
         "claude": {
@@ -390,8 +390,8 @@ The application enforces token-based authentication on all API routes and WebSoc
           "availableModels": ["opus", "fable", "sonnet", "haiku"]
         },
         "codex": {
-          "defaultModel": "gpt-5.6-terra",
-          "availableModels": ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini"]
+          "defaultModel": "gpt-6-sol",
+          "availableModels": ["gpt-6.1-sol", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]
         }
       }
     }
@@ -454,10 +454,10 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **Secure Prompt Passing**: Instead of command line arguments, prompts are passed to agents using temporary files on the runner. The file path is stored in the `ARONDO_PROMPT_FILE` environment variable (and resolved using shell redirection `$(< "$ARONDO_PROMPT_FILE")`), which mitigates command length constraints and process command argument exposure. The UI "Show Prompt" panel displays the real resolved prompt instead of the original raw inputs.
 - **autoagent (Auto Mode)**: Automatically selects the best agent based on hourly and weekly quota availability retrieved from the runner, then optionally lets `automodel` choose the model/effort from the selected choice's allowed model options. New chat sessions default to using the Auto agent mode.
   - **Choices**:
-    - **Choice A**: Antigravity (`agy`) Gemini model group (Quota: `GeminiHourRemain`, `GeminiWeeklyRemain`; default fallback model configured in `agentModels.antigravity.gemini.defaultModel`, e.g. `Gemini 3.7 Flash (Medium)`)
-    - **Choice B**: Antigravity (`agy`) non-Gemini model group (Quota: `OtherHourRemain`, `OtherWeeklyRemain`; default fallback model configured in `agentModels.antigravity.other.defaultModel`, e.g. `Claude Sonnet 4.6 (Thinking)`; model options are drawn from `agentModels.antigravity.other.availableModels`)
+    - **Choice A**: Antigravity (`agy`) Gemini model group (Quota: `GeminiHourRemain`, `GeminiWeeklyRemain`; default fallback model configured in `agentModels.antigravity.gemini.defaultModel`, e.g. `Gemini 3.8 Flash (Medium)`)
+    - **Choice B**: Antigravity (`agy`) non-Gemini model group (Quota: `OtherHourRemain`, `OtherWeeklyRemain`; default fallback model configured in `agentModels.antigravity.other.defaultModel`, e.g. `Claude Sonnet 5.5 (Medium)`; model options are drawn from `agentModels.antigravity.other.availableModels`)
     - **Choice C**: Claude (`claude`) (Quota: `HourRemain`, `WeekRemain`; default fallback model configured in `agentModels.claude.defaultModel`, e.g. `opus`)
-    - **Choice D**: Codex (`codex`) (Quota: `WeeklyRemain`, hourly is treated as always available; default fallback model configured in `agentModels.codex.defaultModel`, e.g. `gpt-5.6-terra`)
+    - **Choice D**: Codex (`codex`) (Quota: `WeeklyRemain`, hourly is treated as always available; default fallback model configured in `agentModels.codex.defaultModel`, e.g. `gpt-6-sol`)
     - **Choice E**: Antigravity (`agy`) Gemini 4 Argon model group (Quota: `ArgonWeeklyRemain`, hourly is treated as always available; default fallback model configured in `agentModels.antigravity.argon.defaultModel`, e.g. `Gemini 4 Argon (Medium)`)
   - **Selection Algorithm**:
     1. **Quota-source preference**: Consider choices with a known, non-API-key weekly quota first. If none are known, fall back to unknown subscription quotas; use API-key billed choices only when no subscription choice is available.

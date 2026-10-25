@@ -89,30 +89,27 @@ const PREDEFINED_MODEL_OPTIONS: Record<string, Omit<AutoModelOption, "model">> =
   "Gemini 4 Argon (High)": { id: "gemini-4-argon-high", costTier: "strong", description: "Gemini 4 Argon with high thinking for complex tasks." },
   "Gemini 4 Argon (Medium)": { id: "gemini-4-argon-medium", costTier: "standard", description: "Gemini 4 Argon balanced option." },
   "Gemini 4 Argon (Low)": { id: "gemini-4-argon-low", costTier: "cheap", description: "Gemini 4 Argon low thinking for small tasks." },
-  "Gemini 3.7 Flash (High)": { id: "gemini-3.7-flash-high", costTier: "standard", description: "Gemini Flash 3.7 with high thinking for harder work." },
-  "Gemini 3.7 Flash (Medium)": { id: "gemini-3.7-flash-medium", costTier: "standard", description: "Gemini Flash 3.7 balanced option." },
-  "Gemini 3.7 Flash (Low)": { id: "gemini-3.7-flash-low", costTier: "cheap", description: "Gemini Flash 3.7 low thinking for small tasks." },
-  "Gemini 3.6 Flash (High)": { id: "gemini-3.6-flash-high", costTier: "standard", description: "Gemini Flash 3.6 with high thinking." },
-  "Gemini 3.6 Flash (Medium)": { id: "gemini-3.6-flash-medium", costTier: "standard", description: "Gemini Flash 3.6 balanced option." },
-  "Gemini 3.6 Flash (Low)": { id: "gemini-3.6-flash-low", costTier: "cheap", description: "Gemini Flash 3.6 low thinking for small tasks." },
-  "Gemini 3.5 Flash (High)": { id: "gemini-3.5-flash-high", costTier: "standard", description: "Gemini Flash 3.5 with high thinking." },
-  "Gemini 3.5 Flash (Medium)": { id: "gemini-3.5-flash-medium", costTier: "cheap", description: "Gemini Flash 3.5 balanced low-cost option." },
-  "Gemini 3.5 Flash (Low)": { id: "gemini-3.5-flash-low", costTier: "cheap", description: "Cheapest Gemini Flash option for simple requests." },
-  "Gemini 3.1 Pro (High)": { id: "gemini-3.1-pro-high", costTier: "strong", description: "Gemini Pro with high thinking for complex work." },
-  "Gemini 3.1 Pro (Low)": { id: "gemini-3.1-pro-low", costTier: "standard", description: "Gemini Pro with low thinking for moderate work." },
-  "Claude Sonnet 4.6 (Thinking)": { id: "claude-sonnet-4-6", costTier: "strong", description: "Strong general coding model in Antigravity." },
-  "Claude Opus 4.6 (Thinking)": { id: "claude-opus-4-6-thinking", costTier: "strong", description: "Highest-cost Antigravity model for the hardest tasks." },
-  "GPT-OSS 120B (Medium)": { id: "gpt-oss-120b-medium", costTier: "cheap", description: "Open-source model in Antigravity. May have suboptimal coding performance." },
-  "opus": { id: "claude-opus", costTier: "strong", description: "Opus 5 with 1M context · Best for everyday, complex tasks · $5/$25 per Mtok" },
-  "fable": { id: "claude-fable", costTier: "strong", description: "Fable 5 · Most capable for your hardest and longest-running tasks · $10/$50 per Mtok" },
-  "sonnet": { id: "claude-sonnet", costTier: "standard", description: "Sonnet 5 · Efficient for routine tasks · $2/$10 per Mtok" },
-  "haiku": { id: "claude-haiku", costTier: "cheap", description: "Haiku 4.5 · Fastest for quick answers · $1/$5 per Mtok" },
-  "gpt-5.6-sol": { id: "codex-gpt-5.6-sol", costTier: "strong", description: "Flagship high-performance reasoning model in OpenAI Codex." },
-  "gpt-5.6-terra": { id: "codex-gpt-5.6-terra", costTier: "standard", description: "Balanced default performance model in OpenAI Codex." },
-  "gpt-5.6-luna": { id: "codex-gpt-5.6-luna", costTier: "cheap", description: "Fast and lightweight model in OpenAI Codex." },
-  "gpt-5.5": { id: "codex-gpt-5.5", costTier: "standard", description: "Standard general-purpose model in OpenAI Codex." },
-  "gpt-5.4": { id: "codex-gpt-5.4", costTier: "standard", description: "Codex 5.4 model for general coding." },
-  "gpt-5.4-mini": { id: "codex-gpt-5.4-mini", costTier: "cheap", description: "Cheaper lightweight Codex option for small tasks." },
+  "Gemini 3.8 Flash (High)": { id: "gemini-3.8-flash-high", costTier: "strong", description: "Gemini 3.8 Flash (High)" },
+  "Gemini 3.8 Flash (Medium)": { id: "gemini-3.8-flash-medium", costTier: "standard", description: "Gemini 3.8 Flash (Medium)" },
+  "Gemini 3.8 Flash (Low)": { id: "gemini-3.8-flash-low", costTier: "cheap", description: "Gemini 3.8 Flash (Low)" },
+  "Claude Opus 5.5 (Low)": { id: "claude-opus-5-5-low", costTier: "standard", description: "Claude Opus 5.5 (Low)" },
+  "Claude Opus 5.5 (Medium)": { id: "claude-opus-5-5-medium", costTier: "strong", description: "Claude Opus 5.5 (Medium)" },
+  "Claude Opus 5.5 (High)": { id: "claude-opus-5-5-high", costTier: "strong", description: "Claude Opus 5.5 (High)" },
+  "Claude Sonnet 5.5 (Low)": { id: "claude-sonnet-5-5-low", costTier: "cheap", description: "Claude Sonnet 5.5 (Low)" },
+  "Claude Sonnet 5.5 (Medium)": { id: "claude-sonnet-5-5-medium", costTier: "standard", description: "Claude Sonnet 5.5 (Medium)" },
+  "Claude Sonnet 5.5 (High)": { id: "claude-sonnet-5-5-high", costTier: "strong", description: "Claude Sonnet 5.5 (High)" },
+  "GPT-OSS 120B (Medium)": { id: "gpt-oss-120b-medium", costTier: "cheap", description: "GPT-OSS 120B (Medium)" },
+  "opus": { id: "claude-opus", costTier: "strong", description: "Opus 5.5 · Best for everyday, complex tasks · $4/$20 per Mtok" },
+  "fable": { id: "claude-fable", costTier: "strong", description: "Fable 5.1 · Most capable for your hardest and longest-running tasks · $10/$50 per Mtok" },
+  "sonnet": { id: "claude-sonnet", costTier: "standard", description: "Sonnet 5.5 · Efficient for routine tasks · $2/$10 per Mtok" },
+  "haiku": { id: "claude-haiku", costTier: "cheap", description: "Haiku 5.5 · Fastest for quick answers · $0.10/$0.50 per Mtok ($0.50/$2.50 for prompts over 100k)" },
+  "gpt-6.1-sol": { id: "codex-gpt-6.1-sol", costTier: "strong", description: "Latest workhorse model for coding and everyday work." },
+  "gpt-6-astra": { id: "codex-gpt-6-astra", costTier: "strong", description: "Frontier intelligence for the most demanding work." },
+  "gpt-6-sol": { id: "codex-gpt-6-sol", costTier: "standard", description: "Previous generation workhorse model." },
+  "gpt-6-luna": { id: "codex-gpt-6-luna", costTier: "cheap", description: "Fast and affordable model for easier tasks." },
+  "gpt-5.6-sol": { id: "codex-gpt-5.6-sol", costTier: "standard", description: "Older generation workhorse model." },
+  "gpt-5.6-terra": { id: "codex-gpt-5.6-terra", costTier: "standard", description: "Older balanced model for straightforward work." },
+  "gpt-5.6-luna": { id: "codex-gpt-5.6-luna", costTier: "cheap", description: "Older fast and efficient model." },
   "gpt-5.4-mini low": { id: "codex-gpt-5.4-mini-low", effort: "low", costTier: "cheap", description: "Cheaper Codex option for small questions and low-risk changes." },
   "gpt-5.5 medium": { id: "codex-gpt-5.5-medium", effort: "medium", costTier: "standard", description: "Default Codex option for normal coding tasks." },
   "gpt-5.5 high": { id: "codex-gpt-5.5-high", effort: "high", costTier: "strong", description: "Stronger Codex reasoning for hard debugging and broad changes." },
@@ -198,12 +195,13 @@ export function getModelOptionsForAgent(
       return models.map((m) => buildModelOption(m, "codex"));
     }
     return [
+      buildModelOption("gpt-6.1-sol", "codex"),
+      buildModelOption("gpt-6-astra", "codex"),
+      buildModelOption("gpt-6-sol", "codex"),
+      buildModelOption("gpt-6-luna", "codex"),
       buildModelOption("gpt-5.6-sol", "codex"),
       buildModelOption("gpt-5.6-terra", "codex"),
       buildModelOption("gpt-5.6-luna", "codex"),
-      buildModelOption("gpt-5.5", "codex"),
-      buildModelOption("gpt-5.4", "codex"),
-      buildModelOption("gpt-5.4-mini", "codex"),
     ];
   }
   return [];
@@ -231,15 +229,15 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
   // A: agy + Gemini models
   // B: agy + Other (Claude) models
   // C: claude
-  // D: codex + gpt-5.6-terra
+  // D: codex + gpt-6-sol
   // E: agy + Gemini 4 Argon models
   const choices: AgentChoice[] = [];
   if (hasAgy) {
     const geminiOptions = getModelOptionsForAgent("antigravity", "gemini", agentModels);
     const otherOptions = getModelOptionsForAgent("antigravity", "other", agentModels);
     const argonOptions = getModelOptionsForAgent("antigravity", "argon", agentModels);
-    const agyDefault = parseModelLine(agentModels.antigravity?.gemini?.defaultModel) || geminiOptions[0]?.model || "Gemini 3.7 Flash (Medium)";
-    const otherDefault = parseModelLine(agentModels.antigravity?.other?.defaultModel) || otherOptions[0]?.model || "Claude Sonnet 4.6 (Thinking)";
+    const agyDefault = parseModelLine(agentModels.antigravity?.gemini?.defaultModel) || geminiOptions[0]?.model || "Gemini 3.8 Flash (Medium)";
+    const otherDefault = parseModelLine(agentModels.antigravity?.other?.defaultModel) || otherOptions[0]?.model || "Claude Sonnet 5.5 (Medium)";
     const argonDefault = parseModelLine(agentModels.antigravity?.argon?.defaultModel) || argonOptions[0]?.model || "Gemini 4 Argon (Medium)";
 
     choices.push({
@@ -276,7 +274,7 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
   }
   if (hasCodex) {
     const codexOptions = getModelOptionsForAgent("codex", undefined, agentModels);
-    const codexDefault = parseModelLine(agentModels.codex?.defaultModel) || "gpt-5.6-terra";
+    const codexDefault = parseModelLine(agentModels.codex?.defaultModel) || "gpt-6-sol";
     choices.push({
       id: "D",
       agentType: "codex",

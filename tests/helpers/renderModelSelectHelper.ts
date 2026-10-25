@@ -156,10 +156,10 @@ console.log(
       hasGeminiGroup: agyHtml.includes('Gemini'),
       hasAnthropicGroup: agyHtml.includes('Anthropic &amp; Other'),
       hasArgonGroup: agyHtml.includes('Gemini 4 Argon'),
-      hasGeminiModel: agyHtml.includes('Gemini 3.7 Flash (High)'),
-      hasClaudeModel: agyHtml.includes('Claude Sonnet 4.6 (Thinking)'),
+      hasGeminiModel: agyHtml.includes('Gemini 3.8 Flash (High)'),
+      hasClaudeModel: agyHtml.includes('Claude Sonnet 5.5 (Medium)'),
       hasArgonModel: agyHtml.includes('Gemini 4 Argon (Medium)'),
-      hasCommentedModelExcluded: !agyHtml.includes('GPT-OSS 120B'),
+      hasGptOssModel: agyHtml.includes('GPT-OSS 120B (Medium)'),
       hasInlineCommentExcluded: !agyHtml.includes('# Best for complex tasks'),
     },
     claude: {
@@ -172,7 +172,7 @@ console.log(
     codex: {
       hasModelRow: codexHtml.includes('model-meta-row'),
       hasTerra: codexHtml.includes('gpt-5.6-terra'),
-      hasSol: codexHtml.includes('gpt-5.6-sol'),
+      hasSol: codexHtml.includes('gpt-6-sol'),
     },
     auto: {
       hasModelRow: autoHtml.includes('model-meta-row'),

@@ -327,8 +327,8 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
               form.antigravityGemini,
               (k, v) => handleChange("antigravityGemini", k, v),
               () => handleResetAgyGroup("gemini"),
-              "e.g. Gemini 3.7 Flash (Medium)",
-              "Gemini 3.7 Flash (High) # Fast reasoning\nGemini 3.7 Flash (Medium)\n# Gemini 3.5 Flash (Low)",
+              "e.g. Gemini 3.8 Flash (Medium)",
+              "Gemini 3.8 Flash (High)\nGemini 3.8 Flash (Medium)\nGemini 3.8 Flash (Low)",
               "agy-gemini",
             )}
             {renderGroupCard(
@@ -337,8 +337,8 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
               form.antigravityOther,
               (k, v) => handleChange("antigravityOther", k, v),
               () => handleResetAgyGroup("other"),
-              "e.g. Claude Sonnet 4.6 (Thinking)",
-              "Claude Sonnet 4.6 (Thinking) # Default thinking model\nClaude Opus 4.6 (Thinking)",
+              "e.g. Claude Sonnet 5.5 (Medium)",
+              "Claude Opus 5.5 (Low)\nClaude Opus 5.5 (Medium)\nClaude Opus 5.5 (High)\nClaude Sonnet 5.5 (Low)\nClaude Sonnet 5.5 (Medium)\nClaude Sonnet 5.5 (High)\nGPT-OSS 120B (Medium)",
               "agy-other",
             )}
             {renderGroupCard(
@@ -366,7 +366,7 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
             (k, v) => handleChange("claude", k, v),
             () => handleResetAgent("claude"),
             "e.g. opus",
-            "opus # Opus 5 with 1M context · $5/$25 per Mtok\nfable # Fable 5 · $10/$50 per Mtok\nsonnet # Sonnet 5 · $2/$10 per Mtok\nhaiku # Haiku 4.5 · $1/$5 per Mtok",
+            "opus # Opus 5.5 · $4/$20 per Mtok\nfable # Fable 5.1 · $10/$50 per Mtok\nsonnet # Sonnet 5.5 · $2/$10 per Mtok\nhaiku # Haiku 5.5 · $0.10/$0.50 per Mtok",
             "claude",
           )}
         </div>
@@ -382,8 +382,8 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
             form.codex,
             (k, v) => handleChange("codex", k, v),
             () => handleResetAgent("codex"),
-            "e.g. gpt-5.6-terra",
-            "gpt-5.6-sol # Flagship reasoning\ngpt-5.6-terra # Default balanced\ngpt-5.6-luna # Fast lightweight\ngpt-5.5 # General coding\ngpt-5.4\ngpt-5.4-mini",
+            "e.g. gpt-6-sol",
+            "gpt-6.1-sol # Latest workhorse\ngpt-6-astra # Frontier intelligence\ngpt-6-sol # Previous workhorse\ngpt-6-luna # Fast and affordable\ngpt-5.6-sol # Older workhorse\ngpt-5.6-terra # Older balanced\ngpt-5.6-luna # Older fast and efficient",
             "codex",
           )}
         </div>

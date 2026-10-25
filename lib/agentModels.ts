@@ -18,24 +18,23 @@ export interface AgentModelsConfig {
 export const DEFAULT_AGENT_MODELS: AgentModelsConfig = {
   antigravity: {
     gemini: {
-      defaultModel: "Gemini 3.7 Flash (Medium)",
+      defaultModel: "Gemini 3.8 Flash (Medium)",
       availableModels: [
-        "Gemini 3.7 Flash (High) # Best for complex tasks and deep reasoning",
-        "Gemini 3.7 Flash (Medium) # Default recommended for everyday coding",
-        "Gemini 3.7 Flash (Low) # Fast and responsive for small tasks",
-        "Gemini 3.6 Flash (High) # Solid reasoning performance",
-        "Gemini 3.6 Flash (Medium) # Balanced option · Reliable daily driver",
-        "Gemini 3.6 Flash (Low) # Fast and lightweight for simple requests",
-        "Gemini 3.1 Pro (High) # Deep reasoning for complex architectural work",
-        "Gemini 3.1 Pro (Low) # Moderate reasoning for general tasks",
+        "Gemini 3.8 Flash (High)",
+        "Gemini 3.8 Flash (Medium)",
+        "Gemini 3.8 Flash (Low)",
       ],
     },
     other: {
-      defaultModel: "Claude Sonnet 4.6 (Thinking)",
+      defaultModel: "Claude Sonnet 5.5 (Medium)",
       availableModels: [
-        "Claude Sonnet 4.6 (Thinking) # Strong general coding model in Antigravity",
-        "Claude Opus 4.6 (Thinking) # Highest capability for the hardest tasks",
-        "# GPT-OSS 120B (Medium) # Open-source 120B model · Coding performance may be suboptimal; remove '#' to enable",
+        "Claude Opus 5.5 (Low)",
+        "Claude Opus 5.5 (Medium)",
+        "Claude Opus 5.5 (High)",
+        "Claude Sonnet 5.5 (Low)",
+        "Claude Sonnet 5.5 (Medium)",
+        "Claude Sonnet 5.5 (High)",
+        "GPT-OSS 120B (Medium)",
       ],
     },
     argon: {
@@ -50,21 +49,22 @@ export const DEFAULT_AGENT_MODELS: AgentModelsConfig = {
   claude: {
     defaultModel: "opus",
     availableModels: [
-      "opus # Opus 5 with 1M context · Best for everyday, complex tasks · $5/$25 per Mtok",
-      "fable # Fable 5 · Most capable for your hardest and longest-running tasks · $10/$50 per Mtok",
-      "sonnet # Sonnet 5 · Efficient for routine tasks · $2/$10 per Mtok",
-      "haiku # Haiku 4.5 · Fastest for quick answers · $1/$5 per Mtok",
+      "opus # Opus 5.5 · Best for everyday, complex tasks · $4/$20 per Mtok",
+      "fable # Fable 5.1 · Most capable for your hardest and longest-running tasks · $10/$50 per Mtok",
+      "sonnet # Sonnet 5.5 · Efficient for routine tasks · $2/$10 per Mtok",
+      "haiku # Haiku 5.5 · Fastest for quick answers · $0.10/$0.50 per Mtok ($0.50/$2.50 for prompts over 100k)",
     ],
   },
   codex: {
-    defaultModel: "gpt-5.6-terra",
+    defaultModel: "gpt-6-sol",
     availableModels: [
-      "gpt-5.6-sol # Flagship reasoning model · Best for complex reasoning and architecture",
-      "gpt-5.6-terra # Balanced default model · Everyday coding and refactoring",
-      "gpt-5.6-luna # Fast and lightweight · Quick edits and simple tasks",
-      "gpt-5.5 # Standard general-purpose coding model",
-      "gpt-5.4 # Previous generation general coding model",
-      "gpt-5.4-mini # Lightweight low-cost option for small tasks",
+      "gpt-6.1-sol # Latest workhorse model for coding and everyday work.",
+      "gpt-6-astra # Frontier intelligence for the most demanding work.",
+      "gpt-6-sol # Previous generation workhorse model.",
+      "gpt-6-luna # Fast and affordable model for easier tasks.",
+      "gpt-5.6-sol # Older generation workhorse model.",
+      "gpt-5.6-terra # Older balanced model for straightforward work.",
+      "gpt-5.6-luna # Older fast and efficient model.",
     ],
   },
 };
