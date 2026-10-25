@@ -12,7 +12,7 @@ const baseProps: React.ComponentProps<typeof SessionView> = {
   messages: [],
   execCards: new Map(),
   returnMsgIds: new Set(),
-  runners: [{ id: 'runner-1', name: 'Runner 1', address: '127.0.0.1', isRunning: false, connectedAt: new Date().toISOString() }],
+  runners: [{ id: 'runner-1', name: 'Runner 1', hostname: 'localhost', os: 'linux', arch: 'amd64', connected: true }],
   projects: [],
   runnerAgents: ['agy', 'claude', 'codex', 'opencode'],
   runnerId: 'runner-1',

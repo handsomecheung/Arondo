@@ -267,7 +267,7 @@ export async function dispatchFollowupMessage(
   const lastAgentRun = [...messages].reverse().find((m) => m.type === "agent-run" && m.resolvedAgentType);
   const autoLockedType = session.autoLockedAgentType || lastAgentRun?.resolvedAgentType;
   const autoLockedGroup = session.autoLockedAgyQuotaGroup || lastAgentRun?.resolvedAgyQuotaGroup;
-  const autoLockedModel = session.autoLockedAgentModel || (session.autoLockedAgentType ? undefined : lastAgentRun?.model);
+  const autoLockedModel = session.autoLockedAgentModel;
 
   const prevQuotaError = session.agentType === "auto" &&
     session.errorMessage != null &&
