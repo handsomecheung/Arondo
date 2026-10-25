@@ -172,6 +172,7 @@ lib/
   config.ts             # Configuration helpers, resolves data directory (defaults to ~/.arondo)
   store.ts              # File-based JSON storage (sessions, messages, logs, projects, scripts)
   agentCommands.ts      # Merges built-in and user-defined agent slash commands, resolves matches
+  agentCommands.server.ts # Loads stored default/project commands and resolves API input
   notification.ts       # Client-side Web Push helper: subscription, permission management, service worker reset, test push trigger
   web-push-server.ts    # Server-side Web Push notifications: VAPID key generation, persistent subscription storage, delivery via web-push
   remarkFileLinks.ts    # Custom remark plugin to scan, verify, and linkify file paths inside markdown output
@@ -319,6 +320,8 @@ cd cli && go build -o arondo-cli . && cd ..  # Build the Go CLI
 ```
 
 The CLI reads connection settings in this order: command flags (`--server`, `--client-token`), then `ARONDO_SERVER` / `ARONDO_CLIENT_TOKEN`, then `cli.server` / `cli.clientToken` in `~/.arondo/arondo.json`. `send` creates or resumes sessions and waits for completion (`--once` restricts `--temp-dir` sessions to a single message, and `--cache on` caches output by prompt hash for seven days). `decide` executes fast categorical decisions using Jev System One without spawning an agent. `get-sessions` lists active sessions, `get-projects` lists accessible projects, `get-agents` reports Antigravity, Claude, Codex, and OpenCode availability per runner, `get-quota` prints recorded quota data, and `update-quota` queues an asynchronous quota refresh via `/api/agents/quota`.
+
+Agent Command resolution also runs on the server for CLI/API inputs: `POST /api/sessions` expands `prompt` when no separate display `message` is supplied; the session messages and todo-messages endpoints expand `message` when no explicit `prompt` is supplied. Project definitions override default custom commands, which override built-ins. Original commands remain as display messages, while expanded prompts are stored for immediate or queued execution.
 
 ## Real-time Communication
 

@@ -58,6 +58,8 @@ cli/arondo-cli send --server "$ARONDO_SERVER" --client-token "$ARONDO_CLIENT_TOK
 
 Use `--resume` to continue the most recently updated session for the chosen Runner and repository path. Do not combine it with `--session-id`, `--temp-dir`, or `--no-path`.
 
+`send` also accepts configured Agent Commands such as `/commit` and `/commit message`. The server resolves matching built-in, default, and project commands before running or queueing the agent, including matcher capture groups such as `$1`. The session history keeps the slash command as the displayed message and records the expanded instruction as the prompt. Commands such as `/review` and `/btw` that run in a separate context require an existing session.
+
 ## Handle outcomes
 
 When using `--output json`, parse the stdout JSON: `sessionId` identifies the session for follow-ups, and `rawOutput` contains the agent stdout. In `plain` mode, output is streamed to stdout and the session ID is logged to stderr. A non-zero exit means the session ended in an error or the CLI could not complete the request.

@@ -5,6 +5,7 @@ import { getArondoToken, verifySessionPermission, getUuidByToken } from "@/lib/a
 import { getProjectReadiness } from "@/lib/project-readiness";
 import { isDetachedAgentType, parseDetachedAgentCommand } from "@/lib/detached-agent-command";
 import { runnerManager } from "@/lib/runner-manager";
+import { resolveStoredAgentCommand } from "@/lib/agentCommands.server";
 
 export async function POST(
   req: NextRequest,
@@ -85,8 +86,11 @@ export async function POST(
   }
 
   try {
+    const resolvedPrompt = !prompt
+      ? await resolveStoredAgentCommand(message, session.runnerId, session.repoPath, session.projectId)
+      : null;
     const result = await dispatchFollowupMessage(id, message, {
-      prompt,
+      prompt: resolvedPrompt ?? prompt,
       type,
       tokenUuid: getUuidByToken(token) || undefined,
       files,

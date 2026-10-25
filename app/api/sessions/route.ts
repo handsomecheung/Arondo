@@ -7,6 +7,7 @@ import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken, getUuidByToken } from "@/lib/auth";
 import { dispatchCreateSession } from "@/lib/session-actions";
 import { getProjectReadiness } from "@/lib/project-readiness";
+import { resolveStoredAgentCommand } from "@/lib/agentCommands.server";
 
 const MAX_SESSION_NAME_LENGTH = 80;
 
@@ -180,6 +181,12 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const displayMessage = message?.trim() || prompt?.trim() || "";
+  const resolvedPrompt = !message && prompt
+    ? await resolveStoredAgentCommand(prompt, runnerId || "", repoPath)
+    : null;
+  const effectivePrompt = resolvedPrompt ?? prompt;
+
   if (isBlank) {
     const session = await createSession({
       id: typeof idInput === "string" && idInput.trim() ? idInput.trim() : undefined,
@@ -198,8 +205,8 @@ export async function POST(req: NextRequest) {
   }
 
   if (isDraft) {
-    const trimmedPrompt = prompt.trim();
-    const trimmedMessage = message?.trim() || trimmedPrompt;
+    const trimmedPrompt = effectivePrompt.trim();
+    const trimmedMessage = displayMessage;
     const session = await createSession({
       id: typeof idInput === "string" && idInput.trim() ? idInput.trim() : undefined,
       status: "idle",
@@ -235,11 +242,11 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const result = await dispatchCreateSession(runnerId || "", repoPath, agentType, prompt, {
+  const result = await dispatchCreateSession(runnerId || "", repoPath, agentType, effectivePrompt, {
     id: typeof idInput === "string" && idInput.trim() ? idInput.trim() : undefined,
     name,
     tokenUuid: getUuidByToken(token) || undefined,
-    displayMessage: message,
+    displayMessage,
     tempDir,
     noProject,
     once,

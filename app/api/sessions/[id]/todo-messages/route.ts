@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { addTodoMessage, getSession, isSessionArchived, type TodoTrigger } from "@/lib/store";
 import { getArondoToken, verifySessionPermission, getUuidByToken } from "@/lib/auth";
 import { eventBus } from "@/lib/event-bus";
+import { resolveStoredAgentCommand } from "@/lib/agentCommands.server";
 
 // Creates a new todo message on an existing session — used to queue a
 // follow-up behind a currently-running agent ("afterSession" trigger), and
@@ -44,9 +45,12 @@ export async function POST(
     return NextResponse.json({ error: "trigger.timestamp must be a timestamp in the future" }, { status: 400 });
   }
 
+  const resolvedPrompt = !prompt
+    ? await resolveStoredAgentCommand(message, session.runnerId, session.repoPath, session.projectId)
+    : null;
   const todoMessage = await addTodoMessage(id, {
     content: message.trim(),
-    prompt: prompt?.trim() || undefined,
+    prompt: resolvedPrompt ?? prompt?.trim() ?? undefined,
     trigger,
     tokenUuid: getUuidByToken(token) || undefined,
     files,

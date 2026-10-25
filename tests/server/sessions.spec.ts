@@ -72,6 +72,79 @@ test.describe('Sessions API integration tests', () => {
     expect(json.error).toBe('runnerId is required');
   });
 
+  test('resolves CLI-style agent commands for drafts and follow-ups', async ({ request }) => {
+    const headers = { 'x-arondo-token': 'test-token-123456' };
+    const testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arondo-cli-command-'));
+    const command = `cli-${Date.now()}`;
+    const matcher = `^${command}\\s+(.+)$`;
+    const sessions: string[] = [];
+
+    try {
+      const globalRes = await request.post('/api/agent-commands', {
+        headers,
+        data: { command, matcher, send: 'global $1' },
+      });
+      expect(globalRes.ok()).toBe(true);
+
+      const initial = await request.post('/api/sessions', {
+        headers,
+        data: { prompt: '', repoPath: testDir, runnerId, agentType: 'antigravity' },
+      });
+      expect(initial.status()).toBe(201);
+      const firstSession = await initial.json();
+      sessions.push(firstSession.id);
+
+      const override = await request.post(`/api/projects/${firstSession.projectId}/agent-commands`, {
+        headers,
+        data: { command, matcher, send: 'project $1' },
+      });
+      expect(override.ok()).toBe(true);
+
+      const draft = await request.post('/api/sessions', {
+        headers,
+        data: { prompt: `/${command} draft`, repoPath: testDir, runnerId, agentType: 'antigravity', isDraft: true, draftTrigger: 'manual' },
+      });
+      expect(draft.status()).toBe(201);
+      const draftSession = await draft.json();
+      sessions.push(draftSession.id);
+      const draftMessages = await (await request.get(`/api/messages?sessionId=${draftSession.id}`, { headers })).json();
+      expect(draftMessages[0]).toMatchObject({ content: `/${command} draft`, prompt: 'project draft' });
+
+      const immediate = await request.post('/api/sessions', {
+        headers,
+        data: { prompt: `/${command} immediate`, repoPath: testDir, runnerId, agentType: 'antigravity', force: true },
+      });
+      expect(immediate.status()).toBe(201);
+      const immediateSession = await immediate.json();
+      sessions.push(immediateSession.id);
+      const immediateMessages = await (await request.get(`/api/messages?sessionId=${immediateSession.id}`, { headers })).json();
+      expect(immediateMessages.find((item: any) => item.role === 'user')).toMatchObject({
+        content: `/${command} immediate`, prompt: 'project immediate',
+      });
+
+      const followup = await request.post(`/api/sessions/${firstSession.id}/messages`, {
+        headers,
+        data: { message: `/${command} followup`, force: true },
+      });
+      expect(followup.ok()).toBe(true);
+      const messages = await (await request.get(`/api/messages?sessionId=${firstSession.id}`, { headers })).json();
+      expect(messages.find((item: any) => item.role === 'user')).toMatchObject({
+        content: `/${command} followup`, prompt: 'project followup',
+      });
+
+      const queued = await request.post(`/api/sessions/${firstSession.id}/todo-messages`, {
+        headers,
+        data: { message: `/${command} queued`, trigger: { kind: 'manual' } },
+      });
+      expect(queued.status()).toBe(201);
+      expect(await queued.json()).toMatchObject({ content: `/${command} queued`, prompt: 'project queued' });
+    } finally {
+      for (const id of sessions) await request.delete(`/api/sessions/${id}`, { headers });
+      await request.delete(`/api/agent-commands?command=${command}`, { headers });
+      await fs.rm(testDir, { recursive: true, force: true });
+    }
+  });
+
   test('should create, update, list, and delete a session successfully', async ({ request }) => {
     // 1. Create a session (use blank prompt to keep status idle and bypass agent execution)
     console.log('[sessions-test] Creating test session...');
