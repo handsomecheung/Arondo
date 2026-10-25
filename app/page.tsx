@@ -92,6 +92,18 @@ export default function HomePage() {
   const [archivedView, setArchivedView] = useState(false);
   const [archivedSessions, setArchivedSessions] = useState<Session[]>([]);
   const [hasArchived, setHasArchived] = useState<boolean>(false);
+  const [pendingArchive, setPendingArchive] = useState<{
+    id: string;
+    session: Session;
+    name: string;
+    wasSelected: boolean;
+  } | null>(null);
+  const pendingArchiveRef = useRef<{
+    id: string;
+    session: Session;
+    wasSelected: boolean;
+    timerId: NodeJS.Timeout;
+  } | null>(null);
 
   // Custom dropdown states & refs
   const [runnerDropdownOpen, setRunnerDropdownOpen] = useState(false);
@@ -529,7 +541,118 @@ export default function HomePage() {
       .catch(console.error);
   }, []);
 
-  const handleOpenArchivedSessions = () => {
+  const commitPendingArchive = useCallback(async () => {
+    if (!pendingArchiveRef.current) return;
+    const { id, session, wasSelected, timerId } = pendingArchiveRef.current;
+    clearTimeout(timerId);
+    pendingArchiveRef.current = null;
+    setPendingArchive(null);
+
+    try {
+      const res = await fetch(`/api/sessions/${id}/archive`, { method: "POST" });
+      if (res.ok) {
+        checkArchivedSessions();
+      } else {
+        setSessions((prev) => {
+          if (prev.some((s) => s.id === id)) return prev;
+          return [session, ...prev];
+        });
+        if (wasSelected) {
+          setSelectedSessionId(id);
+        }
+        const data = await res.json();
+        setApiError({ title: "Archive Session Error", message: data.error || "Failed to archive session" });
+      }
+    } catch (err: any) {
+      console.error(err);
+      setSessions((prev) => {
+        if (prev.some((s) => s.id === id)) return prev;
+        return [session, ...prev];
+      });
+      if (wasSelected) {
+        setSelectedSessionId(id);
+      }
+      setApiError({ title: "Archive Session Error", message: err.message || "Failed to archive session" });
+    }
+  }, [checkArchivedSessions]);
+
+  const handleSwipeArchiveSession = useCallback((id: string) => {
+    if (pendingArchiveRef.current) {
+      commitPendingArchive();
+    }
+
+    const sessionToArchive = sessions.find((s) => s.id === id);
+    if (!sessionToArchive) return;
+
+    const wasSelected = selectedSessionId === id;
+
+    // Immediately hide from sessions list
+    setSessions((prev) => prev.filter((s) => s.id !== id));
+
+    // If currently selected, hide from main view as well
+    if (wasSelected) {
+      setSelectedSessionId(null);
+      setMessages([]);
+      setSessionLog("");
+      setActiveLogMsgId(null);
+      setLogModalOpen(false);
+    }
+
+    const timerId = setTimeout(() => {
+      commitPendingArchive();
+    }, 3000);
+
+    const pendingItem = {
+      id,
+      session: sessionToArchive,
+      name: sessionToArchive.name || "Untitled",
+      wasSelected,
+      timerId,
+    };
+
+    pendingArchiveRef.current = pendingItem;
+    setPendingArchive({
+      id,
+      session: sessionToArchive,
+      name: sessionToArchive.name || "Untitled",
+      wasSelected,
+    });
+  }, [sessions, selectedSessionId, commitPendingArchive]);
+
+  const handleUndoArchiveSession = useCallback(() => {
+    if (!pendingArchiveRef.current) return;
+    const { id, session, wasSelected, timerId } = pendingArchiveRef.current;
+    clearTimeout(timerId);
+    pendingArchiveRef.current = null;
+    setPendingArchive(null);
+
+    // Unhide the session in sessions list
+    setSessions((prev) => {
+      if (prev.some((s) => s.id === id)) return prev;
+      return [session, ...prev];
+    });
+
+    // If it was selected before, restore selection
+    if (wasSelected) {
+      setSelectedSessionId(id);
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (pendingArchiveRef.current) {
+        clearTimeout(pendingArchiveRef.current.timerId);
+        const { id } = pendingArchiveRef.current;
+        pendingArchiveRef.current = null;
+        fetch(`/api/sessions/${id}/archive`, { method: "POST" }).catch(console.error);
+      }
+    };
+  }, []);
+
+  const handleOpenArchivedSessions = async () => {
+    if (pendingArchiveRef.current) {
+      await commitPendingArchive();
+    }
     setArchivedView(true);
     setSelectedProjectId(null);
     loadArchivedSessions();
@@ -551,6 +674,13 @@ export default function HomePage() {
   };
 
   const handleArchiveSession = async (id: string) => {
+    if (pendingArchiveRef.current) {
+      if (pendingArchiveRef.current.id === id) {
+        await commitPendingArchive();
+        return;
+      }
+      await commitPendingArchive();
+    }
     try {
       const res = await fetch(`/api/sessions/${id}/archive`, { method: "POST" });
       if (res.ok) {
@@ -749,6 +879,11 @@ export default function HomePage() {
         "Delete this session? All messages and logs will be permanently removed.",
       onConfirm: async () => {
         setConfirmDialog(null);
+        if (pendingArchiveRef.current?.id === id) {
+          clearTimeout(pendingArchiveRef.current.timerId);
+          pendingArchiveRef.current = null;
+          setPendingArchive(null);
+        }
         try {
           const res = await fetch(`/api/sessions/${id}`, {
             method: "DELETE",
@@ -1499,6 +1634,9 @@ export default function HomePage() {
         onNewSession={handleNewSession}
         onDeleteSession={handleDeleteSession}
         onArchiveSession={handleArchiveSession}
+        onSwipeArchiveSession={handleSwipeArchiveSession}
+        pendingArchive={pendingArchive}
+        onUndoArchive={handleUndoArchiveSession}
         onTogglePinSession={handleTogglePinSession}
         onOpenRenameModal={(id, currentName) => {
           setRenameModal({ sessionId: id, currentName });

@@ -506,6 +506,63 @@ body {
   border-top: 1px solid var(--border);
 }
 
+.sidebar-undo-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border);
+  animation: fadeInUp 0.2s ease;
+  z-index: 10;
+}
+
+.sidebar-undo-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  min-width: 0;
+  flex: 1;
+}
+
+.sidebar-undo-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-undo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-glow);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  font-family: inherit;
+}
+
+.sidebar-undo-btn:hover {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.sidebar-undo-btn:active {
+  transform: scale(0.96);
+}
+
 .sidebar-settings-link {
   display: flex;
   align-items: center;
@@ -654,6 +711,10 @@ body {
 .task-item-swipe-action-delete {
   left: 0;
   background: #ef4444;
+}
+.task-item-swipe-action-archive {
+  left: 0;
+  background: #d97706;
 }
 
 .task-item {

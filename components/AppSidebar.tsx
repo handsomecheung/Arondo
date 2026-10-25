@@ -18,6 +18,9 @@ interface Props {
   onNewSession: () => void;
   onDeleteSession: (id: string) => void;
   onArchiveSession: (id: string) => void;
+  onSwipeArchiveSession?: (id: string) => void;
+  pendingArchive?: { id: string; name?: string } | null;
+  onUndoArchive?: () => void;
   onTogglePinSession: (id: string, pinned: boolean) => void;
   onOpenRenameModal: (id: string, currentName: string) => void;
   archivedView: boolean;
@@ -40,6 +43,9 @@ export default function AppSidebar({
   onNewSession,
   onDeleteSession,
   onArchiveSession,
+  onSwipeArchiveSession,
+  pendingArchive,
+  onUndoArchive,
   onTogglePinSession,
   onOpenRenameModal,
   archivedView,
@@ -114,7 +120,15 @@ export default function AppSidebar({
     if (!prev) return;
     lastDragDistanceRef.current = Math.abs(prev.dx);
     if (prev.dx >= SWIPE_THRESHOLD) {
-      onDeleteSession(prev.id);
+      if (archivedView) {
+        onDeleteSession(prev.id);
+      } else {
+        if (onSwipeArchiveSession) {
+          onSwipeArchiveSession(prev.id);
+        } else {
+          onArchiveSession(prev.id);
+        }
+      }
     }
   };
   const handleSwipeClick = (onClick: () => void) => () => {
@@ -481,8 +495,8 @@ export default function AppSidebar({
                     key={session.id ? `session-${session.id}` : `session-idx-${index}`}
                     className="task-item-swipe-wrapper"
                   >
-                    <div className="task-item-swipe-action task-item-swipe-action-delete" style={{ opacity: clampedDx > 8 ? Math.min(1, clampedDx / SWIPE_THRESHOLD) : 0 }}>
-                      <IconTrash /> Delete
+                    <div className="task-item-swipe-action task-item-swipe-action-archive" style={{ opacity: clampedDx > 8 ? Math.min(1, clampedDx / SWIPE_THRESHOLD) : 0 }}>
+                      <IconArchive /> Archive
                     </div>
                     <div
                       className={`task-item ${selectedSessionId === session.id ? "active" : ""} ${unread ? "unread-completion" : ""}`}
@@ -673,6 +687,24 @@ export default function AppSidebar({
             ];
           })()}
         </div>
+        {pendingArchive && (
+          <div className="sidebar-undo-bar" role="status" aria-live="polite">
+            <div className="sidebar-undo-info">
+              <IconArchive size={14} />
+              <span className="sidebar-undo-text">
+                {pendingArchive.name ? `Archived "${pendingArchive.name}"` : "Session archived"}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="sidebar-undo-btn"
+              onClick={onUndoArchive}
+              id="sidebar-undo-btn"
+            >
+              Undo
+            </button>
+          </div>
+        )}
       </aside>
     </>
   );
