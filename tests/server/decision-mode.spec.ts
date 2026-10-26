@@ -190,6 +190,14 @@ test.describe('Decision Mode integration tests', () => {
 
       const updated = await getSession(session.id);
       expect(updated?.status).toBe('done');
+      expect(updated?.decisionAnswers).toEqual({
+        symphony_count: {
+          choice: '4',
+          probabilities: { '2': 0.01, '4': 0.96, '9': 0.02, '15': 0.01 },
+          confidence: 0.96,
+        },
+        is_nine: { noul: 0.02 },
+      });
 
       const messages = await getMessages(session.id);
       const returnMsg = messages.find((m) => m.type === 'agent-return');

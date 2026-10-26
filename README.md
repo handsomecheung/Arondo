@@ -416,7 +416,7 @@ cat payload.json | cli/arondo-cli decide
   - The `model` field is optional (defaults to `jev-latest` on the server). The `state` field is optional context.
 - **Server-Side Execution**: Runs directly on the server via `TYPESAFE_API_KEY` (in ~180ms) without requiring a connected runner or git repository.
 - **Ephemeral & Web-Clean**: Automatically runs with `--temp-dir` and `--once` semantics, so sessions auto-destruct upon completion and do not appear in the Web UI session list by default.
-- **Output**: Formatted plain text by default, or structured JSON when using `--output json`.
+- **Output**: Formatted plain text by default, or structured JSON when using `--output json`. JSON output includes `decisionAnswers`, the native Jev answer map with choices, probabilities, and confidence values.
 
 Additional CLI commands help inspect runner readiness before sending work:
 

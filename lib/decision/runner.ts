@@ -506,6 +506,7 @@ export async function executeDecisionSession(
     const updatedSession = await updateSession(session.id, {
       status: "done",
       completedAt: new Date().toISOString(),
+      decisionAnswers: answers,
     });
 
     const returnMsg = await addMessage({

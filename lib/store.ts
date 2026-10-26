@@ -124,6 +124,8 @@ export interface Session {
   // dedicated runner-side temporary directory, not a tempDir workspace.
   noProject?: boolean;
   tempDir?: boolean;
+  // Native Jev answers retained for machine consumers of decision sessions.
+  decisionAnswers?: Record<string, unknown>;
 }
 
 export type MessageType =

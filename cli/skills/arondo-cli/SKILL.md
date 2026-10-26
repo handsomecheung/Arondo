@@ -45,7 +45,7 @@ cli/arondo-cli send \
 - **Isolated runs (`--temp-dir` / `--no-path`)**: Use `--temp-dir` to create the session in a fresh temporary directory on the runner (mutually exclusive with `--path`; cannot be combined with `--resume`). Use `--no-path` to create the session in a dedicated temporary directory without a project path.
 - **Single-use & caching (`--once`, `--cache`)**: Pass `--once` with `--temp-dir` to create a single-use session that rejects follow-up messages. Add `--cache on` (default: `off`, requires `--once`) to return cached results from `${ARONDO_CONFIG_DIR}/cache/once/` for matching prompt hashes without invoking an agent for seven days. Expired files remain on disk and are refreshed after a successful agent run.
 - **Polling & Timeout**: The command blocks until completion (defaults: 3-second polling via `--poll-interval` and 600-second timeout via `--timeout`).
-- **Output format (`--output`)**: Defaults to `plain` (streams terminal output in real time). Set `--output json` to output structured JSON with `sessionId` and `rawOutput`.
+- **Output format (`--output`)**: Defaults to `plain` (streams terminal output in real time). Set `--output json` to output structured JSON with `sessionId` and `rawOutput`. For `decide`, it also includes native Jev `decisionAnswers`.
 
 ## Continue a task
 
@@ -62,7 +62,7 @@ Use `--resume` to continue the most recently updated session for the chosen Runn
 
 ## Handle outcomes
 
-When using `--output json`, parse the stdout JSON: `sessionId` identifies the session for follow-ups, and `rawOutput` contains the agent stdout. In `plain` mode, output is streamed to stdout and the session ID is logged to stderr. A non-zero exit means the session ended in an error or the CLI could not complete the request.
+When using `--output json`, parse the stdout JSON: `sessionId` identifies the session for follow-ups, and `rawOutput` contains the agent stdout. For `decide`, use `decisionAnswers` rather than parsing the formatted output. In `plain` mode, output is streamed to stdout and the session ID is logged to stderr. A non-zero exit means the session ended in an error or the CLI could not complete the request.
 
 If the CLI returns `needsConfirmation: true` (e.g. uncommitted changes in the repository or an agent is already running), inspect why the project is dirty or busy. Retry with `--confirmation auto`, `--confirmation draft`, or `--confirmation force` according to user intent:
 - `auto`: Queue for automatic send once the project/codebase is ready.
@@ -118,7 +118,7 @@ cat payload.json | cli/arondo-cli decide
   - Optional `state` context; optional `model` override.
 - **Server-Side Execution**: Runs directly on the server via `TYPESAFE_API_KEY` (in ~180ms) without requiring a connected runner or git repository.
 - **Ephemeral & Web-Clean**: Automatically runs with `--temp-dir` and `--once` semantics.
-- **Output**: Formatted plain text by default, or structured JSON when using `--output json`.
+- **Output**: Formatted plain text by default, or structured JSON when using `--output json`. JSON output includes `decisionAnswers`, the native Jev answer map with choices, probabilities, and confidence values.
 
 ## Inspection & Diagnostic Commands
 
