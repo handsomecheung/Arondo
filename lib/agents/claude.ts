@@ -16,6 +16,6 @@ export class ClaudeCodeAgent extends BaseAgent {
         : ` --session-id "${sessionId}"`;
     }
     const modelArg = model ? ` --model "${model}"` : "";
-    return `claude --print "$(< "$${PROMPT_ENV_VAR}")" --allowedTools "all" --dangerously-skip-permissions${sessionFlag}${modelArg}`;
+    return `claude --print --allowedTools "all" --dangerously-skip-permissions${sessionFlag}${modelArg} -- "$(< "$${PROMPT_ENV_VAR}")"`;
   }
 }

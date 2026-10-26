@@ -65,6 +65,6 @@ export class CodexAgent extends BaseAgent {
       : "";
     const codexId = isResume && sessionId ? getCodexSessionIdSync(sessionId) : undefined;
     const resumeArg = codexId ? `resume "${codexId}" ` : "";
-    return `codex exec --dangerously-bypass-approvals-and-sandbox${modelArg} ${resumeArg}"$(< "$${PROMPT_ENV_VAR}")"`;
+    return `codex exec --dangerously-bypass-approvals-and-sandbox${modelArg} ${resumeArg}-- "$(< "$${PROMPT_ENV_VAR}")"`;
   }
 }

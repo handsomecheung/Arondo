@@ -21,7 +21,10 @@ let prompt = null;
 let resumeMode = false;
 
 for (let i = 0; i < args.length; i++) {
-  if (args[i] === '--session-id') {
+  if (args[i] === '--') {
+    prompt = args.slice(i + 1).join(' ');
+    break;
+  } else if (args[i] === '--session-id') {
     sessionId = args[i + 1];
     i++;
   } else if (args[i] === '--resume') {
@@ -29,8 +32,10 @@ for (let i = 0; i < args.length; i++) {
     resumeMode = true;
     i++;
   } else if (args[i] === '--print') {
-    prompt = args[i + 1];
-    i++;
+    if (args[i + 1] && !args[i + 1].startsWith('-')) {
+      prompt = args[i + 1];
+      i++;
+    }
   }
 }
 

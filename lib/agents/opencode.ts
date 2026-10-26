@@ -62,10 +62,10 @@ export class OpencodeAgent extends BaseAgent {
     const opencodeId = isResume && sessionId ? getOpencodeSessionIdSync(sessionId) : undefined;
 
     if (opencodeId) {
-      return `opencode run${modelArg} --session "${opencodeId}" ${promptArg}`;
+      return `opencode run${modelArg} --session "${opencodeId}" -- ${promptArg}`;
     }
 
     const titleArg = sessionId ? ` --title "${titleFor(sessionId)}"` : "";
-    return `opencode run${modelArg}${titleArg} ${promptArg}`;
+    return `opencode run${modelArg}${titleArg} -- ${promptArg}`;
   }
 }
