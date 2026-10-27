@@ -28,7 +28,7 @@ Treat the token as a secret: do not echo it, include it in prompts, or put it in
 
 ## Start a task (`send`)
 
-Use an explicit repository path for work in an existing project. When `--path`, `--temp-dir`, and `--no-path` are omitted, the current working directory is used as the repository path. Keep the prompt self-contained: name the expected outcome, relevant files or constraints, and validation expected from the delegated agent.
+Use an explicit repository path for work in an existing project. When `--path`, `--automation`, `--temp-dir`, and `--no-path` are omitted, the current working directory is used as the repository path. Keep the prompt self-contained: name the expected outcome, relevant files or constraints, and validation expected from the delegated agent.
 
 ```bash
 cli/arondo-cli send \
@@ -42,9 +42,11 @@ cli/arondo-cli send \
 ```
 
 - **Agent selection (`--agent`)**: Choose from `auto`, `antigravity`, `claude`, `codex`, `opencode`, or `decision`. Prefer `auto` unless a specific agent is requested.
-- **Isolated runs (`--temp-dir` / `--no-path`)**: Use `--temp-dir` to create the session in a fresh temporary directory on the runner (mutually exclusive with `--path`; cannot be combined with `--resume`). Use `--no-path` to create the session in a dedicated temporary directory without a project path.
-- **Single-use & caching (`--once`, `--cache`)**: Pass `--once` with `--temp-dir` to create a single-use session that rejects follow-up messages. Add `--cache on` (default: `off`, requires `--once`) to return cached results from `${ARONDO_CONFIG_DIR}/cache/once/` for matching prompt hashes without invoking an agent for seven days. Expired files remain on disk and are refreshed after a successful agent run.
+- **Automation (`--automation`)**: Create a project-free session marked `automation: true` with a fresh Runner-side workspace in `${ARONDO_CONFIG_DIR:-$HOME/.arondo}/automation-workspaces/`, named with a UTC datetime and random suffix. Without `--runner-id`, an accessible connected Runner is selected at random. Decision agents need neither a Runner nor a workspace. Sessions, tasks, search results, todos, and notifications are hidden unless an admin enables **Show automation sessions**. Direct session-ID access still works. Workspaces are retained until manually removed, including after session deletion. Do not combine with `--path`, `--no-path`, `--temp-dir`, `--resume`, or `--session-id`. To continue later, use `send --session-id <id>` without `--automation`.
+- **Isolated runs (`--temp-dir` / `--no-path`)**: `--temp-dir` is deprecated and emits a warning on stderr; its existing behavior is unchanged. Prefer `--automation` for new automation calls. Use `--temp-dir` to create the session in a fresh temporary directory on the runner (mutually exclusive with `--path`; cannot be combined with `--resume`). Use `--no-path` to create the session in a dedicated temporary directory without a project path.
+- **Single-use & caching (`--once`, `--cache`)**: Pass `--once` with `--automation` (or legacy `--temp-dir`) to create a single-use session that rejects follow-up messages. Add `--cache on` (default: `off`, requires `--once`) to return cached results from `${ARONDO_CONFIG_DIR}/cache/once/` for matching prompt hashes without invoking an agent for seven days. Expired files remain on disk and are refreshed after a successful agent run.
 - **Polling & Timeout**: The command blocks until completion (defaults: 3-second polling via `--poll-interval` and 600-second timeout via `--timeout`).
+- **Failures**: A failed session exits nonzero and prints its failure reason to stderr. If a completion event omits the reason, the CLI refreshes it from the session API. JSON stdout stays machine-readable.
 - **Output format (`--output`)**: Defaults to `plain` (streams terminal output in real time). Set `--output json` to output structured JSON with `sessionId` and `rawOutput`. For `decide`, it also includes native Jev `decisionAnswers`.
 
 ## Continue a task
@@ -56,7 +58,7 @@ cli/arondo-cli send --server "$ARONDO_SERVER" --client-token "$ARONDO_CLIENT_TOK
   --session-id "<session-id>" "Address the failing test and rerun it."
 ```
 
-Use `--resume` to continue the most recently updated session for the chosen Runner and repository path. Do not combine it with `--session-id`, `--temp-dir`, or `--no-path`.
+Use `--resume` to continue the most recently updated session for the chosen Runner and repository path. Do not combine it with `--session-id`, `--automation`, `--temp-dir`, or `--no-path`.
 
 `send` also accepts configured Agent Commands such as `/commit` and `/commit message`. The server resolves matching built-in, default, and project commands before running or queueing the agent, including matcher capture groups such as `$1`. The session history keeps the slash command as the displayed message and records the expanded instruction as the prompt. Commands such as `/review` and `/btw` that run in a separate context require an existing session.
 

@@ -1,5 +1,7 @@
 "use client";
 
+import AutomationSessionSetting from "@/components/AutomationSessionSetting";
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -1015,6 +1017,7 @@ export default function AdminSettingsPage() {
                 />
                 <span>Show temporary sessions and projects</span>
               </label>
+              <AutomationSessionSetting />
             </div>
 
             <div

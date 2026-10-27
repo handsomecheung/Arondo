@@ -24,6 +24,7 @@ interface Session {
   agentType: string;
   repoPath: string;
   projectId: string;
+  automation?: boolean;
   command?: string;
   createdAt: string;
   updatedAt: string;
@@ -168,14 +169,14 @@ export default function TasksPage() {
         const todos: { id: string; sessionId: string; sessionName?: string; content: string; trigger: TodoTrigger; createdAt: string }[] =
           await todoRes.json();
         todoItems = todos
-          .filter((t) => visibleProjectIds.has(sessionMap.get(t.sessionId)?.projectId || ""))
+          .filter((t) => sessionMap.get(t.sessionId)?.automation || visibleProjectIds.has(sessionMap.get(t.sessionId)?.projectId || ""))
           .map((t) => todoMessageToTaskItem(t, t.sessionName || sessionMap.get(t.sessionId)?.name));
       } catch {
         // ignore
       }
 
       const initTasks: TaskItem[] = serverTasks
-        .filter((t) => visibleProjectIds.has(t.projectId || sessionMap.get(t.sessionId)?.projectId || ""))
+        .filter((t) => sessionMap.get(t.sessionId)?.automation || visibleProjectIds.has(t.projectId || sessionMap.get(t.sessionId)?.projectId || ""))
         .map((t) => {
           const session = sessionMap.get(t.sessionId);
           let name: string;
@@ -239,7 +240,7 @@ export default function TasksPage() {
       setTaskQueue((prev) => {
         const nonTodo = prev.filter((t) => t.status !== "todo");
         const todoItems = items
-          .filter((t) => visibleProjectIds.has(sessionMap.get(t.sessionId)?.projectId || ""))
+          .filter((t) => sessionMap.get(t.sessionId)?.automation || visibleProjectIds.has(sessionMap.get(t.sessionId)?.projectId || ""))
           .map((t) => todoMessageToTaskItem(t, t.sessionName || sessionMap.get(t.sessionId)?.name));
         return [...todoItems, ...nonTodo];
       });
@@ -300,7 +301,7 @@ export default function TasksPage() {
     function connect() {
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
       const token = typeof window !== "undefined" ? localStorage.getItem("arondo_token") : "";
-      const wsUrl = `${proto}//${location.host}/ws`;
+      const wsUrl = `${proto}//${location.host}/ws?ui=1`;
       const protocols = token ? ["arondo-token", token] : [];
       ws = new WebSocket(wsUrl, protocols);
       wsRef.current = ws;
@@ -337,7 +338,7 @@ export default function TasksPage() {
               next[idx] = updated;
               return next;
             });
-            if (!projectsRef.current.some((project) => project.id === updated.projectId)) {
+            if (!updated.automation && !projectsRef.current.some((project) => project.id === updated.projectId)) {
               setTaskQueue((prev) =>
                 prev.filter((t) => t.sessionId !== updated.id && t.projectId !== updated.projectId),
               );
@@ -392,7 +393,8 @@ export default function TasksPage() {
           if (event.type === "message:added") {
             const msg = event.payload as Message;
             const resolvedProjectId = msg.projectId || sessionProjectIdsRef.current.get(msg.sessionId);
-            if (!resolvedProjectId || !projectsRef.current.some((project) => project.id === resolvedProjectId)) {
+            if (!sessionsRef.current.some((session) => session.id === msg.sessionId && session.automation) &&
+                (!resolvedProjectId || !projectsRef.current.some((project) => project.id === resolvedProjectId))) {
               return;
             }
             if (msg.type === "user-todo" && msg.todoStatus === "pending" && msg.todoTrigger) {
@@ -493,7 +495,8 @@ export default function TasksPage() {
             const msg = event.payload as Message;
             if (msg.type === "user-todo") {
               const resolvedProjectId = msg.projectId || sessionProjectIdsRef.current.get(msg.sessionId);
-              if (!resolvedProjectId || !projectsRef.current.some((project) => project.id === resolvedProjectId)) {
+              if (!sessionsRef.current.some((session) => session.id === msg.sessionId && session.automation) &&
+                (!resolvedProjectId || !projectsRef.current.some((project) => project.id === resolvedProjectId))) {
                 setTaskQueue((prev) => prev.filter((t) => t.id !== msg.id));
                 return;
               }

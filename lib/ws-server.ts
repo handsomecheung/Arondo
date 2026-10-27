@@ -3,6 +3,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { eventBus, SseEvent } from "./event-bus";
 import { runnerManager } from "./runner-manager";
 import { isValidToken } from "./auth";
+import { getShowAutomationSessions } from "./automation";
 
 const shellToRunner = new Map<string, string>();
 const pendingSpawns = new Map<string, Promise<any>>();
@@ -22,6 +23,7 @@ const HEARTBEAT_INTERVAL = 30_000;
 
 export function setupWebSocketServer(wss: WebSocketServer): void {
   const wsClients = new Map<WebSocket, string | null>();
+  const uiClients = new Set<WebSocket>();
 
   eventBus.subscribe((event: SseEvent) => {
     if (event.type === "session_deleted") {
@@ -65,6 +67,7 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
     // Resolve runnerId and tokenUuid for authorization checks
     let runnerId: string | undefined = event.payload?.runnerId;
     let sessionTokenUuid: string | undefined = event.payload?.tokenUuid;
+    let automation = event.payload?.automation === true;
 
     const resolveAndBroadcast = async () => {
       if ((!runnerId || !sessionTokenUuid) && event.payload) {
@@ -73,6 +76,7 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
           const { getSession } = await import("./store");
           const session = await getSession(sid);
           if (session) {
+            automation = session.automation === true;
             if (!runnerId) runnerId = session.runnerId;
             if (!sessionTokenUuid) sessionTokenUuid = session.tokenUuid;
           }
@@ -83,7 +87,9 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
         }
       }
 
+      const hideAutomation = automation && !(await getShowAutomationSessions());
       for (const [ws, clientToken] of openClients) {
+        if (hideAutomation && uiClients.has(ws)) continue;
         let allowed = true;
         if (sessionTokenUuid) {
           const { getUuidByToken } = await import("./auth");
@@ -117,6 +123,10 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
   wss.on("close", () => clearInterval(heartbeat));
 
   wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
+    if (new URL(req.url || "/ws", "http://localhost").searchParams.get("ui") === "1") {
+      uiClients.add(ws);
+      ws.once("close", () => uiClients.delete(ws));
+    }
     const protocolHeader = req.headers["sec-websocket-protocol"];
     let token: string | null = null;
     if (typeof protocolHeader === "string") {

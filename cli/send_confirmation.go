@@ -11,7 +11,15 @@ import (
 
 func (c *client) createQueuedSession(args arguments, trigger string) (session, error) {
 	payload := map[string]any{"prompt": args.prompt, "agentType": args.agentType, "isDraft": true, "draftTrigger": trigger}
-	if args.tempDir {
+	if args.automation {
+		payload["automation"] = true
+		if args.once {
+			payload["once"] = true
+		}
+		if args.cache != "" {
+			payload["cache"] = args.cache
+		}
+	} else if args.tempDir {
 		payload["tempDir"] = true
 	} else if args.noProject {
 		payload["noProject"] = true

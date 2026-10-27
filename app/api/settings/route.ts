@@ -1,3 +1,4 @@
+import { getShowAutomationSessions } from "@/lib/automation";
 import { NextRequest, NextResponse } from "next/server";
 import { getArondoToken, getRoleByToken, isValidToken } from "@/lib/auth";
 import { updateAppSettings, getAppSettings, getSessionArchiveDays, getTempDirProjectRetentionHours, getShowHiddenFiles, getShowTempDirSessions, getEnableAutomodel, getAgentModelsConfig, type AgentModelsConfig } from "@/lib/store";
@@ -23,6 +24,7 @@ export async function GET(request: NextRequest) {
   const tempDirProjectRetentionHours = await getTempDirProjectRetentionHours();
   const showHiddenFiles = await getShowHiddenFiles();
   const showTempDirSessions = await getShowTempDirSessions();
+  const showAutomationSessions = await getShowAutomationSessions();
   const enableAutomodel = await getEnableAutomodel();
   const agentModels = await getAgentModelsConfig();
   const webPushContactEmail = await getWebPushContactEmail();
@@ -55,6 +57,7 @@ export async function GET(request: NextRequest) {
     tempDirProjectRetentionHours,
     showHiddenFiles,
     showTempDirSessions,
+    showAutomationSessions,
     enableAutomodel,
     version,
     llmApiKeys,
@@ -75,6 +78,7 @@ export async function POST(request: NextRequest) {
     tempDirProjectRetentionHours,
     showHiddenFiles,
     showTempDirSessions,
+    showAutomationSessions,
     enableAutomodel,
     llmApiKeys,
     agentModels,
@@ -95,6 +99,9 @@ export async function POST(request: NextRequest) {
   }
   if (showTempDirSessions !== undefined && typeof showTempDirSessions !== "boolean") {
     return NextResponse.json({ error: "showTempDirSessions must be a boolean" }, { status: 400 });
+  }
+  if (showAutomationSessions !== undefined && typeof showAutomationSessions !== "boolean") {
+    return NextResponse.json({ error: "showAutomationSessions must be a boolean" }, { status: 400 });
   }
   if (enableAutomodel !== undefined && typeof enableAutomodel !== "boolean") {
     return NextResponse.json({ error: "enableAutomodel must be a boolean" }, { status: 400 });
@@ -147,6 +154,7 @@ export async function POST(request: NextRequest) {
     tempDirProjectRetentionHours?: number;
     showHiddenFiles?: boolean;
     showTempDirSessions?: boolean;
+    showAutomationSessions?: boolean;
     enableAutomodel?: boolean;
     llmApiKeys?: Partial<Record<LlmApiKeyName, string | undefined>>;
     agentModels?: AgentModelsConfig;
@@ -155,6 +163,7 @@ export async function POST(request: NextRequest) {
   if (tempDirProjectRetentionHours !== undefined) patch.tempDirProjectRetentionHours = tempDirProjectRetentionHours;
   if (showHiddenFiles !== undefined) patch.showHiddenFiles = showHiddenFiles;
   if (showTempDirSessions !== undefined) patch.showTempDirSessions = showTempDirSessions;
+  if (showAutomationSessions !== undefined) patch.showAutomationSessions = showAutomationSessions;
   if (enableAutomodel !== undefined) patch.enableAutomodel = enableAutomodel;
   if (llmApiKeys !== undefined) {
     const current = await getAppSettings();

@@ -1,3 +1,4 @@
+import { getShowAutomationSessions } from "./automation";
 import type { WebSocket } from "ws";
 import { eventBus } from "./event-bus";
 import {
@@ -141,6 +142,7 @@ class RunnerManager {
   private async shouldSendSessionNotification(sessionId: string): Promise<boolean> {
     const session = await getSession(sessionId);
     if (!session) return true;
+    if (session.automation) return getShowAutomationSessions();
 
     const project = session.projectId ? await getProject(session.projectId) : undefined;
     if (!session.tempDir && (!project || !isTempDirProject(project))) return true;
@@ -1709,7 +1711,7 @@ class RunnerManager {
     });
 
     eventBus.publish({ type: "message_added", payload: agentMsg });
-    eventBus.publish({ type: "session_updated", payload: updated });
+    eventBus.publish({ type: "session_updated", payload: (await getSession(ctx.sessionId)) || updated });
 
     if (
       !stoppedByUser &&

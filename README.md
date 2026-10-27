@@ -293,9 +293,10 @@ Content-Type: application/json
 x-arondo-token: <token>
 
 {
-  "repoPath": "/path/to/repo",   // repository path on the runner — required unless "tempDir" is set
+  "repoPath": "/path/to/repo",   // repository path on the runner — required unless "tempDir", "noProject", or "automation" is set
   "tempDir": false,              // optional — create the session in a fresh temp dir generated on the runner instead of "repoPath" (mutually exclusive with "repoPath")
-  "runnerId": "runner-id",       // target runner (see GET /api/runners) — required, unless "tempDir" is set, in which case it's optional and a random available runner is picked
+  "automation": false,           // optional — create a hidden, project-free automation session; cannot be combined with repoPath, tempDir, or noProject
+  "runnerId": "runner-id",       // target runner — optional for tempDir, noProject, or automation; an accessible connected runner is picked at random
   "prompt": "Fix the login bug", // prompt sent to the agent; omit/blank to create an idle session
   "agentType": "auto",           // optional — "antigravity" | "claude" | "codex" | "opencode" | "auto" (default: "auto")
   "name": "My session",          // optional — defaults to first line of the prompt
@@ -336,6 +337,18 @@ x-arondo-token: <token>
 - Returns the `Session` object. Check `status`, one of: `idle`, `running`, `script-running`, `done`, `error`.
 - `done`/`error` means the agent finished; poll this endpoint until the status leaves `running`/`script-running`.
 
+### Automation sessions
+
+Set `automation: true` on `POST /api/sessions`, or use `arondo-cli send --automation`, to create a session with `automation: true` and `noProject: true` in `session.json` and no project record. Each session receives a fresh Runner-side directory at `${ARONDO_CONFIG_DIR:-$HOME/.arondo}/automation-workspaces/YYYY-MM-DD_HH-mm-ssZ-<random>/` (UTC). The configuration directory is resolved on the Runner, independently of the CLI and server. When no runner is specified, an accessible connected Runner is selected at random. Decision agents run on the server without a Runner or a dedicated workspace.
+
+Automation sessions are hidden from session lists, archived lists, search, Tasks, Todo lists, and completion notifications by default. An admin can enable **Admin Settings → Show automation sessions** (`setitngs.showAutomationSessions`). Direct session-ID access and polling remain available. Sessions use the normal archive policy when listed; workspaces are retained until manually removed, including after session deletion. No automatic workspace deletion is performed.
+
+The sidebar's active and archived session lists label automation sessions with an **Automation** tag and single-use sessions with a **Once** tag. Sessions with both attributes display both tags.
+
+`--automation` cannot be combined with `--path`, `--no-path`, `--temp-dir`, `--resume`, or `--session-id`. It permits follow-up messages via a later `send --session-id <id>` unless `--once` was used. Both `--automation --once` and `--automation --once --cache on` are supported.
+
+`--temp-dir` is deprecated and emits a warning on stderr. Its temporary-project behavior remains unchanged; use `--automation` for new automation calls.
+
 ### CLI
 
 `cli/arondo-cli` is a dependency-free Go CLI. Build it with `cd cli && go build -o arondo-cli . && cd ..`. Its `send` command creates a session or sends a message to an existing session, then polls until it finishes and prints the result. The required message is passed as the final positional argument.
@@ -344,7 +357,7 @@ x-arondo-token: <token>
 cli/arondo-cli send \
   --server http://localhost:3251 \
   --client-token <client_access_token> \
-  --temp-dir \
+  --automation \
   "Print the current date"
 ```
 
@@ -354,20 +367,21 @@ The command prints the session ID. Use it to continue that conversation in a lat
 cli/arondo-cli send \
   --server http://localhost:3251 \
   --client-token <client_access_token> \
-  --resume \
+  --session-id <session_id> \
   "Now also print the current directory"
 ```
 
-When creating a session without `--temp-dir` or `--path`, the script uses its current working directory as the repository path.
-When `--runner-id` is omitted, it selects the connected runner with the current hostname; use `--runner-id` when no runner or multiple runners share that hostname.
-Use `--resume` to send the message to the most recently updated session for the selected runner and repository path. It cannot be combined with `--session-id` or `--temp-dir`.
+When creating a session without `--automation`, `--no-path`, `--temp-dir`, or `--path`, the script uses its current working directory as the repository path.
+For sessions using an existing path, omitting `--runner-id` selects the connected runner with the current hostname; use `--runner-id` when no runner or multiple runners share that hostname. `--automation`, `--no-path`, and `--temp-dir` instead select an accessible connected Runner at random.
+Use `--resume` to send the message to the most recently updated session for the selected runner and repository path. It cannot be combined with `--session-id`, `--automation`, `--no-path`, or `--temp-dir`.
 Pass an Agent Command as the message, for example `cli/arondo-cli send --resume "/commit"`, to run its configured prompt. Matcher capture groups such as `$1` are expanded, and project commands take priority over default and built-in commands. This works for new sessions, follow-ups, and messages queued with `--confirmation auto` or `--confirmation draft`; `/review` and `/btw` require an existing session.
-Use `--once` with `--temp-dir` to create a single-use session that disallows follow-up messages; subsequent `--resume` or `--session-id` requests targeting this session will be rejected.
+Use `--once` with `--automation` (or legacy `--temp-dir`) to create a single-use session that disallows follow-up messages; subsequent `--resume` or `--session-id` requests targeting this session will be rejected.
 Use `--cache on` (default: `off`, requires `--once`) to cache single-use session outputs in `${ARONDO_CONFIG_DIR}/cache/once/` keyed by the SHA-256 hash of the prompt. Cache entries expire after seven days; their creation timestamps are stored in `${hash}.meta.json`. Expired files are retained and refreshed only after a subsequent successful agent run.
 Use `--confirmation auto`, `--confirmation draft`, or `--confirmation force` to resolve a server `needsConfirmation` response the same way as the Web UI buttons: queue for automatic send, save as a manual draft, or send now anyway.
 When the server returns `needsConfirmation: true`, the CLI prints a hint with those retry choices.
 The final JSON result uses `sessionId` and includes the agent's stdout as `rawOutput`.
 The final JSON result is written to stdout; progress messages and errors are written to stderr.
+Failed sessions exit nonzero and report the failure reason on stderr. If a completion event omits the reason, the CLI refreshes it from the session API.
 
 #### Fast Categorical Decisions (`decide`)
 

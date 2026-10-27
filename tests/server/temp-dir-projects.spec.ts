@@ -203,7 +203,7 @@ test.describe('Temp dir project task visibility', () => {
     });
     expect(invalidRes.status()).toBe(400);
     const invalidJson = await invalidRes.json();
-    expect(invalidJson.error).toBe('once can only be used when tempDir is set');
+    expect(invalidJson.error).toBe('once can only be used when tempDir or automation is set');
 
     // 2. Create session with tempDir and once
     const createRes = await request.post('/api/sessions', {

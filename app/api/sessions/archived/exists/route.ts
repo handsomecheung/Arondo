@@ -1,3 +1,4 @@
+import { getShowAutomationSessions } from "@/lib/automation";
 import { NextRequest, NextResponse } from "next/server";
 import { getArchivedSessionPaths, getProjects, isTempDirProject, getShowTempDirSessions } from "@/lib/store";
 import { runnerManager } from "@/lib/runner-manager";
@@ -5,7 +6,7 @@ import { getArondoToken, isValidToken } from "@/lib/auth";
 import fs from "fs/promises";
 
 // Helper to load only the minimal necessary metadata from each session file
-async function readSessionMetadata(filePath: string): Promise<{ runnerId: string; projectId?: string } | null> {
+async function readSessionMetadata(filePath: string): Promise<{ runnerId: string; projectId?: string; automation?: boolean } | null> {
   try {
     const data = await fs.readFile(filePath, "utf-8");
     return JSON.parse(data);
@@ -23,9 +24,11 @@ export async function GET(request: NextRequest) {
   const [filePaths, projects] = await Promise.all([getArchivedSessionPaths(), getProjects()]);
   const projectsById = new Map(projects.map((project) => [project.id, project]));
   const showTempDirSessions = await getShowTempDirSessions();
+  const showAutomationSessions = await getShowAutomationSessions();
 
   for (const filePath of filePaths) {
     const session = await readSessionMetadata(filePath);
+    if (session?.automation && !showAutomationSessions) continue;
     if (session && session.runnerId) {
       const project = session.projectId ? projectsById.get(session.projectId) : undefined;
       if (session.projectId && !project) continue;

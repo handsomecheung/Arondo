@@ -88,12 +88,12 @@ func TestParseArgsRejectsInvalidCombinations(t *testing.T) {
 	}
 
 	_, err = parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--once", "message"}, cliConfig{})
-	if err == nil || err.Error() != "--once can only be used with --temp-dir" {
+	if err == nil || err.Error() != "--once can only be used with --temp-dir or --automation" {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	_, err = parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--session-id", "s1", "--once", "message"}, cliConfig{})
-	if err == nil || err.Error() != "--once can only be used with --temp-dir" {
+	if err == nil || err.Error() != "--once can only be used with --temp-dir or --automation" {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

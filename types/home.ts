@@ -29,6 +29,7 @@ export interface Session {
   model?: string;
   once?: boolean;
   noProject?: boolean;
+  automation?: boolean;
   tempDir?: boolean;
 }
 

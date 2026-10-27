@@ -1,3 +1,4 @@
+import { getShowAutomationSessions } from "@/lib/automation";
 import path from "path";
 import os from "os";
 import { NextRequest, NextResponse } from "next/server";
@@ -33,9 +34,11 @@ export async function GET(request: NextRequest) {
   const projectsById = new Map(projects.map((p) => [p.id, p]));
   const sessionArchiveAgeMs = await getSessionArchiveAgeMs();
   const showTempDirSessions = await getShowTempDirSessions();
+  const showAutomationSessions = await getShowAutomationSessions();
 
   const valid: typeof sessions = [];
   for (const session of sessions) {
+    if (session.automation && !showAutomationSessions) continue;
     const isAllowed = await runnerManager.isTokenAllowedForRunnerId(session.runnerId, token);
     if (!isAllowed) {
       continue;
@@ -85,13 +88,14 @@ async function pickRandomAllowedRunnerId(token: string | null): Promise<string |
 export async function POST(req: NextRequest) {
   const token = getArondoToken(req);
   const body = await req.json();
-  const { id: idInput, prompt, message, repoPath: repoPathInput, tempDir, noProject, once, cache, agentType = "auto", runnerId: runnerIdInput, name, isDraft, draftTrigger = "codebaseReady", draftAt, force, files, model } = body as {
+  const { id: idInput, prompt, message, repoPath: repoPathInput, tempDir, automation, noProject: noProjectInput, once, cache, agentType = "auto", runnerId: runnerIdInput, name, isDraft, draftTrigger = "codebaseReady", draftAt, force, files, model } = body as {
     id?: string;
     prompt: string;
     message?: string;
     repoPath?: string;
     tempDir?: boolean;
     noProject?: boolean;
+    automation?: boolean;
     once?: boolean;
     cache?: "on" | "off";
     agentType?: string;
@@ -105,8 +109,16 @@ export async function POST(req: NextRequest) {
     model?: string;
   };
 
-  if (once && !tempDir) {
-    return NextResponse.json({ error: "once can only be used when tempDir is set" }, { status: 400 });
+  if (automation !== undefined && typeof automation !== "boolean") {
+    return NextResponse.json({ error: "automation must be a boolean" }, { status: 400 });
+  }
+  if (automation && (tempDir || noProjectInput || repoPathInput)) {
+    return NextResponse.json({ error: "automation cannot be used with tempDir, noProject, or repoPath" }, { status: 400 });
+  }
+  const noProject = automation || noProjectInput;
+
+  if (once && !tempDir && !automation) {
+    return NextResponse.json({ error: "once can only be used when tempDir or automation is set" }, { status: 400 });
   }
 
   if (cache !== undefined && cache !== "off") {
@@ -172,7 +184,7 @@ export async function POST(req: NextRequest) {
         const result = await runnerManager.sendRequest(
           runnerId!,
           "fs.mkdtemp",
-          noProject ? { purpose: "no-project-session" } : { excludePaths: busyPaths },
+          automation ? { purpose: "automation-session" } : noProject ? { purpose: "no-project-session" } : { excludePaths: busyPaths },
         );
         repoPath = result.path;
       } catch (error: any) {
@@ -199,7 +211,7 @@ export async function POST(req: NextRequest) {
       tokenUuid: getUuidByToken(token) || undefined,
       once: once ? true : undefined,
       cache: cache === "on" ? "on" : undefined,
-    }, { tempDir, noProject });
+    }, { tempDir, noProject, automation });
     eventBus.publish({ type: "session_updated", payload: session });
     return NextResponse.json(session, { status: 201 });
   }
@@ -218,7 +230,7 @@ export async function POST(req: NextRequest) {
       tokenUuid: getUuidByToken(token) || undefined,
       once: once ? true : undefined,
       cache: cache === "on" ? "on" : undefined,
-    }, { tempDir, noProject });
+    }, { tempDir, noProject, automation });
     const todoMessage = await addTodoMessage(session.id, {
       content: trimmedMessage,
       prompt: trimmedPrompt,
@@ -248,6 +260,7 @@ export async function POST(req: NextRequest) {
     tokenUuid: getUuidByToken(token) || undefined,
     displayMessage,
     tempDir,
+    automation,
     noProject,
     once,
     cache,

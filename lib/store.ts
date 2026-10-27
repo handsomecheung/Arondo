@@ -47,6 +47,7 @@ export interface AppSettings {
   tempDirProjectRetentionHours?: number;
   showHiddenFiles?: boolean;
   showTempDirSessions?: boolean;
+  showAutomationSessions?: boolean;
   enableAutomodel?: boolean;
   llmApiKeys?: Partial<Record<LlmApiKeyName, string>>;
   agentModels?: AgentModelsConfig;
@@ -117,12 +118,13 @@ export interface Session {
   autoLockedAgyQuotaGroup?: "gemini" | "other" | "argon";
   model?: string;
   tokenUuid?: string;
-  // Set to true if the session only allows a single message (must be created with tempDir).
+  // Set to true if the session only allows a single message (tempDir or automation).
   once?: boolean;
   cache?: "on" | "off";
   // Set when the session was created without a Project. Its repoPath is a
   // dedicated runner-side temporary directory, not a tempDir workspace.
   noProject?: boolean;
+  automation?: boolean;
   tempDir?: boolean;
   // Native Jev answers retained for machine consumers of decision sessions.
   decisionAnswers?: Record<string, unknown>;
@@ -462,10 +464,10 @@ export async function recordScriptHistory(projectId: string, command: string): P
 
 export async function createSession(
   data: Omit<Session, "id" | "projectId" | "createdAt" | "updatedAt"> & { id?: string },
-  opts: { tempDir?: boolean; noProject?: boolean } = {}
+  opts: { tempDir?: boolean; noProject?: boolean; automation?: boolean } = {}
 ): Promise<Session> {
   const id = data.id || crypto.randomUUID();
-  const project = opts.noProject
+  const project = opts.noProject || opts.automation
     ? undefined
     : await getOrCreateProject(data.repoPath, data.runnerId, { tempDir: opts.tempDir });
   const sessionData = { ...data } as typeof data & { runningScripts?: string[] };
@@ -475,7 +477,8 @@ export async function createSession(
     id,
     ...(project ? { projectId: project.id } : {}),
     ...(opts.tempDir ? { tempDir: true } : {}),
-    ...(opts.noProject ? { noProject: true } : {}),
+    ...(opts.noProject || opts.automation ? { noProject: true } : {}),
+    ...(opts.automation ? { automation: true } : {}),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -636,7 +639,7 @@ export function deriveSessionCompletion(messages: Message[]): Pick<Session, "sta
   if (latestResult.content.startsWith("❌") || latestResult.content.startsWith("⚠️")) {
     return {
       status: "error",
-      errorMessage: latestResult.content.replace(/^[❌⚠️]\s*(?:Error:\s*)?/, ""),
+      errorMessage: latestResult.content.replace(/^(?:❌|⚠\uFE0F?)\s*(?:Error:\s*)?/, ""),
     };
   }
 

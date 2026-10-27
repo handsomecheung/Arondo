@@ -1,3 +1,4 @@
+import { getShowAutomationSessions } from "@/lib/automation";
 import { NextRequest, NextResponse } from "next/server";
 import { getArchivedSessions, getMessages, getProjects, getSessions, getShowTempDirSessions, isTempDirProject, sessionExecutionLogsContain } from "@/lib/store";
 import { getArondoToken, isValidToken } from "@/lib/auth";
@@ -26,10 +27,12 @@ export async function GET(request: NextRequest) {
     getShowTempDirSessions(),
   ]);
   const projectsById = new Map(projects.map((project) => [project.id, project]));
+  const showAutomationSessions = await getShowAutomationSessions();
   const normalizedQuery = query.toLocaleLowerCase();
   const sessionIds = new Set<string>();
 
   await Promise.all([...activeSessions, ...archivedSessions].map(async (session) => {
+    if (session.automation && !showAutomationSessions) return;
     const project = session.projectId ? projectsById.get(session.projectId) : undefined;
     if ((session.projectId && !project) || (!showTempDirSessions && project && isTempDirProject(project))) {
       return;

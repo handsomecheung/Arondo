@@ -4,6 +4,7 @@ import Link from "next/link";
 import { IconPlus, IconInbox, IconSettings, IconServer, IconMoreVertical, IconArchive, IconArrowLeft, IconTrash, IconPin, IconEdit, IconLogout, IconSearch, IconX } from "@/components/Icons";
 import { formatRelative, isUnviewedCompletion } from "@/lib/homeUtils";
 import type { Session, Project, Runner } from "@/types/home";
+import SessionTags from "@/components/SessionTags";
 
 const SWIPE_THRESHOLD = 72;
 
@@ -434,8 +435,9 @@ export default function AppSidebar({
                       }}
                       id={`archived-session-item-${session.id}`}
                     >
-                      <div className="task-item-header">
+                      <div className="task-item-header" style={{ flexWrap: "wrap" }}>
                         <span className={`task-status-badge ${session.status}`}>{session.status}</span>
+                        <SessionTags session={session} />
                         {projectName && (
                           <span
                             className="task-item-project-badge"
@@ -512,7 +514,7 @@ export default function AppSidebar({
                       }}
                       id={`session-item-${session.id}`}
                     >
-                    <div className="task-item-header">
+                    <div className="task-item-header" style={{ flexWrap: "wrap" }}>
                       {unread && (
                         <span
                           className="task-item-unread-dot"
@@ -532,6 +534,7 @@ export default function AppSidebar({
                           ? "running"
                           : session.status}
                       </span>
+                      <SessionTags session={session} />
                       {projectName && (
                         <span
                           className="task-item-project-badge"

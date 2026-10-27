@@ -1,3 +1,4 @@
+import { getShowAutomationSessions } from "@/lib/automation";
 import { NextRequest, NextResponse } from "next/server";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken } from "@/lib/auth";
@@ -14,10 +15,12 @@ export async function GET(request: NextRequest) {
   const projectsById = new Map(projects.map((project) => [project.id, project]));
   const tasks = runnerManager.getAllTasks();
   const showTempDirSessions = await getShowTempDirSessions();
+  const showAutomationSessions = await getShowAutomationSessions();
 
   const filtered = [];
   for (const task of tasks) {
     const session = task.sessionId ? sessionsById.get(task.sessionId) : undefined;
+    if (session?.automation && !showAutomationSessions) continue;
     const projectId = task.projectId || session?.projectId;
     if (projectId) {
       const project = projectsById.get(projectId);

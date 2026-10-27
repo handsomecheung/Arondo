@@ -1,3 +1,4 @@
+import { getShowAutomationSessions } from "@/lib/automation";
 import { NextRequest, NextResponse } from "next/server";
 import { getArchivedSessions, getProjects, isTempDirProject, getShowTempDirSessions } from "@/lib/store";
 import { runnerManager } from "@/lib/runner-manager";
@@ -12,8 +13,10 @@ export async function GET(request: NextRequest) {
   const [sessions, projects] = await Promise.all([getArchivedSessions(), getProjects()]);
   const projectsById = new Map(projects.map((project) => [project.id, project]));
   const showTempDirSessions = await getShowTempDirSessions();
+  const showAutomationSessions = await getShowAutomationSessions();
   const valid: typeof sessions = [];
   for (const session of sessions) {
+    if (session.automation && !showAutomationSessions) continue;
     const project = session.projectId ? projectsById.get(session.projectId) : undefined;
     if (session.projectId && !project) continue;
     if (!showTempDirSessions && project && isTempDirProject(project)) continue;

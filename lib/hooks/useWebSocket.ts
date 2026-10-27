@@ -42,7 +42,7 @@ export function useWebSocket({
     function connect() {
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
       const token = typeof window !== "undefined" ? localStorage.getItem("arondo_token") : "";
-      const wsUrl = `${proto}//${location.host}/ws`;
+      const wsUrl = `${proto}//${location.host}/ws?ui=1`;
       const protocols = token ? ["arondo-token", token] : [];
       ws = new WebSocket(wsUrl, protocols);
       wsRef.current = ws;

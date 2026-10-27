@@ -35,9 +35,10 @@ Options:
   --client-token <token>       Client access token (overrides ARONDO_CLIENT_TOKEN and cli.clientToken in arondo.json)
   --runner-id <id>             Target runner ID (default: connected runner with the current hostname)
   --path <path>                Repository path on the runner (default: current working directory)
-  --temp-dir                   Create the session in a fresh temporary directory on the runner
+  --temp-dir                   Deprecated: create a temporary project (use --automation for new automation calls)
+  --automation                 Create a hidden automation session in a dedicated runner workspace
   --no-path                    Create the session in a dedicated temporary directory without a project path
-  --once                       Allow only a single message in the session (can only be used with --temp-dir)
+  --once                       Allow only a single message in the session (requires --automation or --temp-dir)
   --cache <mode>               Cache single-use session results: on or off (default: off, requires --once)
   --session-id <id>            Send the message to an existing session
   --resume                     Resume the most recently updated session for the runner and repository path
@@ -65,7 +66,7 @@ Run cli/arondo-cli <command> --help for command options.`
 type arguments struct {
 	server, token, runnerID, repoPath, sessionID, agentType, prompt, output, confirmation, cache string
 	pollInterval, timeout                                                                        float64
-	tempDir, noProject, resume, once                                                             bool
+	tempDir, noProject, automation, resume, once                                                 bool
 }
 
 type apiError struct {
@@ -143,6 +144,9 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 		switch option {
 		case "--help":
 			return arguments{}, errHelp
+		case "--automation":
+			args.automation = true
+			continue
 		case "--temp-dir":
 			args.tempDir = true
 			continue
@@ -230,8 +234,13 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 	if args.tempDir && args.noProject {
 		return arguments{}, errors.New("--temp-dir cannot be used with --no-path")
 	}
-	if args.once && !args.tempDir {
-		return arguments{}, errors.New("--once can only be used with --temp-dir")
+	if args.automation {
+		if args.tempDir || args.noProject || args.repoPath != "" || args.resume || args.sessionID != "" {
+			return arguments{}, errors.New("--automation cannot be used with --path, --no-path, --temp-dir, --resume, or --session-id")
+		}
+	}
+	if args.once && !args.tempDir && !args.automation {
+		return arguments{}, errors.New("--once can only be used with --temp-dir or --automation")
 	}
 	if args.cache != "" {
 		if args.cache != "on" && args.cache != "off" {
@@ -241,7 +250,7 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 			return arguments{}, errors.New("--cache can only be used with --once")
 		}
 	}
-	if args.sessionID == "" && !args.tempDir && !args.noProject && args.repoPath == "" {
+	if args.sessionID == "" && !args.tempDir && !args.noProject && !args.automation && args.repoPath == "" {
 		workingDirectory, err := os.Getwd()
 		if err != nil {
 			return arguments{}, err
@@ -346,7 +355,9 @@ func (c *client) getSession(sessionID string) (session, error) {
 
 func (c *client) createSession(args arguments, force bool) (session, error) {
 	payload := map[string]any{"prompt": args.prompt, "agentType": args.agentType}
-	if args.tempDir {
+	if args.automation {
+		payload["automation"] = true
+	} else if args.tempDir {
 		payload["tempDir"] = true
 	} else if args.noProject {
 		payload["noProject"] = true
@@ -628,6 +639,9 @@ func run(argv []string) error {
 	if err != nil {
 		return err
 	}
+	if args.tempDir {
+		fmt.Fprintln(os.Stderr, "Warning: --temp-dir is deprecated; use --automation for new automation calls. Existing --temp-dir behavior is unchanged.")
+	}
 	c := &client{server: args.server, token: args.token, http: http.DefaultClient}
 	ws, _ := dialWebSocket(args.server, args.token, 5*time.Second)
 	if ws != nil {
@@ -668,7 +682,7 @@ func run(argv []string) error {
 			messageID = sent.MessageID
 		}
 	} else {
-		if args.runnerID == "" && !args.tempDir && !args.noProject {
+		if args.runnerID == "" && !args.tempDir && !args.noProject && !args.automation {
 			hostname, err := os.Hostname()
 			if err != nil {
 				return err
@@ -727,6 +741,9 @@ func run(argv []string) error {
 		return errSession
 	}
 	if session.Status == "error" {
+		if session.ErrorMessage == "" {
+			session.ErrorMessage = "The agent failed. See the session execution logs for details."
+		}
 		fmt.Fprintf(os.Stderr, "\nSession finished with an error: %s\n", session.ErrorMessage)
 		return errSession
 	}

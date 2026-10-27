@@ -438,6 +438,13 @@ func streamSessionUntilDone(c *client, args arguments, sessionID, messageID stri
 		}
 	}
 
+	if messageID == "" && finalSession.Status == "error" && finalSession.ErrorMessage == "" {
+		refreshed, err := c.getSession(sessionID)
+		if err == nil && refreshed.ErrorMessage != "" {
+			finalSession = refreshed
+		}
+	}
+
 	if args.output != "json" && !streamed {
 		fmt.Print(rawOutput.String())
 	}

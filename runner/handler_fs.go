@@ -334,6 +334,15 @@ type fsMkdtempResponse struct {
 
 func (h *Handler) handleFsMkdtemp(msg *Message) {
 	req, _ := parsePayload[fsMkdtempRequest](msg)
+	if req.Purpose == "automation-session" {
+		dir, err := createAutomationWorkspace()
+		if err != nil {
+			h.sendError(msg.ID, "INTERNAL", "failed to create automation workspace: "+err.Error())
+			return
+		}
+		h.sendResponse(msg.ID, fsMkdtempResponse{OK: true, Path: dir})
+		return
+	}
 	if req.Purpose == "no-project-session" {
 		dir, err := os.MkdirTemp("", "arondo-session-")
 		if err != nil {
