@@ -46,7 +46,7 @@ Options:
   --agent <type>               auto, antigravity, claude, codex, opencode, or decision (default: auto)
   --poll-interval <seconds>    Seconds between status polls (default: 3)
   --timeout <seconds>          Maximum seconds to wait for completion (default: 600)
-  --output <format>            Output format: plain or json (default: plain)
+  --output <format>            Output format: plain, json, or html (default: plain)
   --help                       Show this help message`
 
 const rootUsage = `Usage: cli/arondo-cli <command> [options] <message>
@@ -263,8 +263,8 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 	if !map[string]bool{"auto": true, "antigravity": true, "claude": true, "codex": true, "opencode": true, "decision": true}[args.agentType] {
 		return arguments{}, errors.New("--agent must be auto, antigravity, claude, codex, opencode, or decision")
 	}
-	if args.output != "plain" && args.output != "json" {
-		return arguments{}, errors.New("--output must be plain or json")
+	if args.output != "plain" && args.output != "json" && args.output != "html" {
+		return arguments{}, errors.New("--output must be plain, json, or html")
 	}
 	if args.confirmation != "" && !map[string]bool{"auto": true, "draft": true, "force": true}[args.confirmation] {
 		return arguments{}, errors.New("--confirmation must be auto, draft, or force")
@@ -422,6 +422,23 @@ func (c *client) getSessionLog(sessionID, messageID string) (string, error) {
 	}
 	err := c.request(http.MethodGet, "/api/sessions/"+url.PathEscape(sessionID)+"/log?messageId="+url.QueryEscape(messageID), nil, &result)
 	return result.Log, err
+}
+
+func (c *client) renderedHTML(sessionID, messageID string) (string, error) {
+	path := "/api/sessions/" + url.PathEscape(sessionID) + "/html"
+	if messageID != "" {
+		path += "?messageId=" + url.QueryEscape(messageID)
+	}
+	var result struct {
+		HTML string `json:"html"`
+	}
+	err := c.request(http.MethodGet, path, nil, &result)
+	if err != nil {
+		return "", err
+	}
+	html := result.HTML
+	html = strings.TrimPrefix(html, "<!--arondo-agent-output-html-v4-->")
+	return strings.TrimSpace(html), nil
 }
 
 type runner struct {
@@ -735,6 +752,12 @@ func run(argv []string) error {
 		fmt.Fprintln(os.Stderr, "\n=== Result ===")
 		pretty, _ := json.MarshalIndent(result, "", "  ")
 		fmt.Println(string(pretty))
+	} else if args.output == "html" {
+		html, err := c.renderedHTML(sessionID, messageID)
+		if err != nil {
+			return err
+		}
+		fmt.Println(html)
 	}
 	if detachedFailed {
 		fmt.Fprintln(os.Stderr, "\nDetached agent finished with an error.")

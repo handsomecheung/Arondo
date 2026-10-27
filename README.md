@@ -380,8 +380,8 @@ Use `--once` with `--automation` (or legacy `--temp-dir`) to create a single-use
 Use `--cache on` (default: `off`, requires `--once`) to cache single-use session outputs in `${ARONDO_CONFIG_DIR}/cache/once/` keyed by the SHA-256 hash of the prompt. Cache entries expire after seven days; their creation timestamps are stored in `${hash}.meta.json`. Expired files are retained and refreshed only after a subsequent successful agent run.
 Use `--confirmation auto`, `--confirmation draft`, or `--confirmation force` to resolve a server `needsConfirmation` response the same way as the Web UI buttons: queue for automatic send, save as a manual draft, or send now anyway.
 When the server returns `needsConfirmation: true`, the CLI prints a hint with those retry choices.
-The final JSON result uses `sessionId` and includes the agent's stdout as `rawOutput`.
-The final JSON result is written to stdout; progress messages and errors are written to stderr.
+Use `--output plain` (default), `--output json`, or `--output html` to choose the output format. In `plain` mode, terminal output is streamed in real time. In `json` mode, the final JSON result uses `sessionId` and includes the agent's stdout as `rawOutput`. In `html` mode, the rendered HTML is printed upon completion.
+The final result is written to stdout; progress messages and errors are written to stderr.
 Failed sessions exit nonzero and report the failure reason on stderr. If a completion event omits the reason, the CLI refreshes it from the session API.
 
 #### Fast Categorical Decisions (`decide`)

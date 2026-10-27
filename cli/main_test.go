@@ -51,6 +51,44 @@ func TestConversationMessagesExcludesDetachedAgentAndTodoMessages(t *testing.T) 
 	}
 }
 
+func TestParseArgsOutputHtml(t *testing.T) {
+	args, err := parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--temp-dir", "--output", "html", "Do work"}, cliConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if args.output != "html" {
+		t.Fatalf("expected output html, got %q", args.output)
+	}
+
+	_, err = parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--temp-dir", "--output", "invalid", "Do work"}, cliConfig{})
+	if err == nil || err.Error() != "--output must be plain, json, or html" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRenderedHTML(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/sessions/sess-1/html" {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"html": "<!--arondo-agent-output-html-v4--><p>Rendered <strong>content</strong></p>",
+			})
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	c := &client{server: server.URL, token: "secret", http: server.Client()}
+	html, err := c.renderedHTML("sess-1", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expected := "<p>Rendered <strong>content</strong></p>"
+	if html != expected {
+		t.Fatalf("expected %q, got %q", expected, html)
+	}
+}
+
 func TestParseArgs(t *testing.T) {
 	args, err := parseArgs([]string{"--server=https://arondo.example/", "--client-token", "secret", "--temp-dir", "--agent", "codex", "--confirmation", "auto", "--poll-interval=0.5", "--timeout", "12", "Do work"}, cliConfig{})
 	if err != nil {
@@ -563,8 +601,16 @@ func TestParseGetMessagesArgsRejectsInvalid(t *testing.T) {
 	}
 
 	_, err = parseGetMessagesArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--session-id", "s1", "--output", "invalid"}, cliConfig{})
-	if err == nil || err.Error() != "--output must be plain or json" {
+	if err == nil || err.Error() != "--output must be plain, json, or html" {
 		t.Fatalf("unexpected error: %v", err)
+	}
+
+	htmlArgs, err := parseGetMessagesArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--session-id", "s1", "--output", "html"}, cliConfig{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if htmlArgs.output != "html" {
+		t.Fatalf("expected output html, got %q", htmlArgs.output)
 	}
 
 	_, err = parseGetMessagesArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--session-id", "s1", "--timeout", "-1"}, cliConfig{})
@@ -741,6 +787,47 @@ func TestGetMessagesFollowJSONOutput(t *testing.T) {
 
 	if err := getMessages(c, args); err != nil {
 		t.Fatalf("getMessages json error: %v", err)
+	}
+}
+
+func TestGetMessagesHTMLOutput(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/sessions/sess-html" {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":     "sess-html",
+				"status": "done",
+			})
+			return
+		}
+		if r.URL.Path == "/api/messages" {
+			exitCode := 0
+			_ = json.NewEncoder(w).Encode([]map[string]any{
+				{"id": "msg-1", "role": "user", "type": "chat-user", "content": "Help me with Go"},
+				{"id": "msg-2", "role": "system", "type": "agent-run", "command": "codex", "exitCode": exitCode, "content": "Run result"},
+			})
+			return
+		}
+		if r.URL.Path == "/api/sessions/sess-html/log" {
+			_ = json.NewEncoder(w).Encode(map[string]any{"log": "Agent log\n"})
+			return
+		}
+		if r.URL.Path == "/api/sessions/sess-html/html" {
+			_ = json.NewEncoder(w).Encode(map[string]any{"html": "<!--arondo-agent-output-html-v4--><p>Rendered Go solution</p>"})
+			return
+		}
+	}))
+	defer server.Close()
+
+	c := &client{server: server.URL, token: "token", http: server.Client()}
+	args := getMessagesArguments{
+		server:    server.URL,
+		token:     "token",
+		sessionID: "sess-html",
+		output:    "html",
+	}
+
+	if err := getMessages(c, args); err != nil {
+		t.Fatalf("getMessages html error: %v", err)
 	}
 }
 

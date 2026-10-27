@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionHtml, saveSessionHtml, saveSessionDiffs } from "@/lib/store";
+import { getSessionHtml, saveSessionHtml, saveSessionDiffs, getMessages, getSessionLog } from "@/lib/store";
 import { getArondoToken, verifySessionPermission, verifyProjectPermission, isValidToken } from "@/lib/auth";
+import { renderMarkdownHtml, RENDERED_HTML_CACHE_MARKER } from "@/lib/renderHtml";
 
 export async function GET(
   req: NextRequest,
@@ -28,11 +29,41 @@ export async function GET(
     }
   }
 
-  if (!messageId) {
+  let targetMessageId = messageId;
+  if (!targetMessageId && id !== "global") {
+    const messages = await getMessages(id, projectId);
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].type === "agent-run" || messages[i].type === "detached-agent-run" || messages[i].type === "script-run") {
+        targetMessageId = messages[i].id;
+        break;
+      }
+    }
+  }
+
+  if (!targetMessageId) {
     return NextResponse.json({ error: "messageId query parameter is required" }, { status: 400 });
   }
 
-  const html = await getSessionHtml(id === "global" ? "" : id, messageId, projectId);
+  const sessId = id === "global" ? "" : id;
+  let html = await getSessionHtml(sessId, targetMessageId, projectId);
+  if (!html) {
+    const messages = await getMessages(sessId, projectId);
+    const message = messages.find((entry) => entry.id === targetMessageId);
+    const kind = message?.type === "script-run"
+      ? "script"
+      : message?.type === "agent-run" || message?.type === "detached-agent-run"
+        ? "agent"
+        : undefined;
+    if (kind) {
+      const log = await getSessionLog(sessId, targetMessageId, kind, projectId, "stdout");
+      if (log) {
+        const rendered = renderMarkdownHtml(log);
+        html = `${RENDERED_HTML_CACHE_MARKER}${rendered}`;
+        await saveSessionHtml(sessId, targetMessageId, html, projectId);
+      }
+    }
+  }
+
   return NextResponse.json({ html });
 }
 

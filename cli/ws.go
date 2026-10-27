@@ -287,7 +287,7 @@ func streamSessionUntilDone(c *client, args arguments, sessionID, messageID stri
 			switch ev.Type {
 			case "terminal:output":
 				if ev.SessionID == sessionID && (messageID == "" || ev.MessageID == messageID) {
-					if args.output != "json" {
+					if args.output != "json" && args.output != "html" {
 						fmt.Print(ev.Data)
 						streamed = true
 					}
@@ -429,7 +429,7 @@ func streamSessionUntilDone(c *client, args arguments, sessionID, messageID stri
 				}
 			}
 		}
-		if rawOutput.Len() == 0 || !streamed || args.output == "json" {
+		if rawOutput.Len() == 0 || !streamed || args.output == "json" || args.output == "html" {
 			log, err := c.rawOutput(sessionID)
 			if err == nil && log != "" {
 				rawOutput.Reset()
@@ -445,7 +445,7 @@ func streamSessionUntilDone(c *client, args arguments, sessionID, messageID stri
 		}
 	}
 
-	if args.output != "json" && !streamed {
+	if args.output != "json" && args.output != "html" && !streamed {
 		fmt.Print(rawOutput.String())
 	}
 

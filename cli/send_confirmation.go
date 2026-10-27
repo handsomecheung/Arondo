@@ -108,6 +108,8 @@ func outputQueuedResult(c *client, sessionID string, args arguments, trigger str
 		fmt.Fprintln(os.Stderr, "\n=== Result ===")
 		pretty, _ := json.MarshalIndent(result, "", "  ")
 		fmt.Println(string(pretty))
+	} else if args.output == "html" {
+		fmt.Printf("<p>Queued message in session %s (trigger=%s)</p>\n", sessionID, trigger)
 	} else {
 		fmt.Printf("Queued message in session %s (trigger=%s)\n", sessionID, trigger)
 	}

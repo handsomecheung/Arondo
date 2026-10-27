@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"math"
 	"os"
 	"strconv"
@@ -41,7 +42,7 @@ Options:
   --poll-interval <seconds>    Seconds between status polls when following (default: 3)
   --timeout <seconds>          Maximum seconds to wait when following (default: 600)
   --with-logs                  Include agent stdout in a log field for json output (default: false)
-  --output <format>            Output format: plain or json (default: plain)
+  --output <format>            Output format: plain, json, or html (default: plain)
   --help                       Show this help message`
 
 type getMessagesArguments struct {
@@ -123,8 +124,8 @@ func parseGetMessagesArgs(argv []string, config cliConfig) (getMessagesArguments
 	if args.sessionID != "" && args.latest {
 		return getMessagesArguments{}, errors.New("--session-id and --latest cannot be used together")
 	}
-	if args.output != "plain" && args.output != "json" {
-		return getMessagesArguments{}, errors.New("--output must be plain or json")
+	if args.output != "plain" && args.output != "json" && args.output != "html" {
+		return getMessagesArguments{}, errors.New("--output must be plain, json, or html")
 	}
 	return args, validateServerAndToken(args.server, args.token)
 }
@@ -175,6 +176,113 @@ func outputJSONMessages(messages []message, withLogs bool) error {
 	}
 	pretty, _ := json.MarshalIndent(enriched, "", "  ")
 	fmt.Println(string(pretty))
+	return nil
+}
+
+func formatUserHTMLContent(content string) string {
+	if content == "" {
+		return ""
+	}
+	paragraphs := strings.Split(content, "\n\n")
+	var b strings.Builder
+	for _, p := range paragraphs {
+		trimmed := strings.TrimSpace(p)
+		if trimmed == "" {
+			continue
+		}
+		escaped := html.EscapeString(trimmed)
+		escaped = strings.ReplaceAll(escaped, "\n", "<br>\n")
+		b.WriteString("      <p>" + escaped + "</p>\n")
+	}
+	return b.String()
+}
+
+func (c *client) outputHTMLMessages(sessionID string, messages []message, isSessionRunning bool) error {
+	var b strings.Builder
+	b.WriteString("<div class=\"session-messages\">\n")
+
+	for _, msg := range messages {
+		ts := msg.CreatedAt
+		if t, err := time.Parse(time.RFC3339, msg.CreatedAt); err == nil {
+			ts = t.Local().Format("2006-01-02 15:04:05")
+		}
+
+		switch msg.Role {
+		case "user":
+			sender := "User"
+			if msg.UserName != "" {
+				sender = msg.UserName
+			}
+			b.WriteString("  <article class=\"message user-message\"")
+			if msg.ID != "" {
+				b.WriteString(fmt.Sprintf(" data-message-id=%q", msg.ID))
+			}
+			b.WriteString(">\n")
+			b.WriteString(fmt.Sprintf("    <header class=\"message-header\">\n      <time class=\"message-time\">%s</time>\n      <span class=\"message-sender\">%s</span>\n    </header>\n", html.EscapeString(ts), html.EscapeString(sender)))
+			b.WriteString("    <div class=\"message-content user-message-content\">\n")
+			b.WriteString(formatUserHTMLContent(msg.Content))
+			b.WriteString("    </div>\n")
+			b.WriteString("  </article>\n")
+
+		case "agent":
+			b.WriteString("  <article class=\"message agent-message\"")
+			if msg.ID != "" {
+				b.WriteString(fmt.Sprintf(" data-message-id=%q", msg.ID))
+			}
+			b.WriteString(">\n")
+			b.WriteString(fmt.Sprintf("    <header class=\"message-header\">\n      <time class=\"message-time\">%s</time>\n      <span class=\"message-sender\">Agent</span>\n    </header>\n", html.EscapeString(ts)))
+			b.WriteString("    <div class=\"message-content agent-output markdown-body\">\n")
+			if msg.Content != "" {
+				b.WriteString(formatUserHTMLContent(msg.Content))
+			}
+			b.WriteString("    </div>\n")
+			b.WriteString("  </article>\n")
+
+		case "system":
+			label := "System"
+			isAgentRun := msg.Type == "agent-run"
+			if isAgentRun {
+				label = agentLabel(msg.Command)
+				if msg.ExitCode != nil {
+					label += fmt.Sprintf(" (exit %d)", *msg.ExitCode)
+				} else if isSessionRunning {
+					label += " (Running)"
+				}
+			}
+
+			articleClass := "message system-message"
+			if isAgentRun {
+				articleClass += " agent-message"
+			}
+			b.WriteString(fmt.Sprintf("  <article class=%q", articleClass))
+			if msg.ID != "" {
+				b.WriteString(fmt.Sprintf(" data-message-id=%q", msg.ID))
+			}
+			b.WriteString(">\n")
+			b.WriteString(fmt.Sprintf("    <header class=\"message-header\">\n      <time class=\"message-time\">%s</time>\n      <span class=\"message-sender\">%s</span>\n    </header>\n", html.EscapeString(ts), html.EscapeString(label)))
+
+			if isAgentRun {
+				b.WriteString("    <div class=\"message-content agent-output markdown-body\">\n")
+				rendered, err := c.renderedHTML(sessionID, msg.ID)
+				if err != nil || rendered == "" {
+					if msg.Content != "" {
+						b.WriteString("      <pre><code>" + html.EscapeString(msg.Content) + "</code></pre>\n")
+					}
+				} else {
+					b.WriteString("      " + rendered + "\n")
+				}
+				b.WriteString("    </div>\n")
+			} else if msg.Content != "" {
+				b.WriteString("    <div class=\"message-content system-message-content\">\n")
+				b.WriteString(formatUserHTMLContent(msg.Content))
+				b.WriteString("    </div>\n")
+			}
+			b.WriteString("  </article>\n")
+		}
+	}
+
+	b.WriteString("</div>")
+	fmt.Println(b.String())
 	return nil
 }
 
@@ -257,7 +365,7 @@ func followRunningAgent(c *client, args getMessagesArguments, sess session, init
 
 	var printedLen int
 	var activeMsgID string
-	if args.output != "json" {
+	if args.output != "json" && args.output != "html" {
 		for _, msg := range priorMessages {
 			printPlainMessage(msg, false)
 		}
@@ -293,7 +401,7 @@ func followRunningAgent(c *client, args getMessagesArguments, sess session, init
 			switch ev.Type {
 			case "terminal:output":
 				if ev.SessionID == args.sessionID && (activeMsgID == "" || ev.MessageID == activeMsgID) {
-					if args.output != "json" {
+					if args.output != "json" && args.output != "html" {
 						fmt.Print(ev.Data)
 						printedLen += len(ev.Data)
 					}
@@ -310,7 +418,7 @@ func followRunningAgent(c *client, args getMessagesArguments, sess session, init
 				if err := json.Unmarshal(ev.Payload, &m); err == nil && m.Type == "agent-run" {
 					if activeMsgID == "" {
 						activeMsgID = m.ID
-						if args.output != "json" {
+						if args.output != "json" && args.output != "html" {
 							separator := strings.Repeat("─", 60)
 							ts := m.CreatedAt
 							if t, err := time.Parse(time.RFC3339, m.CreatedAt); err == nil {
@@ -329,7 +437,7 @@ func followRunningAgent(c *client, args getMessagesArguments, sess session, init
 					for i := len(msgs) - 1; i >= 0; i-- {
 						if msgs[i].Type == "agent-run" {
 							activeMsgID = msgs[i].ID
-							if args.output != "json" {
+							if args.output != "json" && args.output != "html" {
 								separator := strings.Repeat("─", 60)
 								ts := msgs[i].CreatedAt
 								if t, err := time.Parse(time.RFC3339, msgs[i].CreatedAt); err == nil {
@@ -342,7 +450,7 @@ func followRunningAgent(c *client, args getMessagesArguments, sess session, init
 						}
 					}
 				}
-			} else if args.output != "json" {
+			} else if args.output != "json" && args.output != "html" {
 				log, err := c.getSessionLog(args.sessionID, activeMsgID)
 				if err == nil && len(log) > printedLen {
 					fmt.Print(log[printedLen:])
@@ -368,6 +476,18 @@ func followRunningAgent(c *client, args getMessagesArguments, sess session, init
 			return err
 		}
 		return outputJSONMessages(convMessages, args.withLogs)
+	}
+
+	if args.output == "html" {
+		finalMessages, err := c.listMessages(args.sessionID)
+		if err != nil {
+			return err
+		}
+		convMessages, err := c.conversationMessages(args.sessionID, finalMessages)
+		if err != nil {
+			return err
+		}
+		return c.outputHTMLMessages(args.sessionID, convMessages, false)
 	}
 
 	if activeMsgID != "" {
@@ -462,6 +582,9 @@ func getMessages(c *client, args getMessagesArguments) error {
 		}
 		if args.output == "json" {
 			return outputJSONMessages(convMessages, args.withLogs)
+		}
+		if args.output == "html" {
+			return c.outputHTMLMessages(args.sessionID, convMessages, sess.Status == "running")
 		}
 		for _, msg := range convMessages {
 			printPlainMessage(msg, sess.Status == "running")

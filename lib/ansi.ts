@@ -3,5 +3,9 @@
 const ANSI_RE = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
 
 export function stripAnsi(s: string): string {
-  return s.replace(ANSI_RE, "");
+  return s
+    .replace(ANSI_RE, "")
+    .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "")
+    .replace(/\r/g, "")
+    .replace(/\uFFFD/g, "");
 }
