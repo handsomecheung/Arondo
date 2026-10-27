@@ -320,7 +320,7 @@ export function useSessionSubmit({
     setShowCommandMenu(false);
     if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
 
-    if (isNewSession || !selectedSessionId) {
+    if (isNewSession || isNewDraft || !selectedSessionId) {
       if (!repoPath.trim() || !runnerId) return;
       try {
         const res = await fetch("/api/sessions", {
@@ -545,7 +545,7 @@ export function useSessionSubmit({
 
     const isNew = isNewSession || isNewDraft || !selectedSessionId;
     const targetRunnerId = isNew ? runnerId : (selectedSession?.runnerId ?? runnerId);
-    const targetSessionId = selectedSessionId || (isNew ? crypto.randomUUID() : undefined);
+    const targetSessionId = isNew ? crypto.randomUUID() : (selectedSessionId || undefined);
 
     // displayMessage is what's shown in the chat timeline (never reveals the
     // runner-local upload path); agentPrompt is the real instruction sent to

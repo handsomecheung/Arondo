@@ -272,7 +272,7 @@ export default function HomePage() {
   } = useScripts({
     selectedSessionId,
     selectedProjectId,
-    selectedSessionProjectId: selectedSession?.projectId || ((isNewSession || isNewDraft) ? projects.find((p) => p.runnerId === runnerId && p.repoPath === repoPath)?.id : undefined),
+    selectedSessionProjectId: ((isNewSession || isNewDraft) ? projects.find((p) => p.runnerId === runnerId && p.repoPath === repoPath)?.id : undefined) || selectedSession?.projectId,
     setApiError,
     setTaskQueue,
     setMenuOpen,
@@ -281,10 +281,10 @@ export default function HomePage() {
 
   const currentAgentCommandProjectId = useMemo(() => {
     if (selectedProjectId) return selectedProjectId;
-    if (selectedSession?.projectId) return selectedSession.projectId;
     if (isNewSession || isNewDraft) {
       return projects.find((p) => p.runnerId === runnerId && p.repoPath === repoPath)?.id ?? null;
     }
+    if (selectedSession?.projectId) return selectedSession.projectId;
     return null;
   }, [isNewDraft, isNewSession, projects, repoPath, runnerId, selectedProjectId, selectedSession?.projectId]);
 

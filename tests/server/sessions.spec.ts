@@ -388,5 +388,51 @@ test.describe('Sessions API integration tests', () => {
       headers: { 'x-arondo-token': 'test-token-123456' }
     });
   });
+
+  test('rejects creating a session with an existing id and protects immutable fields', async ({ request }) => {
+    const headers = { 'x-arondo-token': 'test-token-123456' };
+    const createRes = await request.post('/api/sessions', {
+      headers,
+      data: {
+        prompt: 'First prompt',
+        repoPath: '/tmp/test-repo-immutable',
+        runnerId,
+        agentType: 'antigravity',
+        force: true,
+      },
+    });
+    expect(createRes.status()).toBe(201);
+    const session = await createRes.json();
+    const originalProjectId = session.projectId;
+    const originalRepoPath = session.repoPath;
+    const originalCreatedAt = session.createdAt;
+
+    // Attempt to recreate with the same session id but different repoPath
+    const duplicateRes = await request.post('/api/sessions', {
+      headers,
+      data: {
+        id: session.id,
+        prompt: 'Overwriting prompt',
+        repoPath: '/tmp/different-repo',
+        runnerId,
+        agentType: 'antigravity',
+        force: true,
+      },
+    });
+    expect(duplicateRes.status()).toBe(409);
+    const duplicateData = await duplicateRes.json();
+    expect(duplicateData.error).toContain('Session already exists');
+
+    // Verify session was not overwritten
+    const getRes = await request.get(`/api/sessions/${session.id}`, { headers });
+    expect(getRes.status()).toBe(200);
+    const sessionAfter = await getRes.json();
+    expect(sessionAfter.repoPath).toBe(originalRepoPath);
+    expect(sessionAfter.projectId).toBe(originalProjectId);
+    expect(sessionAfter.createdAt).toBe(originalCreatedAt);
+
+    // Cleanup
+    await request.delete(`/api/sessions/${session.id}`, { headers });
+  });
 });
 

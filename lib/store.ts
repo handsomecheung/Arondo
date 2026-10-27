@@ -467,6 +467,10 @@ export async function createSession(
   opts: { tempDir?: boolean; noProject?: boolean; automation?: boolean } = {}
 ): Promise<Session> {
   const id = data.id || crypto.randomUUID();
+  const filePath = getSessionFilePath(id);
+  if (fsSync.existsSync(filePath) || fsSync.existsSync(path.join(ARCHIVED_SESSIONS_DIR, id))) {
+    throw new Error(`Session with id ${id} already exists`);
+  }
   const project = opts.noProject || opts.automation
     ? undefined
     : await getOrCreateProject(data.repoPath, data.runnerId, { tempDir: opts.tempDir });
@@ -483,7 +487,7 @@ export async function createSession(
     updatedAt: new Date().toISOString(),
   };
 
-  await writeJson(getSessionFilePath(id), session);
+  await writeJson(filePath, session);
   return session;
 }
 
@@ -508,6 +512,14 @@ export async function updateSession(
     const updated: Session = {
       ...persistentSession,
       ...persistentPatch,
+      id: persistentSession.id,
+      createdAt: persistentSession.createdAt,
+      repoPath: persistentSession.repoPath,
+      projectId: persistentSession.projectId,
+      runnerId: persistentSession.runnerId,
+      tempDir: persistentSession.tempDir,
+      automation: persistentSession.automation,
+      noProject: persistentSession.noProject,
       updatedAt,
     };
     if (persistentPatch.status === "done" || persistentPatch.status === "error") {

@@ -2,7 +2,7 @@ import { getShowAutomationSessions } from "@/lib/automation";
 import path from "path";
 import os from "os";
 import { NextRequest, NextResponse } from "next/server";
-import { getSessions, getProjects, deleteSession, archiveSession, createSession, addTodoMessage, getSession, getSessionArchiveAgeMs, isTempDirProject, getShowTempDirSessions, type MessageFile } from "@/lib/store";
+import { getSessions, getProjects, deleteSession, archiveSession, createSession, addTodoMessage, getSession, isSessionArchived, getSessionArchiveAgeMs, isTempDirProject, getShowTempDirSessions, type MessageFile } from "@/lib/store";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken, getUuidByToken } from "@/lib/auth";
@@ -108,6 +108,13 @@ export async function POST(req: NextRequest) {
     files?: MessageFile[];
     model?: string;
   };
+
+  if (idInput !== undefined && typeof idInput === "string" && idInput.trim()) {
+    const trimmedId = idInput.trim();
+    if ((await getSession(trimmedId)) || isSessionArchived(trimmedId)) {
+      return NextResponse.json({ error: "Session already exists" }, { status: 409 });
+    }
+  }
 
   if (automation !== undefined && typeof automation !== "boolean") {
     return NextResponse.json({ error: "automation must be a boolean" }, { status: 400 });

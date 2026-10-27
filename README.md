@@ -307,6 +307,7 @@ x-arondo-token: <token>
 - Set `tempDir: true` to have Arondo generate a temporary directory on the runner and use it as the repo path — do not pass `repoPath` in that case. `runnerId` also becomes optional; when omitted, a runner is picked at random among the runners the token is allowed to access.
 - `prompt` can contain an Agent Command such as `/commit`. When no separate display `message` is supplied, the server expands matching commands using built-in, default, and project definitions, with project definitions taking priority. The history keeps the original command as the message and stores the expanded instruction as its prompt. This also applies when creating a draft with `isDraft: true`.
 - Returns `201` with the created `Session` object (includes `id`).
+- Returns `409 { error: "Session already exists" }` if an explicit session `id` is supplied that already exists.
 - Returns `409 { needsConfirmation: true, reason: { dirty, busy } }` if the repo has uncommitted changes or an agent is already running and `force` was not set — retry with `force: true` to proceed anyway.
 
 ### 2. Send a message to a session
