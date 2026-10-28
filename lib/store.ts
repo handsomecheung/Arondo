@@ -172,6 +172,7 @@ export interface Message {
   taskDeleted?: boolean;
   deleted?: boolean;
   resolvedAgentType?: string;
+  resolvedModel?: string;
   resolvedAgyQuotaGroup?: "gemini" | "other" | "argon";
   prompt?: string;
   tokenUuid?: string;

@@ -112,6 +112,7 @@ export async function POST(
     type: "agent-run",
     command,
     resolvedAgentType: resolvedType,
+    resolvedModel: resolved.model,
     resolvedAgyQuotaGroup: resolved.agyQuotaGroup,
     prompt: fullPrompt,
     tokenUuid,

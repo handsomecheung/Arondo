@@ -9,6 +9,7 @@ export interface ExecCardItem {
   type: "agent" | "script" | "command";
   agentType?: string;
   title: string;
+  model?: string;
   subtitle?: string;
   status: "running" | "done" | "error" | "stopped";
   statusText: string;
@@ -212,12 +213,19 @@ export default function ExecCard({
           <div className="exec-card-title">
             {item.type === "script" ? "Script" : item.type === "command" ? "Command" : "Agent"}: {item.title}
           </div>
+          {item.model && (
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, overflowWrap: "anywhere" }}>
+              {item.model}
+            </div>
+          )}
           {item.subtitle && (
             <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
               {item.subtitle}
             </div>
           )}
-          <div className="exec-card-status">{item.statusText}</div>
+          {!(item.type === "agent" && item.status === "done") && (
+            <div className="exec-card-status">{item.statusText}</div>
+          )}
         </div>
         {(collapsible || hasMenuItems) && (
           <div className="exec-card-actions">

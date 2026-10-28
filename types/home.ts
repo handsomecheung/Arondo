@@ -63,6 +63,7 @@ export interface Message {
   type?: string;
   parentId?: string;
   resolvedAgentType?: string;
+  resolvedModel?: string;
   prompt?: string;
   createdAt: string;
   todoStatus?: "pending" | "triggered" | "done" | "failed" | "cancelled" | "expired";
