@@ -514,7 +514,7 @@ export default function AppSidebar({
                       }}
                       id={`session-item-${session.id}`}
                     >
-                    <div className="task-item-header" style={{ flexWrap: "wrap" }}>
+                    <div className="task-item-header" style={{ position: "relative", flexWrap: "wrap", paddingRight: 32, minHeight: 24 }}>
                       {unread && (
                         <span
                           className="task-item-unread-dot"
@@ -564,7 +564,7 @@ export default function AppSidebar({
                         </span>
                       )}
                       <div
-                        style={{ marginLeft: "auto" }}
+                        style={{ position: "absolute", top: 0, right: 0 }}
                         ref={openSessionMenuId === session.id ? sessionMenuTriggerRef : null}
                       >
                         <button
