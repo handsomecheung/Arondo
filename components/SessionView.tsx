@@ -22,7 +22,9 @@ import {
 import { agentCommandAcceptsArguments, getTriggerWord, isAgentCommand } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
 import { CHAT_INPUT_TIPS } from "@/lib/chatInputTips";
-import { DEFAULT_AGENT_MODELS, parseModelList, type AgentModelsConfig } from "@/lib/agentModels";
+import type { AgentModelsConfig } from "@/lib/agentModels";
+import AgentDropdownMenu from "@/components/AgentDropdownMenu";
+import ModelDropdownMenu from "@/components/ModelDropdownMenu";
 
 function MiddleTruncatePath({ path, className }: { path: string; className?: string }) {
   const { prefix, suffix } = splitPathForMiddleTruncate(path);
@@ -1440,38 +1442,15 @@ export default function SessionView({
                   />
                 </button>
                 {agentDropdownOpen && (
-                  <div className="custom-dropdown-menu new-session-dropdown-menu">
-                    {(() => {
-                      const concreteAgents = (
-                        [
-                          { value: "antigravity", label: "Antigravity CLI", cmd: "agy", comingSoon: false },
-                          { value: "claude",       label: "Claude Code",     cmd: "claude", comingSoon: false },
-                          { value: "codex",        label: "Codex",           cmd: "codex",  comingSoon: false },
-                          { value: "opencode",     label: "OpenCode",        cmd: "opencode", comingSoon: false },
-                        ] as const
-                      ).filter(({ cmd, comingSoon }) => !comingSoon && isAgentAvailable(cmd));
-
-                      const showAuto = concreteAgents.length > 1;
-                      const items: { value: string; label: string }[] = [
-                        ...(showAuto ? [{ value: "auto", label: "Auto" }] : []),
-                        ...concreteAgents,
-                      ];
-
-                      return items.map(({ value, label }) => (
-                        <button
-                          key={value}
-                          type="button"
-                          className={`custom-dropdown-item ${agentType === value ? "active" : ""}`}
-                          onClick={() => {
-                            onSetAgentType(value);
-                            onSetAgentDropdownOpen(false);
-                          }}
-                        >
-                          <span style={{ flex: 1, textAlign: "left" }}>{label}</span>
-                        </button>
-                      ));
-                    })()}
-                  </div>
+                  <AgentDropdownMenu
+                    runnerId={runnerId}
+                    agentType={agentType}
+                    isAgentAvailable={isAgentAvailable}
+                    onSelect={(agent) => {
+                      onSetAgentType(agent);
+                      onSetAgentDropdownOpen(false);
+                    }}
+                  />
                 )}
               </div>
             </div>
@@ -1497,74 +1476,16 @@ export default function SessionView({
                     />
                   </button>
                   {modelDropdownOpen && (
-                    <div className="custom-dropdown-menu new-session-dropdown-menu new-session-model-dropdown-menu">
-                      <button
-                        type="button"
-                        className={`custom-dropdown-item ${!selectedModel ? "active" : ""}`}
-                        onClick={() => {
-                          onSetSelectedModel?.("");
-                          onSetModelDropdownOpen?.(false);
-                        }}
-                      >
-                        <span style={{ flex: 1, textAlign: "left" }}>Default</span>
-                      </button>
-                      {(() => {
-                        if (agentType === "antigravity") {
-                          const agyConfig = agentModelsConfig?.antigravity ?? DEFAULT_AGENT_MODELS.antigravity;
-                          const groups = [
-                            {
-                              name: "Gemini",
-                              models: parseModelList(agyConfig.gemini?.availableModels ?? DEFAULT_AGENT_MODELS.antigravity.gemini.availableModels),
-                            },
-                            {
-                              name: "Anthropic & Other",
-                              models: parseModelList(agyConfig.other?.availableModels ?? DEFAULT_AGENT_MODELS.antigravity.other.availableModels),
-                            },
-                            {
-                              name: "Gemini 4 Argon",
-                              models: parseModelList(agyConfig.argon?.availableModels ?? DEFAULT_AGENT_MODELS.antigravity.argon?.availableModels),
-                            },
-                          ];
-                          return groups.map((grp) => {
-                            if (grp.models.length === 0) return null;
-                            return (
-                              <div key={grp.name} className="custom-dropdown-group">
-                                <div className="custom-dropdown-group-header">{grp.name}</div>
-                                {grp.models.map((model) => (
-                                  <button
-                                    key={model}
-                                    type="button"
-                                    className={`custom-dropdown-item ${selectedModel === model ? "active" : ""}`}
-                                    onClick={() => {
-                                      onSetSelectedModel?.(model);
-                                      onSetModelDropdownOpen?.(false);
-                                    }}
-                                  >
-                                    <span style={{ flex: 1, textAlign: "left" }}>{model}</span>
-                                  </button>
-                                ))}
-                              </div>
-                            );
-                          });
-                        }
-                        const models = agentType === "claude"
-                          ? parseModelList(agentModelsConfig?.claude?.availableModels ?? DEFAULT_AGENT_MODELS.claude.availableModels)
-                          : parseModelList(agentModelsConfig?.codex?.availableModels ?? DEFAULT_AGENT_MODELS.codex.availableModels);
-                        return models.map((model) => (
-                          <button
-                            key={model}
-                            type="button"
-                            className={`custom-dropdown-item ${selectedModel === model ? "active" : ""}`}
-                            onClick={() => {
-                              onSetSelectedModel?.(model);
-                              onSetModelDropdownOpen?.(false);
-                            }}
-                          >
-                            <span style={{ flex: 1, textAlign: "left" }}>{model}</span>
-                          </button>
-                        ));
-                      })()}
-                    </div>
+                    <ModelDropdownMenu
+                      runnerId={runnerId}
+                      agentType={agentType}
+                      selectedModel={selectedModel}
+                      config={agentModelsConfig}
+                      onSelect={(model) => {
+                        onSetSelectedModel?.(model);
+                        onSetModelDropdownOpen?.(false);
+                      }}
+                    />
                   )}
                 </div>
               </div>

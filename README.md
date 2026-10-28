@@ -12,6 +12,8 @@ Arondo lets you delegate work to an AI agent from a mobile-friendly workspace, r
 
 Choose a Runner, project, and agent, then describe the task and send it.
 
+The **Agent** dropdown shows the selected Runner's latest recorded quota as progress bars labeled `hour:` and `week:`, with remaining percentages and the same color scale as the Runners page. Antigravity CLI shows separate Gemini, Anthropic & Other, and Gemini 4 Argon quota groups; its **Model** dropdown also shows these bars under each group heading. Only known quota windows have bars; missing data and API-key billing are labeled explicitly.
+
 <img src="public/readme/basic-usage/01-create-session.jpg" alt="Creating a new session by choosing a runner, project, and agent, then entering a task" width="360">
 
 ### 2. Review, validate, and commit
@@ -92,7 +94,7 @@ After Auto Mode has selected the agent, **automodel** can optionally choose that
 
 Configure default models and available model lists in **Settings → Agent Models & Defaults**:
 
-- **Antigravity CLI (agy)**: Configured separately for **Gemini Group** and **Others Group** (Claude/other models), aligning with Antigravity quota tiers.
+- **Antigravity CLI (agy)**: Configured separately for **Gemini Group**, **Others Group** (Claude/other models), and **Gemini 4 Argon Group**, aligning with Antigravity quota tiers.
 - **Claude Code (claude)**: Customize default models and recognized model options passed via `--model`.
 - **Codex CLI (codex)**: Customize default model and reasoning effort options passed to OpenAI Codex.
 

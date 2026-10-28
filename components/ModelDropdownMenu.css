@@ -1,0 +1,64 @@
+.dropdown-quota-option .dropdown-option-name {
+  display: block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.dropdown-option-quota {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+.agent-quota-line {
+  display: block;
+}
+
+.model-quota-group-header {
+  white-space: normal;
+}
+
+.model-group-quota {
+  display: block;
+  margin-top: 4px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.dropdown-quota-bars {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  font-size: 12px;
+}
+
+.dropdown-quota-row {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.4;
+}
+
+.dropdown-quota-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-secondary);
+  overflow: hidden;
+}
+
+.dropdown-quota-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.dropdown-quota-percent {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

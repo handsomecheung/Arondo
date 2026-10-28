@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "@/components/ModelDropdownMenu.css";
 import { ClientInit } from "@/components/ClientInit";
 
 export const metadata: Metadata = {

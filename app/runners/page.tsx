@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import ConfirmDialog from "@/components/modals/ConfirmDialog";
 import { IconArrowLeft, IconLogo, IconInbox, IconRefresh } from "@/components/Icons";
-import { getAutoagentQuotaScore } from "@/lib/autoagent-score";
+import { getQuotaScoreColors } from "@/lib/agent-quota-display";
 
 interface AgyQuota {
   Account: string;
@@ -121,44 +121,6 @@ interface QuotaRow {
   remaining?: number | null; // 0-1 remaining ratio (optional override)
   resetsAt: number | null;
   scoreColor?: string;
-}
-
-interface QuotaScoreColors {
-  claude?: string;
-  gemini?: string;
-  other?: string;
-  argon?: string;
-  codex?: string;
-}
-
-function getQuotaScoreColors(quota: AgentsQuota | null): QuotaScoreColors {
-  if (!quota) return {};
-
-  const scores = {
-    claude: quota.claude?.IsAPIKey ? null : getAutoagentQuotaScore(quota.claude?.WeekRemain ?? null, quota.claude?.WeekResetsAt ?? null),
-    gemini: quota.antigravity?.IsAPIKey ? null : getAutoagentQuotaScore(quota.antigravity?.GeminiWeeklyRemain ?? null, quota.antigravity?.GeminiWeeklyResetsAt ?? null),
-    other: quota.antigravity?.IsAPIKey ? null : getAutoagentQuotaScore(quota.antigravity?.OtherWeeklyRemain ?? null, quota.antigravity?.OtherWeeklyResetsAt ?? null),
-    argon: quota.antigravity?.IsAPIKey ? null : getAutoagentQuotaScore(quota.antigravity?.ArgonWeeklyRemain ?? null, quota.antigravity?.ArgonWeeklyResetsAt ?? null),
-    codex: quota.codex?.IsAPIKey ? null : getAutoagentQuotaScore(quota.codex?.WeeklyRemain ?? null, quota.codex?.WeeklyResetAt ?? null),
-  };
-  const knownScores = Object.values(scores).filter((score): score is number => score != null);
-  if (knownScores.length === 0) return {};
-
-  const lowest = Math.min(...knownScores);
-  const highest = Math.max(...knownScores);
-  const colorFor = (score: number | null) => {
-    if (score == null) return undefined;
-    const position = highest === lowest ? 1 : (score - lowest) / (highest - lowest);
-    return `hsl(${Math.round(position * 120)} 70% 42%)`;
-  };
-
-  return {
-    claude: colorFor(scores.claude),
-    gemini: colorFor(scores.gemini),
-    other: colorFor(scores.other),
-    argon: colorFor(scores.argon),
-    codex: colorFor(scores.codex),
-  };
 }
 
 function QuotaCard({
