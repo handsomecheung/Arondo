@@ -383,7 +383,12 @@ async function selectAgentFromQuota(
       : choice.id === "C"
         ? latestEntryByType.get("claude")
         : latestEntryByType.get("codex");
-    return { hourRemain, weekRemain, resetsAt, isAPIKey: entry?.IsAPIKey === true };
+    return {
+      hourRemain: hourRemain ?? null,
+      weekRemain: weekRemain ?? null,
+      resetsAt: resetsAt ?? null,
+      isAPIKey: entry?.IsAPIKey === true,
+    };
   };
 
   for (const choice of choices) {

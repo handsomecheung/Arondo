@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
 import { setupRunner, teardownRunner, waitForSessionNotRunning, waitForRunMessages } from '../resume.helper';
-import { getModelOptionsForAgent, isQuotaAvailable, selectAgent } from '../../../../lib/autoagent';
+import { isQuotaAvailable, selectAgent } from '../../../../lib/autoagent';
 import { resolveAgentType } from '../../../../lib/agents';
 import { getDefaultAgentModels } from '../../../../lib/agentModels';
 import { appendAutoagentLog } from '../../../../lib/store';
@@ -43,6 +43,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
   });
 
   test('logs empty, single-choice, unknown-quota, and API-key fallback decisions', async () => {
+    await fs.writeFile(quotaPath, JSON.stringify({}));
     for (const binaries of [[], ['codex'], ['agy']]) {
       const logs: string[] = [];
       await selectAgent(binaries, (text) => { logs.push(text); });
@@ -57,6 +58,34 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
     const logs: string[] = [];
     await selectAgent(['codex', 'claude'], (text) => { logs.push(text); });
     expect(logs.join('')).toContain('Falling back to API Key choices');
+  });
+
+  test('treats omitted quota metrics as unknown and prefers known subscription quotas', async () => {
+    const quota = {
+      agy: { Type: 'antigravity' },
+      claude: { Type: 'claude' },
+      codex: { Type: 'codex' },
+    };
+    for (const binaries of [['agy'], ['claude', 'codex'], ['agy', 'claude', 'codex']]) {
+      await fs.writeFile(quotaPath, JSON.stringify(quota));
+      const logs: string[] = [];
+      await expect(selectAgent(binaries, (text) => { logs.push(text); })).resolves.toMatchObject({
+        agentType: binaries[0] === 'agy' ? 'antigravity' : 'claude',
+      });
+      expect(logs.join('')).toContain('Falling back to unknown choices');
+      expect(logs.join('')).not.toContain('Step 2 Scoring');
+    }
+
+    await fs.writeFile(quotaPath, JSON.stringify({
+      ...quota,
+      codex: { Type: 'codex', WeeklyRemain: 0.5 },
+    }));
+    const logs: string[] = [];
+    await expect(selectAgent(['agy', 'claude', 'codex'], (text) => { logs.push(text); })).resolves.toMatchObject({
+      agentType: 'codex',
+    });
+    expect(logs.join('')).toContain('Final Candidate Order: [D]');
+    expect(logs.join('')).toContain('WeekRemain=0.500, WeekTimeRemain=0.000');
   });
 
   test('persists quota ranking and locked agy group overrides in the autoagent log', async () => {
