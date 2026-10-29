@@ -3,7 +3,7 @@ import { AntigravityAgent } from "./antigravity";
 import { ClaudeCodeAgent } from "./claude";
 import { CodexAgent } from "./codex";
 import { OpencodeAgent } from "./opencode";
-import { getAgyQuotaGroupForModel, getModelOptionsForAgent, selectAgent, type AgyQuotaGroup } from "../autoagent";
+import { getAgyQuotaGroupForModel, getModelOptionsForAgent, isAgentQuotaExhausted, selectAgent, type AgyQuotaGroup } from "../autoagent";
 import { routeModel, type AutoModelEffort, type AutoModelOption } from "../llm/automodel";
 import { getAgentModelsConfig, parseModelLine } from "../store";
 
@@ -63,13 +63,24 @@ interface ResolveAgentOptions {
 /**
  * Resolves "auto" to a concrete AgentType by running the quota-based selection
  * algorithm against the agents installed on the given runner.
+ * Returns null when Auto Mode has no eligible choice.
  * Non-"auto" types are returned unchanged.
  */
+export function resolveAgentType(
+  agentType: ConcreteAgentType,
+  runnerAgentBinaries: string[],
+  options?: ResolveAgentOptions,
+): Promise<ResolvedAgent>;
+export function resolveAgentType(
+  agentType: string,
+  runnerAgentBinaries: string[],
+  options?: ResolveAgentOptions,
+): Promise<ResolvedAgent | null>;
 export async function resolveAgentType(
   agentType: string,
   runnerAgentBinaries: string[],
   options: ResolveAgentOptions = {},
-): Promise<ResolvedAgent> {
+): Promise<ResolvedAgent | null> {
   const agentModels = await getAgentModelsConfig();
   if (agentType !== "auto") {
     let defaultModel: string | undefined = options.model?.trim() || undefined;
@@ -88,7 +99,9 @@ export async function resolveAgentType(
     };
   }
   const resolved = await selectAgent(runnerAgentBinaries, options.autoagentLog);
-  const selected = options.lockedAgent
+  const lockedGroup = options.lockedAgent?.agyQuotaGroup ?? getAgyQuotaGroupForModel(options.lockedAgent?.model);
+  const useLockedAgent = options.lockedAgent && !await isAgentQuotaExhausted(options.lockedAgent.agentType, lockedGroup);
+  const selected = options.lockedAgent && useLockedAgent
     ? {
       ...options.lockedAgent,
       agyQuotaGroup: options.lockedAgent.agyQuotaGroup
@@ -99,16 +112,18 @@ export async function resolveAgentType(
         agentModels,
       ),
     }
-    : resolved ?? { agentType: "antigravity" as ConcreteAgentType };
+    : resolved;
   await options.autoagentLog?.([
     "## Result",
     JSON.stringify({
-      source: options.lockedAgent ? "lockedAgent" : resolved ? "quota" : "fallback",
+      source: useLockedAgent ? "lockedAgent" : resolved ? "quota" : "unavailable",
+      lockedAgentExhausted: Boolean(options.lockedAgent && !useLockedAgent),
       lockedAgent: options.lockedAgent,
       selected,
     }, null, 2),
     "",
   ].join("\n"));
+  if (!selected) return null;
   const routed = options.prompt && selected.modelOptions
     ? await routeModel({
       agentType: selected.agentType,

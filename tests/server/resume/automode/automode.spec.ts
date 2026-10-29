@@ -93,7 +93,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
       agy: {
         Type: 'antigravity',
         GeminiHourRemain: 0.8, GeminiWeeklyRemain: 0.9, GeminiWeeklyResetsAt: null,
-        OtherHourRemain: 0, OtherWeeklyRemain: 0, OtherWeeklyResetsAt: null,
+        OtherHourRemain: 0.1, OtherWeeklyRemain: 0.1, OtherWeeklyResetsAt: null,
         ArgonWeeklyRemain: 0.1, ArgonWeeklyResetsAt: null,
         updatedAt: 123,
       },
@@ -105,7 +105,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
         autoagentLog: (text) => appendAutoagentLog(sessionId, messageId, text),
         lockedAgent: { agentType: 'antigravity', agyQuotaGroup: 'other' },
       });
-      expect(resolved.agyQuotaGroup).toBe('other');
+      expect(resolved?.agyQuotaGroup).toBe('other');
       const log = await fs.readFile(path.join(CONFIG_DIR, 'sessions', sessionId, 'logs', `${messageId}.autoagent.log`), 'utf-8');
       expect(log).toContain('"updatedAt": 123');
       expect(log).toContain('"latestEntryByType"');

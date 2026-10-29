@@ -101,6 +101,8 @@ export async function dispatchDetachedAgent(
     once: session.once,
   });
 
+  if (!resolved) return { ok: false, error: "No Auto Mode agent has available quota above 2%", status: 503 };
+
   const agentSessionKey = crypto.randomUUID();
   const agent = getAgent(resolved.agentType);
   const fullPrompt = agent.buildPrompt(prompt);
@@ -221,20 +223,24 @@ export async function dispatchFollowupMessage(
     }
   }
 
-  const userMsg = await addMessage({
-    sessionId,
-    role: "user",
-    content: trimmedMessage,
-    prompt: trimmedPrompt || undefined,
-    type: (opts.type as any) || "chat-user",
-    tokenUuid: opts.tokenUuid,
-    userName,
-    userColor,
-    files: opts.files,
-  });
-  eventBus.publish({ type: "message_added", payload: userMsg });
+  const saveUserMessage = async () => {
+    const userMsg = await addMessage({
+      sessionId,
+      role: "user",
+      content: trimmedMessage,
+      prompt: trimmedPrompt || undefined,
+      type: (opts.type as any) || "chat-user",
+      tokenUuid: opts.tokenUuid,
+      userName,
+      userColor,
+      files: opts.files,
+    });
+    eventBus.publish({ type: "message_added", payload: userMsg });
+    return userMsg;
+  };
 
   if (session.agentType === "decision") {
+    const userMsg = await saveUserMessage();
     const patch: Record<string, any> = { status: "running" };
     if (!session.name) {
       const firstLine = trimmedMessage.split("\n")[0];
@@ -293,6 +299,8 @@ export async function dispatchFollowupMessage(
       : undefined,
     once: session.once,
   });
+  if (!resolved) return { ok: false, error: "No Auto Mode agent has available quota above 2%", status: 503 };
+  const userMsg = await saveUserMessage();
   const resolvedType = resolved.agentType;
 
   const prevResolvedType = lastAgentRun?.resolvedAgentType;
@@ -568,6 +576,7 @@ export async function dispatchCreateSession(
     once: opts.once,
     model: opts.model,
   });
+  if (!resolved) return { ok: false, error: "No Auto Mode agent has available quota above 2%", status: 503 };
   const resolvedType = resolved.agentType;
   const agent = getAgent(resolvedType);
   const fullPrompt = agent.buildPrompt(trimmedPrompt);

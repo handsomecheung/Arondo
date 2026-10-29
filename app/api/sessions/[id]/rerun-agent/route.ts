@@ -79,6 +79,9 @@ export async function POST(
     automodelLog: (text) => appendAutomodelLog(id, systemMessageId, text),
     once: session.once,
   });
+  if (!resolved) {
+    return NextResponse.json({ error: "No Auto Mode agent has available quota above 2%" }, { status: 503 });
+  }
   const resolvedType = resolved.agentType;
 
   const priorRuns = messages.slice(0, targetMsgIndex).filter((m) => m.type === "agent-run" && m.resolvedAgentType);

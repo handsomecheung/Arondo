@@ -77,6 +77,46 @@ async function readQuota(): Promise<Record<string, QuotaEntry>> {
   }
 }
 
+const EXHAUSTED_QUOTA_THRESHOLD = 0.02;
+
+function getLatestQuotaByType(quota: Record<string, QuotaEntry>): Map<QuotaEntry["Type"], QuotaEntry> {
+  const latest = new Map<QuotaEntry["Type"], QuotaEntry>();
+  for (const entry of Object.values(quota)) {
+    const existing = latest.get(entry.Type);
+    if (!existing || (entry.updatedAt ?? 0) > (existing.updatedAt ?? 0)) latest.set(entry.Type, entry);
+  }
+  return latest;
+}
+
+function getQuotaMetrics(entry?: QuotaEntry, group?: AgyQuotaGroup) {
+  if (entry?.Type === "antigravity") {
+    return {
+      hourRemain: group === "argon" ? null : group === "other" ? entry.OtherHourRemain ?? null : entry.GeminiHourRemain ?? null,
+      weekRemain: group === "argon" ? entry.ArgonWeeklyRemain ?? null : group === "other" ? entry.OtherWeeklyRemain ?? null : entry.GeminiWeeklyRemain ?? null,
+      resetsAt: group === "argon" ? entry.ArgonWeeklyResetsAt ?? null : group === "other" ? entry.OtherWeeklyResetsAt ?? null : entry.GeminiWeeklyResetsAt ?? null,
+      isAPIKey: entry.IsAPIKey === true,
+    };
+  }
+  return {
+    hourRemain: entry?.Type === "claude" ? entry.HourRemain ?? null : entry?.FiveHourRemain ?? null,
+    weekRemain: entry?.Type === "claude" ? entry.WeekRemain ?? null : entry?.WeeklyRemain ?? null,
+    resetsAt: entry?.Type === "claude" ? entry.WeekResetsAt ?? null : entry?.WeeklyResetAt ?? null,
+    isAPIKey: entry?.IsAPIKey === true,
+  };
+}
+
+function isExhausted(metrics: ReturnType<typeof getQuotaMetrics>): boolean {
+  // Collectors may compute 2% as 1 - 0.98, introducing floating-point noise.
+  return !metrics.isAPIKey && [metrics.hourRemain, metrics.weekRemain]
+    .some((remain) => remain !== null && remain <= EXHAUSTED_QUOTA_THRESHOLD + Number.EPSILON);
+}
+
+export async function isAgentQuotaExhausted(agentType: ConcreteAgentType, group?: AgyQuotaGroup): Promise<boolean> {
+  if (agentType === "opencode") return false;
+  const entry = getLatestQuotaByType(await readQuota()).get(agentType);
+  return isExhausted(getQuotaMetrics(entry, group));
+}
+
 interface AgentChoice {
   id: "A" | "B" | "C" | "D" | "E";
   agentType: ConcreteAgentType;
@@ -313,83 +353,13 @@ async function selectAgentFromQuota(
     log("[autoagent] No choices available.");
     return null;
   }
-  if (choices.length === 1) {
-    log(`[autoagent] Only one choice available: ${choices[0].id}. Selecting it directly.`);
-    return {
-      agentType: choices[0].agentType,
-      model: choices[0].model,
-      modelOptions: choices[0].modelOptions,
-      agyQuotaGroup: choices[0].agyQuotaGroup,
-    };
-  }
-
   const quota = await readQuota();
-  const entries = Object.values(quota);
-  const latestEntryByType = new Map<QuotaEntry["Type"], QuotaEntry>();
-  for (const entry of entries) {
-    const existing = latestEntryByType.get(entry.Type);
-    if (!existing || (entry.updatedAt ?? 0) > (existing.updatedAt ?? 0)) {
-      latestEntryByType.set(entry.Type, entry);
-    }
-  }
-
+  const latestEntryByType = getLatestQuotaByType(quota);
   log(`## Quota\n${JSON.stringify({ path: QUOTA_PATH, entries: quota, latestEntryByType: Object.fromEntries(latestEntryByType) }, null, 2)}`, false);
 
-  // Helper to extract relevant quota metrics for a choice
-  const getMetrics = (choice: AgentChoice) => {
-    let hourRemain: number | null = null;
-    let weekRemain: number | null = null;
-    let resetsAt: number | null = null;
-
-    if (choice.id === "A") {
-      const q = latestEntryByType.get("antigravity") as AntigravityQuota | undefined;
-      if (q) {
-        hourRemain = q.GeminiHourRemain;
-        weekRemain = q.GeminiWeeklyRemain;
-        resetsAt = q.GeminiWeeklyResetsAt;
-      }
-    } else if (choice.id === "B") {
-      const q = latestEntryByType.get("antigravity") as AntigravityQuota | undefined;
-      if (q) {
-        hourRemain = q.OtherHourRemain;
-        weekRemain = q.OtherWeeklyRemain;
-        resetsAt = q.OtherWeeklyResetsAt;
-      }
-    } else if (choice.id === "C") {
-      const q = latestEntryByType.get("claude") as ClaudeQuota | undefined;
-      if (q) {
-        hourRemain = q.HourRemain;
-        weekRemain = q.WeekRemain;
-        resetsAt = q.WeekResetsAt;
-      }
-    } else if (choice.id === "D") {
-      const q = latestEntryByType.get("codex") as CodexQuota | undefined;
-      if (q) {
-        hourRemain = q.FiveHourRemain ?? null;
-        weekRemain = q.WeeklyRemain;
-        resetsAt = q.WeeklyResetAt;
-      }
-    } else if (choice.id === "E") {
-      const q = latestEntryByType.get("antigravity") as AntigravityQuota | undefined;
-      if (q) {
-        hourRemain = null;
-        weekRemain = q.ArgonWeeklyRemain ?? null;
-        resetsAt = q.ArgonWeeklyResetsAt ?? null;
-      }
-    }
-
-    const entry = choice.id === "A" || choice.id === "B" || choice.id === "E"
-      ? latestEntryByType.get("antigravity")
-      : choice.id === "C"
-        ? latestEntryByType.get("claude")
-        : latestEntryByType.get("codex");
-    return {
-      hourRemain: hourRemain ?? null,
-      weekRemain: weekRemain ?? null,
-      resetsAt: resetsAt ?? null,
-      isAPIKey: entry?.IsAPIKey === true,
-    };
-  };
+  const getMetrics = (choice: AgentChoice) => getQuotaMetrics(
+    latestEntryByType.get(choice.agentType as QuotaEntry["Type"]), choice.agyQuotaGroup,
+  );
 
   for (const choice of choices) {
     const { hourRemain, weekRemain, resetsAt } = getMetrics(choice);
@@ -399,15 +369,26 @@ async function selectAgentFromQuota(
     );
   }
 
-  const knownQuotaChoices = choices.filter((choice) => {
+  const eligibleChoices = choices.filter((choice) => {
+    const metrics = getMetrics(choice);
+    if (!isExhausted(metrics)) return true;
+    log(`[autoagent] Excluded exhausted choice ${choice.id}: HourRemain=${metrics.hourRemain}, WeekRemain=${metrics.weekRemain} (threshold <=${EXHAUSTED_QUOTA_THRESHOLD})`);
+    return false;
+  });
+  if (eligibleChoices.length === 0) {
+    log("[autoagent] No eligible choices: all quotas are exhausted.");
+    return null;
+  }
+
+  const knownQuotaChoices = eligibleChoices.filter((choice) => {
     const { weekRemain, isAPIKey } = getMetrics(choice);
     return !isAPIKey && weekRemain !== null;
   });
-  const unknownQuotaChoices = choices.filter((choice) => {
+  const unknownQuotaChoices = eligibleChoices.filter((choice) => {
     const { weekRemain, isAPIKey } = getMetrics(choice);
     return !isAPIKey && weekRemain === null;
   });
-  const apiKeyChoices = choices.filter((choice) => getMetrics(choice).isAPIKey);
+  const apiKeyChoices = eligibleChoices.filter((choice) => getMetrics(choice).isAPIKey);
 
   if (knownQuotaChoices.length === 0) {
     const fallbackChoices = unknownQuotaChoices.length > 0 ? unknownQuotaChoices : apiKeyChoices;
@@ -483,34 +464,26 @@ async function selectAgentFromQuota(
 }
 
 /**
- * Returns true if at least one agent (or the given one) has enough hourly
- * quota left to be worth trying. Mirrors the 0.15 threshold used by selectAgent.
- * No quota data at all is treated as "available" so we never block forever.
+ * Quota retries require a non-exhausted weekly window and at least 15% hourly
+ * quota when known. Unknown quota remains available to avoid blocking forever.
  */
 export async function isQuotaAvailable(
   agentType?: ConcreteAgentType,
   agyQuotaGroup?: AgyQuotaGroup,
 ): Promise<boolean> {
-  const quota = await readQuota();
-  const entries = Object.values(quota);
-  if (entries.length === 0) return true;
-
-  const relevant = agentType ? entries.filter((e) => e.Type === agentType) : entries;
-  if (relevant.length === 0) return true;
-
-  for (const e of relevant) {
-    if (e.Type === "claude") {
-      if ((e.HourRemain ?? 1) >= 0.15) return true;
-    } else if (e.Type === "antigravity") {
-      if (agyQuotaGroup === "gemini" && (e.GeminiHourRemain ?? 1) >= 0.15) return true;
-      if (agyQuotaGroup === "other" && (e.OtherHourRemain ?? 1) >= 0.15) return true;
-      if (agyQuotaGroup === "argon" && (e.ArgonWeeklyRemain ?? 1) > 0) return true;
-      if (!agyQuotaGroup && ((e.GeminiHourRemain ?? 1) >= 0.15 || (e.OtherHourRemain ?? 1) >= 0.15 || (e.ArgonWeeklyRemain ?? 1) > 0)) return true;
-    } else if (e.Type === "codex") {
-      if ((e.FiveHourRemain ?? 1) >= 0.15) return true;
-    }
-  }
-  return false;
+  if (agentType === "opencode") return true;
+  const latest = getLatestQuotaByType(await readQuota());
+  if (latest.size === 0) return true;
+  const relevant = agentType ? [latest.get(agentType)] : [...latest.values()];
+  return relevant.some((entry) => {
+    const groups: (AgyQuotaGroup | undefined)[] = entry?.Type === "antigravity"
+      ? agyQuotaGroup ? [agyQuotaGroup] : ["gemini", "other", "argon"]
+      : [undefined];
+    return groups.some((group) => {
+      const metrics = getQuotaMetrics(entry, group);
+      return !isExhausted(metrics) && (metrics.isAPIKey || (metrics.hourRemain ?? 1) >= 0.15);
+    });
+  });
 }
 
 // ─── Cross-agent context injection ────────────────────────────────────────────

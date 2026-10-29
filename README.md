@@ -81,10 +81,13 @@ Select **Auto** in the agent picker to let Arondo choose among the agent CLIs in
 
 Auto Mode uses the following order of preference:
 
-1. Consider installed Antigravity, Claude, and Codex CLIs with known subscription quota; API-key-billed accounts are held back as a last resort.
-2. Deprioritize agents with less than 15% hourly quota remaining when another candidate has sufficient capacity; if every candidate is low, keep all of them available.
-3. Rank the remaining candidates by weekly quota remaining, adjusted for how much time is left before the weekly reset.
-4. If no subscription quota is known, use an agent with unknown quota before falling back to an API-key-billed agent.
+1. Exclude subscription choices with known hourly or weekly quota remaining at or below 2%. Unknown quota is not treated as exhausted.
+2. Consider installed Antigravity, Claude, and Codex CLIs with known subscription quota; API-key-billed accounts are held back as a last resort.
+3. Deprioritize agents with less than 15% hourly quota remaining when another candidate has sufficient capacity; if every eligible candidate is low, keep those above 2% available.
+4. Rank the remaining candidates by weekly quota remaining, adjusted for how much time is left before the weekly reset.
+5. If no eligible subscription choice has known weekly quota, use an agent with unknown quota before falling back to an API-key-billed agent.
+
+Session locks are preserved only while the locked agent/quota group is not exhausted. If every installed choice is exhausted, Auto Mode returns HTTP 503 without starting an agent; queued messages remain pending for retry. Quota retry checks also require weekly quota above 2% and hourly quota of at least 15% when known.
 
 After Auto Mode has selected the agent, **automodel** can optionally choose that agent's model and reasoning effort. When configured with a Jev Key (`TYPESAFE_API_KEY`), automodel prioritizes TypeSafe AI's System One model (`jev-latest`) for ultra-fast categorical decision making. If Jev is unconfigured or encounters an error, it seamlessly falls back to standard lightweight LLMs (Anthropic Claude Haiku 4.5, OpenAI GPT-5.4-mini, or Google Gemini 3.5 Flash Lite) through the Vercel AI SDK. automodel is only enabled when a Jev, Anthropic, OpenAI, or Google API key is configured in Settings or through the server environment. It receives the selected agent, the quota-filtered model options for that agent, and the user message, then must choose one of those provided options. If no key is configured, the request times out, the provider returns an error, or the model choice is invalid, Arondo falls back to the predefined model selected by the existing quota-based logic.
 
