@@ -6,6 +6,7 @@ import { setupRunner, teardownRunner, waitForSessionNotRunning, waitForRunMessag
 import { getModelOptionsForAgent, isQuotaAvailable, selectAgent } from '../../../../lib/autoagent';
 import { resolveAgentType } from '../../../../lib/agents';
 import { getDefaultAgentModels } from '../../../../lib/agentModels';
+import { appendAutoagentLog } from '../../../../lib/store';
 
 const CONFIG_DIR_RUNTIME = process.env.ARONDO_CONFIG_DIR || path.join(os.tmpdir(), 'arondo-test-config');
 const AGENTS_SESSION_MAP_FILE = path.join(CONFIG_DIR_RUNTIME, 'agent-sessions.json');
@@ -39,6 +40,55 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
 
   test.afterEach(async () => {
     await fs.rm(quotaPath, { force: true }).catch(() => {});
+  });
+
+  test('logs empty, single-choice, unknown-quota, and API-key fallback decisions', async () => {
+    for (const binaries of [[], ['codex'], ['agy']]) {
+      const logs: string[] = [];
+      await selectAgent(binaries, (text) => { logs.push(text); });
+      expect(logs.join('')).toContain('# autoagent');
+      expect(logs.join('')).toContain('## Input');
+      expect(logs.join('')).toContain('## Quota selection');
+    }
+    await fs.writeFile(quotaPath, JSON.stringify({
+      codex: { Type: 'codex', IsAPIKey: true },
+      claude: { Type: 'claude', IsAPIKey: true },
+    }));
+    const logs: string[] = [];
+    await selectAgent(['codex', 'claude'], (text) => { logs.push(text); });
+    expect(logs.join('')).toContain('Falling back to API Key choices');
+  });
+
+  test('persists quota ranking and locked agy group overrides in the autoagent log', async () => {
+    await fs.writeFile(quotaPath, JSON.stringify({
+      agy: {
+        Type: 'antigravity',
+        GeminiHourRemain: 0.8, GeminiWeeklyRemain: 0.9, GeminiWeeklyResetsAt: null,
+        OtherHourRemain: 0, OtherWeeklyRemain: 0, OtherWeeklyResetsAt: null,
+        ArgonWeeklyRemain: 0.1, ArgonWeeklyResetsAt: null,
+        updatedAt: 123,
+      },
+    }));
+    const sessionId = crypto.randomUUID();
+    const messageId = crypto.randomUUID();
+    try {
+      const resolved = await resolveAgentType('auto', ['agy'], {
+        autoagentLog: (text) => appendAutoagentLog(sessionId, messageId, text),
+        lockedAgent: { agentType: 'antigravity', agyQuotaGroup: 'other' },
+      });
+      expect(resolved.agyQuotaGroup).toBe('other');
+      const log = await fs.readFile(path.join(CONFIG_DIR, 'sessions', sessionId, 'logs', `${messageId}.autoagent.log`), 'utf-8');
+      expect(log).toContain('"updatedAt": 123');
+      expect(log).toContain('"latestEntryByType"');
+      expect(log).toContain('Low quota choices (<0.15) = [B]');
+      expect(log).toContain('Step 2 Scoring: Choice A');
+      expect(log).toContain('Final Candidate Order: [A, E, B]');
+      expect(log).toContain('"source": "lockedAgent"');
+      expect(log).toContain('"agyQuotaGroup": "other"');
+      expect(log).toContain('## Result');
+    } finally {
+      await fs.rm(path.join(CONFIG_DIR, 'sessions', sessionId), { recursive: true, force: true });
+    }
   });
 
   test('selects codex when Claude and agy quotas are unknown', async () => {
@@ -537,6 +587,11 @@ async function runTransitionTest(
 }
 
 async function expectAutomodelLog(sessionId: string, messageId: string) {
+  const autoagentPath = path.join(CONFIG_DIR_RUNTIME, 'sessions', sessionId, 'logs', `${messageId}.autoagent.log`);
+  const autoagentLog = await fs.readFile(autoagentPath, 'utf-8');
+  expect(autoagentLog).toContain('# autoagent');
+  expect(autoagentLog).toContain('## Input');
+  expect(autoagentLog).toContain('## Result');
   const logPath = path.join(CONFIG_DIR_RUNTIME, 'sessions', sessionId, 'logs', `${messageId}.automodel.log`);
   const log = await fs.readFile(logPath, 'utf-8');
   expect(log).toContain('# automodel');

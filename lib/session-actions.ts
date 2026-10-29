@@ -7,6 +7,7 @@ import {
   clearSessionLog,
   appendSessionLog,
   appendAutomodelLog,
+  appendAutoagentLog,
   getMessages,
   getRunningSessionScriptRuns,
   recordScriptHistory,
@@ -95,6 +96,7 @@ export async function dispatchDetachedAgent(
   const runMessageId = crypto.randomUUID();
   const resolved = await resolveAgentType(selectedAgentType, runner?.info.agents ?? [], {
     prompt,
+    autoagentLog: (text) => appendAutoagentLog(sessionId, runMessageId, text),
     automodelLog: (text) => appendAutomodelLog(sessionId, runMessageId, text),
     once: session.once,
   });
@@ -277,6 +279,7 @@ export async function dispatchFollowupMessage(
   const systemMessageId = crypto.randomUUID();
   const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? [], {
     prompt: trimmedPrompt || trimmedMessage,
+    autoagentLog: (text) => appendAutoagentLog(sessionId, systemMessageId, text),
     automodelLog: (text) => appendAutomodelLog(sessionId, systemMessageId, text),
     model: session.model,
     lockedAgent: session.agentType === "auto" && autoLockedType &&
@@ -560,6 +563,7 @@ export async function dispatchCreateSession(
   const systemMessageId = crypto.randomUUID();
   const resolved = await resolveAgentType(agentType, run.info.agents, {
     prompt: trimmedPrompt,
+    autoagentLog: (text) => appendAutoagentLog(sessionId, systemMessageId, text),
     automodelLog: (text) => appendAutomodelLog(sessionId, systemMessageId, text),
     once: opts.once,
     model: opts.model,

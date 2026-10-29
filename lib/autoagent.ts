@@ -220,7 +220,28 @@ export function getAgyQuotaGroupForModel(model?: string): AgyQuotaGroup | undefi
 /**
  * Selects the best agent and model from the available binary names on a runner.
  */
-export async function selectAgent(runnerAgentBinaries: string[]): Promise<ResolvedAgent | null> {
+export async function selectAgent(
+  runnerAgentBinaries: string[],
+  writeLog?: (text: string) => void | Promise<void>,
+): Promise<ResolvedAgent | null> {
+  const logParts = ["# autoagent", `Time: ${new Date().toISOString()}`, "## Input", JSON.stringify({ runnerAgentBinaries }, null, 2)];
+  const log = (text: string, stdout = true) => {
+    if (stdout) console.log(text);
+    logParts.push(text);
+  };
+  try {
+    const selected = await selectAgentFromQuota(runnerAgentBinaries, log);
+    logParts.push("## Quota selection", JSON.stringify(selected, null, 2));
+    return selected;
+  } finally {
+    await writeLog?.(logParts.join("\n") + "\n");
+  }
+}
+
+async function selectAgentFromQuota(
+  runnerAgentBinaries: string[],
+  log: (text: string, stdout?: boolean) => void,
+): Promise<ResolvedAgent | null> {
   const agentModels = await getAgentModelsConfig();
   const hasAgy = runnerAgentBinaries.includes("agy");
   const hasClaude = runnerAgentBinaries.includes("claude");
@@ -283,15 +304,17 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
     });
   }
 
-  console.log(`[autoagent] Available runner binaries: ${runnerAgentBinaries.join(", ")}`);
-  console.log(`[autoagent] Initial choices: ${choices.map((c) => c.id).join(", ")}`);
+  log(`[autoagent] Available runner binaries: ${runnerAgentBinaries.join(", ")}`);
+  log(`[autoagent] Initial choices: ${choices.map((c) => c.id).join(", ")}`);
+
+  log(`## Choices\n${JSON.stringify(choices, null, 2)}`, false);
 
   if (choices.length === 0) {
-    console.log("[autoagent] No choices available.");
+    log("[autoagent] No choices available.");
     return null;
   }
   if (choices.length === 1) {
-    console.log(`[autoagent] Only one choice available: ${choices[0].id}. Selecting it directly.`);
+    log(`[autoagent] Only one choice available: ${choices[0].id}. Selecting it directly.`);
     return {
       agentType: choices[0].agentType,
       model: choices[0].model,
@@ -309,6 +332,8 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
       latestEntryByType.set(entry.Type, entry);
     }
   }
+
+  log(`## Quota\n${JSON.stringify({ path: QUOTA_PATH, entries: quota, latestEntryByType: Object.fromEntries(latestEntryByType) }, null, 2)}`, false);
 
   // Helper to extract relevant quota metrics for a choice
   const getMetrics = (choice: AgentChoice) => {
@@ -363,7 +388,7 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
 
   for (const choice of choices) {
     const { hourRemain, weekRemain, resetsAt } = getMetrics(choice);
-    console.log(
+    log(
       `[autoagent] Choice ${choice.id} (${choice.agentType} / ${choice.model ?? "default"}): ` +
       `HourRemain=${hourRemain}, WeekRemain=${weekRemain}, ResetsAt=${resetsAt}`
     );
@@ -381,7 +406,7 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
 
   if (knownQuotaChoices.length === 0) {
     const fallbackChoices = unknownQuotaChoices.length > 0 ? unknownQuotaChoices : apiKeyChoices;
-    console.log(`[autoagent] No known quota scores. Falling back to ${unknownQuotaChoices.length > 0 ? "unknown" : "API Key"} choices: [${fallbackChoices.map((c) => c.id).join(", ")}]`);
+    log(`[autoagent] No known quota scores. Falling back to ${unknownQuotaChoices.length > 0 ? "unknown" : "API Key"} choices: [${fallbackChoices.map((c) => c.id).join(", ")}]`);
     const fallback = fallbackChoices[0];
     return {
       agentType: fallback.agentType,
@@ -405,7 +430,7 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
     }
   }
 
-  console.log(
+  log(
     `[autoagent] Step 1 Filter: Normal choices = [${normalChoices.map((c) => c.id).join(", ")}], ` +
     `Low quota choices (<0.15) = [${lowQuotaChoices.map((c) => c.id).join(", ")}]`
   );
@@ -414,7 +439,7 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
   let activeChoices = normalChoices;
   let excludedChoices = lowQuotaChoices;
   if (normalChoices.length === 0) {
-    console.log("[autoagent] Exception: All choices are low quota. Keeping all choices in active list.");
+    log("[autoagent] Exception: All choices are low quota. Keeping all choices in active list.");
     activeChoices = lowQuotaChoices;
     excludedChoices = [];
   }
@@ -424,7 +449,7 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
     const { weekRemain, resetsAt } = getMetrics(choice);
     const weekTimeRemain = getAutoagentWeekTimeRemain(resetsAt, now);
     const score = getAutoagentQuotaScore(weekRemain, resetsAt, now)!;
-    console.log(
+    log(
       `[autoagent] Step 2 Scoring: Choice ${choice.id} -> ` +
       `WeekRemain=${weekRemain!.toFixed(3)}, WeekTimeRemain=${weekTimeRemain.toFixed(3)}, ` +
       `Score=${score.toFixed(3)} (Reset at ${resetsAt}, Current time ${now})`
@@ -440,10 +465,10 @@ export async function selectAgent(runnerAgentBinaries: string[]): Promise<Resolv
     ...excludedChoices,
   ];
 
-  console.log(`[autoagent] Final Candidate Order: [${candidateAgents.map((c) => c.id).join(", ")}]`);
+  log(`[autoagent] Final Candidate Order: [${candidateAgents.map((c) => c.id).join(", ")}]`);
 
   const best = candidateAgents[0];
-  console.log(`[autoagent] Selection Result: Choice ${best.id} (Agent: ${best.agentType}, Model: ${best.model ?? "default"})`);
+  log(`[autoagent] Selection Result: Choice ${best.id} (Agent: ${best.agentType}, Model: ${best.model ?? "default"})`);
   return {
     agentType: best.agentType,
     model: best.model,

@@ -88,6 +88,8 @@ Auto Mode uses the following order of preference:
 
 After Auto Mode has selected the agent, **automodel** can optionally choose that agent's model and reasoning effort. When configured with a Jev Key (`TYPESAFE_API_KEY`), automodel prioritizes TypeSafe AI's System One model (`jev-latest`) for ultra-fast categorical decision making. If Jev is unconfigured or encounters an error, it seamlessly falls back to standard lightweight LLMs (Anthropic Claude Haiku 4.5, OpenAI GPT-5.4-mini, or Google Gemini 3.5 Flash Lite) through the Vercel AI SDK. automodel is only enabled when a Jev, Anthropic, OpenAI, or Google API key is configured in Settings or through the server environment. It receives the selected agent, the quota-filtered model options for that agent, and the user message, then must choose one of those provided options. If no key is configured, the request times out, the provider returns an error, or the model choice is invalid, Arondo falls back to the predefined model selected by the existing quota-based logic.
 
+Auto Mode writes its agent selection trace to `${ARONDO_CONFIG_DIR}/sessions/${sessionId}/logs/${messageId}.autoagent.log` (the configuration directory defaults to `~/.arondo`). The log includes available candidates, quota records and timestamps used for selection, filtering, scores, candidate order, and the selected agent/quota group, including session lock overrides. Model routing is recorded separately in `${messageId}.automodel.log`.
+
 <img src="public/readme/auto-mode-quota.png" alt="Runner page showing Claude, Antigravity, and Codex quota information used by Auto Mode" width="360">
 
 ## Agent Models & Defaults

@@ -719,6 +719,12 @@ export async function appendSessionLog(sessionId: string, messageId: string, kin
   await fs.appendFile(logPath, raw ? text : `${text}\n`, "utf-8");
 }
 
+export async function appendAutoagentLog(sessionId: string, messageId: string, text: string): Promise<void> {
+  const logPath = path.join(getSessionDir(sessionId), "logs", `${messageId}.autoagent.log`);
+  await ensureDir(path.dirname(logPath));
+  await fs.appendFile(logPath, text.endsWith("\n") ? text : `${text}\n`, "utf-8");
+}
+
 export async function appendAutomodelLog(sessionId: string, messageId: string, text: string): Promise<void> {
   const logPath = getAutomodelLogFilePath(sessionId, messageId);
   await ensureDir(path.dirname(logPath));

@@ -53,6 +53,7 @@ export interface ResolvedAgent {
 
 interface ResolveAgentOptions {
   prompt?: string;
+  autoagentLog?: (text: string) => void | Promise<void>;
   automodelLog?: (text: string) => void | Promise<void>;
   lockedAgent?: Pick<ResolvedAgent, "agentType" | "model" | "effort" | "agyQuotaGroup">;
   once?: boolean;
@@ -86,7 +87,7 @@ export async function resolveAgentType(
       model: defaultModel,
     };
   }
-  const resolved = await selectAgent(runnerAgentBinaries);
+  const resolved = await selectAgent(runnerAgentBinaries, options.autoagentLog);
   const selected = options.lockedAgent
     ? {
       ...options.lockedAgent,
@@ -99,6 +100,15 @@ export async function resolveAgentType(
       ),
     }
     : resolved ?? { agentType: "antigravity" as ConcreteAgentType };
+  await options.autoagentLog?.([
+    "## Result",
+    JSON.stringify({
+      source: options.lockedAgent ? "lockedAgent" : resolved ? "quota" : "fallback",
+      lockedAgent: options.lockedAgent,
+      selected,
+    }, null, 2),
+    "",
+  ].join("\n"));
   const routed = options.prompt && selected.modelOptions
     ? await routeModel({
       agentType: selected.agentType,
