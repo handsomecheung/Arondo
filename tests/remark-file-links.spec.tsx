@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import remarkFileLinks, { candidateToPath, extractCandidatePaths, isPathCandidate } from "../lib/remarkFileLinks";
+import { renderMarkdownHtml } from "../lib/renderHtml";
 
 test("renders a verified file URL in agent markdown as a File Browser link", () => {
   const fileUrl = "file:///mnt/coder-workspaces/private-workspace/repos/github/Arondo/app/api/sessions/%5Bid%5D/detached-agent-runs/route.ts";
@@ -65,4 +66,25 @@ test("handles malformed URI sequences like batch variables without throwing", ()
   expect(isPathCandidate("%~n0")).toBe(false);
   expect(isPathCandidate("%BASE_DATE%")).toBe(false);
 });
+
+test("converts [web/AGENTS-CONTEXT.md](file:///...) into a clickable File Browser button in rendered HTML", () => {
+  const fileUrl = "file:///mnt/coder-workspaces/private-workspace/repos/ck-apps/clanavi/web/AGENTS-CONTEXT.md";
+  const expectedPath = "/mnt/coder-workspaces/private-workspace/repos/ck-apps/clanavi/web/AGENTS-CONTEXT.md";
+  const markdown = `[web/AGENTS-CONTEXT.md](${fileUrl})`;
+
+  const candidates = extractCandidatePaths(markdown);
+  expect(candidates).toEqual([fileUrl]);
+  expect(candidateToPath(fileUrl)).toBe(expectedPath);
+
+  const html = renderMarkdownHtml(markdown, {
+    [expectedPath]: { exists: true },
+    [fileUrl]: { exists: true },
+  } as any);
+
+  expect(html).not.toContain('<a href="">web/AGENTS-CONTEXT.md</a>');
+  expect(html).toContain(
+    `<button type="button" class="agent-filelink-btn" data-path="${expectedPath}">web/AGENTS-CONTEXT.md</button>`
+  );
+});
+
 

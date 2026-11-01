@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionHtml, saveSessionHtml, saveSessionDiffs, getMessages, getSessionLog } from "@/lib/store";
+import { getSessionHtml, saveSessionHtml, saveSessionDiffs, getMessages, getSessionLog, getSession, getProject } from "@/lib/store";
 import { getArondoToken, verifySessionPermission, verifyProjectPermission, isValidToken } from "@/lib/auth";
-import { renderMarkdownHtml, RENDERED_HTML_CACHE_MARKER } from "@/lib/renderHtml";
+import { renderMarkdownHtml, RENDERED_HTML_CACHE_MARKER, PathInfoMap } from "@/lib/renderHtml";
+import { extractCandidatePaths, candidateToPath, safeDecodeURIComponent } from "@/lib/remarkFileLinks";
+import { resolveRepoFilePath } from "@/lib/homeUtils";
+import { stripAnsi } from "@/lib/ansi";
+import { runnerManager } from "@/lib/runner-manager";
 
 export async function GET(
   req: NextRequest,
@@ -46,7 +50,8 @@ export async function GET(
 
   const sessId = id === "global" ? "" : id;
   let html = await getSessionHtml(sessId, targetMessageId, projectId);
-  if (!html) {
+  const hasLegacyEmptyFileLink = html.includes('<a href="">');
+  if (!html || !html.includes(RENDERED_HTML_CACHE_MARKER) || hasLegacyEmptyFileLink) {
     const messages = await getMessages(sessId, projectId);
     const message = messages.find((entry) => entry.id === targetMessageId);
     const kind = message?.type === "script-run"
@@ -57,9 +62,66 @@ export async function GET(
     if (kind) {
       const log = await getSessionLog(sessId, targetMessageId, kind, projectId, "stdout");
       if (log) {
-        const rendered = renderMarkdownHtml(log);
-        html = `${RENDERED_HTML_CACHE_MARKER}${rendered}`;
-        await saveSessionHtml(sessId, targetMessageId, html, projectId);
+        const cleanLog = stripAnsi(log);
+        const candidates = extractCandidatePaths(cleanLog);
+        const pathInfos: PathInfoMap = {};
+        const diffMap: Record<string, string> = {};
+        let canCache = true;
+
+        const session = sessId ? await getSession(sessId) : undefined;
+        if (session?.status === "running") {
+          canCache = false;
+        }
+
+        if (candidates.length > 0) {
+          const project = !session && projectId ? await getProject(projectId) : undefined;
+          const runnerId = session?.runnerId ?? project?.runnerId;
+          const repoPath = session?.repoPath ?? project?.repoPath;
+
+          const absPaths = candidates.map((c) => {
+            const rawPath = candidateToPath(c);
+            const decoded = safeDecodeURIComponent(rawPath);
+            return decoded.startsWith("/") ? decoded : (repoPath ? resolveRepoFilePath(repoPath, decoded) : decoded);
+          });
+
+          if (runnerId && runnerManager.getRunner(runnerId)) {
+            try {
+              const result = await runnerManager.sendRequest(runnerId, "fs.infos", { paths: absPaths });
+              const results = result?.results as Record<string, { exists: boolean; diff?: string }> | undefined;
+              if (results) {
+                candidates.forEach((c, i) => {
+                  const res = results[absPaths[i]];
+                  if (res && res.exists) {
+                    const cleanPath = candidateToPath(c);
+                    const infoObj = { exists: true, diff: res.diff };
+                    pathInfos[cleanPath] = infoObj;
+                    pathInfos[c] = infoObj;
+                    if (res.diff) {
+                      diffMap[absPaths[i]] = res.diff;
+                    }
+                  }
+                });
+                if (canCache && Object.keys(diffMap).length > 0) {
+                  await saveSessionDiffs(sessId, targetMessageId, diffMap, projectId);
+                }
+              } else {
+                canCache = false;
+              }
+            } catch {
+              canCache = false;
+            }
+          } else {
+            canCache = false;
+          }
+        }
+
+        const rendered = renderMarkdownHtml(log, pathInfos);
+        if (canCache) {
+          html = `${RENDERED_HTML_CACHE_MARKER}${rendered}`;
+          await saveSessionHtml(sessId, targetMessageId, html, projectId);
+        } else {
+          html = rendered;
+        }
       }
     }
   }

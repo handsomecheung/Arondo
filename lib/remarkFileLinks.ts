@@ -21,7 +21,7 @@ export const FILE_URL_PREFIX = "file://";
 
 const BACKTICK_RE = /`([^`\n]+)`/g;
 const FILE_URL_RE = /file:\/\/[^\s`]+/g;
-const MARKDOWN_ABSOLUTE_PATH_LINK_RE = /\[[^\]]*\]\((\/[^\s)`]+)\)/g;
+const MARKDOWN_LINK_RE = /\[[^\]]*\]\(([^\s)`]+)\)/g;
 
 // Strips a trailing line-reference from a path so existence checks and the
 // eventual file-open hit a real filesystem path — e.g. GitHub-style
@@ -64,7 +64,7 @@ export function isPathCandidate(value: string): boolean {
 }
 
 // Scans raw (unparsed) markdown text for tokens that *might* be file paths —
-// backtick spans (plain paths or file:// URLs), bare file:// URLs, and absolute
+// backtick spans (plain paths or file:// URLs), bare file:// URLs, and file
 // paths in Markdown links —
 // without yet confirming they exist on disk. Callers should verify existence
 // before passing the results into remarkFileLinks' `verified` set.
@@ -79,8 +79,8 @@ export function extractCandidatePaths(text: string): string[] {
     // (and anything after, e.g. surrounding **bold**) — cut it off there.
     candidates.add(match[0].split(")")[0]);
   }
-  for (const match of text.matchAll(MARKDOWN_ABSOLUTE_PATH_LINK_RE)) {
-    if (isPathCandidate(match[1])) candidates.add(match[1]);
+  for (const match of text.matchAll(MARKDOWN_LINK_RE)) {
+    if (!isHttpUrl(match[1]) && isPathCandidate(match[1])) candidates.add(match[1]);
   }
 
   return [...candidates];
@@ -96,9 +96,8 @@ export function candidateToPath(candidate: string): string {
 }
 
 interface RemarkFileLinksOptions {
-  // Raw tokens (inline-code text, file:// URLs, or absolute Markdown link paths)
-  // confirmed to exist on disk.
-  // Nothing is linkified unless its raw form is a member of this set.
+  // Raw tokens or resolved filesystem paths confirmed to exist on disk.
+  // Nothing is linkified unless its raw form or resolved path is a member of this set.
   verified: Set<string>;
 }
 
@@ -134,9 +133,9 @@ export default function remarkFileLinks(options: RemarkFileLinksOptions) {
         return;
       }
 
-      if (!isPathCandidate(value) || !verified.has(value)) return;
-
       const path = candidateToPath(value);
+      if (!isPathCandidate(value) || (!verified.has(value) && !verified.has(path))) return;
+
       node.data = {
         hName: "a",
         hProperties: {
@@ -155,9 +154,9 @@ export default function remarkFileLinks(options: RemarkFileLinksOptions) {
 
     visit(tree, "link", (node: any) => {
       const url: string = node.url || "";
-      if (!isPathCandidate(url) || !verified.has(url)) return;
-
       const path = candidateToPath(url);
+      if (!isPathCandidate(url) || (!verified.has(url) && !verified.has(path))) return;
+
       node.data = {
         ...node.data,
         hName: "a",

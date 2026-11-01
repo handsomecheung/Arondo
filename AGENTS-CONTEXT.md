@@ -101,6 +101,8 @@ app/
             route.ts    # PATCH: cancel / send-now / change-trigger actions on a pending todo message
         diff/
           route.ts      # GET: generate and serve visual HTML diff via runner + diff2html
+        html/
+          route.ts      # GET/POST: retrieve, render (with runner file-link verification), and cache agent output HTML
         log/
           route.ts      # GET: fetch run log for specific messageId
         git-status/
@@ -176,6 +178,7 @@ lib/
   notification.ts       # Client-side Web Push helper: subscription, permission management, service worker reset, test push trigger
   web-push-server.ts    # Server-side Web Push notifications: VAPID key generation, persistent subscription storage, delivery via web-push
   remarkFileLinks.ts    # Custom remark plugin to scan, verify, and linkify file paths inside markdown output
+  renderHtml.ts         # Server-side Markdown-to-HTML renderer with syntax highlighting and verified file-link rendering
   event-bus.ts          # In-memory pub/sub (singleton on `process` for cross-context sharing)
   runner-manager.ts     # Manages runner connections, task routing, task persistence, and push notification dispatch on task completion
   runner-server.ts      # WebSocket handler for /runner endpoint (registration, heartbeat)

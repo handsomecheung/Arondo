@@ -52,7 +52,7 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
 
   // Fetch cached HTML if exists
   useEffect(() => {
-    if (!props.item.messageId || onViewLog) {
+    if (isLive || !props.item.messageId || onViewLog) {
       return;
     }
 
@@ -69,7 +69,7 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
       })
       .catch(() => {
       });
-  }, [props.item.messageId, sessionId, projectId, onViewLog]);
+  }, [isLive, props.item.messageId, sessionId, projectId, onViewLog]);
 
   // Fetch log only if html cache doesn't exist and not live, or if it is live
   useEffect(() => {
@@ -129,7 +129,7 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
 
   // Verify paths once the agent execution completes (isLive becomes false)
   useEffect(() => {
-    if (isLive || !repoPath || !runnerId || !log || hasVerified || cachedHtml) return;
+    if (isLive || !runnerId || !log || hasVerified || cachedHtml) return;
 
     const candidates = extractCandidatePaths(log);
     if (candidates.length === 0) {
@@ -140,7 +140,7 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
     const absPaths = candidates.map((c) => {
       const path = candidateToPath(c);
       const decoded = safeDecodeURIComponent(path);
-      return decoded.startsWith("/") ? decoded : resolveRepoFilePath(repoPath, decoded);
+      return decoded.startsWith("/") ? decoded : (repoPath ? resolveRepoFilePath(repoPath, decoded) : decoded);
     });
 
     fetch("/api/fs/infos", {
