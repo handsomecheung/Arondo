@@ -91,4 +91,6 @@ export interface TaskItem {
   messageId?: string;
   projectId?: string;
   scriptName?: string;
+  command?: string;
+  waitingForInput?: boolean;
 }

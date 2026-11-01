@@ -9,7 +9,7 @@ import UserTodoMessageCard from "@/components/UserTodoMessageCard";
 import {
   IconArrowLeft, IconLogo, IconX, IconInbox, IconTerminal, IconCode, IconChevronDown, IconRefresh,
 } from "@/components/Icons";
-import { agentTypeLabel } from "@/lib/homeUtils";
+import { agentTypeLabel, formatDuration } from "@/lib/homeUtils";
 import type { TodoTrigger } from "@/types/home";
 
 const Terminal = dynamic(() => import("@/components/Terminal"), { ssr: false });
@@ -116,16 +116,6 @@ interface SessionGroup {
   hasRunning: boolean;
   latestTime: number;
   tasks: TaskItem[];
-}
-
-function formatDuration(ms: number): string {
-  if (ms < 0) return "0s";
-  const seconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  if (hours > 0) return `${hours}h ${minutes % 60}m`;
-  if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
-  return `${seconds}s`;
 }
 
 export default function TasksPage() {

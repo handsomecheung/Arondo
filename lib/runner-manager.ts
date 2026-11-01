@@ -1791,21 +1791,13 @@ class RunnerManager {
       },
     });
 
-    if (!ctx.sessionId) {
-      return;
-    }
-
-    const hasAgentTask = Array.from(this.tasks.values()).some(
-      (t) =>
-        t.sessionId === ctx.sessionId && t.type === "agent" && !t.completedAt,
-    );
-
     const stoppedByUser = !!ctx.stoppedByUser;
     const errorMessage = stoppedByUser
       ? "Stopped by user"
       : `Script exited with code ${exitCode}`;
     const returnMessage = await addMessage({
       sessionId: ctx.sessionId,
+      projectId: ctx.projectId,
       role: "system",
       content: exitCode === 0
         ? "✅ Script completed successfully."
@@ -1816,29 +1808,35 @@ class RunnerManager {
       parentId: ctx.messageId,
       tokenUuid: ctx.tokenUuid,
     });
-    const runningScripts = await getRunningSessionScriptRuns(ctx.sessionId);
+    eventBus.publish({ type: "message_added", payload: returnMessage });
 
-    if (exitCode === 0) {
-      let nextStatus: string;
-      if (hasAgentTask) nextStatus = "running";
-      else if (runningScripts.length > 0) nextStatus = "script-running";
-      else nextStatus = "done";
-      const updated = await updateSession(ctx.sessionId, {
-        status: nextStatus as any,
-      });
-      eventBus.publish({ type: "message_added", payload: returnMessage });
-      eventBus.publish({ type: "session_updated", payload: updated });
-    } else {
-      let nextStatus: string;
-      if (hasAgentTask) nextStatus = "running";
-      else if (runningScripts.length > 0) nextStatus = "script-running";
-      else nextStatus = stoppedByUser ? "done" : "error";
-      const updated = await updateSession(ctx.sessionId, {
-        status: nextStatus as any,
-        errorMessage: stoppedByUser ? undefined : errorMessage,
-      });
-      eventBus.publish({ type: "message_added", payload: returnMessage });
-      eventBus.publish({ type: "session_updated", payload: updated });
+    if (ctx.sessionId) {
+      const hasAgentTask = Array.from(this.tasks.values()).some(
+        (t) =>
+          t.sessionId === ctx.sessionId && t.type === "agent" && !t.completedAt,
+      );
+      const runningScripts = await getRunningSessionScriptRuns(ctx.sessionId);
+
+      if (exitCode === 0) {
+        let nextStatus: string;
+        if (hasAgentTask) nextStatus = "running";
+        else if (runningScripts.length > 0) nextStatus = "script-running";
+        else nextStatus = "done";
+        const updated = await updateSession(ctx.sessionId, {
+          status: nextStatus as any,
+        });
+        eventBus.publish({ type: "session_updated", payload: updated });
+      } else {
+        let nextStatus: string;
+        if (hasAgentTask) nextStatus = "running";
+        else if (runningScripts.length > 0) nextStatus = "script-running";
+        else nextStatus = stoppedByUser ? "done" : "error";
+        const updated = await updateSession(ctx.sessionId, {
+          status: nextStatus as any,
+          errorMessage: stoppedByUser ? undefined : errorMessage,
+        });
+        eventBus.publish({ type: "session_updated", payload: updated });
+      }
     }
 
     if (

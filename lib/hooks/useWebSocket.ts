@@ -193,6 +193,15 @@ export function useWebSocket({
             if (msg.sessionId === currentSelectedSessionId) {
               setMessages((prev) => prev.map((m) => (m.id === msg.id ? msg : m)));
             }
+            if (msg.waitingForInput !== undefined) {
+              setTaskQueue((prev) =>
+                prev.map((t) =>
+                  t.messageId === msg.id
+                    ? { ...t, waitingForInput: msg.waitingForInput }
+                    : t
+                )
+              );
+            }
           }
         } catch {
           /* ignore parse errors */

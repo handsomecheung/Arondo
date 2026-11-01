@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { Project, Session, Runner } from "@/types/home";
+import { useEffect, useMemo, useState } from "react";
+import type { Project, Session, Runner, TaskItem } from "@/types/home";
 import type { AgentCommand } from "@/lib/agentCommands";
 import AgentCommandsManager from "@/components/AgentCommandsManager";
+import ScriptExecCard from "@/components/ScriptExecCard";
+import { formatDuration } from "@/lib/homeUtils";
 import { IconPlus, IconTrash, IconMoreVertical, IconFileSearch, IconTerminal, IconCommit, IconPlay, IconFolder, IconArrowLeft } from "@/components/Icons";
 
 interface ProjectPanelProps {
@@ -12,6 +14,8 @@ interface ProjectPanelProps {
   projectAgentCommands: AgentCommand[];
   scriptHistory: Record<string, number>;
   runners: Runner[];
+  runningScripts?: TaskItem[];
+  ws?: WebSocket | null;
   menuOpen: boolean;
   menuRef: React.RefObject<HTMLDivElement | null>;
   onSetMenuOpen: (v: boolean) => void;
@@ -33,18 +37,29 @@ interface ProjectPanelProps {
   isGitRepo: boolean;
   onBack?: () => void;
   previousSessionId?: string | null;
+  onStopScript?: (messageId: string) => void;
+  onViewLog?: (messageId: string) => void;
+  onShowCommand?: (command: string) => void;
 }
 
 export default function ProjectPanel({
-  project, projectSessions, projectAgentCommands, scriptHistory, runners, menuOpen, menuRef, onSetMenuOpen,
+  project, projectSessions, projectAgentCommands, scriptHistory, runners, runningScripts, ws, menuOpen, menuRef, onSetMenuOpen,
   onNewSession, onDeleteProject, onOpenFileBrowser, onOpenShellModal, onSaveAgentCommand,
   onDeleteAgentCommand, onConfirmDeleteAgentCommand, onSelectSession, onShowDiff, onShowCommits,
   isCheckingGitChanges, hasGitChanges, isGitRepo, onOpenProjectScriptCommand, onRunProjectScript, onSelectProjectScriptFile,
-  onBack, previousSessionId,
+  onBack, previousSessionId, onStopScript, onViewLog, onShowCommand,
 }: ProjectPanelProps) {
   const folderName = project.repoPath.split("/").pop() || project.repoPath;
   const projectRunner = runners.find((runner) => runner.id === project.runnerId);
   const [runScriptMenuOpen, setRunScriptMenuOpen] = useState(false);
+  const [taskTimeTicker, setTaskTimeTicker] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!runningScripts || runningScripts.length === 0) return;
+    const interval = setInterval(() => setTaskTimeTicker(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [runningScripts?.length]);
+
   const topHistoryCommands = useMemo(() => Object.entries(scriptHistory)
     .sort(([, countA], [, countB]) => countB - countA)
     .slice(0, 5)
@@ -156,7 +171,14 @@ export default function ProjectPanel({
 
     <div className="project-section-block project-scripts-section">
       <div className="project-section-header">
-        <h3 className="project-section-title">Scripts</h3>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <h3 className="project-section-title">Scripts</h3>
+          {runningScripts && runningScripts.length > 0 && (
+            <span className="project-section-count" style={{ color: "var(--accent, #3b82f6)" }}>
+              {runningScripts.length}
+            </span>
+          )}
+        </div>
         <div style={{ position: "relative" }}>
           <button
             className="new-task-btn"
@@ -188,8 +210,42 @@ export default function ProjectPanel({
           )}
         </div>
       </div>
-      <div className="project-section-body" style={{ color: "var(--text-secondary)", fontSize: 13 }}>
-        Run a command in this project. Commands are saved to the project script history.
+      <div className="project-section-body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ color: "var(--text-secondary)", fontSize: 13 }}>
+          Run a command in this project. Commands are saved to the project script history.
+        </div>
+        {runningScripts && runningScripts.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {runningScripts.map((task) => {
+              const elapsedMs = taskTimeTicker - task.createdAt;
+              const statusText = task.waitingForInput
+                ? "Waiting for input"
+                : `Running (${formatDuration(elapsedMs)})...`;
+              return (
+                <ScriptExecCard
+                  key={task.id}
+                  item={{
+                    id: task.id,
+                    type: "script",
+                    title: task.scriptName || task.command || task.name.replace(/^Script:\s*/, ""),
+                    status: "running",
+                    statusText,
+                    command: task.command,
+                    messageId: task.messageId,
+                    waitingForInput: task.waitingForInput,
+                  }}
+                  sessionId=""
+                  projectId={project.id}
+                  ws={ws}
+                  showLogInline={true}
+                  onViewLog={task.messageId && onViewLog ? () => onViewLog(task.messageId!) : undefined}
+                  onShowCommand={task.command && onShowCommand ? () => onShowCommand(task.command!) : undefined}
+                  onStopTask={task.messageId && onStopScript ? () => onStopScript(task.messageId!) : undefined}
+                />
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
 

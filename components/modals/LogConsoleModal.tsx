@@ -10,6 +10,7 @@ interface Props {
   isRunning: boolean;
   isScriptLog: boolean;
   selectedSessionId: string | null;
+  projectId?: string | null;
   ws: WebSocket | null;
 }
 
@@ -20,6 +21,7 @@ export default function LogConsoleModal({
   isRunning,
   isScriptLog,
   selectedSessionId,
+  projectId,
   ws,
 }: Props) {
   if (!open) return null;
@@ -41,9 +43,10 @@ export default function LogConsoleModal({
           </button>
         </div>
         <div className="modal-body" style={{ padding: 0, overflow: "hidden" }}>
-          {activeLogMsgId && selectedSessionId ? (
+          {activeLogMsgId && (selectedSessionId || projectId) ? (
             <Terminal
-              sessionId={selectedSessionId}
+              sessionId={selectedSessionId || ""}
+              projectId={projectId || undefined}
               messageId={activeLogMsgId}
               ws={ws}
               mode={isRunning ? "live" : "history"}

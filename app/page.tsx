@@ -143,6 +143,17 @@ export default function HomePage() {
     );
   }, [projects, sessions]);
 
+  const projectRunningScripts = useMemo(() => {
+    if (!selectedProjectId) return [];
+    return taskQueue.filter(
+      (t) =>
+        t.projectId === selectedProjectId &&
+        (!t.sessionId || t.sessionId === "") &&
+        t.type === "script" &&
+        t.status === "running",
+    );
+  }, [taskQueue, selectedProjectId]);
+
   const [toast, setToast] = useState<{
     message: string;
     type: "success" | "info" | "error";
@@ -1140,6 +1151,8 @@ export default function HomePage() {
       id: tempTaskId,
       type: "script",
       name: `Script: ${command}`,
+      command,
+      scriptName: command,
       sessionId: "",
       projectId: selectedProjectId,
       status: "running",
@@ -1159,7 +1172,7 @@ export default function HomePage() {
       }
       const data = await response.json();
       setTaskQueue((prev) => prev.map((task) => task.id === tempTaskId
-        ? { ...task, id: data.taskId, messageId: data.messageId }
+        ? { ...task, id: data.taskId, messageId: data.messageId, command, scriptName: command }
         : task));
       loadScriptHistory(selectedProjectId);
       setProjectScriptCommandOpen(false);
@@ -1169,6 +1182,18 @@ export default function HomePage() {
       setTaskQueue((prev) => prev.filter((task) => task.id !== tempTaskId));
     } finally {
       setIsRunningProjectScript(false);
+    }
+  };
+
+  const handleStopProjectScript = async (msgId: string) => {
+    try {
+      await fetch("/api/tasks/kill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: "", messageId: msgId }),
+      });
+    } catch (err) {
+      console.error("Failed to stop project script:", err);
     }
   };
 
@@ -1828,6 +1853,14 @@ export default function HomePage() {
                 isCheckingGitChanges={isCheckingProjectGitChanges}
                 hasGitChanges={hasProjectGitChanges}
                 isGitRepo={isProjectGitRepo}
+                runningScripts={projectRunningScripts}
+                ws={wsInstance}
+                onStopScript={handleStopProjectScript}
+                onViewLog={(msgId) => {
+                  setActiveLogMsgId(msgId);
+                  setLogModalOpen(true);
+                }}
+                onShowCommand={(cmd) => setCommandModalText(cmd)}
               />
             );
           })()
@@ -1992,9 +2025,15 @@ export default function HomePage() {
           setActiveLogMsgId(null);
         }}
         activeLogMsgId={activeLogMsgId}
-        isRunning={!!(activeLogMsgId && execCards.get(activeLogMsgId)?.returnMsg === null)}
-        isScriptLog={isScriptLog}
+        isRunning={Boolean(
+          activeLogMsgId && (
+            execCards.get(activeLogMsgId)?.returnMsg === null ||
+            taskQueue.some((t) => t.messageId === activeLogMsgId && t.status === "running")
+          )
+        )}
+        isScriptLog={isScriptLog || Boolean(taskQueue.some((t) => t.messageId === activeLogMsgId && t.type === "script"))}
         selectedSessionId={selectedSessionId}
+        projectId={selectedProjectId}
         ws={wsInstance}
       />
 
