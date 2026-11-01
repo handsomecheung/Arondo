@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { Project, Session, Runner } from "@/types/home";
 import type { AgentCommand } from "@/lib/agentCommands";
 import AgentCommandsManager from "@/components/AgentCommandsManager";
-import { IconPlus, IconTrash, IconMoreVertical, IconFileSearch, IconTerminal, IconCommit, IconPlay, IconFolder } from "@/components/Icons";
+import { IconPlus, IconTrash, IconMoreVertical, IconFileSearch, IconTerminal, IconCommit, IconPlay, IconFolder, IconArrowLeft } from "@/components/Icons";
 
 interface ProjectPanelProps {
   project: Project;
@@ -31,6 +31,8 @@ interface ProjectPanelProps {
   isCheckingGitChanges: boolean;
   hasGitChanges: boolean;
   isGitRepo: boolean;
+  onBack?: () => void;
+  previousSessionId?: string | null;
 }
 
 export default function ProjectPanel({
@@ -38,6 +40,7 @@ export default function ProjectPanel({
   onNewSession, onDeleteProject, onOpenFileBrowser, onOpenShellModal, onSaveAgentCommand,
   onDeleteAgentCommand, onConfirmDeleteAgentCommand, onSelectSession, onShowDiff, onShowCommits,
   isCheckingGitChanges, hasGitChanges, isGitRepo, onOpenProjectScriptCommand, onRunProjectScript, onSelectProjectScriptFile,
+  onBack, previousSessionId,
 }: ProjectPanelProps) {
   const folderName = project.repoPath.split("/").pop() || project.repoPath;
   const projectRunner = runners.find((runner) => runner.id === project.runnerId);
@@ -64,7 +67,22 @@ export default function ProjectPanel({
   return <div className="project-detail-container">
     <div style={{ borderBottom: "1px solid var(--border)", paddingBottom: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{folderName}</h2>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
+          {onBack && (
+            <button
+              type="button"
+              className="menu-trigger-btn"
+              onClick={onBack}
+              id="project-back-btn"
+              title="Back"
+              aria-label="Back"
+              style={{ flexShrink: 0 }}
+            >
+              <IconArrowLeft />
+            </button>
+          )}
+          <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{folderName}</h2>
+        </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
           <button className="new-task-btn" onClick={onNewSession} style={{ padding: "8px 16px", fontSize: 13 }}><IconPlus /> New Session</button>
           <div ref={menuRef} style={{ position: "relative" }}>
@@ -187,27 +205,52 @@ export default function ProjectPanel({
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {projectSessions.map((session) => (
-              <div
-                key={session.id}
-                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 12, background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", cursor: "pointer", transition: "background 0.2s" }}
-                onClick={() => onSelectSession(session.id)}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-surface)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "var(--bg-elevated)"; }}
-              >
-                <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0, flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span className={`task-status-badge ${session.status}`}>{session.status}</span>
+            {projectSessions.map((session) => {
+              const isPrevious = Boolean(previousSessionId && session.id === previousSessionId);
+              return (
+                <div
+                  key={session.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: 12,
+                    background: isPrevious ? "var(--bg-surface)" : "var(--bg-elevated)",
+                    border: isPrevious ? "1px solid var(--accent, #3b82f6)" : "1px solid var(--border)",
+                    borderRadius: "var(--radius-sm)",
+                    cursor: "pointer",
+                    transition: "background 0.2s, border-color 0.2s",
+                  }}
+                  onClick={() => onSelectSession(session.id)}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-surface)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = isPrevious ? "var(--bg-surface)" : "var(--bg-elevated)"; }}
+                >
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0, flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span className={`task-status-badge ${session.status}`}>{session.status}</span>
+                      {isPrevious && (
+                        <span
+                          className="task-status-badge"
+                          style={{
+                            background: "rgba(59, 130, 246, 0.15)",
+                            color: "var(--accent, #3b82f6)",
+                            border: "1px solid var(--accent, #3b82f6)",
+                          }}
+                        >
+                          Previous
+                        </span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: 13, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {session.name || "Untitled"}
+                    </span>
                   </div>
-                  <span style={{ fontSize: 13, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {session.name || "Untitled"}
+                  <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 16 }}>
+                    {new Date(session.createdAt).toLocaleDateString()}
                   </span>
                 </div>
-                <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 16 }}>
-                  {new Date(session.createdAt).toLocaleDateString()}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

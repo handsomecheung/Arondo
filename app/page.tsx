@@ -130,6 +130,7 @@ export default function HomePage() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     initUrl.project,
   );
+  const [previousSessionId, setPreviousSessionId] = useState<string | null>(null);
   const sortedProjectsByRecentSession = useMemo(() => {
     const latestSessionCreatedAt = (projectId: string): number => {
       const times = sessions
@@ -1356,6 +1357,9 @@ export default function HomePage() {
   };
 
   const handleSelectProject = (projectId: string) => {
+    if (selectedSessionId) {
+      setPreviousSessionId(selectedSessionId);
+    }
     setSelectedProjectId(projectId);
     setSelectedSessionId(null);
     setIsNewSession(false);
@@ -1364,6 +1368,20 @@ export default function HomePage() {
     setActiveLogMsgId(null);
     setLogModalOpen(false);
     setMenuOpen(false);
+  };
+
+  const handleBackFromProject = () => {
+    if (previousSessionId && sessions.some((s) => s.id === previousSessionId)) {
+      handleSelectSession(previousSessionId);
+    } else if (typeof window !== "undefined" && window.history.length > 1) {
+      window.history.back();
+    } else {
+      setSelectedProjectId(null);
+      const fallbackSession = sessions.find((s) => s.projectId === selectedProjectId);
+      if (fallbackSession) {
+        handleSelectSession(fallbackSession.id);
+      }
+    }
   };
 
   const markSessionViewed = useCallback((id: string) => {
@@ -1707,6 +1725,8 @@ export default function HomePage() {
                 menuOpen={projectMenuOpen}
                 menuRef={projectMenuRef}
                 onSetMenuOpen={setProjectMenuOpen}
+                onBack={handleBackFromProject}
+                previousSessionId={previousSessionId}
                 onOpenFileBrowser={() => {
                   setFileBrowserTargetPath(undefined);
                   setFileBrowserOpen(true);
