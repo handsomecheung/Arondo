@@ -263,14 +263,15 @@ export function getAgyQuotaGroupForModel(model?: string): AgyQuotaGroup | undefi
 export async function selectAgent(
   runnerAgentBinaries: string[],
   writeLog?: (text: string) => void | Promise<void>,
+  preferredAgentType?: ConcreteAgentType,
 ): Promise<ResolvedAgent | null> {
-  const logParts = ["# autoagent", `Time: ${new Date().toISOString()}`, "## Input", JSON.stringify({ runnerAgentBinaries }, null, 2)];
+  const logParts = ["# autoagent", `Time: ${new Date().toISOString()}`, "## Input", JSON.stringify({ runnerAgentBinaries, preferredAgentType }, null, 2)];
   const log = (text: string, stdout = true) => {
     if (stdout) console.log(text);
     logParts.push(text);
   };
   try {
-    const selected = await selectAgentFromQuota(runnerAgentBinaries, log);
+    const selected = await selectAgentFromQuota(runnerAgentBinaries, log, preferredAgentType);
     logParts.push("## Quota selection", JSON.stringify(selected, null, 2));
     return selected;
   } finally {
@@ -281,6 +282,7 @@ export async function selectAgent(
 async function selectAgentFromQuota(
   runnerAgentBinaries: string[],
   log: (text: string, stdout?: boolean) => void,
+  preferredAgentType?: ConcreteAgentType,
 ): Promise<ResolvedAgent | null> {
   const agentModels = await getAgentModelsConfig();
   const hasAgy = runnerAgentBinaries.includes("agy");
@@ -392,8 +394,14 @@ async function selectAgentFromQuota(
 
   if (knownQuotaChoices.length === 0) {
     const fallbackChoices = unknownQuotaChoices.length > 0 ? unknownQuotaChoices : apiKeyChoices;
-    log(`[autoagent] No known quota scores. Falling back to ${unknownQuotaChoices.length > 0 ? "unknown" : "API Key"} choices: [${fallbackChoices.map((c) => c.id).join(", ")}]`);
-    const fallback = fallbackChoices[0];
+    const prioritizedFallback = preferredAgentType
+      ? [
+        ...fallbackChoices.filter((c) => c.agentType === preferredAgentType),
+        ...fallbackChoices.filter((c) => c.agentType !== preferredAgentType),
+      ]
+      : fallbackChoices;
+    log(`[autoagent] No known quota scores. Falling back to ${unknownQuotaChoices.length > 0 ? "unknown" : "API Key"} choices: [${prioritizedFallback.map((c) => c.id).join(", ")}]`);
+    const fallback = prioritizedFallback[0];
     return {
       agentType: fallback.agentType,
       model: fallback.model,
@@ -446,10 +454,19 @@ async function selectAgentFromQuota(
   // Sort active choices by score descending
   scoredChoices.sort((a, b) => b.score - a.score);
 
-  const candidateAgents = [
+  let candidateAgents = [
     ...scoredChoices.map((sc) => sc.choice),
     ...excludedChoices,
   ];
+
+  if (preferredAgentType) {
+    const sameAgentCandidates = candidateAgents.filter((c) => c.agentType === preferredAgentType);
+    const otherAgentCandidates = candidateAgents.filter((c) => c.agentType !== preferredAgentType);
+    if (sameAgentCandidates.length > 0) {
+      candidateAgents = [...sameAgentCandidates, ...otherAgentCandidates];
+      log(`[autoagent] Prioritized choices within current agent ${preferredAgentType}: [${sameAgentCandidates.map((c) => c.id).join(", ")}]`);
+    }
+  }
 
   log(`[autoagent] Final Candidate Order: [${candidateAgents.map((c) => c.id).join(", ")}]`);
 

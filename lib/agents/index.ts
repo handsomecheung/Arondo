@@ -98,7 +98,7 @@ export async function resolveAgentType(
       model: defaultModel,
     };
   }
-  const resolved = await selectAgent(runnerAgentBinaries, options.autoagentLog);
+  const resolved = await selectAgent(runnerAgentBinaries, options.autoagentLog, options.lockedAgent?.agentType);
   const lockedGroup = options.lockedAgent?.agyQuotaGroup ?? getAgyQuotaGroupForModel(options.lockedAgent?.model);
   const useLockedAgent = options.lockedAgent && !await isAgentQuotaExhausted(options.lockedAgent.agentType, lockedGroup);
   const selected = options.lockedAgent && useLockedAgent

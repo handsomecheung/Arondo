@@ -120,6 +120,31 @@ test('releases an exhausted agy group lock and logs the replacement', async () =
   expect(logs.join('')).toContain('"source": "quota"');
 });
 
+test('prioritizes alternative groups within the same agent over switching to another agent', async () => {
+  // When 'other' group in antigravity is exhausted, but 'gemini' group still has quota (e.g. 0.4),
+  // and another agent like codex has higher quota (e.g. 0.9),
+  // it should still prefer antigravity (gemini group) to avoid cross-agent switching cost.
+  await writeQuota({
+    agy: {
+      Type: 'antigravity',
+      GeminiWeeklyRemain: 0.4,
+      OtherWeeklyRemain: 0.02, // exhausted
+      ArgonWeeklyRemain: 0.01, // exhausted
+    },
+    codex: {
+      Type: 'codex',
+      FiveHourRemain: 1,
+      WeeklyRemain: 0.9,
+    },
+  });
+
+  const logs: string[] = [];
+  await expect(resolveAgentType('auto', ['agy', 'codex'], {
+    lockedAgent: { agentType: 'antigravity', agyQuotaGroup: 'other', model: 'Claude Sonnet 5.5 (Medium)' },
+    autoagentLog: (text) => { logs.push(text); },
+  })).resolves.toMatchObject({ agentType: 'antigravity', agyQuotaGroup: 'gemini' });
+});
+
 test('quota recovery uses the latest record rather than older available quota', async () => {
   await writeQuota({
     old: { Type: 'codex', FiveHourRemain: 1, WeeklyRemain: 1, updatedAt: 1 },
