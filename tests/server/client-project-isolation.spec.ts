@@ -195,4 +195,31 @@ test.describe('Client project isolation tests', () => {
     expect(projectsAAfterArchive.some((p: any) => p.id === sessionA.projectId)).toBe(true);
     expect(projectsAAfterArchive.some((p: any) => p.id === sessionB.projectId)).toBe(false);
   });
+
+  test('admin sees projects referenced by other clients\' sessions, even after archive', async ({ request }) => {
+    // The admin token is allowed on the runner and GET /api/sessions shows
+    // User B's session to admin, so the project behind that session must also
+    // be visible to admin. Otherwise the sidebar renders no project tag and
+    // "Go to Project" stays disabled for a session the admin can open.
+    // Regular (non-admin) clients must remain isolated (see the test above).
+    const res = await request.get('/api/projects', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+    });
+    expect(res.status()).toBe(200);
+    const projects = await res.json();
+    expect(projects.some((p: any) => p.id === sessionBProjectId)).toBe(true);
+
+    // Admin should keep seeing the project after User B's session is archived.
+    const archiveRes = await request.post(`/api/sessions/${sessionBId}/archive`, {
+      headers: { 'x-arondo-token': userBToken },
+    });
+    expect(archiveRes.status()).toBe(200);
+
+    const projectsAfterArchiveRes = await request.get('/api/projects', {
+      headers: { 'x-arondo-token': 'test-token-123456' },
+    });
+    expect(projectsAfterArchiveRes.status()).toBe(200);
+    const projectsAfterArchive = await projectsAfterArchiveRes.json();
+    expect(projectsAfterArchive.some((p: any) => p.id === sessionBProjectId)).toBe(true);
+  });
 });

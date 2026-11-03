@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getProjects, deleteProject, getTempDirProjectRetentionHours, isTempDirProject, getShowTempDirSessions, getSessions, getArchivedSessions } from "@/lib/store";
 import { runnerManager } from "@/lib/runner-manager";
-import { getArondoToken, isValidToken, getUuidByToken } from "@/lib/auth";
+import { getArondoToken, isValidToken, getUuidByToken, getRoleByToken } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
   const token = getArondoToken(request);
@@ -9,9 +9,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  // Admin is not subject to the per-client project isolation filter, so it
+  // can reach every project behind the sessions it can see (sessions are
+  // filtered by runner allowance only, and admins are always allowed).
+  const isAdmin = getRoleByToken(token) === "admin";
+
   const clientUuid = getUuidByToken(token);
   const clientProjectIds = new Set<string>();
-  if (clientUuid) {
+  if (!isAdmin && clientUuid) {
     const [activeSessions, archivedSessions] = await Promise.all([
       getSessions(),
       getArchivedSessions(),
@@ -60,7 +65,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (!clientProjectIds.has(project.id)) {
+    // Admin bypasses the per-client project filter (already skipped above
+    // when collecting clientProjectIds, but keep the guard explicit here).
+    if (!isAdmin && !clientProjectIds.has(project.id)) {
       continue;
     }
 
