@@ -12,9 +12,6 @@ import {
   getMessages,
   getRunningSessionScriptRuns,
   writeOnceCache,
-  getProject,
-  getShowTempDirSessions,
-  isTempDirProject,
 } from "./store";
 import {
   getAgySessionId,
@@ -143,11 +140,7 @@ class RunnerManager {
     const session = await getSession(sessionId);
     if (!session) return true;
     if (session.automation) return getShowAutomationSessions();
-
-    const project = session.projectId ? await getProject(session.projectId) : undefined;
-    if (!session.tempDir && (!project || !isTempDirProject(project))) return true;
-
-    return getShowTempDirSessions();
+    return true;
   }
 
   async sendSessionNotification(

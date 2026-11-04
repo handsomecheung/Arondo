@@ -1,6 +1,6 @@
 import { getShowAutomationSessions } from "@/lib/automation";
 import { NextRequest, NextResponse } from "next/server";
-import { getProjects, getSessions, getPendingTodoMessages, isTempDirProject, getShowTempDirSessions } from "@/lib/store";
+import { getProjects, getSessions, getPendingTodoMessages } from "@/lib/store";
 import { getArondoToken, isValidToken } from "@/lib/auth";
 import { runnerManager } from "@/lib/runner-manager";
 
@@ -16,7 +16,6 @@ export async function GET(request: NextRequest) {
   const sessions = await getSessions();
   const projects = await getProjects();
   const projectsById = new Map(projects.map((project) => [project.id, project]));
-  const showTempDirSessions = await getShowTempDirSessions();
   const showAutomationSessions = await getShowAutomationSessions();
   const items = [];
   for (const session of sessions) {
@@ -24,7 +23,6 @@ export async function GET(request: NextRequest) {
     if (!session.pendingTodoMessageIds || session.pendingTodoMessageIds.length === 0) continue;
     const project = session.projectId ? projectsById.get(session.projectId) : undefined;
     if (session.projectId && !project) continue;
-    if (!showTempDirSessions && project && isTempDirProject(project)) continue;
     const isAllowed = await runnerManager.isTokenAllowedForRunnerId(session.runnerId, token);
     if (!isAllowed) continue;
 

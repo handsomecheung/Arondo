@@ -1,6 +1,6 @@
 import { getShowAutomationSessions } from "@/lib/automation";
 import { NextRequest, NextResponse } from "next/server";
-import { getArchivedSessions, getMessages, getProjects, getSessions, getShowTempDirSessions, isTempDirProject, sessionExecutionLogsContain } from "@/lib/store";
+import { getArchivedSessions, getMessages, getProjects, getSessions, sessionExecutionLogsContain } from "@/lib/store";
 import { getArondoToken, isValidToken } from "@/lib/auth";
 import { runnerManager } from "@/lib/runner-manager";
 
@@ -20,11 +20,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: `q must be at most ${MAX_QUERY_LENGTH} characters` }, { status: 400 });
   }
 
-  const [activeSessions, archivedSessions, projects, showTempDirSessions] = await Promise.all([
+  const [activeSessions, archivedSessions, projects] = await Promise.all([
     getSessions(),
     getArchivedSessions(),
     getProjects(),
-    getShowTempDirSessions(),
   ]);
   const projectsById = new Map(projects.map((project) => [project.id, project]));
   const showAutomationSessions = await getShowAutomationSessions();
@@ -34,7 +33,7 @@ export async function GET(request: NextRequest) {
   await Promise.all([...activeSessions, ...archivedSessions].map(async (session) => {
     if (session.automation && !showAutomationSessions) return;
     const project = session.projectId ? projectsById.get(session.projectId) : undefined;
-    if ((session.projectId && !project) || (!showTempDirSessions && project && isTempDirProject(project))) {
+    if (session.projectId && !project) {
       return;
     }
     if (!(await runnerManager.isTokenAllowedForRunnerId(session.runnerId, token))) {

@@ -60,7 +60,7 @@ func parseDecideArgs(argv []string, config cliConfig) (arguments, error) {
 		server:       server,
 		token:        token,
 		agentType:    "decision",
-		tempDir:      true,
+		automation:   true,
 		once:         true,
 		pollInterval: 1,
 		timeout:      60,

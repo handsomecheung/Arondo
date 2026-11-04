@@ -434,7 +434,7 @@ export async function dispatchCreateSession(
   repoPath: string,
   agentType: string,
   prompt: string,
-  opts: { id?: string; name?: string; tokenUuid?: string; displayMessage?: string; tempDir?: boolean; noProject?: boolean; automation?: boolean; once?: boolean; cache?: "on" | "off"; files?: MessageFile[]; model?: string } = {},
+  opts: { id?: string; name?: string; tokenUuid?: string; displayMessage?: string; noProject?: boolean; automation?: boolean; once?: boolean; cache?: "on" | "off"; files?: MessageFile[]; model?: string } = {},
 ): Promise<ActionResult> {
   const taskStartedAt = Date.now();
   const trimmedPrompt = prompt.trim();
@@ -457,7 +457,7 @@ export async function dispatchCreateSession(
         tokenUuid: opts.tokenUuid,
         once: opts.once ? true : undefined,
         cache: "on",
-      }, { tempDir: opts.tempDir, noProject: opts.noProject, automation: opts.automation });
+      }, { noProject: opts.noProject, automation: opts.automation });
 
       await updateSession(session.id, { status: "done" });
 
@@ -529,7 +529,7 @@ export async function dispatchCreateSession(
       tokenUuid: opts.tokenUuid,
       once: opts.once ? true : undefined,
       cache: opts.cache === "on" ? "on" : undefined,
-    }, { tempDir: opts.tempDir, noProject: opts.noProject, automation: opts.automation });
+    }, { noProject: opts.noProject, automation: opts.automation });
 
     const userMessage = await addMessage({
       sessionId: session.id,
@@ -609,7 +609,7 @@ export async function dispatchCreateSession(
       autoLockedAgentEffort: resolved.effort ?? undefined,
       autoLockedAgyQuotaGroup: resolved.agyQuotaGroup,
     } : {}),
-  }, { tempDir: opts.tempDir, noProject: opts.noProject, automation: opts.automation });
+  }, { noProject: opts.noProject, automation: opts.automation });
 
   const userMessage = await addMessage({
     sessionId: session.id,

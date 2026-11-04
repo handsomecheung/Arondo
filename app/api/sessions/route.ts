@@ -2,7 +2,7 @@ import { getShowAutomationSessions } from "@/lib/automation";
 import path from "path";
 import os from "os";
 import { NextRequest, NextResponse } from "next/server";
-import { getSessions, getProjects, deleteSession, archiveSession, createSession, addTodoMessage, getSession, isSessionArchived, getSessionArchiveAgeMs, isTempDirProject, getShowTempDirSessions, type MessageFile } from "@/lib/store";
+import { getSessions, getProjects, deleteSession, archiveSession, createSession, addTodoMessage, getSession, isSessionArchived, getSessionArchiveAgeMs, getAutomationSessionRetentionHours, type MessageFile } from "@/lib/store";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken, getUuidByToken } from "@/lib/auth";
@@ -33,15 +33,31 @@ export async function GET(request: NextRequest) {
   const projects = await getProjects();
   const projectsById = new Map(projects.map((p) => [p.id, p]));
   const sessionArchiveAgeMs = await getSessionArchiveAgeMs();
-  const showTempDirSessions = await getShowTempDirSessions();
+  const automationSessionRetentionHours = await getAutomationSessionRetentionHours();
+  const automationSessionMaxAgeMs = automationSessionRetentionHours * 60 * 60 * 1000;
   const showAutomationSessions = await getShowAutomationSessions();
 
   const valid: typeof sessions = [];
   for (const session of sessions) {
-    if (session.automation && !showAutomationSessions) continue;
     const isAllowed = await runnerManager.isTokenAllowedForRunnerId(session.runnerId, token);
     if (!isAllowed) {
       continue;
+    }
+
+    const isActive = session.status === "running" || session.status === "script-running";
+    if (session.automation) {
+      const age = Math.max(
+        Date.now() - new Date(session.createdAt).getTime(),
+        Date.now() - new Date(session.updatedAt).getTime(),
+      );
+      if (!isActive && age > automationSessionMaxAgeMs) {
+        console.log(`[sessions] automation session ${session.id} older than ${automationSessionRetentionHours} hours, deleting`);
+        runnerManager.removeTasksForSession(session.id);
+        await deleteSession(session.id);
+        eventBus.publish({ type: "session_deleted", payload: { id: session.id } });
+        continue;
+      }
+      if (!showAutomationSessions) continue;
     }
 
     const project = session.projectId ? projectsById.get(session.projectId) : undefined;
@@ -53,13 +69,8 @@ export async function GET(request: NextRequest) {
       continue;
     }
 
-    if (!showTempDirSessions && (session.tempDir || (project && isTempDirProject(project)))) {
-      continue;
-    }
-
-    const isActive = session.status === "running" || session.status === "script-running";
     const isStale = Date.now() - new Date(session.updatedAt).getTime() > sessionArchiveAgeMs;
-    if (!isActive && isStale && session.archivedManually !== false && !session.pinnedAt) {
+    if (!session.automation && !isActive && isStale && session.archivedManually !== false && !session.pinnedAt) {
       console.log(`[sessions] session ${session.id} last updated over ${sessionArchiveAgeMs / (24 * 60 * 60 * 1000)} days ago, archiving`);
       await archiveSession(session.id);
       runnerManager.removeCompletedTasksForSession(session.id);
@@ -93,7 +104,7 @@ export async function POST(req: NextRequest) {
     prompt: string;
     message?: string;
     repoPath?: string;
-    tempDir?: boolean;
+    tempDir?: unknown;
     noProject?: boolean;
     automation?: boolean;
     once?: boolean;
@@ -116,16 +127,20 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  if (tempDir !== undefined) {
+    return NextResponse.json({ error: "tempDir is no longer supported; use automation instead" }, { status: 400 });
+  }
+
   if (automation !== undefined && typeof automation !== "boolean") {
     return NextResponse.json({ error: "automation must be a boolean" }, { status: 400 });
   }
-  if (automation && (tempDir || noProjectInput || repoPathInput)) {
-    return NextResponse.json({ error: "automation cannot be used with tempDir, noProject, or repoPath" }, { status: 400 });
+  if (automation && (noProjectInput || repoPathInput)) {
+    return NextResponse.json({ error: "automation cannot be used with noProject or repoPath" }, { status: 400 });
   }
   const noProject = automation || noProjectInput;
 
-  if (once && !tempDir && !automation) {
-    return NextResponse.json({ error: "once can only be used when tempDir or automation is set" }, { status: 400 });
+  if (once && !automation) {
+    return NextResponse.json({ error: "once can only be used when automation is set" }, { status: 400 });
   }
 
   if (cache !== undefined && cache !== "off") {
@@ -143,19 +158,16 @@ export async function POST(req: NextRequest) {
 
   const isBlank = !prompt || !prompt.trim();
 
-  if (tempDir && noProject) {
-    return NextResponse.json({ error: "tempDir and noProject cannot be used together" }, { status: 400 });
+  if (noProject && repoPathInput) {
+    return NextResponse.json({ error: "repoPath must not be provided when noProject is set" }, { status: 400 });
   }
-  if ((tempDir || noProject) && repoPathInput) {
-    return NextResponse.json({ error: "repoPath must not be provided when tempDir or noProject is set" }, { status: 400 });
-  }
-  if (!tempDir && !noProject && !repoPathInput) {
+  if (!noProject && !repoPathInput) {
     return NextResponse.json({ error: "repoPath is required" }, { status: 400 });
   }
 
   let runnerId = runnerIdInput;
   if (!runnerId) {
-    if (!tempDir && !noProject && agentType !== "decision") {
+    if (!noProject && agentType !== "decision") {
       return NextResponse.json({ error: "runnerId is required" }, { status: 400 });
     }
     if (agentType !== "decision") {
@@ -179,19 +191,15 @@ export async function POST(req: NextRequest) {
   }
 
   let repoPath = repoPathInput as string;
-  if (tempDir || noProject) {
+  if (noProject) {
     if (agentType === "decision") {
       repoPath = os.tmpdir();
     } else {
       try {
-        const sessions = await getSessions();
-        const busyPaths = sessions
-          .filter((s) => s.runnerId === runnerId && (s.status === "running" || s.status === "script-running") && s.repoPath)
-          .map((s) => s.repoPath);
         const result = await runnerManager.sendRequest(
           runnerId!,
           "fs.mkdtemp",
-          automation ? { purpose: "automation-session" } : noProject ? { purpose: "no-project-session" } : { excludePaths: busyPaths },
+          automation ? { purpose: "automation-session" } : { purpose: "no-project-session" },
         );
         repoPath = result.path;
       } catch (error: any) {
@@ -218,7 +226,7 @@ export async function POST(req: NextRequest) {
       tokenUuid: getUuidByToken(token) || undefined,
       once: once ? true : undefined,
       cache: cache === "on" ? "on" : undefined,
-    }, { tempDir, noProject, automation });
+    }, { noProject, automation });
     eventBus.publish({ type: "session_updated", payload: session });
     return NextResponse.json(session, { status: 201 });
   }
@@ -237,7 +245,7 @@ export async function POST(req: NextRequest) {
       tokenUuid: getUuidByToken(token) || undefined,
       once: once ? true : undefined,
       cache: cache === "on" ? "on" : undefined,
-    }, { tempDir, noProject, automation });
+    }, { noProject, automation });
     const todoMessage = await addTodoMessage(session.id, {
       content: trimmedMessage,
       prompt: trimmedPrompt,
@@ -266,7 +274,6 @@ export async function POST(req: NextRequest) {
     name,
     tokenUuid: getUuidByToken(token) || undefined,
     displayMessage,
-    tempDir,
     automation,
     noProject,
     once,

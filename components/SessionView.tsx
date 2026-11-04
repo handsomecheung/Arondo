@@ -256,11 +256,6 @@ export default function SessionView({
   const sessionProjectExists = selectedSession?.projectId
     ? projects.some((p) => p.id === selectedSession.projectId)
     : true;
-  const isTempDirSession = Boolean(
-    selectedSession?.tempDir ||
-    selectedSession?.once ||
-    (selectedSession?.projectId && projects.find((p) => p.id === selectedSession.projectId)?.tempDir)
-  );
   const isNoPathSession = Boolean(selectedSession?.noProject);
   const isOnceSession = Boolean(selectedSession?.once);
   const hasPendingTodo = messages.some(
@@ -598,13 +593,6 @@ export default function SessionView({
                   style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 1 }}
                 >
                   Standalone Workspace
-                </span>
-              ) : isTempDirSession ? (
-                <span
-                  title="This session runs in an isolated temporary directory workspace"
-                  style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 1 }}
-                >
-                  Temporary Workspace
                 </span>
               ) : (
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 1 }}>

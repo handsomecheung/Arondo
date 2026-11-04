@@ -14,9 +14,12 @@ const ARONDO_CONFIG_FILE = path.join(CONFIG_DIR, "arondo.json");
 const DEFAULT_SESSION_ARCHIVE_DAYS = 7;
 const SESSION_ARCHIVE_DAYS_DEFAULT =
   Number(process.env.ARONDO_SESSION_ARCHIVE_DAYS_DEFAULT) || DEFAULT_SESSION_ARCHIVE_DAYS;
-const DEFAULT_TEMP_DIR_PROJECT_RETENTION_HOURS = 72;
-const TEMP_DIR_PROJECT_RETENTION_HOURS_DEFAULT =
-  Number(process.env.ARONDO_TEMP_DIR_PROJECT_RETENTION_HOURS_DEFAULT) || DEFAULT_TEMP_DIR_PROJECT_RETENTION_HOURS;
+const DEFAULT_AUTOMATION_SESSION_RETENTION_HOURS = 72;
+const parsedAutomationRetentionDefault = Number(process.env.ARONDO_AUTOMATION_SESSION_RETENTION_HOURS_DEFAULT);
+const AUTOMATION_SESSION_RETENTION_HOURS_DEFAULT =
+  Number.isFinite(parsedAutomationRetentionDefault) && parsedAutomationRetentionDefault > 0
+    ? parsedAutomationRetentionDefault
+    : DEFAULT_AUTOMATION_SESSION_RETENTION_HOURS;
 
 const FILE_SHOW_HIDDEN_DEFAULT = process.env.ARONDO_FILE_SHOW_HIDDEN_DEFAULT !== "false";
 
@@ -44,9 +47,8 @@ import type { LlmApiKeyName } from "./llm/config";
 
 export interface AppSettings {
   sessionArchiveDays?: number;
-  tempDirProjectRetentionHours?: number;
+  automationSessionRetentionHours?: number;
   showHiddenFiles?: boolean;
-  showTempDirSessions?: boolean;
   showAutomationSessions?: boolean;
   enableAutomodel?: boolean;
   llmApiKeys?: Partial<Record<LlmApiKeyName, string>>;
@@ -75,9 +77,6 @@ export interface Project {
   runnerId: string;
   createdAt: string;
   updatedAt: string;
-  // Set when the project's repoPath was generated via the session-creation
-  // "tempDir" option. Kept out of normal project/session/task lists.
-  tempDir?: boolean;
 }
 
 export interface Session {
@@ -118,14 +117,12 @@ export interface Session {
   autoLockedAgyQuotaGroup?: "gemini" | "other" | "argon";
   model?: string;
   tokenUuid?: string;
-  // Set to true if the session only allows a single message (tempDir or automation).
+  // Set to true if the session only allows a single message (automation).
   once?: boolean;
   cache?: "on" | "off";
-  // Set when the session was created without a Project. Its repoPath is a
-  // dedicated runner-side temporary directory, not a tempDir workspace.
+  // Set when the session was created without a Project.
   noProject?: boolean;
   automation?: boolean;
-  tempDir?: boolean;
   // Native Jev answers retained for machine consumers of decision sessions.
   decisionAnswers?: Record<string, unknown>;
 }
@@ -372,11 +369,7 @@ export async function getArchivedSessionPaths(): Promise<string[]> {
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
 
-export function isTempDirProject(project: Pick<Project, "tempDir">): boolean {
-  return project.tempDir === true;
-}
-
-export async function getOrCreateProject(repoPath: string, runnerId: string, opts: { tempDir?: boolean } = {}): Promise<Project> {
+export async function getOrCreateProject(repoPath: string, runnerId: string): Promise<Project> {
   await ensureDir(PROJECTS_DIR);
 
   const resolvedRepoPath = path.resolve(repoPath);
@@ -407,7 +400,6 @@ export async function getOrCreateProject(repoPath: string, runnerId: string, opt
     runnerId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    ...(opts.tempDir ? { tempDir: true } : {}),
   };
 
   await writeJson(getProjectFilePath(projectId), project);
@@ -465,7 +457,7 @@ export async function recordScriptHistory(projectId: string, command: string): P
 
 export async function createSession(
   data: Omit<Session, "id" | "projectId" | "createdAt" | "updatedAt"> & { id?: string },
-  opts: { tempDir?: boolean; noProject?: boolean; automation?: boolean } = {}
+  opts: { noProject?: boolean; automation?: boolean } = {}
 ): Promise<Session> {
   const id = data.id || crypto.randomUUID();
   const filePath = getSessionFilePath(id);
@@ -474,14 +466,13 @@ export async function createSession(
   }
   const project = opts.noProject || opts.automation
     ? undefined
-    : await getOrCreateProject(data.repoPath, data.runnerId, { tempDir: opts.tempDir });
+    : await getOrCreateProject(data.repoPath, data.runnerId);
   const sessionData = { ...data } as typeof data & { runningScripts?: string[] };
   delete sessionData.runningScripts;
   const session: Session = {
     ...sessionData,
     id,
     ...(project ? { projectId: project.id } : {}),
-    ...(opts.tempDir ? { tempDir: true } : {}),
     ...(opts.noProject || opts.automation ? { noProject: true } : {}),
     ...(opts.automation ? { automation: true } : {}),
     createdAt: new Date().toISOString(),
@@ -518,7 +509,6 @@ export async function updateSession(
       repoPath: persistentSession.repoPath,
       projectId: persistentSession.projectId,
       runnerId: persistentSession.runnerId,
-      tempDir: persistentSession.tempDir,
       automation: persistentSession.automation,
       noProject: persistentSession.noProject,
       updatedAt,
@@ -1048,19 +1038,16 @@ export async function getSessionArchiveDays(): Promise<number> {
   return settings.sessionArchiveDays || SESSION_ARCHIVE_DAYS_DEFAULT;
 }
 
-export async function getTempDirProjectRetentionHours(): Promise<number> {
+export async function getAutomationSessionRetentionHours(): Promise<number> {
   const settings = await getAppSettings();
-  return settings.tempDirProjectRetentionHours || TEMP_DIR_PROJECT_RETENTION_HOURS_DEFAULT;
+  return typeof settings.automationSessionRetentionHours === "number" && settings.automationSessionRetentionHours > 0
+    ? settings.automationSessionRetentionHours
+    : AUTOMATION_SESSION_RETENTION_HOURS_DEFAULT;
 }
 
 export async function getShowHiddenFiles(): Promise<boolean> {
   const settings = await getAppSettings();
   return settings.showHiddenFiles !== undefined ? settings.showHiddenFiles : FILE_SHOW_HIDDEN_DEFAULT;
-}
-
-export async function getShowTempDirSessions(): Promise<boolean> {
-  const settings = await getAppSettings();
-  return settings.showTempDirSessions !== undefined ? settings.showTempDirSessions : false;
 }
 
 export async function getEnableAutomodel(): Promise<boolean> {

@@ -6,7 +6,7 @@ import path from 'path';
 // chat input must be disabled and must explain why in its placeholder.
 const EXPECTED_PLACEHOLDER = 'This is a single-use session. Chat is disabled.';
 
-function renderChatInput(scenario: 'temp-dir-once' | 'no-path-once') {
+function renderChatInput(scenario: 'automation-once' | 'no-path-once') {
   const scriptPath = path.resolve(__dirname, 'helpers/renderOnceSessionInputHelper.ts');
   const output = execFileSync('npx', ['tsx', scriptPath, scenario], {
     cwd: path.resolve(__dirname, '..'),
@@ -20,8 +20,8 @@ function renderChatInput(scenario: 'temp-dir-once' | 'no-path-once') {
 }
 
 test.describe('Once session chat input', () => {
-  test('--temp-dir --once: chat input is disabled with a single-use reason', () => {
-    const result = renderChatInput('temp-dir-once');
+  test('--automation --once: chat input is disabled with a single-use reason', () => {
+    const result = renderChatInput('automation-once');
     expect(result.found).toBe(true);
     expect(result.disabled).toBe(true);
     expect(result.placeholder).toBe(EXPECTED_PLACEHOLDER);

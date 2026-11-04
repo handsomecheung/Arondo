@@ -52,7 +52,7 @@ func TestConversationMessagesExcludesDetachedAgentAndTodoMessages(t *testing.T) 
 }
 
 func TestParseArgsOutputHtml(t *testing.T) {
-	args, err := parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--temp-dir", "--output", "html", "Do work"}, cliConfig{})
+	args, err := parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--automation", "--output", "html", "Do work"}, cliConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestParseArgsOutputHtml(t *testing.T) {
 		t.Fatalf("expected output html, got %q", args.output)
 	}
 
-	_, err = parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--temp-dir", "--output", "invalid", "Do work"}, cliConfig{})
+	_, err = parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--automation", "--output", "invalid", "Do work"}, cliConfig{})
 	if err == nil || err.Error() != "--output must be plain, json, or html" {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -90,11 +90,11 @@ func TestRenderedHTML(t *testing.T) {
 }
 
 func TestParseArgs(t *testing.T) {
-	args, err := parseArgs([]string{"--server=https://arondo.example/", "--client-token", "secret", "--temp-dir", "--agent", "codex", "--confirmation", "auto", "--poll-interval=0.5", "--timeout", "12", "Do work"}, cliConfig{})
+	args, err := parseArgs([]string{"--server=https://arondo.example/", "--client-token", "secret", "--automation", "--agent", "codex", "--confirmation", "auto", "--poll-interval=0.5", "--timeout", "12", "Do work"}, cliConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if args.server != "https://arondo.example/" || args.token != "secret" || !args.tempDir || args.agentType != "codex" || args.confirmation != "auto" || args.pollInterval != 0.5 || args.timeout != 12 || args.prompt != "Do work" {
+	if args.server != "https://arondo.example/" || args.token != "secret" || !args.automation || args.agentType != "codex" || args.confirmation != "auto" || args.pollInterval != 0.5 || args.timeout != 12 || args.prompt != "Do work" {
 		t.Fatalf("unexpected arguments: %#v", args)
 	}
 }
@@ -110,43 +110,38 @@ func TestParseArgsNoProject(t *testing.T) {
 }
 
 func TestParseArgsRejectsInvalidCombinations(t *testing.T) {
-	_, err := parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--resume", "--temp-dir", "message"}, cliConfig{})
-	if err == nil || err.Error() != "--resume cannot be used with --temp-dir" {
+	_, err := parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--resume", "--no-path", "message"}, cliConfig{})
+	if err == nil || err.Error() != "--resume cannot be used with --no-path" {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, err = parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--session-id", "s1", "--temp-dir", "message"}, cliConfig{})
-	if err == nil || err.Error() != "--session-id cannot be used with --temp-dir" {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	_, err = parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--temp-dir", "--no-path", "message"}, cliConfig{})
-	if err == nil || err.Error() != "--temp-dir cannot be used with --no-path" {
+	_, err = parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--session-id", "s1", "--no-path", "message"}, cliConfig{})
+	if err == nil || err.Error() != "--session-id cannot be used with --no-path" {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	_, err = parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--once", "message"}, cliConfig{})
-	if err == nil || err.Error() != "--once can only be used with --temp-dir or --automation" {
+	if err == nil || err.Error() != "--once can only be used with --automation" {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	_, err = parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--session-id", "s1", "--once", "message"}, cliConfig{})
-	if err == nil || err.Error() != "--once can only be used with --temp-dir or --automation" {
+	if err == nil || err.Error() != "--once can only be used with --automation" {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestParseArgsOnce(t *testing.T) {
-	args, err := parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--temp-dir", "--once", "Do work"}, cliConfig{})
+	args, err := parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--automation", "--once", "Do work"}, cliConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !args.tempDir || !args.once {
-		t.Fatalf("expected tempDir and once to be true, got tempDir=%v once=%v", args.tempDir, args.once)
+	if !args.automation || !args.once {
+		t.Fatalf("expected automation and once to be true, got automation=%v once=%v", args.automation, args.once)
 	}
 
 	// Test with --cache on
-	argsCache, err := parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--temp-dir", "--once", "--cache", "on", "Do work"}, cliConfig{})
+	argsCache, err := parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--automation", "--once", "--cache", "on", "Do work"}, cliConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,13 +150,13 @@ func TestParseArgsOnce(t *testing.T) {
 	}
 
 	// Test rejecting --cache without --once
-	_, err = parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--temp-dir", "--cache", "on", "Do work"}, cliConfig{})
+	_, err = parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--automation", "--cache", "on", "Do work"}, cliConfig{})
 	if err == nil || err.Error() != "--cache can only be used with --once" {
 		t.Fatalf("unexpected error for --cache without --once: %v", err)
 	}
 
 	// Test rejecting invalid --cache value
-	_, err = parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--temp-dir", "--once", "--cache", "invalid", "Do work"}, cliConfig{})
+	_, err = parseArgs([]string{"--server", "http://localhost", "--client-token", "secret", "--automation", "--once", "--cache", "invalid", "Do work"}, cliConfig{})
 	if err == nil || err.Error() != "--cache must be on or off" {
 		t.Fatalf("unexpected error for invalid --cache: %v", err)
 	}
@@ -848,10 +843,10 @@ func TestCreateSessionSendsOncePayload(t *testing.T) {
 
 	c := &client{server: server.URL, token: "token", http: server.Client()}
 	args := arguments{
-		prompt:    "Test single shot prompt",
-		tempDir:   true,
-		once:      true,
-		agentType: "auto",
+		prompt:     "Test single shot prompt",
+		automation: true,
+		once:       true,
+		agentType:  "auto",
 	}
 
 	session, err := c.createSession(args, false)
@@ -864,8 +859,8 @@ func TestCreateSessionSendsOncePayload(t *testing.T) {
 	if capturedPayload["once"] != true {
 		t.Fatalf("expected payload once=true, got %#v", capturedPayload["once"])
 	}
-	if capturedPayload["tempDir"] != true {
-		t.Fatalf("expected payload tempDir=true, got %#v", capturedPayload["tempDir"])
+	if capturedPayload["automation"] != true {
+		t.Fatalf("expected payload automation=true, got %#v", capturedPayload["automation"])
 	}
 
 	args.cache = "on"

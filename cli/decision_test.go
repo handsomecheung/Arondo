@@ -45,8 +45,8 @@ func TestParseDecideArgs(t *testing.T) {
 	if args.agentType != "decision" {
 		t.Fatalf("expected agentType 'decision', got %q", args.agentType)
 	}
-	if !args.tempDir {
-		t.Fatalf("expected tempDir to be true")
+	if !args.automation {
+		t.Fatalf("expected automation to be true")
 	}
 	if !args.once {
 		t.Fatalf("expected once to be true")

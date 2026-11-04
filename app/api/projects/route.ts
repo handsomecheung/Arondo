@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProjects, deleteProject, getTempDirProjectRetentionHours, isTempDirProject, getShowTempDirSessions, getSessions, getArchivedSessions } from "@/lib/store";
+import { getProjects, deleteProject, getSessions, getArchivedSessions } from "@/lib/store";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken, getUuidByToken, getRoleByToken } from "@/lib/auth";
 
@@ -36,9 +36,6 @@ export async function GET(request: NextRequest) {
   const projects = await getProjects();
   const knownRunners = await runnerManager.getAllKnownRunners();
   const runnerIds = new Set(knownRunners.map((r) => r.id));
-  const showTempDirSessions = await getShowTempDirSessions();
-  const tempDirProjectRetentionHours = await getTempDirProjectRetentionHours();
-  const tempDirProjectMaxAgeMs = tempDirProjectRetentionHours * 60 * 60 * 1000;
 
   const candidates: typeof projects = [];
   for (const project of projects) {
@@ -51,18 +48,6 @@ export async function GET(request: NextRequest) {
       console.log(`[projects] runner ${project.runnerId} for project ${project.id} no longer exists, deleting project`);
       await deleteProject(project.id);
       continue;
-    }
-
-    if (isTempDirProject(project)) {
-      const age = Date.now() - new Date(project.createdAt).getTime();
-      if (age > tempDirProjectMaxAgeMs) {
-        console.log(`[projects] temp dir project ${project.id} older than ${tempDirProjectRetentionHours} hours, deleting`);
-        await deleteProject(project.id);
-        continue;
-      }
-      if (!showTempDirSessions) {
-        continue;
-      }
     }
 
     // Admin bypasses the per-client project filter (already skipped above

@@ -292,13 +292,13 @@ test.describe('Decision Mode integration tests', () => {
     }
   });
 
-  test('POST /api/sessions creates tempDir + once decision session hidden from GET /api/sessions by default', async ({ request }) => {
+  test('POST /api/sessions creates automation + once decision session hidden from GET /api/sessions by default', async ({ request }) => {
     process.env.TYPESAFE_API_KEY = 'test-key';
     const res = await request.post('/api/sessions', {
       headers: { 'x-arondo-token': 'test-token-123456' },
       data: {
         agentType: 'decision',
-        tempDir: true,
+        automation: true,
         once: true,
         prompt: JSON.stringify({
           questions: {
@@ -310,7 +310,7 @@ test.describe('Decision Mode integration tests', () => {
     expect(res.status()).toBe(201);
     const session = await res.json();
     expect(session.once).toBe(true);
-    expect(session.tempDir).toBe(true);
+    expect(session.automation).toBe(true);
     expect(session.agentType).toBe('decision');
 
     // Verify it does NOT appear in GET /api/sessions by default (Web UI session list)

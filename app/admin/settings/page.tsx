@@ -225,14 +225,12 @@ export default function AdminSettingsPage() {
 
   const [sessionArchiveDays, setSessionArchiveDays] = useState<number | "">("");
   const sessionArchiveDaysAutoSaveReady = useRef(false);
-  const [tempDirProjectRetentionHours, setTempDirProjectRetentionHours] = useState<number | "">("");
-  const tempDirProjectRetentionHoursAutoSaveReady = useRef(false);
+  const [automationSessionRetentionHours, setAutomationSessionRetentionHours] = useState<number | "">("");
+  const automationSessionRetentionHoursAutoSaveReady = useRef(false);
   const [serverVersion, setServerVersion] = useState<string>("");
 
   const [showHiddenFiles, setShowHiddenFiles] = useState(true);
   const [savingShowHiddenFiles, setSavingShowHiddenFiles] = useState(false);
-  const [showTempDirSessions, setShowTempDirSessions] = useState(false);
-  const [savingShowTempDirSessions, setSavingShowTempDirSessions] = useState(false);
   const [enableAutomodel, setEnableAutomodel] = useState(false);
   const [savingEnableAutomodel, setSavingEnableAutomodel] = useState(false);
   const [llmApiKeys, setLlmApiKeys] = useState<Record<LlmApiKeyName, string>>(EMPTY_LLM_KEYS);
@@ -272,9 +270,8 @@ export default function AdminSettingsPage() {
       .then((r) => r.json())
       .then((data: {
         sessionArchiveDays: number;
-        tempDirProjectRetentionHours: number;
+        automationSessionRetentionHours: number;
         showHiddenFiles?: boolean;
-        showTempDirSessions?: boolean;
         enableAutomodel?: boolean;
         version?: string;
         llmApiKeys?: Record<LlmApiKeyName, AutoModelApiKeyStatus>;
@@ -282,12 +279,9 @@ export default function AdminSettingsPage() {
         webPushContactEmail?: string;
       }) => {
         setSessionArchiveDays(data.sessionArchiveDays);
-        setTempDirProjectRetentionHours(data.tempDirProjectRetentionHours);
+        setAutomationSessionRetentionHours(data.automationSessionRetentionHours);
         if (data.showHiddenFiles !== undefined) {
           setShowHiddenFiles(data.showHiddenFiles);
-        }
-        if (data.showTempDirSessions !== undefined) {
-          setShowTempDirSessions(data.showTempDirSessions);
         }
         if (data.enableAutomodel !== undefined) {
           setEnableAutomodel(data.enableAutomodel);
@@ -499,18 +493,18 @@ export default function AdminSettingsPage() {
     }
   }, []);
 
-  const saveTempDirProjectRetentionHours = useCallback(async (hours: number) => {
+  const saveAutomationSessionRetentionHours = useCallback(async (hours: number) => {
     try {
       const res = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tempDirProjectRetentionHours: hours }),
+        body: JSON.stringify({ automationSessionRetentionHours: hours }),
       });
       if (!res.ok) {
-        alert("Failed to save temporary project retention hours");
+        alert("Failed to save automation session retention hours");
       }
     } catch (err) {
-      console.error("Failed to save temporary project retention hours:", err);
+      console.error("Failed to save automation session retention hours:", err);
     }
   }, []);
 
@@ -532,27 +526,6 @@ export default function AdminSettingsPage() {
       setShowHiddenFiles(!checked);
     } finally {
       setSavingShowHiddenFiles(false);
-    }
-  }, []);
-
-  const handleToggleShowTempDirSessions = useCallback(async (checked: boolean) => {
-    setShowTempDirSessions(checked);
-    setSavingShowTempDirSessions(true);
-    try {
-      const res = await fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ showTempDirSessions: checked }),
-      });
-      if (!res.ok) {
-        setShowTempDirSessions(!checked);
-        alert("Failed to save temporary sessions and projects setting");
-      }
-    } catch (err) {
-      console.error("Failed to save temporary sessions and projects setting:", err);
-      setShowTempDirSessions(!checked);
-    } finally {
-      setSavingShowTempDirSessions(false);
     }
   }, []);
 
@@ -698,19 +671,19 @@ export default function AdminSettingsPage() {
   }, [sessionArchiveDays, saveSessionArchiveDays]);
 
   useEffect(() => {
-    if (tempDirProjectRetentionHours === "" || tempDirProjectRetentionHours < 1) return;
+    if (automationSessionRetentionHours === "" || automationSessionRetentionHours <= 0) return;
 
-    if (!tempDirProjectRetentionHoursAutoSaveReady.current) {
-      tempDirProjectRetentionHoursAutoSaveReady.current = true;
+    if (!automationSessionRetentionHoursAutoSaveReady.current) {
+      automationSessionRetentionHoursAutoSaveReady.current = true;
       return;
     }
 
     const timeout = window.setTimeout(() => {
-      saveTempDirProjectRetentionHours(tempDirProjectRetentionHours);
+      saveAutomationSessionRetentionHours(automationSessionRetentionHours);
     }, 500);
 
     return () => window.clearTimeout(timeout);
-  }, [tempDirProjectRetentionHours, saveTempDirProjectRetentionHours]);
+  }, [automationSessionRetentionHours, saveAutomationSessionRetentionHours]);
 
   useEffect(() => {
     fetch("/api/auth/verify")
@@ -976,15 +949,16 @@ export default function AdminSettingsPage() {
                   marginBottom: 12,
                 }}
               >
-                Number of hours temporary sessions and projects are retained before cleanup.
+                Number of hours automation sessions are retained before cleanup.
               </p>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
                 <input
                   type="number"
-                  min={1}
-                  value={tempDirProjectRetentionHours}
+                  min={0.01}
+                  step="any"
+                  value={automationSessionRetentionHours}
                   onChange={(e) =>
-                    setTempDirProjectRetentionHours(e.target.value === "" ? "" : Number(e.target.value))
+                    setAutomationSessionRetentionHours(e.target.value === "" ? "" : Number(e.target.value))
                   }
                   style={{
                     width: 100,
@@ -998,25 +972,6 @@ export default function AdminSettingsPage() {
                   }}
                 />
               </div>
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  fontSize: 13,
-                  color: "var(--text-primary)",
-                  cursor: savingShowTempDirSessions ? "default" : "pointer",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={showTempDirSessions}
-                  disabled={savingShowTempDirSessions}
-                  onChange={(e) => handleToggleShowTempDirSessions(e.target.checked)}
-                  style={{ cursor: savingShowTempDirSessions ? "default" : "pointer" }}
-                />
-                <span>Show temporary sessions and projects</span>
-              </label>
               <AutomationSessionSetting />
             </div>
 

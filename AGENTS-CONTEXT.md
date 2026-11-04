@@ -55,7 +55,7 @@ runner/                  # Go runner binary
   protocol.go           # Message envelope struct (id, type, method, payload), constructors
   handler.go            # Request dispatcher by method string, response helpers, runner.shutdown
   handler_exec.go       # exec.agent, exec.script, exec.cancel, exec.restart (all PTY-based)
-  handler_fs.go         # fs.list: directory listing; fs.mkdtemp: create a runner-side temp dir (used by automation session creation with tempDir)
+  handler_fs.go         # fs.list: directory listing; fs.mkdtemp: create a runner-side workspace for automation or standalone sessions
   handler_git.go        # git.status, git.diff
   handler_pty.go        # pty.input (write to PTY), pty.resize
   pty.go                # TaskManager: spawn processes with PTY, scrollback buffer, auto-cleanup on exit
@@ -84,7 +84,7 @@ app/
     settings/
       route.ts          # GET/POST: retrieve and update global app settings (e.g., sessionArchiveDays, automodel API keys)
     sessions/
-      route.ts          # POST: create session & run agent via runner (supports "tempDir" to generate a runner-side temp dir via fs.mkdtemp, with random runner selection when omitted; default agentType is "auto"); GET: list active sessions
+      route.ts          # POST: create session & run agent via runner (supports "automation" and "noProject" to generate a runner-side workspace via fs.mkdtemp, with random runner selection when omitted; default agentType is "auto"); GET: list active sessions
       archived/
         route.ts        # GET: list archived sessions
       [id]/
@@ -134,11 +134,11 @@ app/
       info/
         route.ts        # GET: fetch quota status for agents on all runners
     tasks/
-      route.ts        # GET: list all tasks (active + retained, excluding tasks belonging to temp-dir projects or archived sessions)
+      route.ts        # GET: list all tasks (active + retained, excluding tasks belonging to hidden automation sessions or archived sessions)
       kill/
         route.ts        # POST: kill a running task by sessionId + messageId
     todo-messages/
-      route.ts          # GET: flat list of every session's pending todo messages (read-time join, excluding those belonging to temp-dir projects; backs the Tasks dashboard "Upcoming" section)
+      route.ts          # GET: flat list of every session's pending todo messages (read-time join, excluding those belonging to hidden automation sessions; backs the Tasks dashboard "Upcoming" section)
     messages/route.ts   # GET: list messages for a session
     fs/route.ts         # GET: browse directories on a runner
     fs/infos/route.ts   # POST: batch check path existence and git diff status on the runner (used for markdown file link verification and inline diff triggering)
@@ -283,7 +283,7 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 | `fs.read` | S→R request | Read file content (supports offset/length chunked reads) |
 | `fs.upload` | S→R request | Upload base64 file to a temporary directory on the runner |
 | `fs.infos` | S→R request | Batch check path existence and git diff status |
-| `fs.mkdtemp` | S→R request | Create a temporary directory on the runner (used by the automation API's `tempDir` session creation option) |
+| `fs.mkdtemp` | S→R request | Create a workspace directory on the runner (used by `automation` and `noProject` session creation) |
 | `git.status` | S→R request | Run `git status --porcelain` |
 | `git.diff` | S→R request | Run `git diff HEAD` |
 | `rules.sync` | S→R request | Write global agent rules block into `~/.gemini/GEMINI.md` and `~/.claude/CLAUDE.md` |
@@ -322,7 +322,7 @@ Uses the `process` singleton pattern (shared across tsx and Turbopack contexts).
 cd cli && go build -o arondo-cli . && cd ..  # Build the Go CLI
 ```
 
-The CLI reads connection settings in this order: command flags (`--server`, `--client-token`), then `ARONDO_SERVER` / `ARONDO_CLIENT_TOKEN`, then `cli.server` / `cli.clientToken` in `~/.arondo/arondo.json`. `send --automation` creates a project-free session marked `automation: true`, hidden by default via `showAutomationSessions`, with a dedicated Runner-side workspace under its configuration directory’s `automation-workspaces/` (UTC datetime + random suffix). Workspaces persist until manually removed; decision agents do not allocate a workspace. `--temp-dir` retains its legacy behavior with a stderr deprecation warning. `send` creates or resumes sessions and waits for completion (`--once` restricts `--automation` or `--temp-dir` sessions to a single message, and `--cache on` caches output by prompt hash for seven days). `decide` executes fast categorical decisions using Jev System One without spawning an agent. `get-sessions` lists active sessions, `get-projects` lists accessible projects, `get-agents` reports Antigravity, Claude, Codex, and OpenCode availability per runner, `get-quota` prints recorded quota data, and `update-quota` queues an asynchronous quota refresh via `/api/agents/quota`.
+The CLI reads connection settings in this order: command flags (`--server`, `--client-token`), then `ARONDO_SERVER` / `ARONDO_CLIENT_TOKEN`, then `cli.server` / `cli.clientToken` in `~/.arondo/arondo.json`. `send --automation` creates a project-free session marked `automation: true`, hidden by default via `showAutomationSessions`, with a dedicated Runner-side workspace under its configuration directory’s `automation-workspaces/` (UTC datetime + random suffix). Workspaces persist until manually removed; decision agents do not allocate a workspace. `send` creates or resumes sessions and waits for completion (`--once` restricts `--automation` sessions to a single message, and `--cache on` caches output by prompt hash for seven days). `decide` executes fast categorical decisions using Jev System One without spawning an agent. `get-sessions` lists active sessions, `get-projects` lists accessible projects, `get-agents` reports Antigravity, Claude, Codex, and OpenCode availability per runner, `get-quota` prints recorded quota data, and `update-quota` queues an asynchronous quota refresh via `/api/agents/quota`.
 
 Agent Command resolution also runs on the server for CLI/API inputs: `POST /api/sessions` expands `prompt` when no separate display `message` is supplied; the session messages and todo-messages endpoints expand `message` when no explicit `prompt` is supplied. Project definitions override default custom commands, which override built-ins. Original commands remain as display messages, while expanded prompts are stored for immediate or queued execution.
 
@@ -372,8 +372,9 @@ The application enforces token-based authentication on all API routes and WebSoc
     ],
     "setitngs": {
       "sessionArchiveDays": 7,
+      "automationSessionRetentionHours": 72,
       "showHiddenFiles": true,
-      "showTempDirSessions": false,
+      "showAutomationSessions": false,
       "enableAutomodel": false,
       "llmApiKeys": {
         "ANTHROPIC_API_KEY": "...",
@@ -424,7 +425,7 @@ The application enforces token-based authentication on all API routes and WebSoc
 ## Core Logging & Session Lifecycle Features
 - **Message-specific execution logs**: Every agent or script execution creates a specific system message (e.g., `Executing command...`). The resulting terminal outputs are streamed via the runner and stored in `~/.arondo/sessions/[sessionId]/logs/[systemMsgId].log`. Agent runs that use piped stdout/stderr also write stderr to `~/.arondo/sessions/[sessionId]/logs/[systemMsgId].stderr.log`.
 - **Interactive Terminal (PTY) & Mobile Keyboard Bar**: Script execution uses Go's `creack/pty` on the runner for full pseudo-terminal support (stdin, ANSI colors, cursor control). The frontend renders output via `xterm.js` (`components/Terminal.tsx`) in two modes: live (WebSocket-connected for running scripts, with historical log pre-loaded) and history (loads saved log data for completed scripts). It includes a mobile-specific special-keys bar (`components/TerminalKeyboardBar.tsx`) containing ESC/TAB/CTRL/ALT, arrow keys, and an FN layer (F1-F12), dynamically positioning itself above the mobile software keyboard to prevent obstruction.
-- **Task Queue & Log Popup**: Tasks are tracked in a global header queue grouped by session, with session names always visible. Completed tasks are retained for 3 days. Clicking any task switches to its session and opens the log modal. Each running task has a kill button that sends SIGTERM via the runner, and stopped/completed retained tasks can be deleted from their three-dot menu (the delete button only shows for project-scoped tasks, since session-scoped tasks are cleaned up with their session). In the Tasks dashboard, users can toggle to display only non-completed tasks (active/running/stopped) and view execution logs inline. Archiving a session (manual or auto-archive-on-idle) removes its completed tasks from the in-memory task map so they stop showing up in the queue; `GET /api/tasks` also filters out any task whose session is archived as a safety net. Tasks and todo messages belonging to temp-dir projects are also filtered out from the active queue and Tasks dashboard.
+- **Task Queue & Log Popup**: Tasks are tracked in a global header queue grouped by session, with session names always visible. Completed tasks are retained for 3 days. Clicking any task switches to its session and opens the log modal. Each running task has a kill button that sends SIGTERM via the runner, and stopped/completed retained tasks can be deleted from their three-dot menu (the delete button only shows for project-scoped tasks, since session-scoped tasks are cleaned up with their session). In the Tasks dashboard, users can toggle to display only non-completed tasks (active/running/stopped) and view execution logs inline. Archiving a session (manual or auto-archive-on-idle) removes its completed tasks from the in-memory task map so they stop showing up in the queue; `GET /api/tasks` also filters out any task whose session is archived as a safety net. Tasks and todo messages belonging to automation sessions are also filtered out from the active queue and Tasks dashboard by default.
 - **User-stopped vs Failed distinction**: When a task is killed via the UI, `TaskContext.stoppedByUser` is set, producing a 🛑 "Stopped by user" completion message and `errorMessage` instead of an ❌ error. The terminal shows a “─── stopped by user ───” separator.
 - **Dedicated Execution Cards, Rich Markdown & Inline Logs**: Unified `ExecCard` is split into `ScriptExecCard` (using `xterm.js` for interactive output, and supporting inline log streaming for quick-run commands) and `AgentExecCard` (rendering outputs in Markdown with syntax highlighting and clickable file/URL links). Chat cards support rendering user messages with distinct token-based colors and sender avatars. Clicking verified file paths opens them in the Remote File Browser. If a file has git modifications, a diff button is displayed next to the path to trigger an inline visual diff viewer modal. Card rendering performance is optimized by caching generated HTML to the backend on the first render. Users can toggle between Markdown and raw text views. On entering a session, the chat area automatically scrolls to the latest message instantly, while normal updates use smooth scrolling. Because execution cards load content asynchronously and grow, a ResizeObserver and MutationObserver monitor the card elements for 2 seconds after session entry to keep the viewport pinned to the bottom.
 - **Restart/Retry actions**: `ScriptExecCard` shows a Restart button for script tasks (calls `restart-script` API → `exec.restart` on the runner) and `AgentExecCard` shows a Retry button for failed agent tasks (calls `rerun-agent` API). The terminal/view shows a “─── restarting ───” separator inline in the existing log.

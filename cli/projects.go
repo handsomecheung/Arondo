@@ -64,7 +64,6 @@ type project struct {
 	ID        string `json:"id"`
 	RunnerID  string `json:"runnerId"`
 	RepoPath  string `json:"repoPath"`
-	TempDir   bool   `json:"tempDir"`
 	CreatedAt string `json:"createdAt"`
 	UpdatedAt string `json:"updatedAt"`
 }
@@ -74,13 +73,7 @@ func (c *client) listProjects() ([]project, error) {
 	if err := c.request(http.MethodGet, "/api/projects", nil, &projects); err != nil {
 		return nil, err
 	}
-	filtered := projects[:0]
-	for _, p := range projects {
-		if !p.TempDir {
-			filtered = append(filtered, p)
-		}
-	}
-	return filtered, nil
+	return projects, nil
 }
 
 func getProjects(c *client, args getProjectsArguments) error {

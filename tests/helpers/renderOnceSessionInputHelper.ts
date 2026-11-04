@@ -4,8 +4,8 @@ import SessionView from '../../components/SessionView';
 import type { Session, Runner } from '../../types/home';
 import { AGENT_COMMANDS } from '../../lib/agentCommands';
 
-// Usage: tsx renderOnceSessionInputHelper.ts <temp-dir-once | no-path-once>
-const scenario = process.argv[2] || 'temp-dir-once';
+// Usage: tsx renderOnceSessionInputHelper.ts <automation-once | no-path-once>
+const scenario = process.argv[2] || 'automation-once';
 
 const runner: Runner = {
   id: 'runner-1',
@@ -30,7 +30,7 @@ const base: Session = {
 const session: Session =
   scenario === 'no-path-once'
     ? { ...base, noProject: true, once: true }
-    : { ...base, tempDir: true, once: true };
+    : { ...base, automation: true, noProject: true, once: true };
 
 const noop = () => {};
 const props = {

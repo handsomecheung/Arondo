@@ -90,7 +90,6 @@ interface Project {
   runnerId: string;
   createdAt: string;
   updatedAt: string;
-  tempDir?: boolean;
 }
 
 interface Session {
@@ -127,7 +126,6 @@ export default function RunnersPage() {
   const [disconnectingRunnerId, setDisconnectingRunnerId] = useState<string | null>(null);
   const [lastQuotaRefreshAt, setLastQuotaRefreshAt] = useState<Record<string, number>>({});
   const [quotaRefreshNotice, setQuotaRefreshNotice] = useState<Record<string, string>>({});
-  const [showTempDirSessions, setShowTempDirSessions] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     message: string;
     onConfirm: () => void;
@@ -151,15 +149,6 @@ export default function RunnersPage() {
       .then((r) => r.json())
       .then((data) => {
         if (data.valid) setUserRole(data.role);
-      })
-      .catch(console.error);
-
-    fetch("/api/settings")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.showTempDirSessions !== undefined) {
-          setShowTempDirSessions(data.showTempDirSessions);
-        }
       })
       .catch(console.error);
 
@@ -430,7 +419,7 @@ export default function RunnersPage() {
                   const hasAgentInfo = Array.isArray(r.agents);
                   const isSelected = selectedRunnerId === r.id;
                   const rProjects = projects.filter(
-                    (p) => p.runnerId === r.id && (showTempDirSessions || !p.tempDir),
+                    (p) => p.runnerId === r.id,
                   );
                   return (
                     <div key={r.id} style={{ display: "flex", flexDirection: "column", gap: 0 }}>

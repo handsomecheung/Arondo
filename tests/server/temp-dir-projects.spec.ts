@@ -5,29 +5,22 @@ import os from 'os';
 import path from 'path';
 import crypto from 'crypto';
 import { readOnceCache, writeOnceCache } from '../../lib/store';
+import migrateTempDirRecords from '../../migration/2026-11-04-retire-temp-dir.mjs';
 
 const CONFIG_DIR = process.env.ARONDO_CONFIG_DIR || path.join(os.tmpdir(), 'arondo-test-config');
 
-test.describe('Temp dir project task visibility', () => {
+test.describe('Retired tempDir migration and single-use automation sessions', () => {
   let runnerProcess: ChildProcess;
   let runnerId: string;
 
   test.beforeAll(async ({ request }) => {
     const runnerBinary = path.resolve(__dirname, '../../runner/arondo-runner');
 
-    console.log('[temp-dir-projects-test] Spawning Go runner process...');
     runnerProcess = spawn(runnerBinary, [
       '--server', 'ws://localhost:3252/runner',
       '--token', 'test-runner-token-temp-dir'
     ], {
       stdio: 'pipe',
-    });
-
-    runnerProcess.stdout?.on('data', (data) => {
-      console.log(`[temp-dir-projects-runner stdout] ${data.toString().trim()}`);
-    });
-    runnerProcess.stderr?.on('data', (data) => {
-      console.error(`[temp-dir-projects-runner stderr] ${data.toString().trim()}`);
     });
 
     const maxRetries = 20;
@@ -47,24 +40,21 @@ test.describe('Temp dir project task visibility', () => {
     }
 
     if (!runnerId) {
-      throw new Error('Failed to register runner for temp-dir project visibility tests');
+      throw new Error('Failed to register runner for single-use automation session tests');
     }
-    console.log(`[temp-dir-projects-test] Registered runner ID: ${runnerId}`);
   });
 
   test.afterAll(async () => {
     if (runnerProcess) {
-      console.log('[temp-dir-projects-test] Stopping Go runner process...');
       runnerProcess.kill('SIGTERM');
       await new Promise<void>((resolve) => {
         runnerProcess.on('exit', () => resolve());
       });
-      console.log('[temp-dir-projects-test] Go runner stopped.');
     }
   });
 
-  test('stores tempDir project metadata and hides project and session listings', async ({ request }) => {
-    const createRes = await request.post('/api/sessions', {
+  test('rejects retired tempDir option on POST /api/sessions', async ({ request }) => {
+    const res = await request.post('/api/sessions', {
       headers: { 'x-arondo-token': 'test-token-123456' },
       data: {
         prompt: '',
@@ -72,126 +62,154 @@ test.describe('Temp dir project task visibility', () => {
         runnerId,
       }
     });
-    expect(createRes.status()).toBe(201);
-    const session = await createRes.json();
-    expect(session.id).toBeDefined();
-    expect(session.projectId).toBeDefined();
-
-    const projectRaw = await fs.readFile(path.join(CONFIG_DIR, 'projects', session.projectId, 'project.json'), 'utf-8');
-    const project = JSON.parse(projectRaw);
-    expect(project.tempDir).toBe(true);
-
-    const projectsRes = await request.get('/api/projects', {
-      headers: { 'x-arondo-token': 'test-token-123456' }
-    });
-    expect(projectsRes.status()).toBe(200);
-    const projects = await projectsRes.json();
-    expect(projects.find((p: any) => p.id === session.projectId)).toBeUndefined();
-
-    const sessionsRes = await request.get('/api/sessions', {
-      headers: { 'x-arondo-token': 'test-token-123456' }
-    });
-    expect(sessionsRes.status()).toBe(200);
-    const sessions = await sessionsRes.json();
-    expect(sessions.find((s: any) => s.id === session.id)).toBeUndefined();
-
-    const archiveRes = await request.post(`/api/sessions/${session.id}/archive`, {
-      headers: { 'x-arondo-token': 'test-token-123456' }
-    });
-    expect(archiveRes.status()).toBe(200);
-
-    const archivedRes = await request.get('/api/sessions/archived', {
-      headers: { 'x-arondo-token': 'test-token-123456' }
-    });
-    expect(archivedRes.status()).toBe(200);
-    const archived = await archivedRes.json();
-    expect(archived.find((s: any) => s.id === session.id)).toBeUndefined();
-
-    const archivedExistsRes = await request.get('/api/sessions/archived/exists', {
-      headers: { 'x-arondo-token': 'test-token-123456' }
-    });
-    expect(archivedExistsRes.status()).toBe(200);
-    expect(await archivedExistsRes.json()).toEqual({ exists: false });
+    expect(res.status()).toBe(400);
+    expect((await res.json()).error).toBe('tempDir is no longer supported; use automation instead');
   });
 
-  test('hides temp-dir project agent tasks from /api/tasks', async ({ request }) => {
+  test('migrates existing Project.tempDir and Session.tempDir records while preserving workspaces and history', async () => {
+    const tempConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arondo-migrate-tempdir-'));
+    const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arondo-preserved-workspace-'));
+    try {
+      await fs.writeFile(path.join(workspaceDir, 'keep.txt'), 'workspace data', 'utf-8');
+
+      const projectDir = path.join(tempConfigDir, 'projects', 'legacy-temp-proj');
+      await fs.mkdir(projectDir, { recursive: true });
+      await fs.writeFile(
+        path.join(projectDir, 'project.json'),
+        JSON.stringify({
+          id: 'legacy-temp-proj',
+          repoPath: workspaceDir,
+          runnerId: 'runner-1',
+          tempDir: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }),
+        'utf-8',
+      );
+
+      const activeSessionDir = path.join(tempConfigDir, 'sessions', 'legacy-sess-1');
+      await fs.mkdir(activeSessionDir, { recursive: true });
+      await fs.writeFile(
+        path.join(activeSessionDir, 'session.json'),
+        JSON.stringify({
+          id: 'legacy-sess-1',
+          status: 'done',
+          agentType: 'claude',
+          repoPath: workspaceDir,
+          projectId: 'legacy-temp-proj',
+          runnerId: 'runner-1',
+          tempDir: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }),
+        'utf-8',
+      );
+      await fs.writeFile(
+        path.join(activeSessionDir, 'messages.json'),
+        JSON.stringify([{ id: 'msg-1', sessionId: 'legacy-sess-1', role: 'user', content: 'hello', createdAt: new Date().toISOString() }]),
+        'utf-8',
+      );
+
+      const archivedSessionDir = path.join(tempConfigDir, 'archived', 'sessions', 'legacy-sess-2');
+      await fs.mkdir(archivedSessionDir, { recursive: true });
+      await fs.writeFile(
+        path.join(archivedSessionDir, 'session.json'),
+        JSON.stringify({
+          id: 'legacy-sess-2',
+          status: 'done',
+          agentType: 'claude',
+          repoPath: workspaceDir,
+          projectId: 'legacy-temp-proj',
+          runnerId: 'runner-1',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }),
+        'utf-8',
+      );
+
+      await fs.writeFile(
+        path.join(tempConfigDir, 'arondo.json'),
+        JSON.stringify({
+          setitngs: {
+            showTempDirSessions: true,
+            tempDirProjectRetentionHours: 48,
+          },
+        }),
+        'utf-8',
+      );
+
+      await migrateTempDirRecords({ configDir: tempConfigDir });
+
+      await expect(fs.stat(projectDir)).rejects.toThrow();
+      expect(await fs.readFile(path.join(workspaceDir, 'keep.txt'), 'utf-8')).toBe('workspace data');
+
+      const migratedActive = JSON.parse(await fs.readFile(path.join(activeSessionDir, 'session.json'), 'utf-8'));
+      expect(migratedActive.automation).toBe(true);
+      expect(migratedActive.noProject).toBe(true);
+      expect(migratedActive.tempDir).toBeUndefined();
+      expect(migratedActive.projectId).toBeUndefined();
+      expect(migratedActive.repoPath).toBe(workspaceDir);
+
+      const preservedMessages = JSON.parse(await fs.readFile(path.join(activeSessionDir, 'messages.json'), 'utf-8'));
+      expect(preservedMessages).toHaveLength(1);
+      expect(preservedMessages[0].content).toBe('hello');
+
+      const migratedArchived = JSON.parse(await fs.readFile(path.join(archivedSessionDir, 'session.json'), 'utf-8'));
+      expect(migratedArchived.automation).toBe(true);
+      expect(migratedArchived.noProject).toBe(true);
+      expect(migratedArchived.tempDir).toBeUndefined();
+      expect(migratedArchived.projectId).toBeUndefined();
+
+      const migratedConfig = JSON.parse(await fs.readFile(path.join(tempConfigDir, 'arondo.json'), 'utf-8'));
+      expect(migratedConfig.setitngs.showAutomationSessions).toBe(true);
+      expect(migratedConfig.setitngs.automationSessionRetentionHours).toBe(48);
+      expect(migratedConfig.setitngs.showTempDirSessions).toBeUndefined();
+      expect(migratedConfig.setitngs.tempDirProjectRetentionHours).toBeUndefined();
+    } finally {
+      await fs.rm(tempConfigDir, { recursive: true, force: true });
+      await fs.rm(workspaceDir, { recursive: true, force: true });
+    }
+  });
+
+  test('cleans up automation sessions older than automationSessionRetentionHours while preserving workspaces', async ({ request }) => {
+    const headers = { 'x-arondo-token': 'test-token-123456' };
+    await request.post('/api/settings', {
+      headers,
+      data: { automationSessionRetentionHours: 2 },
+    });
+
     const createRes = await request.post('/api/sessions', {
-      headers: { 'x-arondo-token': 'test-token-123456' },
+      headers,
       data: {
-        prompt: 'echo temp dir task',
-        tempDir: true,
+        prompt: '',
+        automation: true,
         runnerId,
-        force: true,
-      }
+      },
     });
     expect(createRes.status()).toBe(201);
     const session = await createRes.json();
-    expect(session.id).toBeDefined();
-    expect(session.projectId).toBeDefined();
 
-    const tasksRes = await request.get('/api/tasks', {
-      headers: { 'x-arondo-token': 'test-token-123456' }
-    });
-    expect(tasksRes.status()).toBe(200);
-    const tasks = await tasksRes.json();
-    expect(tasks.find((task: any) => task.sessionId === session.id)).toBeUndefined();
-  });
+    const sessionFile = path.join(CONFIG_DIR, 'sessions', session.id, 'session.json');
+    const saved = JSON.parse(await fs.readFile(sessionFile, 'utf-8'));
+    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+    saved.createdAt = threeHoursAgo;
+    saved.updatedAt = threeHoursAgo;
+    await fs.writeFile(sessionFile, JSON.stringify(saved, null, 2), 'utf-8');
 
-  test('hides temp-dir project todo messages from /api/todo-messages', async ({ request }) => {
-    const createRes = await request.post('/api/sessions', {
-      headers: { 'x-arondo-token': 'test-token-123456' },
-      data: {
-        prompt: 'draft temp dir todo',
-        message: 'draft temp dir todo',
-        tempDir: true,
-        runnerId,
-        isDraft: true,
-      }
-    });
-    expect(createRes.status()).toBe(201);
-    const session = await createRes.json();
-    expect(session.id).toBeDefined();
-    expect(session.projectId).toBeDefined();
+    const listRes = await request.get('/api/sessions', { headers });
+    expect(listRes.status()).toBe(200);
 
-    const todoRes = await request.get('/api/todo-messages', {
-      headers: { 'x-arondo-token': 'test-token-123456' }
-    });
-    expect(todoRes.status()).toBe(200);
-    const todos = await todoRes.json();
-    expect(todos.find((todo: any) => todo.sessionId === session.id)).toBeUndefined();
-  });
+    await expect(fs.stat(sessionFile)).rejects.toThrow();
+    expect((await fs.stat(session.repoPath)).isDirectory()).toBe(true);
 
-  test('does not reuse temp dir while session in it is running', async ({ request }) => {
-    const createRes1 = await request.post('/api/sessions', {
-      headers: { 'x-arondo-token': 'test-token-123456' },
-      data: {
-        prompt: 'running temp dir 1',
-        tempDir: true,
-        runnerId,
-        force: true,
-      }
+    await request.post('/api/settings', {
+      headers,
+      data: { automationSessionRetentionHours: 72 },
     });
-    expect(createRes1.status()).toBe(201);
-    const session1 = await createRes1.json();
-    expect(session1.repoPath).toBeDefined();
-
-    const createRes2 = await request.post('/api/sessions', {
-      headers: { 'x-arondo-token': 'test-token-123456' },
-      data: {
-        prompt: 'running temp dir 2',
-        tempDir: true,
-        runnerId,
-        force: true,
-      }
-    });
-    expect(createRes2.status()).toBe(201);
-    const session2 = await createRes2.json();
-    expect(session2.repoPath).toBeDefined();
-    expect(session2.repoPath).not.toBe(session1.repoPath);
   });
 
   test('validates once option and rejects sending subsequent messages', async ({ request }) => {
-    // 1. Should reject once without tempDir
+    // 1. Should reject once without automation
     const invalidRes = await request.post('/api/sessions', {
       headers: { 'x-arondo-token': 'test-token-123456' },
       data: {
@@ -203,14 +221,14 @@ test.describe('Temp dir project task visibility', () => {
     });
     expect(invalidRes.status()).toBe(400);
     const invalidJson = await invalidRes.json();
-    expect(invalidJson.error).toBe('once can only be used when tempDir or automation is set');
+    expect(invalidJson.error).toBe('once can only be used when automation is set');
 
-    // 2. Create session with tempDir and once
+    // 2. Create session with automation and once
     const createRes = await request.post('/api/sessions', {
       headers: { 'x-arondo-token': 'test-token-123456' },
       data: {
         prompt: '',
-        tempDir: true,
+        automation: true,
         runnerId,
         once: true,
       }
@@ -219,6 +237,7 @@ test.describe('Temp dir project task visibility', () => {
     const session = await createRes.json();
     expect(session.id).toBeDefined();
     expect(session.once).toBe(true);
+    expect(session.automation).toBe(true);
 
     // 3. Reject follow-up message
     const msgRes = await request.post(`/api/sessions/${session.id}/messages`, {
@@ -261,7 +280,7 @@ test.describe('Temp dir project task visibility', () => {
       headers: { 'x-arondo-token': 'test-token-123456' },
       data: {
         prompt: 'test prompt',
-        tempDir: true,
+        automation: true,
         runnerId,
         cache: 'on',
       }
@@ -274,7 +293,7 @@ test.describe('Temp dir project task visibility', () => {
       headers: { 'x-arondo-token': 'test-token-123456' },
       data: {
         prompt: 'test prompt',
-        tempDir: true,
+        automation: true,
         runnerId,
         once: true,
         cache: 'maybe',
@@ -300,7 +319,7 @@ test.describe('Temp dir project task visibility', () => {
       headers: { 'x-arondo-token': 'test-token-123456' },
       data: {
         prompt,
-        tempDir: true,
+        automation: true,
         runnerId,
         once: true,
         cache: 'on',
@@ -370,7 +389,7 @@ test.describe('Temp dir project task visibility', () => {
       headers: { 'x-arondo-token': 'test-token-123456' },
       data: {
         prompt,
-        tempDir: true,
+        automation: true,
         runnerId,
         once: true,
         cache: 'on',

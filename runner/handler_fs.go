@@ -323,8 +323,7 @@ func (h *Handler) handleFsMkdir(msg *Message) {
 }
 
 type fsMkdtempRequest struct {
-	ExcludePaths []string `json:"excludePaths,omitempty"`
-	Purpose      string   `json:"purpose,omitempty"`
+	Purpose string `json:"purpose,omitempty"`
 }
 
 type fsMkdtempResponse struct {
@@ -334,85 +333,24 @@ type fsMkdtempResponse struct {
 
 func (h *Handler) handleFsMkdtemp(msg *Message) {
 	req, _ := parsePayload[fsMkdtempRequest](msg)
-	if req.Purpose == "automation-session" {
+	switch req.Purpose {
+	case "automation-session":
 		dir, err := createAutomationWorkspace()
 		if err != nil {
 			h.sendError(msg.ID, "INTERNAL", "failed to create automation workspace: "+err.Error())
 			return
 		}
 		h.sendResponse(msg.ID, fsMkdtempResponse{OK: true, Path: dir})
-		return
-	}
-	if req.Purpose == "no-project-session" {
+	case "no-project-session":
 		dir, err := os.MkdirTemp("", "arondo-session-")
 		if err != nil {
 			h.sendError(msg.ID, "INTERNAL", "failed to create session directory: "+err.Error())
 			return
 		}
 		h.sendResponse(msg.ID, fsMkdtempResponse{OK: true, Path: dir})
-		return
+	default:
+		h.sendError(msg.ID, "BAD_REQUEST", "unsupported fs.mkdtemp purpose")
 	}
-
-	excluded := make(map[string]bool)
-	for _, p := range req.ExcludePaths {
-		if p != "" {
-			if abs, err := filepath.Abs(p); err == nil {
-				excluded[filepath.Clean(abs)] = true
-			} else {
-				excluded[filepath.Clean(p)] = true
-			}
-		}
-	}
-	if h.taskManager != nil {
-		for _, p := range h.taskManager.ActiveWorkDirs() {
-			if p != "" {
-				if abs, err := filepath.Abs(p); err == nil {
-					excluded[filepath.Clean(abs)] = true
-				} else {
-					excluded[filepath.Clean(p)] = true
-				}
-			}
-		}
-	}
-
-	// Reuse a temp directory with a fixed prefix if possible.
-	baseTmp := os.TempDir()
-	prefix := "arondo-tempdir-"
-	var dir string
-	for i := 0; ; i++ {
-		candidate := fmt.Sprintf("%s%04d", prefix, i)
-		candidatePath := filepath.Join(baseTmp, candidate)
-		cleanCandidate := filepath.Clean(candidatePath)
-		if abs, err := filepath.Abs(cleanCandidate); err == nil {
-			cleanCandidate = abs
-		}
-
-		if excluded[cleanCandidate] {
-			continue
-		}
-
-		// Try to create the directory.
-		if err := os.Mkdir(candidatePath, 0o755); err == nil {
-			// Successfully created a new empty directory.
-			dir = candidatePath
-			break
-		}
-		// If the directory already exists, check if it's empty.
-		if entries, err := os.ReadDir(candidatePath); err == nil && len(entries) == 0 {
-			dir = candidatePath
-			break
-		}
-		// Otherwise, continue to the next suffix.
-	}
-	if dir == "" {
-		h.sendError(msg.ID, "INTERNAL", "failed to find or create temp dir")
-		return
-	}
-
-	h.sendResponse(msg.ID, fsMkdtempResponse{
-		OK:   true,
-		Path: dir,
-	})
 }
 
 type fsUploadRequest struct {

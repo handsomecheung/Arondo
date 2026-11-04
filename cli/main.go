@@ -21,7 +21,7 @@ Usage:
   cli/arondo-cli send \
     --server http://localhost:3251 \
     --client-token <client_access_token> \
-    --temp-dir \
+    --automation \
     "Print the current date"
 
   cli/arondo-cli send \
@@ -35,10 +35,9 @@ Options:
   --client-token <token>       Client access token (overrides ARONDO_CLIENT_TOKEN and cli.clientToken in arondo.json)
   --runner-id <id>             Target runner ID (default: connected runner with the current hostname)
   --path <path>                Repository path on the runner (default: current working directory)
-  --temp-dir                   Deprecated: create a temporary project (use --automation for new automation calls)
   --automation                 Create a hidden automation session in a dedicated runner workspace
   --no-path                    Create the session in a dedicated temporary directory without a project path
-  --once                       Allow only a single message in the session (requires --automation or --temp-dir)
+  --once                       Allow only a single message in the session (requires --automation)
   --cache <mode>               Cache single-use session results: on or off (default: off, requires --once)
   --session-id <id>            Send the message to an existing session
   --resume                     Resume the most recently updated session for the runner and repository path
@@ -66,7 +65,7 @@ Run cli/arondo-cli <command> --help for command options.`
 type arguments struct {
 	server, token, runnerID, repoPath, sessionID, agentType, prompt, output, confirmation, cache string
 	pollInterval, timeout                                                                        float64
-	tempDir, noProject, automation, resume, once                                                 bool
+	noProject, automation, resume, once                                                          bool
 }
 
 type apiError struct {
@@ -147,9 +146,6 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 		case "--automation":
 			args.automation = true
 			continue
-		case "--temp-dir":
-			args.tempDir = true
-			continue
 		case "--no-path":
 			args.noProject = true
 			continue
@@ -219,28 +215,19 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 	if args.resume && args.sessionID != "" {
 		return arguments{}, errors.New("--resume cannot be used with --session-id")
 	}
-	if args.resume && args.tempDir {
-		return arguments{}, errors.New("--resume cannot be used with --temp-dir")
-	}
 	if args.resume && args.noProject {
 		return arguments{}, errors.New("--resume cannot be used with --no-path")
-	}
-	if args.sessionID != "" && args.tempDir {
-		return arguments{}, errors.New("--session-id cannot be used with --temp-dir")
 	}
 	if args.sessionID != "" && args.noProject {
 		return arguments{}, errors.New("--session-id cannot be used with --no-path")
 	}
-	if args.tempDir && args.noProject {
-		return arguments{}, errors.New("--temp-dir cannot be used with --no-path")
-	}
 	if args.automation {
-		if args.tempDir || args.noProject || args.repoPath != "" || args.resume || args.sessionID != "" {
-			return arguments{}, errors.New("--automation cannot be used with --path, --no-path, --temp-dir, --resume, or --session-id")
+		if args.noProject || args.repoPath != "" || args.resume || args.sessionID != "" {
+			return arguments{}, errors.New("--automation cannot be used with --path, --no-path, --resume, or --session-id")
 		}
 	}
-	if args.once && !args.tempDir && !args.automation {
-		return arguments{}, errors.New("--once can only be used with --temp-dir or --automation")
+	if args.once && !args.automation {
+		return arguments{}, errors.New("--once can only be used with --automation")
 	}
 	if args.cache != "" {
 		if args.cache != "on" && args.cache != "off" {
@@ -250,7 +237,7 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 			return arguments{}, errors.New("--cache can only be used with --once")
 		}
 	}
-	if args.sessionID == "" && !args.tempDir && !args.noProject && !args.automation && args.repoPath == "" {
+	if args.sessionID == "" && !args.noProject && !args.automation && args.repoPath == "" {
 		workingDirectory, err := os.Getwd()
 		if err != nil {
 			return arguments{}, err
@@ -357,8 +344,6 @@ func (c *client) createSession(args arguments, force bool) (session, error) {
 	payload := map[string]any{"prompt": args.prompt, "agentType": args.agentType}
 	if args.automation {
 		payload["automation"] = true
-	} else if args.tempDir {
-		payload["tempDir"] = true
 	} else if args.noProject {
 		payload["noProject"] = true
 	} else {
@@ -656,9 +641,6 @@ func run(argv []string) error {
 	if err != nil {
 		return err
 	}
-	if args.tempDir {
-		fmt.Fprintln(os.Stderr, "Warning: --temp-dir is deprecated; use --automation for new automation calls. Existing --temp-dir behavior is unchanged.")
-	}
 	c := &client{server: args.server, token: args.token, http: http.DefaultClient}
 	ws, _ := dialWebSocket(args.server, args.token, 5*time.Second)
 	if ws != nil {
@@ -699,7 +681,7 @@ func run(argv []string) error {
 			messageID = sent.MessageID
 		}
 	} else {
-		if args.runnerID == "" && !args.tempDir && !args.noProject && !args.automation {
+		if args.runnerID == "" && !args.noProject && !args.automation {
 			hostname, err := os.Hostname()
 			if err != nil {
 				return err

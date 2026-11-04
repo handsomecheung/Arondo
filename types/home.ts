@@ -30,7 +30,6 @@ export interface Session {
   once?: boolean;
   noProject?: boolean;
   automation?: boolean;
-  tempDir?: boolean;
 }
 
 export interface Project {
@@ -39,7 +38,6 @@ export interface Project {
   runnerId: string;
   createdAt: string;
   updatedAt: string;
-  tempDir?: boolean;
 }
 
 export interface Runner {

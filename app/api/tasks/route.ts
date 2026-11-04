@@ -2,7 +2,7 @@ import { getShowAutomationSessions } from "@/lib/automation";
 import { NextRequest, NextResponse } from "next/server";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken } from "@/lib/auth";
-import { getMessages, getProjects, getSessions, isTempDirProject, isSessionArchived, getShowTempDirSessions } from "@/lib/store";
+import { getMessages, getProjects, getSessions, isSessionArchived } from "@/lib/store";
 
 export async function GET(request: NextRequest) {
   const token = getArondoToken(request);
@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
   const sessionsById = new Map(sessions.map((session) => [session.id, session]));
   const projectsById = new Map(projects.map((project) => [project.id, project]));
   const tasks = runnerManager.getAllTasks();
-  const showTempDirSessions = await getShowTempDirSessions();
   const showAutomationSessions = await getShowAutomationSessions();
 
   const filtered = [];
@@ -24,14 +23,14 @@ export async function GET(request: NextRequest) {
     const projectId = task.projectId || session?.projectId;
     if (projectId) {
       const project = projectsById.get(projectId);
-      if (!project || (!showTempDirSessions && isTempDirProject(project))) {
+      if (!project) {
         continue;
       }
     }
 
     if (session?.projectId) {
       const project = projectsById.get(session.projectId);
-      if (!project || (!showTempDirSessions && isTempDirProject(project))) {
+      if (!project) {
         continue;
       }
     }

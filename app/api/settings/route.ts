@@ -1,7 +1,7 @@
 import { getShowAutomationSessions } from "@/lib/automation";
 import { NextRequest, NextResponse } from "next/server";
 import { getArondoToken, getRoleByToken, isValidToken } from "@/lib/auth";
-import { updateAppSettings, getAppSettings, getSessionArchiveDays, getTempDirProjectRetentionHours, getShowHiddenFiles, getShowTempDirSessions, getEnableAutomodel, getAgentModelsConfig, type AgentModelsConfig } from "@/lib/store";
+import { updateAppSettings, getAppSettings, getSessionArchiveDays, getAutomationSessionRetentionHours, getShowHiddenFiles, getEnableAutomodel, getAgentModelsConfig, type AgentModelsConfig } from "@/lib/store";
 import { getLlmApiKeyEnvStatus, type LlmApiKeyName } from "@/lib/llm/config";
 import { getWebPushContactEmail, updateWebPushContactEmail } from "@/lib/web-push-server";
 import fs from "fs/promises";
@@ -21,9 +21,8 @@ export async function GET(request: NextRequest) {
   }
 
   const sessionArchiveDays = await getSessionArchiveDays();
-  const tempDirProjectRetentionHours = await getTempDirProjectRetentionHours();
+  const automationSessionRetentionHours = await getAutomationSessionRetentionHours();
   const showHiddenFiles = await getShowHiddenFiles();
-  const showTempDirSessions = await getShowTempDirSessions();
   const showAutomationSessions = await getShowAutomationSessions();
   const enableAutomodel = await getEnableAutomodel();
   const agentModels = await getAgentModelsConfig();
@@ -54,9 +53,8 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     sessionArchiveDays,
-    tempDirProjectRetentionHours,
+    automationSessionRetentionHours,
     showHiddenFiles,
-    showTempDirSessions,
     showAutomationSessions,
     enableAutomodel,
     version,
@@ -75,9 +73,8 @@ export async function POST(request: NextRequest) {
 
   const {
     sessionArchiveDays,
-    tempDirProjectRetentionHours,
+    automationSessionRetentionHours,
     showHiddenFiles,
-    showTempDirSessions,
     showAutomationSessions,
     enableAutomodel,
     llmApiKeys,
@@ -89,16 +86,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "sessionArchiveDays must be a positive number" }, { status: 400 });
     }
   }
-  if (tempDirProjectRetentionHours !== undefined) {
-    if (typeof tempDirProjectRetentionHours !== "number" || !Number.isFinite(tempDirProjectRetentionHours) || tempDirProjectRetentionHours < 1) {
-      return NextResponse.json({ error: "tempDirProjectRetentionHours must be a positive number" }, { status: 400 });
+  if (automationSessionRetentionHours !== undefined) {
+    if (typeof automationSessionRetentionHours !== "number" || !Number.isFinite(automationSessionRetentionHours) || automationSessionRetentionHours <= 0) {
+      return NextResponse.json({ error: "automationSessionRetentionHours must be a positive number" }, { status: 400 });
     }
   }
   if (showHiddenFiles !== undefined && typeof showHiddenFiles !== "boolean") {
     return NextResponse.json({ error: "showHiddenFiles must be a boolean" }, { status: 400 });
-  }
-  if (showTempDirSessions !== undefined && typeof showTempDirSessions !== "boolean") {
-    return NextResponse.json({ error: "showTempDirSessions must be a boolean" }, { status: 400 });
   }
   if (showAutomationSessions !== undefined && typeof showAutomationSessions !== "boolean") {
     return NextResponse.json({ error: "showAutomationSessions must be a boolean" }, { status: 400 });
@@ -151,18 +145,16 @@ export async function POST(request: NextRequest) {
 
   const patch: {
     sessionArchiveDays?: number;
-    tempDirProjectRetentionHours?: number;
+    automationSessionRetentionHours?: number;
     showHiddenFiles?: boolean;
-    showTempDirSessions?: boolean;
     showAutomationSessions?: boolean;
     enableAutomodel?: boolean;
     llmApiKeys?: Partial<Record<LlmApiKeyName, string | undefined>>;
     agentModels?: AgentModelsConfig;
   } = {};
   if (sessionArchiveDays !== undefined) patch.sessionArchiveDays = sessionArchiveDays;
-  if (tempDirProjectRetentionHours !== undefined) patch.tempDirProjectRetentionHours = tempDirProjectRetentionHours;
+  if (automationSessionRetentionHours !== undefined) patch.automationSessionRetentionHours = automationSessionRetentionHours;
   if (showHiddenFiles !== undefined) patch.showHiddenFiles = showHiddenFiles;
-  if (showTempDirSessions !== undefined) patch.showTempDirSessions = showTempDirSessions;
   if (showAutomationSessions !== undefined) patch.showAutomationSessions = showAutomationSessions;
   if (enableAutomodel !== undefined) patch.enableAutomodel = enableAutomodel;
   if (llmApiKeys !== undefined) {

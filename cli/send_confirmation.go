@@ -19,8 +19,6 @@ func (c *client) createQueuedSession(args arguments, trigger string) (session, e
 		if args.cache != "" {
 			payload["cache"] = args.cache
 		}
-	} else if args.tempDir {
-		payload["tempDir"] = true
 	} else if args.noProject {
 		payload["noProject"] = true
 	} else {

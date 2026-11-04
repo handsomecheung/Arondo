@@ -180,7 +180,7 @@ All execution goes through a Runner — there is no local fallback on the server
 - **Integrated Diff Viewer (diff2html) & Commit History**: View visual code changes directly from the browser, supporting session-wide diffs and single-file inline diff viewer modals triggered directly from file links in agent execution cards. Supports collapsing and expanding individual changed files dynamically inside the diff view. Also supports viewing git commit history and specific commit diffs (Show Commits) via a modal.
 - **Scheduled Tasks, Auto-Queue Follow-ups & Heartbeat Quota Retry**: Schedule project-scoped scripts to run at a future fixed time. Chat input remains active during agent runs; follow-up messages are automatically queued as `afterSession` scheduled tasks. When an agent hits a quota limit, the server's 1-minute Heartbeat service detects the error, verifies/refreshes the agent's quota info from the runner if older than 5 minutes, and automatically converts the user prompt into a scheduled retry at `reset time + 5 minutes` (or `now + 5 minutes`).
 - **Runner Connection Stability (Heartbeat & Dead Link Detection)**: The Go runner client maintains a persistent connection with the server via periodic heartbeats, detecting dead WebSocket connections using a read deadline and ping/pong exchanges, and auto-reconnecting with exponential backoff.
-- **Task Queue & Live Tracking**: Active task queue in the header with PID tracking and live log inspection. Clicking a task opens its dedicated console log modal. Each running task can be killed from the queue, and stopped project-scoped tasks can be deleted from their three-dot menu. Completed tasks are retained for 3 days, and are removed from the queue as soon as their session is archived. Tasks and todo messages belonging to temp-dir projects are automatically filtered out from the active queue and Tasks dashboard.
+- **Task Queue & Live Tracking**: Active task queue in the header with PID tracking and live log inspection. Clicking a task opens its dedicated console log modal. Each running task can be killed from the queue, and stopped project-scoped tasks can be deleted from their three-dot menu. Completed tasks are retained for 3 days, and are removed from the queue as soon as their session is archived. Tasks and todo messages belonging to automation sessions are automatically filtered out from the active queue and Tasks dashboard by default.
 - **Task Grouping, Filtering & Inline Logs**: In the Tasks dashboard, tasks can be filtered by type (Agent/Script), toggled to show only non-completed tasks by default, and grouped by Scope or Status. Script execution logs are now also viewable inline.
 - **Task Persistence**: Active task contexts are persisted by serializing execution metadata directly into the session and project `messages.json` files and dynamically restored on server restart. Runner IDs are stable across reconnections.
 - **Automated Data Lifecycle**: Automatically purges sessions or projects during listing queries if their parent references (e.g. project or runner) no longer exist.
@@ -254,7 +254,7 @@ Open [http://localhost:3251](http://localhost:3251) in your browser. Select the 
 - `ARONDO_CONFIG_DIR` – (Optional) Custom directory to store configuration and runtime data. Defaults to `~/.arondo` in both development and production.
 - `PORT` – (Optional) Server port. Defaults to `3251` in development, `3250` in production.
 - `ARONDO_SESSION_ARCHIVE_DAYS_DEFAULT` – (Optional) Default number of idle days before active sessions are auto-archived, used when no override is set in Settings. Defaults to `7`.
-- `ARONDO_TEMP_DIR_PROJECT_RETENTION_HOURS_DEFAULT` – (Optional) Default number of hours temporary sessions and projects are retained before cleanup, used when no override is set in Settings. Defaults to `72`.
+- `ARONDO_AUTOMATION_SESSION_RETENTION_HOURS_DEFAULT` – (Optional) Default number of hours automation sessions are retained before cleanup, used when no override is set in Settings. Defaults to `72`.
 - `ARONDO_FILE_SHOW_HIDDEN_DEFAULT` – (Optional) Default for whether hidden files/directories (dotfiles) appear in the file browser and @ path selector, used when no override is set in Settings. Defaults to `true`; set to `false` to hide dotfiles by default.
 - `TYPESAFE_API_KEY` (or `JEV_API_KEY`), `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY` – Provider API keys used by `automodel` (with Jev prioritized first for model routing, falling back to Anthropic -> OpenAI -> Google) and LLM-assisted quota extraction (using standard LLMs). These can also be configured from Settings and stored as `setitngs.llmApiKeys` in `arondo.json`; environment variables take precedence and disable editing for that provider in the UI. If none are configured, Auto Mode keeps using the predefined model selected by the existing quota-based logic.
 - `ARONDO_INNER_RUNNER_QUOTA_METHOD` – (Optional) Runner agent quota fetching strategy (`AUTO` | `LLM`). Defaults to `AUTO` (uses fast regex extraction, falling back to an interactive LLM loop if parsing fails and an LLM API key is configured). Set to `LLM` to force using the interactive LLM loop directly from the initial screen upon agent launch. Configured strictly via server environment variable (invalid values cause the server to fail on startup).
@@ -338,10 +338,9 @@ Content-Type: application/json
 x-arondo-token: <token>
 
 {
-  "repoPath": "/path/to/repo",   // repository path on the runner — required unless "tempDir", "noProject", or "automation" is set
-  "tempDir": false,              // optional — create the session in a fresh temp dir generated on the runner instead of "repoPath" (mutually exclusive with "repoPath")
-  "automation": false,           // optional — create a hidden, project-free automation session; cannot be combined with repoPath, tempDir, or noProject
-  "runnerId": "runner-id",       // target runner — optional for tempDir, noProject, or automation; an accessible connected runner is picked at random
+  "repoPath": "/path/to/repo",   // repository path on the runner — required unless "noProject" or "automation" is set
+  "automation": false,           // optional — create a hidden, project-free automation session; cannot be combined with repoPath or noProject
+  "runnerId": "runner-id",       // target runner — optional for noProject or automation; an accessible connected runner is picked at random
   "prompt": "Fix the login bug", // prompt sent to the agent; omit/blank to create an idle session
   "agentType": "auto",           // optional — "antigravity" | "claude" | "codex" | "opencode" | "auto" (default: "auto")
   "name": "My session",          // optional — defaults to first line of the prompt
@@ -349,7 +348,6 @@ x-arondo-token: <token>
 }
 ```
 
-- Set `tempDir: true` to have Arondo generate a temporary directory on the runner and use it as the repo path — do not pass `repoPath` in that case. `runnerId` also becomes optional; when omitted, a runner is picked at random among the runners the token is allowed to access.
 - `prompt` can contain an Agent Command such as `/commit`. When no separate display `message` is supplied, the server expands matching commands using built-in, default, and project definitions, with project definitions taking priority. The history keeps the original command as the message and stores the expanded instruction as its prompt. This also applies when creating a draft with `isDraft: true`.
 - Returns `201` with the created `Session` object (includes `id`).
 - Returns `409 { error: "Session already exists" }` if an explicit session `id` is supplied that already exists.
@@ -387,13 +385,11 @@ x-arondo-token: <token>
 
 Set `automation: true` on `POST /api/sessions`, or use `arondo-cli send --automation`, to create a session with `automation: true` and `noProject: true` in `session.json` and no project record. Each session receives a fresh Runner-side directory at `${ARONDO_CONFIG_DIR:-$HOME/.arondo}/automation-workspaces/YYYY-MM-DD_HH-mm-ssZ-<random>/` (UTC). The configuration directory is resolved on the Runner, independently of the CLI and server. When no runner is specified, an accessible connected Runner is selected at random. Decision agents run on the server without a Runner or a dedicated workspace.
 
-Automation sessions are hidden from session lists, archived lists, search, Tasks, Todo lists, and completion notifications by default. An admin can enable **Admin Settings → Show automation sessions** (`setitngs.showAutomationSessions`). Direct session-ID access and polling remain available. Sessions use the normal archive policy when listed; workspaces are retained until manually removed, including after session deletion. No automatic workspace deletion is performed.
+Automation sessions are hidden from session lists, archived lists, search, Tasks, Todo lists, and completion notifications by default. An admin can enable **Admin Settings → Show automation sessions** (`setitngs.showAutomationSessions`). Direct session-ID access and polling remain available. Automation sessions are retained for `automationSessionRetentionHours` (default 72 hours, configurable in Admin Settings or via `ARONDO_AUTOMATION_SESSION_RETENTION_HOURS_DEFAULT`) before automatic session cleanup; workspaces are retained until manually removed, including after session deletion. No automatic workspace deletion is performed.
 
 The sidebar's active and archived session lists label automation sessions with an **Automation** tag and single-use sessions with a **Once** tag. Sessions with both attributes display both tags.
 
-`--automation` cannot be combined with `--path`, `--no-path`, `--temp-dir`, `--resume`, or `--session-id`. It permits follow-up messages via a later `send --session-id <id>` unless `--once` was used. Both `--automation --once` and `--automation --once --cache on` are supported.
-
-`--temp-dir` is deprecated and emits a warning on stderr. Its temporary-project behavior remains unchanged; use `--automation` for new automation calls.
+`--automation` cannot be combined with `--path`, `--no-path`, `--resume`, or `--session-id`. It permits follow-up messages via a later `send --session-id <id>` unless `--once` was used. Both `--automation --once` and `--automation --once --cache on` are supported.
 
 ### CLI
 
@@ -417,11 +413,11 @@ cli/arondo-cli send \
   "Now also print the current directory"
 ```
 
-When creating a session without `--automation`, `--no-path`, `--temp-dir`, or `--path`, the script uses its current working directory as the repository path.
-For sessions using an existing path, omitting `--runner-id` selects the connected runner with the current hostname; use `--runner-id` when no runner or multiple runners share that hostname. `--automation`, `--no-path`, and `--temp-dir` instead select an accessible connected Runner at random.
-Use `--resume` to send the message to the most recently updated session for the selected runner and repository path. It cannot be combined with `--session-id`, `--automation`, `--no-path`, or `--temp-dir`.
+When creating a session without `--automation`, `--no-path`, or `--path`, the script uses its current working directory as the repository path.
+For sessions using an existing path, omitting `--runner-id` selects the connected runner with the current hostname; use `--runner-id` when no runner or multiple runners share that hostname. `--automation` and `--no-path` instead select an accessible connected Runner at random.
+Use `--resume` to send the message to the most recently updated session for the selected runner and repository path. It cannot be combined with `--session-id`, `--automation`, or `--no-path`.
 Pass an Agent Command as the message, for example `cli/arondo-cli send --resume "/commit"`, to run its configured prompt. Matcher capture groups such as `$1` are expanded, and project commands take priority over default and built-in commands. This works for new sessions, follow-ups, and messages queued with `--confirmation auto` or `--confirmation draft`; `/review` and `/btw` require an existing session.
-Use `--once` with `--automation` (or legacy `--temp-dir`) to create a single-use session that disallows follow-up messages; subsequent `--resume` or `--session-id` requests targeting this session will be rejected.
+Use `--once` with `--automation` to create a single-use session that disallows follow-up messages; subsequent `--resume` or `--session-id` requests targeting this session will be rejected.
 Use `--cache on` (default: `off`, requires `--once`) to cache single-use session outputs in `${ARONDO_CONFIG_DIR}/cache/once/` keyed by the SHA-256 hash of the prompt. Cache entries expire after seven days; their creation timestamps are stored in `${hash}.meta.json`. Expired files are retained and refreshed only after a subsequent successful agent run.
 Use `--confirmation auto`, `--confirmation draft`, or `--confirmation force` to resolve a server `needsConfirmation` response the same way as the Web UI buttons: queue for automatic send, save as a manual draft, or send now anyway.
 When the server returns `needsConfirmation: true`, the CLI prints a hint with those retry choices.
@@ -475,7 +471,7 @@ cat payload.json | cli/arondo-cli decide
   - `noul`: Bernoulli truth probability estimation between 0.0 and 1.0 (True/False or Yes/No propositions).
   - The `model` field is optional (defaults to `jev-latest` on the server). The `state` field is optional context.
 - **Server-Side Execution**: Runs directly on the server via `TYPESAFE_API_KEY` (in ~180ms) without requiring a connected runner or git repository.
-- **Ephemeral & Web-Clean**: Automatically runs with `--temp-dir` and `--once` semantics, so sessions auto-destruct upon completion and do not appear in the Web UI session list by default.
+- **Ephemeral & Web-Clean**: Automatically runs with `--automation` and `--once` semantics, so sessions do not appear in the Web UI session list by default.
 - **Output**: Formatted plain text by default, or structured JSON when using `--output json`. JSON output includes `decisionAnswers`, the native Jev answer map with choices, probabilities, and confidence values.
 
 Additional CLI commands help inspect runner readiness before sending work:
