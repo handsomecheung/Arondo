@@ -181,32 +181,52 @@ All execution goes through a Runner — there is no local fallback on the server
 
 ## Getting Started
 
-### 1. Install dependencies and start the server
+### 1. Install dependencies and create the script environment file
+
+Run these commands from the repository root:
 
 ```bash
 npm install
-npm run dev
+cp scripts/sample.env scripts/.env
 ```
 
-### 2. Build and start a runner
+The startup scripts load `scripts/.env` as a Bash file. See [scripts/sample.env](scripts/sample.env) for configuration instructions. Keep credentials in `scripts/.env`, which is ignored by Git. Use `export` for optional server environment variables.
+
+### 2. Start the server and create a runner token
 
 ```bash
-cd runner
-go build -o arondo-runner .
-# Pass the runner token printed in the server console on startup
-./arondo-runner --server ws://localhost:3251/runner --token <runner_access_token>
-
-# Alternatively, pass it via environment variable:
-# ARONDO_RUNNER_TOKEN=<runner_access_token> ./arondo-runner --server ws://localhost:3251/runner
+./scripts/run.server.sh
 ```
 
-Or use the convenience script:
+Open [http://localhost:3251](http://localhost:3251) and sign in with the admin access token printed in the server console on first startup. In **Admin Settings → Runner Tokens**, create a token for your local runner. Edit `scripts/.env` and set:
+
+```bash
+ARONDO_RUNNER_TOKEN_LOCALDEV='your-runner-token'
+```
+
+The runner token is separate from the admin access token.
+
+### 3. Start a runner
+
+In another terminal, run the convenience script from the repository root (requires Go):
 
 ```bash
 ./scripts/run.runner.sh
 ```
 
-### 3. Build the CLI (optional)
+Alternatively, build and start the runner directly with the token you created:
+
+```bash
+cd runner
+go build -o arondo-runner .
+./arondo-runner --server ws://localhost:3251/runner --token <runner_access_token>
+
+# Alternatively, pass it via environment variable:
+# ARONDO_RUNNER_TOKEN=<runner_access_token> ./arondo-runner --server ws://localhost:3251/runner
+cd ..
+```
+
+### 4. Build the CLI (optional)
 
 ```bash
 cd cli
@@ -214,7 +234,7 @@ go build -o arondo-cli .
 cd ..
 ```
 
-### 4. Open the UI
+### 5. Start a session in the UI
 
 Open [http://localhost:3251](http://localhost:3251) in your browser. Select the connected runner, choose a project directory, and start a session.
 

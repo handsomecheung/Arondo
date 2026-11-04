@@ -2,13 +2,10 @@
 set -e
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
-source .env
+source ./.env
 
 ps aux | grep -v grep | grep "$(pwd)" | grep 'server.ts' | awk '{print $2}' | xargs -r kill -9
 
 cd ..
-
-export ARONDO_INNER_RUNNER_QUOTA_METHOD=LLM
-export ARONDO_INNER_AUTOMODEL_METHOD=DM
 
 npm run dev
