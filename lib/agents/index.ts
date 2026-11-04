@@ -2,11 +2,10 @@ import { BaseAgent } from "./base";
 import { AntigravityAgent } from "./antigravity";
 import { ClaudeCodeAgent } from "./claude";
 import { CodexAgent } from "./codex";
-import { parseOpencodeModelLine } from "../agentModels";
 import { OpencodeAgent } from "./opencode";
-import { getAgyQuotaGroupForModel, getModelOptionsForAgent, isAgentQuotaExhausted, isOpencodeGoModel, selectAgent, type AgyQuotaGroup, type OpencodeQuotaRef } from "../autoagent";
+import { getAgyQuotaGroupForModel, getConfiguredDefaultModel, getModelOptionsForAgent, isAgentQuotaExhausted, isOpencodeGoModel, selectAgent, type AgyQuotaGroup, type OpencodeQuotaRef } from "../autoagent";
 import { routeModel, type AutoModelEffort, type AutoModelOption } from "../llm/automodel";
-import { getAgentModelsConfig, parseModelLine } from "../store";
+import { getAgentModelsConfig } from "../store";
 
 export type ConcreteAgentType = "antigravity" | "claude" | "codex" | "opencode";
 export type AgentType = ConcreteAgentType | "auto" | "decision";
@@ -85,18 +84,8 @@ export async function resolveAgentType(
 ): Promise<ResolvedAgent | null> {
   const agentModels = await getAgentModelsConfig();
   if (agentType !== "auto") {
-    let defaultModel: string | undefined = options.model?.trim() || undefined;
-    if (!defaultModel) {
-      if (agentType === "antigravity") {
-        defaultModel = parseModelLine(agentModels.antigravity?.gemini?.defaultModel) || undefined;
-      } else if (agentType === "claude") {
-        defaultModel = parseModelLine(agentModels.claude?.defaultModel) || undefined;
-      } else if (agentType === "opencode") {
-        defaultModel = parseOpencodeModelLine(agentModels.opencode?.defaultModel) || undefined;
-      } else if (agentType === "codex") {
-        defaultModel = parseModelLine(agentModels.codex?.defaultModel) || undefined;
-      }
-    }
+    const defaultModel = options.model?.trim()
+      || getConfiguredDefaultModel(agentType as ConcreteAgentType, undefined, agentModels);
     return {
       agentType: agentType as ConcreteAgentType,
       model: defaultModel,
@@ -104,18 +93,22 @@ export async function resolveAgentType(
   }
   const resolved = await selectAgent(runnerAgentBinaries, options.autoagentLog, options.lockedAgent?.agentType, options.opencodeQuotaRef);
   const lockedGroup = options.lockedAgent?.agyQuotaGroup ?? getAgyQuotaGroupForModel(options.lockedAgent?.model);
+  const lockedModel = options.lockedAgent?.model?.trim()
+    || (options.lockedAgent
+      ? getConfiguredDefaultModel(options.lockedAgent.agentType, lockedGroup, agentModels)
+      : undefined);
   const lockedOpencodeEligible = options.lockedAgent?.agentType !== "opencode"
-    || (runnerAgentBinaries.includes("opencode") && isOpencodeGoModel(options.lockedAgent.model));
+    || (runnerAgentBinaries.includes("opencode") && (!lockedModel || isOpencodeGoModel(lockedModel)));
   const useLockedAgent = options.lockedAgent && lockedOpencodeEligible
     && !await isAgentQuotaExhausted(options.lockedAgent.agentType, lockedGroup, options.opencodeQuotaRef);
   const selected = options.lockedAgent && useLockedAgent
     ? {
       ...options.lockedAgent,
-      agyQuotaGroup: options.lockedAgent.agyQuotaGroup
-        ?? getAgyQuotaGroupForModel(options.lockedAgent.model),
+      model: lockedModel,
+      agyQuotaGroup: lockedGroup,
       modelOptions: getModelOptionsForAgent(
         options.lockedAgent.agentType,
-        options.lockedAgent.agyQuotaGroup ?? getAgyQuotaGroupForModel(options.lockedAgent.model),
+        lockedGroup,
         agentModels,
       ),
     }

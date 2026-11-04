@@ -79,6 +79,7 @@ export async function POST(
     prompt,
     automodelLog: (text) => appendAutomodelLog(id, systemMessageId, text),
     once: session.once,
+    model: targetMsg.resolvedModel || (rerunAgentType === session.agentType ? session.model : undefined),
   });
   if (!resolved) {
     return NextResponse.json({ error: "No Auto Mode agent has available quota above 2%" }, { status: 503 });

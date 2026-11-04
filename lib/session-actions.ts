@@ -100,6 +100,7 @@ export async function dispatchDetachedAgent(
     autoagentLog: (text) => appendAutoagentLog(sessionId, runMessageId, text),
     automodelLog: (text) => appendAutomodelLog(sessionId, runMessageId, text),
     once: session.once,
+    model: !agentType || agentType === session.agentType ? session.model : undefined,
   });
 
   if (!resolved) return { ok: false, error: "No Auto Mode agent has available quota above 2%", status: 503 };
@@ -277,7 +278,7 @@ export async function dispatchFollowupMessage(
   const lastAgentRun = [...messages].reverse().find((m) => m.type === "agent-run" && m.resolvedAgentType);
   const autoLockedType = session.autoLockedAgentType || lastAgentRun?.resolvedAgentType;
   const autoLockedGroup = session.autoLockedAgyQuotaGroup || lastAgentRun?.resolvedAgyQuotaGroup;
-  const autoLockedModel = session.autoLockedAgentModel;
+  const autoLockedModel = session.autoLockedAgentModel || lastAgentRun?.resolvedModel;
 
   const prevQuotaError = session.agentType === "auto" &&
     session.errorMessage != null &&

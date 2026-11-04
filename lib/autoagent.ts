@@ -229,6 +229,33 @@ export function buildModelOption(modelStr: string, agentType: ConcreteAgentType)
   };
 }
 
+export function getConfiguredDefaultModel(
+  agentType: ConcreteAgentType,
+  agyQuotaGroup?: AgyQuotaGroup,
+  agentModels?: AgentModelsConfig,
+): string | undefined {
+  const configs = agentModels || getDefaultAgentModels();
+  if (agentType === "antigravity") {
+    if (agyQuotaGroup === "other") {
+      return parseModelLine(configs.antigravity?.other?.defaultModel) || undefined;
+    }
+    if (agyQuotaGroup === "argon") {
+      return parseModelLine(configs.antigravity?.argon?.defaultModel) || undefined;
+    }
+    return parseModelLine(configs.antigravity?.gemini?.defaultModel) || undefined;
+  }
+  if (agentType === "claude") {
+    return parseModelLine(configs.claude?.defaultModel) || undefined;
+  }
+  if (agentType === "codex") {
+    return parseModelLine(configs.codex?.defaultModel) || undefined;
+  }
+  if (agentType === "opencode") {
+    return parseOpencodeModelLine(configs.opencode?.defaultModel) || undefined;
+  }
+  return undefined;
+}
+
 export function getModelOptionsForAgent(
   agentType: ConcreteAgentType,
   agyQuotaGroup?: AgyQuotaGroup,
@@ -346,9 +373,9 @@ async function selectAgentFromQuota(
     const geminiOptions = getModelOptionsForAgent("antigravity", "gemini", agentModels);
     const otherOptions = getModelOptionsForAgent("antigravity", "other", agentModels);
     const argonOptions = getModelOptionsForAgent("antigravity", "argon", agentModels);
-    const agyDefault = parseModelLine(agentModels.antigravity?.gemini?.defaultModel) || geminiOptions[0]?.model || "Gemini 3.8 Flash (Medium)";
-    const otherDefault = parseModelLine(agentModels.antigravity?.other?.defaultModel) || otherOptions[0]?.model || "Claude Sonnet 5.5 (Medium)";
-    const argonDefault = parseModelLine(agentModels.antigravity?.argon?.defaultModel) || argonOptions[0]?.model || "Gemini 4 Argon (Medium)";
+    const agyDefault = getConfiguredDefaultModel("antigravity", "gemini", agentModels);
+    const otherDefault = getConfiguredDefaultModel("antigravity", "other", agentModels);
+    const argonDefault = getConfiguredDefaultModel("antigravity", "argon", agentModels);
 
     choices.push({
       id: "A",
@@ -374,7 +401,7 @@ async function selectAgentFromQuota(
   }
   if (hasClaude) {
     const claudeOptions = getModelOptionsForAgent("claude", undefined, agentModels);
-    const claudeDefault = parseModelLine(agentModels.claude?.defaultModel) || claudeOptions[0]?.model || "opus";
+    const claudeDefault = getConfiguredDefaultModel("claude", undefined, agentModels);
     choices.push({
       id: "C",
       agentType: "claude",
@@ -384,7 +411,7 @@ async function selectAgentFromQuota(
   }
   if (hasCodex) {
     const codexOptions = getModelOptionsForAgent("codex", undefined, agentModels);
-    const codexDefault = parseModelLine(agentModels.codex?.defaultModel) || "gpt-6-sol";
+    const codexDefault = getConfiguredDefaultModel("codex", undefined, agentModels);
     choices.push({
       id: "D",
       agentType: "codex",
@@ -396,12 +423,11 @@ async function selectAgentFromQuota(
   if (hasOpencode) {
     if (hasOpencodeSubscriptionQuota(latestEntryByType.get("opencode"))) {
       const opencodeOptions = getModelOptionsForAgent("opencode", undefined, agentModels);
-      const configuredDefault = parseOpencodeModelLine(agentModels.opencode?.defaultModel) || undefined;
+      const configuredDefault = getConfiguredDefaultModel("opencode", undefined, agentModels);
       choices.push({
         id: "F",
         agentType: "opencode",
-        model: isOpencodeGoModel(configuredDefault) ? configuredDefault
-          : opencodeOptions[0]?.model || "opencode-go/minimax-m3",
+        model: configuredDefault,
         modelOptions: opencodeOptions,
       });
     } else {

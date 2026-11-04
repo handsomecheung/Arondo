@@ -98,4 +98,51 @@ test.describe('New Session Model Select UI & Logic', () => {
     expect(codexResolved.agentType).toBe('codex');
     expect(codexResolved.model).toBe('gpt-6-sol');
   });
+
+  test('resolveAgentType always uses configured defaultModel and only omits model when defaultModel is empty', async ({ request }) => {
+    const headers = { 'x-arondo-token': 'test-token-123456' };
+    const before = await (await request.get('/api/settings', { headers })).json();
+    try {
+      // 1. With default config, lockedAgent without explicit model falls back to configured defaultModel
+      await expect(resolveAgentType('auto', ['claude'], {
+        lockedAgent: { agentType: 'claude' },
+      })).resolves.toMatchObject({ agentType: 'claude', model: 'opus' });
+      await expect(resolveAgentType('auto', ['agy'], {
+        lockedAgent: { agentType: 'antigravity', agyQuotaGroup: 'other' },
+      })).resolves.toMatchObject({ agentType: 'antigravity', model: 'Claude Sonnet 5.5 (Medium)' });
+      await expect(resolveAgentType('auto', ['codex'], {
+        lockedAgent: { agentType: 'codex' },
+      })).resolves.toMatchObject({ agentType: 'codex', model: 'gpt-6-sol' });
+
+      // 2. When defaultModel is cleared to empty string in Admin Settings, model is undefined in both direct and auto mode
+      const clearRes = await request.post('/api/settings', {
+        headers,
+        data: {
+          agentModels: {
+            antigravity: {
+              gemini: { defaultModel: '', availableModels: ['Gemini 3.8 Flash (High)'] },
+              other: { defaultModel: '', availableModels: ['Claude Sonnet 5.5 (Medium)'] },
+              argon: { defaultModel: '', availableModels: ['Gemini 4 Argon (Medium)'] },
+            },
+            claude: { defaultModel: '', availableModels: ['opus', 'sonnet'] },
+            codex: { defaultModel: '', availableModels: ['gpt-6-sol'] },
+            opencode: { defaultModel: '', availableModels: ['opencode-go/minimax-m3'] },
+          },
+        },
+      });
+      expect(clearRes.ok()).toBeTruthy();
+
+      expect((await resolveAgentType('antigravity', ['agy'])).model).toBeUndefined();
+      expect((await resolveAgentType('claude', ['claude'])).model).toBeUndefined();
+      expect((await resolveAgentType('codex', ['codex'])).model).toBeUndefined();
+      expect((await resolveAgentType('opencode', ['opencode'])).model).toBeUndefined();
+
+      expect((await resolveAgentType('auto', ['agy']))?.model).toBeUndefined();
+      expect((await resolveAgentType('auto', ['claude']))?.model).toBeUndefined();
+      expect((await resolveAgentType('auto', ['codex']))?.model).toBeUndefined();
+      expect((await resolveAgentType('auto', ['claude'], { lockedAgent: { agentType: 'claude' } }))?.model).toBeUndefined();
+    } finally {
+      await request.post('/api/settings', { headers, data: { agentModels: before.agentModels } });
+    }
+  });
 });
