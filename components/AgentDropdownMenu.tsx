@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { useAgentQuotas } from "@/lib/hooks/useAgentQuotas";
 import { type ModelQuotas } from "@/lib/agent-quota-display";
 
@@ -10,9 +11,11 @@ interface Props {
   agentType: string;
   isAgentAvailable: (command: string) => boolean;
   onSelect: (agent: string) => void;
+  className?: string;
+  style?: CSSProperties;
 }
 
-export function AgentDropdownOptions({ agentType, isAgentAvailable, onSelect, quotas, loading = false }: Omit<Props, "runnerId"> & { quotas: ModelQuotas | null; loading?: boolean }) {
+export function AgentDropdownOptions({ agentType, isAgentAvailable, onSelect, quotas, loading = false, className = "new-session-dropdown-menu", style }: Omit<Props, "runnerId"> & { quotas: ModelQuotas | null; loading?: boolean }) {
   const agents = [
     { value: "antigravity", label: "Antigravity CLI", cmd: "agy" },
     { value: "claude", label: "Claude Code", cmd: "claude" },
@@ -21,7 +24,7 @@ export function AgentDropdownOptions({ agentType, isAgentAvailable, onSelect, qu
   ].filter(({ cmd }) => isAgentAvailable(cmd));
   const items = [...(agents.length > 1 ? [{ value: "auto", label: "Auto" }] : []), ...agents];
   return (
-    <div className="custom-dropdown-menu new-session-dropdown-menu">
+    <div className={`custom-dropdown-menu ${className}`} style={style}>
       {items.map(({ value, label }) => (
         <button
           key={value}

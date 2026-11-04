@@ -666,50 +666,26 @@ export default function SessionView({
                   </span>
                 </button>
                 {agentSwitchOpen && agentSwitchMenuPos && (
-                  <div
+                  <AgentDropdownMenu
+                    runnerId={selectedSession.runnerId}
+                    agentType={selectedSession.agentType}
+                    isAgentAvailable={isAgentAvailable}
+                    onSelect={(value) => {
+                      setAgentSwitchOpen(false);
+                      if (value !== selectedSession.agentType) onSwitchAgent(value);
+                    }}
                     className="session-agent-switch-menu"
                     style={{
                       position: "fixed",
                       top: agentSwitchMenuPos.top,
                       left: agentSwitchMenuPos.left,
-                      zIndex: 50,
-                      background: "var(--bg-surface)",
-                      backdropFilter: "blur(16px)",
-                      border: "1px solid var(--border)",
-                      borderRadius: "var(--radius-md)",
+                      right: "auto",
+                      bottom: "auto",
+                      maxHeight: `min(400px, calc(100dvh - ${agentSwitchMenuPos.top + 8}px))`,
                       boxShadow: "var(--shadow-card)",
-                      padding: 6,
+                      transformOrigin: "top right",
                     }}
-                  >
-                    {(() => {
-                      const concreteAgents = (
-                        [
-                          { value: "antigravity", label: "Antigravity CLI", cmd: "agy" },
-                          { value: "claude",      label: "Claude Code",     cmd: "claude" },
-                          { value: "codex",       label: "Codex",           cmd: "codex" },
-                          { value: "opencode",    label: "OpenCode",        cmd: "opencode" },
-                        ] as const
-                      ).filter(({ cmd }) => isAgentAvailable(cmd));
-                      const showAuto = concreteAgents.length > 1;
-                      const items: { value: string; label: string }[] = [
-                        ...(showAuto ? [{ value: "auto", label: "Auto" }] : []),
-                        ...concreteAgents,
-                      ];
-                      return items.map(({ value, label }) => (
-                        <button
-                          key={value}
-                          type="button"
-                          className={`custom-dropdown-item ${selectedSession.agentType === value ? "active" : ""}`}
-                          onClick={() => {
-                            setAgentSwitchOpen(false);
-                            if (value !== selectedSession.agentType) onSwitchAgent(value);
-                          }}
-                        >
-                          <span style={{ flex: 1, textAlign: "left" }}>{label}</span>
-                        </button>
-                      ));
-                    })()}
-                  </div>
+                  />
                 )}
               </div>
             </div>
