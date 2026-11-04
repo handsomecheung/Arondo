@@ -104,9 +104,20 @@ Configure default models and available model lists in **Admin Settings → Agent
 - **Codex CLI (codex)**: Customize default model and reasoning effort options passed to OpenAI Codex.
 - **OpenCode (opencode)**: Defaults to `opencode-go/minimax-m3` (MiniMax M3), with 30 Go model options and inline capability descriptions. Existing saved model lists are preserved; use **Reset → Save Agent Models** in the OpenCode card to load the built-in list. Configure models as `provider/model` or `provider/model#variant`. Use `opencode-go/` for the Go subscription; `opencode/` selects the separate pay-as-you-go provider. A selected session model takes precedence over the admin default, and Arondo passes it via `opencode run --model` on fresh runs and resumes. Leave the default blank to let OpenCode select its own model (including a resumed session’s saved selection). OpenCode comments require whitespace before `#`, preserving attached variants.
 
-For signed-in OpenCode v2 installations, Arondo reads Go quota through `opencode api GET /api/experimental/usage/limits` on the Runner. The Runners page and Agent dropdown show the reported 5-hour, weekly, and monthly remaining quota and reset times. Initial discovery, stale refresh, and manual refresh use the same quota pipeline as other agents. Older CLIs and accounts without Go usage data show unknown quota.
+For signed-in OpenCode v2 installations, Arondo reads Go quota through `opencode api GET /api/experimental/usage/limits` on the Runner. The Runners page and Agent dropdown show the reported 5-hour, weekly, and monthly remaining quota and reset times. Initial discovery, stale refresh, and manual refresh use the same quota pipeline as other agents.
 
 Arondo records `Account` as `data.workspace.id` and normalizes `Plan` to the literal `"Go"` only when `data.go` is present. This labels Go-family subscription quota; it does not identify the Go, Go Plus, or Go Teams tier. The reported usage percentages are converted to remaining ratios, and reset timestamps are converted from milliseconds to seconds.
+
+Installations without an OpenCode Console account are still reported instead of being left blank. The Runner reads the stored Console credential to tell the billing modes apart:
+
+| State | `Plan` | `IsAPIKey` | Reported as |
+|---|---|---|---|
+| Go subscription | `Go` | `false` | 5-hour, weekly, and monthly remaining quota |
+| Signed in without a Go subscription | `Free` | `false` | No Go subscription; quota unavailable |
+| API-key billed (no Console account) | `API Key` | `true` | API key billing; quota unavailable |
+| Usage response unreadable | `Unknown` | `false` | Quota could not be read on this runner |
+
+Because a quota record now always exists for OpenCode, the Runner page lists OpenCode for every runner that has the binary installed, and the server stops retrying the usage request for an installation that cannot report Go quota.
 
 Auto Mode includes OpenCode only with verified Go subscription capacity. Its fallback model uses the configured OpenCode default when it belongs to `opencode-go/`; automodel options are restricted to that provider, preserving `#variant` suffixes and using inline comments as model descriptions.
 

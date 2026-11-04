@@ -146,6 +146,6 @@ cli/arondo-cli get-projects
 cli/arondo-cli get-messages --session-id "<session-id>" --output html
 ```
 
-OpenCode quota records use the fixed `Plan: "Go"` label when the authenticated usage response contains Go quota; this label does not distinguish Go, Go Plus, and Go Teams.
+OpenCode quota records use the fixed `Plan: "Go"` label when the authenticated usage response contains Go quota; this label does not distinguish Go, Go Plus, and Go Teams. Installations without a Go subscription are recorded as `Plan: "Free"`, and installations billed by provider API key as `Plan: "API Key"` with `IsAPIKey: true`; both report no usage windows. A usage response that carries no data is recorded as `Plan: "Unknown"`.
 
 All commands use the same server and token resolution order (`--server` / `--client-token` > env vars > `~/.arondo/arondo.json`).

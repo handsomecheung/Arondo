@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { setupRunner, teardownRunner } from './resume/resume.helper';
-import { test, expect } from '@playwright/test';
+import { test, expect, type APIRequestContext } from '@playwright/test';
 import { parseOpencodeModelLine, parseOpencodeModelList } from '../../lib/agentModels';
 import { OpencodeAgent } from '../../lib/agents/opencode';
 import { resolveAgentType } from '../../lib/agents';
@@ -64,14 +64,8 @@ test('Runner fetches OpenCode Go quota and serves all windows through the quota 
     weekly: { percent: 30, limited: false, resetsAt: 1794182400000 },
     monthly: { percent: 40, limited: false, resetsAt: 1796292553000 },
   } } };
-  await fs.writeFile(path.join(directory, 'opencode'), `#!/usr/bin/env bash
-if [[ "$1" == "api" && "$2" == "GET" && "$3" == "/api/experimental/usage/limits" ]]; then
-  printf '%s' '${JSON.stringify(fixture)}'
-else
-  printf '%s' 'opencode v2.2.5'
-fi
-`, { mode: 0o755 });
-  const runner = await setupRunner(request, 'OpenCode quota runner', directory);
+  const integrations = { data: [{ id: 'opencode', connections: [{ type: 'credential', id: 'cred_test', label: 'Personal', method: 'oauth' }] }] };
+  const runner = await setupOpencodeRunner(request, 'OpenCode quota runner', directory, fixture, integrations);
   try {
     const refresh = await request.post('/api/agents/quota', { headers, data: { runnerId: runner.runnerId, agent: 'opencode' } });
     expect(refresh.ok()).toBeTruthy();
@@ -96,6 +90,125 @@ fi
     } finally {
       await request.delete(`/api/sessions/${session.id}`, { headers });
     }
+  } finally {
+    await teardownRunner(runner.runnerProcess);
+    await request.delete(`/api/runners?id=${runner.runnerId}`, { headers });
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
+async function setupOpencodeRunner(
+  request: APIRequestContext,
+  name: string,
+  directory: string,
+  limits: unknown,
+  connections: unknown,
+) {
+  await fs.writeFile(path.join(directory, 'opencode'), `#!/usr/bin/env bash
+if [[ "$1" == "api" && "$2" == "GET" && "$3" == "/api/experimental/usage/limits" ]]; then
+  printf '%s' '${JSON.stringify(limits)}'
+elif [[ "$1" == "api" && "$2" == "GET" && "$3" == "/api/integration" ]]; then
+  printf '%s' '${JSON.stringify(connections)}'
+else
+  printf '%s' 'opencode v2.2.5'
+fi
+`, { mode: 0o755 });
+  return setupRunner(request, name, directory);
+}
+
+test('Runner reports a signed-in account without a Go subscription as a free user', async ({ request }) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'arondo-opencode-free-'));
+  const runner = await setupOpencodeRunner(
+    request,
+    'OpenCode free runner',
+    directory,
+    { data: { workspace: { id: 'org_opencode_free' }, budgets: [] } },
+    { data: [{ id: 'opencode', connections: [{ type: 'credential', id: 'cred_test', label: 'Personal', method: 'oauth' }] }] },
+  );
+  try {
+    const refresh = await request.post('/api/agents/quota', { headers, data: { runnerId: runner.runnerId, agent: 'opencode' } });
+    expect(refresh.ok()).toBeTruthy();
+    await expect.poll(async () => {
+      const response = await request.get(`/api/agents/info?runnerId=${runner.runnerId}`, { headers });
+      return (await response.json()).opencode;
+    }).toMatchObject({
+      Type: 'opencode', Account: 'org_opencode_free', Plan: 'Free', IsAPIKey: false,
+    });
+  } finally {
+    await teardownRunner(runner.runnerProcess);
+    await request.delete(`/api/runners?id=${runner.runnerId}`, { headers });
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('Runner reports an installation without a Console account as API-key billed', async ({ request }) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'arondo-opencode-apikey-'));
+  const runner = await setupOpencodeRunner(
+    request,
+    'OpenCode API key runner',
+    directory,
+    { data: { budgets: [] } },
+    { data: [{ id: 'opencode', connections: [] }] },
+  );
+  try {
+    const refresh = await request.post('/api/agents/quota', { headers, data: { runnerId: runner.runnerId, agent: 'opencode' } });
+    expect(refresh.ok()).toBeTruthy();
+    await expect.poll(async () => {
+      const response = await request.get(`/api/agents/info?runnerId=${runner.runnerId}`, { headers });
+      return (await response.json()).opencode;
+    }).toMatchObject({
+      Type: 'opencode', Account: 'unauthenticated', Plan: 'API Key', IsAPIKey: true,
+    });
+  } finally {
+    await teardownRunner(runner.runnerProcess);
+    await request.delete(`/api/runners?id=${runner.runnerId}`, { headers });
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('Runner reports OpenCode when the usage response carries no data', async ({ request }) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'arondo-opencode-nodata-'));
+  const runner = await setupOpencodeRunner(
+    request,
+    'OpenCode no data runner',
+    directory,
+    { data: null },
+    { data: [{ id: 'opencode', connections: [] }] },
+  );
+  try {
+    const refresh = await request.post('/api/agents/quota', { headers, data: { runnerId: runner.runnerId, agent: 'opencode' } });
+    expect(refresh.ok()).toBeTruthy();
+    await expect.poll(async () => {
+      const response = await request.get(`/api/agents/info?runnerId=${runner.runnerId}`, { headers });
+      return (await response.json()).opencode;
+    }).toMatchObject({
+      Type: 'opencode', Account: 'unauthenticated', Plan: 'API Key', IsAPIKey: true,
+    });
+  } finally {
+    await teardownRunner(runner.runnerProcess);
+    await request.delete(`/api/runners?id=${runner.runnerId}`, { headers });
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('Runner reports OpenCode as a free user when the usage response carries no data for a signed-in account', async ({ request }) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'arondo-opencode-nodata-oauth-'));
+  const runner = await setupOpencodeRunner(
+    request,
+    'OpenCode no data OAuth runner',
+    directory,
+    { data: null },
+    { data: [{ id: 'opencode', connections: [{ type: 'credential', id: 'cred_test', label: 'Personal', method: 'oauth' }] }] },
+  );
+  try {
+    const refresh = await request.post('/api/agents/quota', { headers, data: { runnerId: runner.runnerId, agent: 'opencode' } });
+    expect(refresh.ok()).toBeTruthy();
+    await expect.poll(async () => {
+      const response = await request.get(`/api/agents/info?runnerId=${runner.runnerId}`, { headers });
+      return (await response.json()).opencode;
+    }).toMatchObject({
+      Type: 'opencode', Account: 'unauthenticated', Plan: 'Free', IsAPIKey: false,
+    });
   } finally {
     await teardownRunner(runner.runnerProcess);
     await request.delete(`/api/runners?id=${runner.runnerId}`, { headers });

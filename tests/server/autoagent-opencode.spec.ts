@@ -52,6 +52,28 @@ test('excludes API billing, unknown plans, absent quota, and incomplete windows 
   }
 });
 
+test('excludes a signed-in free account without a Go subscription from every fallback', async () => {
+  await writeQuota({ entry: { Type: 'opencode', Account: 'org_free', Plan: 'Free' } });
+  await expect(selectAgent(['opencode'])).resolves.toBeNull();
+  await expect(isQuotaAvailable('opencode')).resolves.toBe(false);
+  await expect(isAgentQuotaExhausted('opencode')).resolves.toBe(true);
+  await expect(resolveAgentType('auto', ['opencode'], {
+    lockedAgent: { agentType: 'opencode', model: 'opencode-go/minimax-m3' },
+  })).resolves.toBeNull();
+  await expect(selectAgent(['opencode', 'claude'])).resolves.toMatchObject({ agentType: 'claude' });
+});
+
+test('excludes an unauthenticated installation billed by API key from every fallback', async () => {
+  await writeQuota({ entry: { Type: 'opencode', Account: 'unauthenticated', Plan: 'API Key', IsAPIKey: true } });
+  await expect(selectAgent(['opencode'])).resolves.toBeNull();
+  await expect(isQuotaAvailable('opencode')).resolves.toBe(false);
+  await expect(isAgentQuotaExhausted('opencode')).resolves.toBe(true);
+  await expect(resolveAgentType('auto', ['opencode'], {
+    lockedAgent: { agentType: 'opencode', model: 'opencode-go/minimax-m3' },
+  })).resolves.toBeNull();
+  await expect(selectAgent(['opencode', 'claude'])).resolves.toMatchObject({ agentType: 'claude' });
+});
+
 for (const metric of ['FiveHourRemain', 'WeeklyRemain', 'MonthlyRemain']) {
   test(`applies exhaustion and retry thresholds to OpenCode ${metric}`, async () => {
     for (const remain of [0, 0.019, 0.02, 1 - 0.98, 0.020001, 0.14, 0.15]) {

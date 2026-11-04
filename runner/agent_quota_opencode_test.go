@@ -13,6 +13,9 @@ func TestParseOpencodeQuota(t *testing.T) {
 	if quota.Account != "org_test" || quota.Plan != "Go" {
 		t.Fatalf("unexpected identity: %+v", quota)
 	}
+	if quota.IsAPIKey {
+		t.Fatal("a Go subscription must not be flagged as API-key billed")
+	}
 	if *quota.FiveHourRemain != .75 || math.Abs(*quota.WeeklyRemain-.395) > 1e-10 || *quota.MonthlyRemain != 0 {
 		t.Fatalf("incorrect remaining quota: %+v", quota)
 	}
@@ -21,11 +24,32 @@ func TestParseOpencodeQuota(t *testing.T) {
 	}
 }
 
+func TestParseOpencodeQuotaFreeUser(t *testing.T) {
+	quota, err := parseOpencodeQuota([]byte(`{"data":{"workspace":{"id":"org_free"},"budgets":[]}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if quota.Account != "org_free" || quota.Plan != "Free" || quota.IsAPIKey {
+		t.Fatalf("unexpected identity: %+v", quota)
+	}
+	if quota.FiveHourRemain != nil || quota.WeeklyRemain != nil || quota.MonthlyRemain != nil {
+		t.Fatal("a free account has no usage windows to report")
+	}
+}
+
+func TestParseOpencodeQuotaUnauthenticated(t *testing.T) {
+	quota, err := parseOpencodeQuota([]byte(`{"data":{"budgets":[]}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if quota.Account != "unauthenticated" || quota.Plan != "Unknown" || quota.IsAPIKey {
+		t.Fatalf("unexpected identity: %+v", quota)
+	}
+}
+
 func TestParseOpencodeQuotaMissingData(t *testing.T) {
-	for _, output := range []string{`not json`, `{"data":null}`, `{"data":{"workspace":{"id":"org_test"},"go":null}}`, `{"data":{"go":{}}}`} {
-		if _, err := parseOpencodeQuota([]byte(output)); err == nil {
-			t.Fatalf("expected error for %s", output)
-		}
+	if _, err := parseOpencodeQuota([]byte(`not json`)); err == nil {
+		t.Fatal("expected error for malformed JSON")
 	}
 	quota, err := parseOpencodeQuota([]byte(`{"data":{"workspace":{"id":"org_test"},"go":{"rolling":{"limited":false}}}}`))
 	if err != nil {
@@ -33,5 +57,20 @@ func TestParseOpencodeQuotaMissingData(t *testing.T) {
 	}
 	if quota.FiveHourRemain != nil || quota.WeeklyRemain != nil || quota.MonthlyRemain != nil {
 		t.Fatal("missing windows must remain unknown")
+	}
+}
+
+func TestParseOpencodeQuotaWithoutData(t *testing.T) {
+	for _, output := range []string{`{"data":null}`, `{}`} {
+		quota, err := parseOpencodeQuota([]byte(output))
+		if err != nil {
+			t.Fatalf("expected no error for %s: %v", output, err)
+		}
+		if quota.Account != "unauthenticated" || quota.Plan != "Unknown" || quota.IsAPIKey {
+			t.Fatalf("unexpected identity for %s: %+v", output, quota)
+		}
+		if quota.FiveHourRemain != nil || quota.WeeklyRemain != nil || quota.MonthlyRemain != nil {
+			t.Fatal("a response without data has no usage windows")
+		}
 	}
 }

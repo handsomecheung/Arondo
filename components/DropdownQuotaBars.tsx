@@ -9,6 +9,8 @@ export default function DropdownQuotaBars({ quotas, agent, group = "", loading =
   const quota = quotas?.[agent];
   if (loading) return <span>Loading quota…</span>;
   if (quota?.IsAPIKey) return <span>API key billing · Quota unavailable</span>;
+  if (agent === "opencode" && quota?.Plan === "Free") return <span>No Go subscription · Quota unavailable</span>;
+  if (agent === "opencode" && quota?.Plan === "Unknown") return <span>Quota unavailable</span>;
   const rows = getQuotaRows(quota, agent, group);
   if (!rows.length) return <span>Quota unavailable</span>;
   const colorKey = (agent === "antigravity" ? group.toLowerCase() : agent) as QuotaGroup;

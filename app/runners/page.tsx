@@ -56,6 +56,16 @@ interface AgentsQuota {
   opencode?: (Omit<CodexQuota, "DefaultModel"> & { MonthlyRemain?: number | null; MonthlyResetAt?: number | null }) | null;
 }
 
+// OpenCode only reports subscription quota for a Go plan. A Console account
+// without Go, an installation billed by provider API keys, and a runner that
+// could not read its usage all have no Go usage windows to show.
+function opencodeQuotaUnavailableMessage(quota: NonNullable<AgentsQuota["opencode"]>): string | undefined {
+  if (quota.IsAPIKey) return "Quota is unavailable when using API Key billing.";
+  if (quota.Plan === "Free") return "No OpenCode Go subscription. Usage quota is unavailable.";
+  if (quota.Plan === "Unknown") return "OpenCode usage quota could not be read on this runner.";
+  return undefined;
+}
+
 const QUOTA_REFRESH_COOLDOWN_MS = 5 * 60 * 1000;
 
 interface Runner {
@@ -753,10 +763,11 @@ export default function RunnersPage() {
                                 )}
                                 {agentsQuota.opencode && (
                                   <QuotaCard
-                                    title="OpenCode Go"
+                                    title="OpenCode"
                                     account={agentsQuota.opencode.Account}
                                     plan={agentsQuota.opencode.Plan}
                                     updatedAt={agentsQuota.opencode.updatedAt}
+                                    unavailableMessage={opencodeQuotaUnavailableMessage(agentsQuota.opencode)}
                                     rows={getQuotaRows(agentsQuota.opencode, "opencode", "").map((row) => ({
                                       label: row.label === "hour" ? "5-Hour" : row.label === "week" ? "Weekly" : "Monthly",
                                       used: 1 - row.remaining,
