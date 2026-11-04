@@ -5,6 +5,7 @@ import { getSessionLog, getAgentModelsConfig, getDefaultAgentModels, parseModelL
 import { getConfigDir } from "./config";
 import { stripAnsi } from "./ansi";
 import type { AutoModelCostTier, AutoModelEffort, AutoModelOption } from "./llm/automodel";
+import { parseOpencodeModelLine } from "./agentModels";
 import { getAutoagentQuotaScore, getAutoagentWeekTimeRemain } from "./autoagent-score";
 
 const CONFIG_DIR = getConfigDir();
@@ -66,7 +67,13 @@ interface CodexQuota {
   IsAPIKey?: boolean;
 }
 
-type QuotaEntry = ClaudeQuota | AntigravityQuota | CodexQuota;
+interface OpencodeQuota extends Omit<CodexQuota, "Type" | "DefaultModel"> {
+  Type: "opencode";
+  MonthlyRemain?: number | null;
+  MonthlyResetAt?: number | null;
+}
+
+type QuotaEntry = ClaudeQuota | AntigravityQuota | CodexQuota | OpencodeQuota;
 
 async function readQuota(): Promise<Record<string, QuotaEntry>> {
   try {
@@ -79,11 +86,23 @@ async function readQuota(): Promise<Record<string, QuotaEntry>> {
 
 const EXHAUSTED_QUOTA_THRESHOLD = 0.02;
 
-function getLatestQuotaByType(quota: Record<string, QuotaEntry>): Map<QuotaEntry["Type"], QuotaEntry> {
+export interface OpencodeQuotaRef {
+  Account: string;
+  Plan: string;
+}
+
+function getLatestQuotaByType(quota: Record<string, QuotaEntry>, opencodeQuotaRef?: OpencodeQuotaRef | null): Map<QuotaEntry["Type"], QuotaEntry> {
   const latest = new Map<QuotaEntry["Type"], QuotaEntry>();
   for (const entry of Object.values(quota)) {
     const existing = latest.get(entry.Type);
     if (!existing || (entry.updatedAt ?? 0) > (existing.updatedAt ?? 0)) latest.set(entry.Type, entry);
+  }
+  if (opencodeQuotaRef !== undefined) {
+    latest.delete("opencode");
+    if (opencodeQuotaRef) {
+      const entry = quota[`opencode_${opencodeQuotaRef.Account}_${opencodeQuotaRef.Plan}`];
+      if (entry?.Type === "opencode") latest.set("opencode", entry);
+    }
   }
   return latest;
 }
@@ -94,6 +113,7 @@ function getQuotaMetrics(entry?: QuotaEntry, group?: AgyQuotaGroup) {
       hourRemain: group === "argon" ? null : group === "other" ? entry.OtherHourRemain ?? null : entry.GeminiHourRemain ?? null,
       weekRemain: group === "argon" ? entry.ArgonWeeklyRemain ?? null : group === "other" ? entry.OtherWeeklyRemain ?? null : entry.GeminiWeeklyRemain ?? null,
       resetsAt: group === "argon" ? entry.ArgonWeeklyResetsAt ?? null : group === "other" ? entry.OtherWeeklyResetsAt ?? null : entry.GeminiWeeklyResetsAt ?? null,
+      monthRemain: null,
       isAPIKey: entry.IsAPIKey === true,
     };
   }
@@ -101,24 +121,36 @@ function getQuotaMetrics(entry?: QuotaEntry, group?: AgyQuotaGroup) {
     hourRemain: entry?.Type === "claude" ? entry.HourRemain ?? null : entry?.FiveHourRemain ?? null,
     weekRemain: entry?.Type === "claude" ? entry.WeekRemain ?? null : entry?.WeeklyRemain ?? null,
     resetsAt: entry?.Type === "claude" ? entry.WeekResetsAt ?? null : entry?.WeeklyResetAt ?? null,
+    monthRemain: entry?.Type === "opencode" ? entry.MonthlyRemain ?? null : null,
     isAPIKey: entry?.IsAPIKey === true,
   };
 }
 
 function isExhausted(metrics: ReturnType<typeof getQuotaMetrics>): boolean {
   // Collectors may compute 2% as 1 - 0.98, introducing floating-point noise.
-  return !metrics.isAPIKey && [metrics.hourRemain, metrics.weekRemain]
+  return !metrics.isAPIKey && [metrics.hourRemain, metrics.weekRemain, metrics.monthRemain]
     .some((remain) => remain !== null && remain <= EXHAUSTED_QUOTA_THRESHOLD + Number.EPSILON);
 }
 
-export async function isAgentQuotaExhausted(agentType: ConcreteAgentType, group?: AgyQuotaGroup): Promise<boolean> {
-  if (agentType === "opencode") return false;
-  const entry = getLatestQuotaByType(await readQuota()).get(agentType);
+export function isOpencodeGoModel(model?: string): boolean {
+  return /^opencode-go\/[^\s#]+(?:#[^\s#]+)?$/.test(model ?? "");
+}
+
+function hasOpencodeSubscriptionQuota(entry?: QuotaEntry): boolean {
+  if (entry?.Type !== "opencode" || entry.IsAPIKey || !/^go(?: plus| teams)?$/i.test(entry.Plan ?? "")) return false;
+  const metrics = getQuotaMetrics(entry);
+  return [metrics.hourRemain, metrics.weekRemain, metrics.monthRemain]
+    .every((remain) => typeof remain === "number" && Number.isFinite(remain)) && !isExhausted(metrics);
+}
+
+export async function isAgentQuotaExhausted(agentType: ConcreteAgentType, group?: AgyQuotaGroup, opencodeQuotaRef?: OpencodeQuotaRef | null): Promise<boolean> {
+  const entry = getLatestQuotaByType(await readQuota(), opencodeQuotaRef).get(agentType);
+  if (agentType === "opencode") return !hasOpencodeSubscriptionQuota(entry);
   return isExhausted(getQuotaMetrics(entry, group));
 }
 
 interface AgentChoice {
-  id: "A" | "B" | "C" | "D" | "E";
+  id: "A" | "B" | "C" | "D" | "E" | "F";
   agentType: ConcreteAgentType;
   model?: string;
   modelOptions: AutoModelOption[];
@@ -222,6 +254,15 @@ export function getModelOptionsForAgent(
       ...argonModels.map((m) => buildModelOption(m, "antigravity")),
     ];
   }
+  if (agentType === "opencode") {
+    return (configs.opencode?.availableModels ?? []).flatMap((line) => {
+      const model = parseOpencodeModelLine(line);
+      if (!model || !isOpencodeGoModel(model)) return [];
+      const option = buildModelOption(model, "opencode");
+      const description = line.match(/\s+#(.*)$/)?.[1]?.trim();
+      return [{ ...option, description: description || option.description }];
+    });
+  }
   if (agentType === "claude") {
     const models = parseModelList(configs.claude?.availableModels);
     if (models.length > 0) {
@@ -264,14 +305,15 @@ export async function selectAgent(
   runnerAgentBinaries: string[],
   writeLog?: (text: string) => void | Promise<void>,
   preferredAgentType?: ConcreteAgentType,
+  opencodeQuotaRef?: OpencodeQuotaRef | null,
 ): Promise<ResolvedAgent | null> {
-  const logParts = ["# autoagent", `Time: ${new Date().toISOString()}`, "## Input", JSON.stringify({ runnerAgentBinaries, preferredAgentType }, null, 2)];
+  const logParts = ["# autoagent", `Time: ${new Date().toISOString()}`, "## Input", JSON.stringify({ runnerAgentBinaries, preferredAgentType, opencodeQuotaRef }, null, 2)];
   const log = (text: string, stdout = true) => {
     if (stdout) console.log(text);
     logParts.push(text);
   };
   try {
-    const selected = await selectAgentFromQuota(runnerAgentBinaries, log, preferredAgentType);
+    const selected = await selectAgentFromQuota(runnerAgentBinaries, log, preferredAgentType, opencodeQuotaRef);
     logParts.push("## Quota selection", JSON.stringify(selected, null, 2));
     return selected;
   } finally {
@@ -283,17 +325,22 @@ async function selectAgentFromQuota(
   runnerAgentBinaries: string[],
   log: (text: string, stdout?: boolean) => void,
   preferredAgentType?: ConcreteAgentType,
+  opencodeQuotaRef?: OpencodeQuotaRef | null,
 ): Promise<ResolvedAgent | null> {
   const agentModels = await getAgentModelsConfig();
   const hasAgy = runnerAgentBinaries.includes("agy");
   const hasClaude = runnerAgentBinaries.includes("claude");
   const hasCodex = runnerAgentBinaries.includes("codex");
+  const hasOpencode = runnerAgentBinaries.includes("opencode");
+  const quota = await readQuota();
+  const latestEntryByType = getLatestQuotaByType(quota, opencodeQuotaRef);
 
   // A: agy + Gemini models
   // B: agy + Other (Claude) models
   // C: claude
   // D: codex + gpt-6-sol
   // E: agy + Gemini 4 Argon models
+  // F: OpenCode Go subscription models
   const choices: AgentChoice[] = [];
   if (hasAgy) {
     const geminiOptions = getModelOptionsForAgent("antigravity", "gemini", agentModels);
@@ -346,18 +393,32 @@ async function selectAgentFromQuota(
     });
   }
 
+  if (hasOpencode) {
+    if (hasOpencodeSubscriptionQuota(latestEntryByType.get("opencode"))) {
+      const opencodeOptions = getModelOptionsForAgent("opencode", undefined, agentModels);
+      const configuredDefault = parseOpencodeModelLine(agentModels.opencode?.defaultModel) || undefined;
+      choices.push({
+        id: "F",
+        agentType: "opencode",
+        model: isOpencodeGoModel(configuredDefault) ? configuredDefault
+          : opencodeOptions[0]?.model || "opencode-go/minimax-m3",
+        modelOptions: opencodeOptions,
+      });
+    } else {
+      log("[autoagent] Excluded OpenCode: requires a Go subscription with known remaining 5-hour, weekly and monthly quota above 2%.");
+    }
+  }
+
   log(`[autoagent] Available runner binaries: ${runnerAgentBinaries.join(", ")}`);
   log(`[autoagent] Initial choices: ${choices.map((c) => c.id).join(", ")}`);
 
   log(`## Choices\n${JSON.stringify(choices, null, 2)}`, false);
 
+  log(`## Quota\n${JSON.stringify({ path: QUOTA_PATH, entries: quota, latestEntryByType: Object.fromEntries(latestEntryByType) }, null, 2)}`, false);
   if (choices.length === 0) {
     log("[autoagent] No choices available.");
     return null;
   }
-  const quota = await readQuota();
-  const latestEntryByType = getLatestQuotaByType(quota);
-  log(`## Quota\n${JSON.stringify({ path: QUOTA_PATH, entries: quota, latestEntryByType: Object.fromEntries(latestEntryByType) }, null, 2)}`, false);
 
   const getMetrics = (choice: AgentChoice) => getQuotaMetrics(
     latestEntryByType.get(choice.agentType as QuotaEntry["Type"]), choice.agyQuotaGroup,
@@ -487,12 +548,14 @@ async function selectAgentFromQuota(
 export async function isQuotaAvailable(
   agentType?: ConcreteAgentType,
   agyQuotaGroup?: AgyQuotaGroup,
+  opencodeQuotaRef?: OpencodeQuotaRef | null,
 ): Promise<boolean> {
-  if (agentType === "opencode") return true;
-  const latest = getLatestQuotaByType(await readQuota());
+  const latest = getLatestQuotaByType(await readQuota(), opencodeQuotaRef);
+  if (agentType === "opencode" && !hasOpencodeSubscriptionQuota(latest.get("opencode"))) return false;
   if (latest.size === 0) return true;
   const relevant = agentType ? [latest.get(agentType)] : [...latest.values()];
   return relevant.some((entry) => {
+    if (entry?.Type === "opencode" && !hasOpencodeSubscriptionQuota(entry)) return false;
     const groups: (AgyQuotaGroup | undefined)[] = entry?.Type === "antigravity"
       ? agyQuotaGroup ? [agyQuotaGroup] : ["gemini", "other", "argon"]
       : [undefined];
@@ -509,6 +572,7 @@ const AGENT_LABEL: Record<string, string> = {
   claude: "Claude Code",
   antigravity: "Antigravity CLI",
   codex: "Codex CLI",
+  opencode: "OpenCode",
 };
 
 /**

@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
         }
       }
     }
-    for (const agent of ["claude", "codex"] as const) {
+    for (const agent of ["claude", "codex", "opencode"] as const) {
       if (agent in agentModels) {
         const cfg = agentModels[agent];
         if (typeof cfg !== "object" || cfg === null || Array.isArray(cfg)) {
@@ -228,6 +228,10 @@ export async function POST(request: NextRequest) {
           ? agentModels.codex.availableModels.map((m: string) => m.trim()).filter(Boolean)
           : current.codex.availableModels,
       },
+    };
+    next.opencode = {
+      defaultModel: agentModels.opencode?.defaultModel?.trim() ?? current.opencode?.defaultModel,
+      availableModels: agentModels.opencode?.availableModels?.map((m: string) => m.trim()).filter(Boolean) ?? current.opencode?.availableModels,
     };
     patch.agentModels = next;
   }

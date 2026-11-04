@@ -2,13 +2,13 @@
 
 import { useAgentQuotas } from "@/lib/hooks/useAgentQuotas";
 import { type ModelQuotas } from "@/lib/agent-quota-display";
-import { DEFAULT_AGENT_MODELS, parseModelList, type AgentModelsConfig } from "@/lib/agentModels";
+import { DEFAULT_AGENT_MODELS, parseModelList, parseOpencodeModelList, type AgentModelsConfig } from "@/lib/agentModels";
 
 import DropdownQuotaBars from "./DropdownQuotaBars";
 
 interface Props {
   runnerId: string;
-  agentType: "antigravity" | "claude" | "codex";
+  agentType: "antigravity" | "claude" | "codex" | "opencode";
   selectedModel: string;
   config?: AgentModelsConfig | null;
   onSelect: (model: string) => void;
@@ -37,7 +37,7 @@ export function ModelDropdownOptions({ agentType, selectedModel, config, onSelec
     <div className="custom-dropdown-menu new-session-dropdown-menu new-session-model-dropdown-menu">
       {option("")}
       {groups.map((group) => {
-        const models = parseModelList(group.models);
+        const models = (agentType === "opencode" ? parseOpencodeModelList : parseModelList)(group.models);
         if (!models.length) return null;
         return (
           <div key={group.key} className="custom-dropdown-group">

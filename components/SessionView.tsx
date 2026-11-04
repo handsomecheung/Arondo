@@ -1455,7 +1455,7 @@ export default function SessionView({
               </div>
             </div>
 
-            {(agentType === "antigravity" || agentType === "codex" || agentType === "claude") && (
+            {(agentType === "antigravity" || agentType === "codex" || agentType === "claude" || agentType === "opencode") && (
               <div className="input-meta-row model-meta-row">
                 <span className="input-label input-meta-row-label">Model:</span>
                 <div

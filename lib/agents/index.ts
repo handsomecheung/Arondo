@@ -2,8 +2,9 @@ import { BaseAgent } from "./base";
 import { AntigravityAgent } from "./antigravity";
 import { ClaudeCodeAgent } from "./claude";
 import { CodexAgent } from "./codex";
+import { parseOpencodeModelLine } from "../agentModels";
 import { OpencodeAgent } from "./opencode";
-import { getAgyQuotaGroupForModel, getModelOptionsForAgent, isAgentQuotaExhausted, selectAgent, type AgyQuotaGroup } from "../autoagent";
+import { getAgyQuotaGroupForModel, getModelOptionsForAgent, isAgentQuotaExhausted, isOpencodeGoModel, selectAgent, type AgyQuotaGroup, type OpencodeQuotaRef } from "../autoagent";
 import { routeModel, type AutoModelEffort, type AutoModelOption } from "../llm/automodel";
 import { getAgentModelsConfig, parseModelLine } from "../store";
 
@@ -52,6 +53,7 @@ export interface ResolvedAgent {
 }
 
 interface ResolveAgentOptions {
+  opencodeQuotaRef?: OpencodeQuotaRef | null;
   prompt?: string;
   autoagentLog?: (text: string) => void | Promise<void>;
   automodelLog?: (text: string) => void | Promise<void>;
@@ -89,6 +91,8 @@ export async function resolveAgentType(
         defaultModel = parseModelLine(agentModels.antigravity?.gemini?.defaultModel) || undefined;
       } else if (agentType === "claude") {
         defaultModel = parseModelLine(agentModels.claude?.defaultModel) || undefined;
+      } else if (agentType === "opencode") {
+        defaultModel = parseOpencodeModelLine(agentModels.opencode?.defaultModel) || undefined;
       } else if (agentType === "codex") {
         defaultModel = parseModelLine(agentModels.codex?.defaultModel) || undefined;
       }
@@ -98,9 +102,12 @@ export async function resolveAgentType(
       model: defaultModel,
     };
   }
-  const resolved = await selectAgent(runnerAgentBinaries, options.autoagentLog, options.lockedAgent?.agentType);
+  const resolved = await selectAgent(runnerAgentBinaries, options.autoagentLog, options.lockedAgent?.agentType, options.opencodeQuotaRef);
   const lockedGroup = options.lockedAgent?.agyQuotaGroup ?? getAgyQuotaGroupForModel(options.lockedAgent?.model);
-  const useLockedAgent = options.lockedAgent && !await isAgentQuotaExhausted(options.lockedAgent.agentType, lockedGroup);
+  const lockedOpencodeEligible = options.lockedAgent?.agentType !== "opencode"
+    || (runnerAgentBinaries.includes("opencode") && isOpencodeGoModel(options.lockedAgent.model));
+  const useLockedAgent = options.lockedAgent && lockedOpencodeEligible
+    && !await isAgentQuotaExhausted(options.lockedAgent.agentType, lockedGroup, options.opencodeQuotaRef);
   const selected = options.lockedAgent && useLockedAgent
     ? {
       ...options.lockedAgent,

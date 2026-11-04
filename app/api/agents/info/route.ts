@@ -9,7 +9,7 @@ const CONFIG_DIR = getConfigDir();
 export async function GET(req: NextRequest) {
   const runnerId = req.nextUrl.searchParams.get("runnerId");
   if (!runnerId) {
-    return NextResponse.json({ claude: null, antigravity: null, codex: null });
+    return NextResponse.json({ claude: null, antigravity: null, codex: null, opencode: null });
   }
 
   const token = getArondoToken(req);
@@ -26,14 +26,14 @@ export async function GET(req: NextRequest) {
     ]);
     const runner = JSON.parse(runnerRaw) as { quotaAgents?: Array<{ Type: string; Account: string; Plan: string }> };
     const quotas = JSON.parse(quotaRaw) as Record<string, unknown>;
-    const result: Record<string, unknown> = { claude: null, antigravity: null, codex: null };
+    const result: Record<string, unknown> = { claude: null, antigravity: null, codex: null, opencode: null };
     for (const agent of runner.quotaAgents ?? []) {
       if (!(agent.Type in result)) continue;
       result[agent.Type] = quotas[`${agent.Type}_${agent.Account}_${agent.Plan}`] ?? null;
     }
     return NextResponse.json(result);
   } catch {
-    return NextResponse.json({ claude: null, antigravity: null, codex: null });
+    return NextResponse.json({ claude: null, antigravity: null, codex: null, opencode: null });
   }
 }
 

@@ -81,13 +81,13 @@ Select **Auto** in the agent picker to let Arondo choose among the agent CLIs in
 
 Auto Mode uses the following order of preference:
 
-1. Exclude subscription choices with known hourly or weekly quota remaining at or below 2%. Unknown quota is not treated as exhausted.
-2. Consider installed Antigravity, Claude, and Codex CLIs with known subscription quota; API-key-billed accounts are held back as a last resort.
+1. Exclude subscription choices with known hourly or weekly quota remaining at or below 2%. OpenCode Go also checks monthly quota. Unknown quota is not treated as exhausted for other agents.
+2. Consider installed Antigravity, Claude, Codex, and OpenCode CLIs with known subscription quota. OpenCode requires a Go, Go Plus, or Go Teams record linked to the execution Runner, with all three quota windows known and above 2%; it never enters unknown-quota or API-billing fallback. Other API-key-billed agents are held back as a last resort.
 3. Deprioritize agents with less than 15% hourly quota remaining when another candidate has sufficient capacity; if every eligible candidate is low, keep those above 2% available.
 4. Rank the remaining candidates by weekly quota remaining, adjusted for how much time is left before the weekly reset.
 5. If no eligible subscription choice has known weekly quota, use an agent with unknown quota before falling back to an API-key-billed agent.
 
-Session locks are preserved only while the locked agent/quota group is not exhausted. If every installed choice is exhausted, Auto Mode returns HTTP 503 without starting an agent; queued messages remain pending for retry. Quota retry checks also require weekly quota above 2% and hourly quota of at least 15% when known.
+Session locks are preserved only while the locked agent/quota group is not exhausted. If every installed choice is exhausted, Auto Mode returns HTTP 503 without starting an agent; queued messages remain pending for retry. Quota retry checks also require weekly quota above 2% and hourly quota of at least 15% when known. OpenCode additionally requires monthly quota above 2%; its retries wait until the last blocking quota window resets.
 
 After Auto Mode has selected the agent, **automodel** can optionally choose that agent's model and reasoning effort. When configured with a Jev Key (`TYPESAFE_API_KEY`), automodel prioritizes TypeSafe AI's System One model (`jev-latest`) for ultra-fast categorical decision making. If Jev is unconfigured or encounters an error, it seamlessly falls back to standard lightweight LLMs (Anthropic Claude Haiku 4.5, OpenAI GPT-5.4-mini, or Google Gemini 3.5 Flash Lite) through the Vercel AI SDK. automodel is only enabled when a Jev, Anthropic, OpenAI, or Google API key is configured in Settings or through the server environment. It receives the selected agent, the quota-filtered model options for that agent, and the user message, then must choose one of those provided options. If no key is configured, the request times out, the provider returns an error, or the model choice is invalid, Arondo falls back to the predefined model selected by the existing quota-based logic.
 
@@ -97,11 +97,18 @@ Auto Mode writes its agent selection trace to `${ARONDO_CONFIG_DIR}/sessions/${s
 
 ## Agent Models & Defaults
 
-Configure default models and available model lists in **Settings → Agent Models & Defaults**:
+Configure default models and available model lists in **Admin Settings → Agent Models & Defaults**:
 
 - **Antigravity CLI (agy)**: Configured separately for **Gemini Group**, **Others Group** (Claude/other models), and **Gemini 4 Argon Group**, aligning with Antigravity quota tiers.
 - **Claude Code (claude)**: Customize default models and recognized model options passed via `--model`.
 - **Codex CLI (codex)**: Customize default model and reasoning effort options passed to OpenAI Codex.
+- **OpenCode (opencode)**: Defaults to `opencode-go/minimax-m3` (MiniMax M3), with 30 Go model options and inline capability descriptions. Existing saved model lists are preserved; use **Reset → Save Agent Models** in the OpenCode card to load the built-in list. Configure models as `provider/model` or `provider/model#variant`. Use `opencode-go/` for the Go subscription; `opencode/` selects the separate pay-as-you-go provider. A selected session model takes precedence over the admin default, and Arondo passes it via `opencode run --model` on fresh runs and resumes. Leave the default blank to let OpenCode select its own model (including a resumed session’s saved selection). OpenCode comments require whitespace before `#`, preserving attached variants.
+
+For signed-in OpenCode v2 installations, Arondo reads Go quota through `opencode api GET /api/experimental/usage/limits` on the Runner. The Runners page and Agent dropdown show the reported 5-hour, weekly, and monthly remaining quota and reset times. Initial discovery, stale refresh, and manual refresh use the same quota pipeline as other agents. Older CLIs and accounts without Go usage data show unknown quota.
+
+Arondo records `Account` as `data.workspace.id` and normalizes `Plan` to the literal `"Go"` only when `data.go` is present. This labels Go-family subscription quota; it does not identify the Go, Go Plus, or Go Teams tier. The reported usage percentages are converted to remaining ratios, and reset timestamps are converted from milliseconds to seconds.
+
+Auto Mode includes OpenCode only with verified Go subscription capacity. Its fallback model uses the configured OpenCode default when it belongs to `opencode-go/`; automodel options are restricted to that provider, preserving `#variant` suffixes and using inline comments as model descriptions.
 
 When an agent fails, Arondo uses Jev System One to classify the failure, including invalid model selections, quota exhaustion, agent-side failures, and invalid invocation parameters. Configure Jev in Admin Settings to enable this classification and its quota retry follow-up.
 
@@ -147,7 +154,7 @@ All execution goes through a Runner — there is no local fallback on the server
 - **Dedicated Execution Cards & Rich Markdown View**: Script execution uses `ScriptExecCard` (supporting inline log streaming for quick-run commands), while agent execution uses `AgentExecCard` which renders output as Markdown with syntax highlighting (`rehype-highlight`) and clickable file/URL links. Agent cards show the model selected for each run on a separate, wrapping line below the agent name when model information is available, and omit the status line after successful completion. Clicking a verified file path automatically opens the Remote File Browser. Users can copy the formatted markdown output or raw text output directly from the card's menu. Users can also copy chat messages using the Copy action on user chat cards.
 - **Terminal Session Persistence & Reattaching**: Terminal sessions persist across browser refreshes or close events. Re-opening a terminal automatically reattaches to the active PTY session on the runner and replays the output buffer.
 - **Quota & Session Limit Detection**: Uses Jev System One to classify agent failures, including quota exhaustion, from the execution context and displays human-readable error messages. Confirmed quota exhaustion continues through the automatic retry flow.
-- **AI Agent Quota Monitoring**: Automatically collects quota usage data for Claude, Antigravity, and Codex via tmux on the runners, recognizes API-key billing accounts, and displays known remaining quota or an explicit unknown state in the Runners dashboard. Supports an interactive LLM fallback loop to handle agent UI changes, modals, and slash commands.
+- **AI Agent Quota Monitoring**: Automatically collects quota usage data for Claude, Antigravity, and Codex via tmux, and OpenCode Go via its authenticated usage API on the runners, recognizes API-key billing accounts, and displays known remaining quota or an explicit unknown state in the Runners dashboard. Supports an interactive LLM fallback loop to handle agent UI changes, modals, and slash commands.
 - **autoagent (Auto Mode)**: Automatically selects the best agent from known subscription quotas, preferring available capacity over unknown data and using API-key billed choices only as a last fallback. When configured, automodel makes a second-stage model/effort choice from only the quota-filtered options that Auto Mode passes to it.
 - **Manual Agent Switching**: Switch the active agent (Antigravity CLI, Claude Code, Codex, OpenCode, or Auto) on-the-fly within an existing session when the agent is idle.
 - **Agent Session Continuity (Resume)**: Conversations in the same session retain their agent-specific history. Claude Code uses native resume support, Codex CLI stores and reuses Codex session IDs, OpenCode CLI stores and reuses OpenCode session IDs, and Antigravity CLI (agy) stores detected conversation IDs for subsequent `--conversation` runs.

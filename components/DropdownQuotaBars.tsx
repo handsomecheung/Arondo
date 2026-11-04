@@ -2,7 +2,7 @@ import { getQuotaRows, getQuotaScoreColors, type ModelQuotas, type QuotaGroup } 
 
 export default function DropdownQuotaBars({ quotas, agent, group = "", loading = false }: {
   quotas: ModelQuotas | null;
-  agent: "antigravity" | "claude" | "codex";
+  agent: "antigravity" | "claude" | "codex" | "opencode";
   group?: string;
   loading?: boolean;
 }) {

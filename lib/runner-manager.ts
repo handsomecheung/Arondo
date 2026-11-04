@@ -1317,6 +1317,7 @@ class RunnerManager {
       claude: "claude",
       agy: "antigravity",
       codex: "codex",
+      opencode: "opencode",
     };
     const type = agentTypes[agent];
     if (!type) {

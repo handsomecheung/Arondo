@@ -8,6 +8,7 @@ import type { ModelQuotas } from '../../lib/agent-quota-display';
 const hourReset = Math.floor(Date.now() / 1000) + 3600;
 const weekReset = hourReset + 6 * 86400;
 const quotas: ModelQuotas = {
+  opencode: { FiveHourRemain: 0.8, WeeklyRemain: 0.7, WeeklyResetAt: weekReset + 86400, MonthlyRemain: 0.6 },
   antigravity: {
     GeminiHourRemain: 0.81, GeminiWeeklyRemain: 0.62,
     OtherHourRemain: 0, OtherWeeklyRemain: 0.19,

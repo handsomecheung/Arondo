@@ -7,7 +7,7 @@ const CONFIG_DIR = getConfigDir();
 const OUTPUT_PATH = path.join(CONFIG_DIR, "autoagent", "agent", "quota.json");
 const STALE_THRESHOLD_S = 60 * 60;
 const INITIAL_FETCH_INTERVAL_MS = 60 * 1000;
-const TYPE_TO_BINARY: Record<string, string> = { claude: "claude", antigravity: "agy", codex: "codex" };
+const TYPE_TO_BINARY: Record<string, string> = { claude: "claude", antigravity: "agy", codex: "codex", opencode: "opencode" };
 const BINARY_TO_TYPE = Object.fromEntries(
   Object.entries(TYPE_TO_BINARY).map(([type, binary]) => [binary, type]),
 );

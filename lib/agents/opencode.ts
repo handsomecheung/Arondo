@@ -57,7 +57,7 @@ export class OpencodeAgent extends BaseAgent {
   readonly name = "opencode";
 
   getCommand({ sessionId, isResume, model }: Omit<AgentRunOptions, "onOutput">): string {
-    const modelArg = model ? ` --model "${model}"` : "";
+    const modelArg = model ? ` --model "${model.replace(/["\\$`]/g, "\\$&")}"` : "";
     const promptArg = `"$(< "$${PROMPT_ENV_VAR}")"`;
     const opencodeId = isResume && sessionId ? getOpencodeSessionIdSync(sessionId) : undefined;
 

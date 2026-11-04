@@ -105,7 +105,6 @@ func interactiveLlmQuotaLoop(client *Client, agent, session string) bool {
 	return false
 }
 
-
 func (h *Handler) handleInfoFetch(msg *Message) {
 	var payload struct {
 		Agent  string `json:"agent"`
@@ -125,6 +124,8 @@ func (h *Handler) handleInfoFetch(msg *Message) {
 		go fetchClaudeQuota(h.client, method)
 	case "agy":
 		go fetchAgyQuota(h.client, method)
+	case "opencode":
+		go fetchOpencodeQuota(h.client)
 	case "codex":
 		go fetchCodexQuota(h.client, method)
 	default:

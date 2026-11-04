@@ -38,7 +38,7 @@ export function AgentDropdownOptions({ agentType, isAgentAvailable, onSelect, qu
               <DropdownQuotaBars quotas={quotas} agent="antigravity" group={group} loading={loading} />
             </span>
           ))}
-          {(value === "claude" || value === "codex") && (
+          {(value === "claude" || value === "codex" || value === "opencode") && (
             <span className="dropdown-option-quota">
               <DropdownQuotaBars quotas={quotas} agent={value} loading={loading} />
             </span>

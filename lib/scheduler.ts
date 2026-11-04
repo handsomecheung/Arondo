@@ -10,6 +10,7 @@ import {
   type TodoStatus,
 } from "./store";
 import { dispatchFollowupMessage } from "./session-actions";
+import { runnerManager } from "./runner-manager";
 import { isQuotaAvailable } from "./autoagent";
 import { getProjectReadiness } from "./project-readiness";
 
@@ -80,7 +81,11 @@ async function evaluateTodo(session: Session, todo: Message): Promise<void> {
     // status leaves the todo pending so the user can decide manually.
     if (canDispatchAfterSessionTodo(session)) await executeAction(session, todo);
   } else if (trigger.kind === "quotaAvailable") {
-    if (await isQuotaAvailable(trigger.agentType as any, trigger.agyQuotaGroup)) await executeAction(session, todo);
+    const opencodeQuotaRef = runnerManager.getRunner(session.runnerId)?.info.quotaAgents
+      ?.find((entry) => entry.Type === "opencode") ?? null;
+    if (await isQuotaAvailable(trigger.agentType as any, trigger.agyQuotaGroup, opencodeQuotaRef)) {
+      await executeAction(session, todo);
+    }
   } else if (trigger.kind === "codebaseReady") {
     if (await isCodebaseReady(session)) await executeAction(session, todo);
   }

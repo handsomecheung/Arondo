@@ -19,6 +19,7 @@ const TYPE_TO_BINARY: Record<string, string> = {
   claude: "claude",
   antigravity: "agy",
   codex: "codex",
+  opencode: "opencode",
 };
 
 interface BaseQuotaEntry {
@@ -59,7 +60,13 @@ interface CodexQuota extends BaseQuotaEntry {
   WeeklyResetAt?: number | null;
 }
 
-type QuotaEntry = ClaudeQuota | AntigravityQuota | CodexQuota;
+interface OpencodeQuota extends Omit<CodexQuota, "Type"> {
+  Type: "opencode";
+  MonthlyRemain?: number | null;
+  MonthlyResetAt?: number | null;
+}
+
+type QuotaEntry = ClaudeQuota | AntigravityQuota | CodexQuota | OpencodeQuota;
 
 async function readQuota(): Promise<Record<string, QuotaEntry>> {
   try {
@@ -132,6 +139,16 @@ function getResetTimestampSec(
       q.ArgonWeeklyResetsAt ||
       null
     );
+  }
+
+  if (agentType === "opencode") {
+    const q = entry as OpencodeQuota;
+    const blockedResets = [
+      (q.FiveHourRemain ?? 1) < 0.15 ? q.FiveHourResetAt : null,
+      (q.WeeklyRemain ?? 1) <= 0.02 + Number.EPSILON ? q.WeeklyResetAt : null,
+      (q.MonthlyRemain ?? 1) <= 0.02 + Number.EPSILON ? q.MonthlyResetAt : null,
+    ].filter((reset): reset is number => typeof reset === "number");
+    return blockedResets.length ? Math.max(...blockedResets) : null;
   }
 
   if (agentType === "codex") {

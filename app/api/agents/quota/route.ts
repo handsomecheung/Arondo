@@ -6,6 +6,7 @@ const QUOTA_AGENTS: Record<string, string> = {
   claude: "claude",
   agy: "antigravity",
   codex: "codex",
+  opencode: "opencode",
 };
 const QUOTA_REFRESH_COOLDOWN_MS = 5 * 60 * 1000;
 const lastQuotaRefreshAt = new Map<string, number>();

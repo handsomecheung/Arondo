@@ -974,6 +974,11 @@ export async function getAppSettings(): Promise<AppSettings> {
   }
 
   const mergedAgentModels: AgentModelsConfig = {
+    opencode: {
+      defaultModel: rawAgentModels?.opencode?.defaultModel ?? defaults.opencode?.defaultModel,
+      availableModels: Array.isArray(rawAgentModels?.opencode?.availableModels)
+        ? rawAgentModels.opencode.availableModels : defaults.opencode?.availableModels,
+    },
     antigravity: {
       gemini: {
         defaultModel: rawAgyGemini?.defaultModel !== undefined

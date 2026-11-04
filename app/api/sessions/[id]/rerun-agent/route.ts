@@ -75,6 +75,7 @@ export async function POST(
   const systemMessageId = crypto.randomUUID();
   const rerunAgentType = targetMsg.resolvedAgentType || session.agentType;
   const resolved = await resolveAgentType(rerunAgentType, runnerConn?.info.agents ?? [], {
+    opencodeQuotaRef: runnerConn?.info.quotaAgents?.find((entry) => entry.Type === "opencode") ?? null,
     prompt,
     automodelLog: (text) => appendAutomodelLog(id, systemMessageId, text),
     once: session.once,

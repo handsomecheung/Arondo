@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { type AgentModelsConfig, DEFAULT_AGENT_MODELS } from "@/lib/agentModels";
+import { type AgentModelsConfig, DEFAULT_AGENT_MODELS, parseModelList, parseOpencodeModelList } from "@/lib/agentModels";
 
 interface AgentModelsManagerProps {
   initialConfig?: AgentModelsConfig;
@@ -19,10 +19,15 @@ interface FormState {
   antigravityArgon: GroupFormState;
   claude: GroupFormState;
   codex: GroupFormState;
+  opencode: GroupFormState;
 }
 
 function configToFormState(config?: AgentModelsConfig): FormState {
   return {
+    opencode: {
+      defaultModel: config?.opencode?.defaultModel ?? DEFAULT_AGENT_MODELS.opencode.defaultModel ?? "",
+      availableModelsText: (config?.opencode?.availableModels ?? DEFAULT_AGENT_MODELS.opencode.availableModels ?? []).join("\n"),
+    },
     antigravityGemini: {
       defaultModel: config?.antigravity?.gemini?.defaultModel ?? DEFAULT_AGENT_MODELS.antigravity.gemini.defaultModel ?? "",
       availableModelsText: (config?.antigravity?.gemini?.availableModels ?? DEFAULT_AGENT_MODELS.antigravity.gemini.availableModels ?? []).join("\n"),
@@ -83,7 +88,7 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
     }));
   };
 
-  const handleResetAgent = (agent: "claude" | "codex") => {
+  const handleResetAgent = (agent: "claude" | "codex" | "opencode") => {
     const def = DEFAULT_AGENT_MODELS[agent];
     setForm((prev) => ({
       ...prev,
@@ -100,6 +105,10 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
     setSavedSuccess(false);
 
     const payload: AgentModelsConfig = {
+      opencode: {
+        defaultModel: form.opencode.defaultModel.trim(),
+        availableModels: form.opencode.availableModelsText.split("\n").map((m) => m.trim()).filter(Boolean),
+      },
       antigravity: {
         gemini: {
           defaultModel: form.antigravityGemini.defaultModel.trim(),
@@ -171,13 +180,9 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
     availablePlaceholder: string,
     idPrefix: string,
   ) => {
-    const modelCount = state.availableModelsText
-      .split("\n")
-      .map((m) => {
-        const hashIdx = m.indexOf("#");
-        return (hashIdx >= 0 ? m.slice(0, hashIdx) : m).trim();
-      })
-      .filter(Boolean).length;
+    const modelCount = (idPrefix === "opencode" ? parseOpencodeModelList : parseModelList)(
+      state.availableModelsText.split("\n"),
+    ).length;
 
     return (
       <div
@@ -310,7 +315,7 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
           Agent Models & Defaults
         </h2>
         <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 0, lineHeight: 1.5 }}>
-          Configure default models and available models for Antigravity (Gemini &amp; Others), Claude Code, and Codex. Model names support comments starting with <code>#</code> (e.g. <code>Model Name # notes</code> or full-line comments), and empty/comment lines will be automatically ignored. Saved in arondo.json.
+          Configure default models and available models for Antigravity (Gemini &amp; Others), Claude Code, Codex, and OpenCode. Model names support comments starting with <code>#</code> (e.g. <code>Model Name # notes</code> or full-line comments), and empty/comment lines will be automatically ignored. Saved in arondo.json.
         </p>
       </div>
 
@@ -387,6 +392,17 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
             "codex",
           )}
         </div>
+
+        {renderGroupCard(
+          "OpenCode Models",
+          "Use provider/model#variant (optional variant). opencode-go uses the Go plan; opencode uses pay-as-you-go. Leave the default blank to use OpenCode’s own selection. Put a space before # comments.",
+          form.opencode,
+          (k, v) => handleChange("opencode", k, v),
+          () => handleResetAgent("opencode"),
+          "OpenCode default",
+          "opencode-go/gemini-4-argon\nopencode-go/glm-5.3",
+          "opencode",
+        )}
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
           <button

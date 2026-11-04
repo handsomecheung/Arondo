@@ -41,7 +41,7 @@ cli/arondo-cli send \
   "Implement the requested change and run the relevant validation."
 ```
 
-- **Agent selection (`--agent`)**: Choose from `auto`, `antigravity`, `claude`, `codex`, `opencode`, or `decision`. Prefer `auto` unless a specific agent is requested.
+- **Agent selection (`--agent`)**: Choose from `auto`, `antigravity`, `claude`, `codex`, `opencode`, or `decision`. Prefer `auto` unless a specific agent is requested. Auto Mode can select OpenCode when the execution Runner has verified Go subscription quota above 2% in its 5-hour, weekly, and monthly windows. OpenCode Auto runs use only `opencode-go/` models; API-billed and unknown-quota OpenCode installations are excluded.
 - **Automation (`--automation`)**: Create a project-free session marked `automation: true` with a fresh Runner-side workspace in `${ARONDO_CONFIG_DIR:-$HOME/.arondo}/automation-workspaces/`, named with a UTC datetime and random suffix. Without `--runner-id`, an accessible connected Runner is selected at random. Decision agents need neither a Runner nor a workspace. Sessions, tasks, search results, todos, and notifications are hidden unless an admin enables **Show automation sessions**. Direct session-ID access still works. Workspaces are retained until manually removed, including after session deletion. Do not combine with `--path`, `--no-path`, `--temp-dir`, `--resume`, or `--session-id`. To continue later, use `send --session-id <id>` without `--automation`.
 - **Isolated runs (`--temp-dir` / `--no-path`)**: `--temp-dir` is deprecated and emits a warning on stderr; its existing behavior is unchanged. Prefer `--automation` for new automation calls. Use `--temp-dir` to create the session in a fresh temporary directory on the runner (mutually exclusive with `--path`; cannot be combined with `--resume`). Use `--no-path` to create the session in a dedicated temporary directory without a project path.
 - **Single-use & caching (`--once`, `--cache`)**: Pass `--once` with `--automation` (or legacy `--temp-dir`) to create a single-use session that rejects follow-up messages. Add `--cache on` (default: `off`, requires `--once`) to return cached results from `${ARONDO_CONFIG_DIR}/cache/once/` for matching prompt hashes without invoking an agent for seven days. Expired files remain on disk and are refreshed after a successful agent run.
@@ -145,5 +145,7 @@ cli/arondo-cli get-projects
 # Print full conversation history of a session (supports --output plain, json, or html)
 cli/arondo-cli get-messages --session-id "<session-id>" --output html
 ```
+
+OpenCode quota records use the fixed `Plan: "Go"` label when the authenticated usage response contains Go quota; this label does not distinguish Go, Go Plus, and Go Teams.
 
 All commands use the same server and token resolution order (`--server` / `--client-token` > env vars > `~/.arondo/arondo.json`).

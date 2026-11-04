@@ -4,7 +4,7 @@ import path from 'path';
 import { resolveAgentType } from '../../lib/agents';
 
 test.describe('New Session Model Select UI & Logic', () => {
-  test('SessionView renders Model dropdown with 3 groups for agy, correct models for claude/codex, and hides for auto/opencode', () => {
+  test('SessionView renders Model dropdown with 3 groups for agy, correct models for claude/codex, includes OpenCode, and hides for auto', () => {
     const scriptPath = path.resolve(__dirname, '../helpers/renderModelSelectHelper.ts');
     const output = execFileSync('npx', ['tsx', scriptPath], {
       cwd: path.resolve(__dirname, '../..'),
@@ -39,7 +39,7 @@ test.describe('New Session Model Select UI & Logic', () => {
 
     // 4. Auto & OpenCode
     expect(result.auto.hasModelRow).toBe(false);
-    expect(result.opencode.hasModelRow).toBe(false);
+    expect(result.opencode.hasModelRow).toBe(true);
   });
 
   test('colored quota bars appear in agent options and Antigravity model group headers', () => {
@@ -59,7 +59,7 @@ test.describe('New Session Model Select UI & Logic', () => {
     expect(option(result.agents, 'Claude Code')).toContain('hour: 75% week: 32%');
     expect(option(result.agents, 'Codex')).toContain('hour: 91% week: 55%');
     expect(option(result.agents, 'Auto')).not.toContain('%');
-    expect(option(result.agents, 'OpenCode')).not.toContain('%');
+    expect(option(result.agents, 'OpenCode')).toContain('hour: 80% week: 70% month: 60%');
     expect(result.singleAgent).toHaveLength(1);
     expect(result.singleAgent[0]).toContain('Claude Code');
     expect(result.claude.every((row: string) => !row.includes('%') && !row.includes('quota'))).toBe(true);
