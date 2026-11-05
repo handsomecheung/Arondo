@@ -164,7 +164,7 @@ export function isFreeOpencodeModel(line: string): boolean {
   return !!model && /^opencode(?:-go)?\/(?:big-pickle|[^/]+-free)$/.test(model);
 }
 
-export function getOpencodeModelGroups(config?: OpencodeModelsConfig | null) {
+export function getOpencodeModelGroups(config?: OpencodeModelsConfig | null, options?: { freeOnly?: boolean }) {
   const available = config?.availableModels ?? DEFAULT_AGENT_MODELS.opencode.availableModels ?? [];
   const seen = new Set<string>();
   const free = [
@@ -178,6 +178,15 @@ export function getOpencodeModelGroups(config?: OpencodeModelsConfig | null) {
       seen.add(model);
       return true;
     });
+  if (options?.freeOnly) {
+    const freeModels = free.filter((line) => {
+      const model = parseOpencodeModelLine(line);
+      return !!model && model.startsWith("opencode/");
+    });
+    return [
+      { name: "Free", key: "Free", models: freeModels },
+    ];
+  }
   return [
     { name: "Go / Pay-as-you-go", key: "", models: available.filter((line) => !isFreeOpencodeModel(line) && !seen.has(parseOpencodeModelLine(line) ?? "")) },
     { name: "Free", key: "Free", models: free },

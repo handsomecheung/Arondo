@@ -56,6 +56,11 @@ test.describe('New Session Model Select UI & Logic', () => {
     expect(result.opencodeGroups).toHaveLength(2);
     expect(result.opencodeGroups[0]).toContain('hour: 80% week: 70% month: 60%');
     expect(result.opencodeGroups[1]).toBe('Free');
+    expect(result.opencodeFreeGroups).toEqual(['Free']);
+    expect(result.opencodeFree.includes('opencode/big-pickle')).toBe(true);
+    expect(result.opencodeFree.includes('opencode-go/beam-free')).toBe(false);
+    expect(result.opencodeFree.includes('opencode-go/minimax-m3')).toBe(false);
+    expect(result.opencodeFree.filter((m: string) => m !== 'Default').every((m: string) => m.startsWith('opencode/'))).toBe(true);
     expect(option(result.agyGroups, 'Gemini ')).toContain('hour: 81% week: 62%');
     expect(option(result.agyGroups, 'Anthropic &amp; Other')).toContain('hour: 0% week: 19%');
     expect(option(result.agyGroups, 'Gemini 4 Argon')).toContain('week: 44%');

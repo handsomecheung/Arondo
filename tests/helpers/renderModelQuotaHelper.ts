@@ -44,6 +44,8 @@ console.log(JSON.stringify({
   agy: render('antigravity', quotas),
   agyGroups: render('antigravity', quotas, false, true),
   opencodeGroups: render('opencode', quotas, false, true),
+  opencodeFree: render('opencode', { opencode: { Plan: 'Free' } }),
+  opencodeFreeGroups: render('opencode', { opencode: { Plan: 'Free' } }, false, true),
   claude: render('claude', quotas),
   codex: render('codex', quotas),
   unknown: renderAgents(null, false, ['codex']),

@@ -1,6 +1,6 @@
 import { getAutoagentQuotaScore } from "./autoagent-score";
 
-export type AgentQuota = { IsAPIKey?: boolean; Plan?: string } & Partial<Record<
+export type AgentQuota = { Account?: string; IsAPIKey?: boolean; Plan?: string } & Partial<Record<
   | 'HourRemain' | 'HourResetAt' | 'WeekRemain' | 'WeekResetsAt'
   | 'MonthlyRemain' | 'MonthlyResetAt'
   | 'FiveHourRemain' | 'FiveHourResetAt' | 'WeeklyRemain' | 'WeeklyResetAt'

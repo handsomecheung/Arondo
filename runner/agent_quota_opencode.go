@@ -101,8 +101,8 @@ func readOpencodeAuth(ctx context.Context) opencodeAuth {
 			return opencodeAuth{APIKey: connection.Method == "key", Known: true}
 		}
 	}
-	// The Console integration exists but has no connected credential.
-	return opencodeAuth{APIKey: true, Known: true}
+	// No connected credential: this is an unconfigured installation with no API key.
+	return opencodeAuth{APIKey: false, Known: true}
 }
 
 func parseOpencodeQuota(output []byte) (*OpencodeQuota, error) {

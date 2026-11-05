@@ -102,7 +102,7 @@ Configure default models and available model lists in **Admin Settings → Agent
 - **Antigravity CLI (agy)**: Configured separately for **Gemini Group**, **Others Group** (Claude/other models), and **Gemini 4 Argon Group**, aligning with Antigravity quota tiers.
 - **Claude Code (claude)**: Customize default models and recognized model options passed via `--model`.
 - **Codex CLI (codex)**: Customize default model and reasoning effort options passed to OpenAI Codex.
-- **OpenCode (opencode)**: Defaults to `opencode-go/minimax-m3` (MiniMax M3), with separate **Go / Pay-as-you-go** and **Free** groups. The Free group includes Go subscription free models and free `opencode/` models, including Big Pickle. Recognized free models in existing lists appear in the Free group automatically. Edit or reset each group in Admin Settings, then select **Save**. Configure models as `provider/model` or `provider/model#variant`; put whitespace before `#` comments to preserve attached variants. `opencode-go/` requires a Go subscription, including for its free models; `opencode/` provides both paid and free models.
+- **OpenCode (opencode)**: Defaults to `opencode-go/minimax-m3` (MiniMax M3), with separate **Go / Pay-as-you-go** and **Free** groups. The Free group includes Go subscription free models and free `opencode/` models, including Big Pickle. Recognized free models in existing lists appear in the Free group automatically. Edit or reset each group in Admin Settings, then select **Save**. Configure models as `provider/model` or `provider/model#variant`; put whitespace before `#` comments to preserve attached variants. `opencode-go/` requires a Go subscription, including for its free models; `opencode/` provides both paid and free models. On runners without an active Go subscription (Free status), model dropdown menus present only free models under `opencode/`.
 
 The OpenCode Free list is stored as `setitngs.agentModels.opencode.freeModels` in `arondo.json`. Missing lists use the built-in defaults; administrators can edit the list as model availability changes. The Free group does not display Go subscription quota bars.
 
@@ -117,8 +117,8 @@ Installations without an OpenCode Console account are still reported instead of 
 | State | `Plan` | `IsAPIKey` | Reported as |
 |---|---|---|---|
 | Go subscription | `Go` | `false` | 5-hour, weekly, and monthly remaining quota |
-| Signed in without a Go subscription | `Free` | `false` | No Go subscription; quota unavailable |
-| API-key billed (no Console account) | `API Key` | `true` | API key billing; quota unavailable |
+| Signed in without Go (or unconfigured) | `Free` | `false` | No Go subscription; quota unavailable |
+| API-key credential connected | `API Key` | `true` | API key billing; quota unavailable |
 | Usage response unreadable | `Unknown` | `false` | Quota could not be read on this runner |
 
 Because a quota record now always exists for OpenCode, the Runner page lists OpenCode for every runner that has the binary installed, and the server stops retrying the usage request for an installation that cannot report Go quota.

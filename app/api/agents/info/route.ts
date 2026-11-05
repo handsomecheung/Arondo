@@ -29,7 +29,8 @@ export async function GET(req: NextRequest) {
     const result: Record<string, unknown> = { claude: null, antigravity: null, codex: null, opencode: null };
     for (const agent of runner.quotaAgents ?? []) {
       if (!(agent.Type in result)) continue;
-      result[agent.Type] = quotas[`${agent.Type}_${agent.Account}_${agent.Plan}`] ?? null;
+      const found = quotas[`${agent.Type}_${agent.Account}_${agent.Plan}`];
+      result[agent.Type] = found ?? { Account: agent.Account, Plan: agent.Plan };
     }
     return NextResponse.json(result);
   } catch {

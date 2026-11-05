@@ -30,6 +30,32 @@ test('OpenCode groups recognize legacy free models, preserve variants, and avoid
   expect(getOpencodeModelGroups({ availableModels: [], freeModels: [] }).every((g) => !g.models.length)).toBe(true);
 });
 
+test('OpenCode groups return only opencode/ free models when freeOnly is true', () => {
+  const groups = getOpencodeModelGroups({
+    availableModels: [
+      'opencode-go/glm-5.3 # paid',
+      'opencode-go/beam-free#high # free variant requiring Go',
+      'opencode/big-pickle # free without suffix',
+      'opencode/beam-free # free opencode model',
+    ],
+    freeModels: [
+      'opencode-go/iceman-contributor-free # Go free model',
+      'opencode/crouton-alpha-free # pure free model',
+    ],
+  }, { freeOnly: true });
+
+  expect(groups).toHaveLength(1);
+  expect(groups[0].name).toBe('Free');
+  const models = parseOpencodeModelList(groups[0].models);
+  expect(models).toContain('opencode/big-pickle');
+  expect(models).toContain('opencode/beam-free');
+  expect(models).toContain('opencode/crouton-alpha-free');
+  expect(models).not.toContain('opencode-go/beam-free#high');
+  expect(models).not.toContain('opencode-go/iceman-contributor-free');
+  expect(models).not.toContain('opencode-go/glm-5.3');
+  expect(models.every((m) => m.startsWith('opencode/'))).toBe(true);
+});
+
 test('OpenCode settings validate, persist, and resolve default and explicit models', async ({ request }) => {
   const before = await (await request.get('/api/settings', { headers })).json();
   try {
@@ -177,14 +203,39 @@ test('Runner reports a signed-in account without a Go subscription as a free use
   }
 });
 
-test('Runner reports an installation without a Console account as API-key billed', async ({ request }) => {
+test('Runner reports an unconfigured installation without credentials as a free user', async ({ request }) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'arondo-opencode-unconfigured-'));
+  const runner = await setupOpencodeRunner(
+    request,
+    'OpenCode unconfigured runner',
+    directory,
+    { data: { budgets: [] } },
+    { data: [{ id: 'opencode', connections: [] }] },
+  );
+  try {
+    const refresh = await request.post('/api/agents/quota', { headers, data: { runnerId: runner.runnerId, agent: 'opencode' } });
+    expect(refresh.ok()).toBeTruthy();
+    await expect.poll(async () => {
+      const response = await request.get(`/api/agents/info?runnerId=${runner.runnerId}`, { headers });
+      return (await response.json()).opencode;
+    }).toMatchObject({
+      Type: 'opencode', Account: 'unauthenticated', Plan: 'Free', IsAPIKey: false,
+    });
+  } finally {
+    await teardownRunner(runner.runnerProcess);
+    await request.delete(`/api/runners?id=${runner.runnerId}`, { headers });
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('Runner reports an installation with an API-key credential as API-key billed', async ({ request }) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'arondo-opencode-apikey-'));
   const runner = await setupOpencodeRunner(
     request,
     'OpenCode API key runner',
     directory,
     { data: { budgets: [] } },
-    { data: [{ id: 'opencode', connections: [] }] },
+    { data: [{ id: 'opencode', connections: [{ type: 'credential', id: 'cred_key', label: 'API Key', method: 'key' }] }] },
   );
   try {
     const refresh = await request.post('/api/agents/quota', { headers, data: { runnerId: runner.runnerId, agent: 'opencode' } });
@@ -218,7 +269,7 @@ test('Runner reports OpenCode when the usage response carries no data', async ({
       const response = await request.get(`/api/agents/info?runnerId=${runner.runnerId}`, { headers });
       return (await response.json()).opencode;
     }).toMatchObject({
-      Type: 'opencode', Account: 'unauthenticated', Plan: 'API Key', IsAPIKey: true,
+      Type: 'opencode', Account: 'unauthenticated', Plan: 'Free', IsAPIKey: false,
     });
   } finally {
     await teardownRunner(runner.runnerProcess);

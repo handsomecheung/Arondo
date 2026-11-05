@@ -21,6 +21,10 @@ interface Props {
 type ModelOptionsProps = Pick<Props, "agentType" | "selectedModel" | "config" | "onSelect"> & { quotas: ModelQuotas | null; loading?: boolean };
 
 export function ModelOptions({ agentType, selectedModel, config, onSelect, quotas, loading = false }: ModelOptionsProps) {
+  const isOpencodeFree = agentType === "opencode" && (
+    quotas?.opencode?.Plan?.toLowerCase() === "free" ||
+    quotas?.opencode?.Account === "unauthenticated"
+  );
   const agy = config?.antigravity;
   const groups = agentType === "antigravity"
     ? [
@@ -28,7 +32,7 @@ export function ModelOptions({ agentType, selectedModel, config, onSelect, quota
       { name: "Anthropic & Other", key: "Other", models: agy?.other?.availableModels ?? DEFAULT_AGENT_MODELS.antigravity.other.availableModels },
       { name: "Gemini 4 Argon", key: "Argon", models: agy?.argon?.availableModels ?? DEFAULT_AGENT_MODELS.antigravity.argon?.availableModels },
     ]
-    : agentType === "opencode" ? getOpencodeModelGroups(config?.opencode)
+    : agentType === "opencode" ? getOpencodeModelGroups(config?.opencode, { freeOnly: isOpencodeFree })
     : [{ name: "", key: "", models: config?.[agentType]?.availableModels ?? DEFAULT_AGENT_MODELS[agentType].availableModels }];
   const option = (model: string) => (
     <button
@@ -74,6 +78,6 @@ export function ModelDropdownOptions({ className = "new-session-dropdown-menu ne
 }
 
 export default function ModelDropdownMenu(props: Props) {
-  const { quotas, loading } = useAgentQuotas(props.runnerId, props.agentType === "antigravity");
+  const { quotas, loading } = useAgentQuotas(props.runnerId);
   return <ModelDropdownOptions {...props} quotas={quotas} loading={loading} />;
 }
