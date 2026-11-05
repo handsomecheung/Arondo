@@ -1333,13 +1333,13 @@ export default function HomePage() {
     }
   };
 
-  const handleSwitchAgent = async (newAgentType: string) => {
+  const handleSwitchAgent = async (newAgentType: string, model?: string) => {
     if (!selectedSessionId) return;
     try {
       const res = await fetch(`/api/sessions/${selectedSessionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agentType: newAgentType }),
+        body: JSON.stringify({ agentType: newAgentType, model: model ?? "" }),
       });
       if (res.ok) {
         const updated = await res.json();

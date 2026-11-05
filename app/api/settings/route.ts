@@ -143,6 +143,11 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  if (agentModels?.opencode?.freeModels !== undefined &&
+    (!Array.isArray(agentModels.opencode.freeModels) || !agentModels.opencode.freeModels.every((m: unknown) => typeof m === "string"))) {
+    return NextResponse.json({ error: "agentModels.opencode.freeModels must be an array of strings" }, { status: 400 });
+  }
+
   const patch: {
     sessionArchiveDays?: number;
     automationSessionRetentionHours?: number;
@@ -222,6 +227,7 @@ export async function POST(request: NextRequest) {
       },
     };
     next.opencode = {
+      freeModels: agentModels.opencode?.freeModels?.map((m: string) => m.trim()).filter(Boolean) ?? current.opencode?.freeModels,
       defaultModel: agentModels.opencode?.defaultModel?.trim() ?? current.opencode?.defaultModel,
       availableModels: agentModels.opencode?.availableModels?.map((m: string) => m.trim()).filter(Boolean) ?? current.opencode?.availableModels,
     };

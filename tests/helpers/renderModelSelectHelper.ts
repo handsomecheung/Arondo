@@ -179,6 +179,9 @@ console.log(
     },
     opencode: {
       hasModelRow: opencodeHtml.includes('model-meta-row'),
+      hasFreeGroup: opencodeHtml.includes('>Free</div>'),
+      hasGoFree: opencodeHtml.includes('opencode-go/beam-free'),
+      hasBigPickle: opencodeHtml.includes('opencode/big-pickle'),
     },
   })
 );

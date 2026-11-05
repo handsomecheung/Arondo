@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { type AgentModelsConfig, DEFAULT_AGENT_MODELS, parseModelList, parseOpencodeModelList } from "@/lib/agentModels";
+import { type AgentModelsConfig, DEFAULT_AGENT_MODELS, getOpencodeModelGroups, parseModelList, parseOpencodeModelList } from "@/lib/agentModels";
 
 interface AgentModelsManagerProps {
   initialConfig?: AgentModelsConfig;
@@ -20,13 +20,18 @@ interface FormState {
   claude: GroupFormState;
   codex: GroupFormState;
   opencode: GroupFormState;
+  opencodeFree: GroupFormState;
 }
 
 function configToFormState(config?: AgentModelsConfig): FormState {
   return {
+    opencodeFree: {
+      defaultModel: "",
+      availableModelsText: getOpencodeModelGroups(config?.opencode)[1].models.join("\n"),
+    },
     opencode: {
       defaultModel: config?.opencode?.defaultModel ?? DEFAULT_AGENT_MODELS.opencode.defaultModel ?? "",
-      availableModelsText: (config?.opencode?.availableModels ?? DEFAULT_AGENT_MODELS.opencode.availableModels ?? []).join("\n"),
+      availableModelsText: getOpencodeModelGroups(config?.opencode)[0].models.join("\n"),
     },
     antigravityGemini: {
       defaultModel: config?.antigravity?.gemini?.defaultModel ?? DEFAULT_AGENT_MODELS.antigravity.gemini.defaultModel ?? "",
@@ -106,6 +111,7 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
 
     const payload: AgentModelsConfig = {
       opencode: {
+        freeModels: form.opencodeFree.availableModelsText.split("\n").map((m) => m.trim()).filter(Boolean),
         defaultModel: form.opencode.defaultModel.trim(),
         availableModels: form.opencode.availableModelsText.split("\n").map((m) => m.trim()).filter(Boolean),
       },
@@ -179,8 +185,9 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
     defaultPlaceholder: string,
     availablePlaceholder: string,
     idPrefix: string,
+    showDefault = true,
   ) => {
-    const modelCount = (idPrefix === "opencode" ? parseOpencodeModelList : parseModelList)(
+    const modelCount = (idPrefix.startsWith("opencode") ? parseOpencodeModelList : parseModelList)(
       state.availableModelsText.split("\n"),
     ).length;
 
@@ -224,7 +231,7 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
           </button>
         </div>
 
-        <div>
+        {showDefault && <div>
           <label
             htmlFor={`${idPrefix}-default`}
             style={{
@@ -254,7 +261,7 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
               boxSizing: "border-box",
             }}
           />
-        </div>
+        </div>}
 
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
@@ -393,16 +400,32 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
           )}
         </div>
 
-        {renderGroupCard(
-          "OpenCode Models",
-          "Use provider/model#variant (optional variant). opencode-go uses the Go plan; opencode uses pay-as-you-go. Leave the default blank to use OpenCode’s own selection. Put a space before # comments.",
-          form.opencode,
-          (k, v) => handleChange("opencode", k, v),
-          () => handleResetAgent("opencode"),
-          "OpenCode default",
-          "opencode-go/gemini-4-argon\nopencode-go/glm-5.3",
-          "opencode",
-        )}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>OpenCode Models</h3>
+          {renderGroupCard(
+            "Go / Pay-as-you-go Group",
+            "Use provider/model#variant (optional variant). opencode-go uses the Go plan; opencode uses pay-as-you-go. Leave the default blank to use OpenCode’s own selection. Put a space before # comments.",
+            form.opencode,
+            (k, v) => handleChange("opencode", k, v),
+            () => handleResetAgent("opencode"),
+            "OpenCode default",
+            "opencode-go/gemini-4-argon\nopencode-go/glm-5.3",
+            "opencode",
+          )}
+
+          {renderGroupCard(
+            "Free Group",
+            "Free OpenCode models. Models with opencode-go/ require a Go subscription. Availability may change.",
+            form.opencodeFree,
+            (k, v) => handleChange("opencodeFree", k, v),
+            () => setForm((prev) => ({ ...prev, opencodeFree: { defaultModel: "", availableModelsText: (DEFAULT_AGENT_MODELS.opencode.freeModels ?? []).join("\n") } })),
+            "",
+            "opencode/big-pickle\nopencode/beam-free",
+            "opencode-free",
+            false,
+          )}
+
+        </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
           <button

@@ -3,6 +3,10 @@ export interface AgentModelConfig {
   availableModels?: string[];
 }
 
+export interface OpencodeModelsConfig extends AgentModelConfig {
+  freeModels?: string[];
+}
+
 export interface AntigravityModelsConfig {
   gemini: AgentModelConfig;
   other: AgentModelConfig;
@@ -13,14 +17,27 @@ export interface AgentModelsConfig {
   antigravity: AntigravityModelsConfig;
   claude: AgentModelConfig;
   codex: AgentModelConfig;
-  opencode?: AgentModelConfig;
+  opencode?: OpencodeModelsConfig;
 }
 
-export const DEFAULT_AGENT_MODELS: AgentModelsConfig & { opencode: AgentModelConfig } = {
+export const DEFAULT_AGENT_MODELS: AgentModelsConfig & { opencode: OpencodeModelsConfig } = {
   opencode: {
     defaultModel: "opencode-go/minimax-m3",
+    freeModels: [
+      "opencode-go/beam-free # Go subscription; limited time and regions",
+      "opencode-go/iceman-contributor-free # Go subscription; limited time",
+      "opencode/beam-free # Limited time and regions",
+      "opencode/big-pickle",
+      "opencode/crouton-alpha-free",
+      "opencode/deepseek-v4.1-flash-free",
+      "opencode/flint-40b-free",
+      "opencode/glm-5.3-flash-free",
+      "opencode/mimo-v2.6-flash-free",
+      "opencode/nemotron-3.5-lightning-free",
+      "opencode/nemotron-3.5-super-vl-free",
+      "opencode/pulse-alpha-free",
+    ],
     availableModels: [
-      "opencode-go/beam-free # Free for a limited time and in limited regions; 1M context; adjustable reasoning",
       "opencode-go/claude-haiku-5-5 # Image and PDF input; 1M context; optional adaptive thinking",
       "opencode-go/deepseek-v4-pro # Text-only; 1M context; high/max reasoning; requires Global region access",
       "opencode-go/deepseek-v4.1-flash # Image input; 1M context; low/high/max reasoning; requires Global region access",
@@ -33,7 +50,6 @@ export const DEFAULT_AGENT_MODELS: AgentModelsConfig & { opencode: AgentModelCon
       "opencode-go/grok-4.7 # Image and PDF input; 500K context; up to 500K output; adjustable reasoning",
       "opencode-go/hy3 # Text-only; 256K context; none/low/high reasoning",
       "opencode-go/hy4-preview # Preview; text-only; 1.024M context; none/high reasoning",
-      "opencode-go/iceman-contributor-free # Free for a limited time; text-only; 262K context; no named reasoning variants",
       "opencode-go/kimi-k2.7-code # Image and video input; 262K context and output; no named reasoning variants",
       "opencode-go/kimi-k3 # Image and video input; 1M context; max reasoning variant",
       "opencode-go/kimi-k3.1-pro # Image and video input; 1M context; low/high/max reasoning",
@@ -141,4 +157,37 @@ export function parseOpencodeModelLine(line?: string | null): string | null {
 
 export function parseOpencodeModelList(models?: string[]): string[] {
   return (models ?? []).map(parseOpencodeModelLine).filter((model): model is string => model !== null);
+}
+
+export function isFreeOpencodeModel(line: string): boolean {
+  const model = parseOpencodeModelLine(line)?.split("#")[0];
+  return !!model && /^opencode(?:-go)?\/(?:big-pickle|[^/]+-free)$/.test(model);
+}
+
+export function getOpencodeModelGroups(config?: OpencodeModelsConfig | null) {
+  const available = config?.availableModels ?? DEFAULT_AGENT_MODELS.opencode.availableModels ?? [];
+  const seen = new Set<string>();
+  const free = [
+    ...(config?.freeModels ?? []),
+    ...available.filter(isFreeOpencodeModel),
+    ...(config?.freeModels === undefined ? DEFAULT_AGENT_MODELS.opencode.freeModels ?? [] : []),
+  ]
+    .filter((line) => {
+      const model = parseOpencodeModelLine(line);
+      if (!model || seen.has(model)) return false;
+      seen.add(model);
+      return true;
+    });
+  return [
+    { name: "Go / Pay-as-you-go", key: "", models: available.filter((line) => !isFreeOpencodeModel(line) && !seen.has(parseOpencodeModelLine(line) ?? "")) },
+    { name: "Free", key: "Free", models: free },
+  ];
+}
+
+export function mergeOpencodeModels(config?: OpencodeModelsConfig): OpencodeModelsConfig {
+  return {
+    defaultModel: config?.defaultModel ?? DEFAULT_AGENT_MODELS.opencode.defaultModel,
+    availableModels: Array.isArray(config?.availableModels) ? config.availableModels : DEFAULT_AGENT_MODELS.opencode.availableModels,
+    freeModels: Array.isArray(config?.freeModels) ? config.freeModels : DEFAULT_AGENT_MODELS.opencode.freeModels,
+  };
 }

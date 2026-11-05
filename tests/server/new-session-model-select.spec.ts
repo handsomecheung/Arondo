@@ -40,6 +40,9 @@ test.describe('New Session Model Select UI & Logic', () => {
     // 4. Auto & OpenCode
     expect(result.auto.hasModelRow).toBe(false);
     expect(result.opencode.hasModelRow).toBe(true);
+    expect(result.opencode.hasFreeGroup).toBe(true);
+    expect(result.opencode.hasGoFree).toBe(true);
+    expect(result.opencode.hasBigPickle).toBe(true);
   });
 
   test('colored quota bars appear in agent options and Antigravity model group headers', () => {
@@ -50,6 +53,9 @@ test.describe('New Session Model Select UI & Logic', () => {
     const option = (group: string[], model: string) => group.find((row) => row.includes(model));
     expect(result.agy.every((row: string) => !row.includes('%') && !row.includes('quota'))).toBe(true);
     expect(result.agyGroups).toHaveLength(3);
+    expect(result.opencodeGroups).toHaveLength(2);
+    expect(result.opencodeGroups[0]).toContain('hour: 80% week: 70% month: 60%');
+    expect(result.opencodeGroups[1]).toBe('Free');
     expect(option(result.agyGroups, 'Gemini ')).toContain('hour: 81% week: 62%');
     expect(option(result.agyGroups, 'Anthropic &amp; Other')).toContain('hour: 0% week: 19%');
     expect(option(result.agyGroups, 'Gemini 4 Argon')).toContain('week: 44%');

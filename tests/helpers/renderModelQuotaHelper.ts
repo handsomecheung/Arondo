@@ -19,7 +19,7 @@ const quotas: ModelQuotas = {
   claude: { HourRemain: 0.75, WeekRemain: 0.32, HourResetAt: hourReset, WeekResetsAt: weekReset },
   codex: { FiveHourRemain: 0.91, WeeklyRemain: 0.55, FiveHourResetAt: hourReset, WeeklyResetAt: weekReset },
 };
-function render(agentType: 'antigravity' | 'claude' | 'codex', data: ModelQuotas | null, loading = false, headers = false) {
+function render(agentType: 'antigravity' | 'claude' | 'codex' | 'opencode', data: ModelQuotas | null, loading = false, headers = false) {
   const html = renderToStaticMarkup(React.createElement(ModelDropdownOptions, {
     agentType, quotas: data, loading, selectedModel: '', onSelect: () => {},
   }));
@@ -43,6 +43,7 @@ console.log(JSON.stringify({
   singleAgent: renderAgents(quotas, false, ['claude']),
   agy: render('antigravity', quotas),
   agyGroups: render('antigravity', quotas, false, true),
+  opencodeGroups: render('opencode', quotas, false, true),
   claude: render('claude', quotas),
   codex: render('codex', quotas),
   unknown: renderAgents(null, false, ['codex']),

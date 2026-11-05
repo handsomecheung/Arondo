@@ -61,7 +61,10 @@ export async function PATCH(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const body = await req.json();
-  const { name, agentType, pinned } = body as { name?: string; agentType?: string; pinned?: boolean };
+  const { name, agentType, model, pinned } = body as { name?: string; agentType?: string; model?: string; pinned?: boolean };
+  if (model !== undefined && typeof model !== "string") {
+    return NextResponse.json({ error: "model must be a string" }, { status: 400 });
+  }
 
   const session = await getSession(id);
   if (!session) {
@@ -74,14 +77,16 @@ export async function PATCH(
     if (name !== undefined) patch.name = name;
     if (agentType !== undefined) {
       patch.agentType = agentType;
+      patch.model = model?.trim() || undefined;
       patch.autoLockedAgentType = undefined;
       patch.autoLockedAgentModel = undefined;
       patch.autoLockedAgentEffort = undefined;
       patch.autoLockedAgyQuotaGroup = undefined;
     }
+    if (model !== undefined && agentType === undefined) patch.model = model.trim() || undefined;
     if (pinned !== undefined) {
       patch.pinnedAt = pinned ? new Date().toISOString() : undefined;
-      if (name === undefined && agentType === undefined) {
+      if (name === undefined && agentType === undefined && model === undefined) {
         touchUpdatedAt = false;
       }
     }

@@ -3,7 +3,7 @@ import os from 'os';
 import path from 'path';
 import { setupRunner, teardownRunner } from './resume/resume.helper';
 import { test, expect, type APIRequestContext } from '@playwright/test';
-import { parseOpencodeModelLine, parseOpencodeModelList } from '../../lib/agentModels';
+import { getOpencodeModelGroups, parseOpencodeModelLine, parseOpencodeModelList } from '../../lib/agentModels';
 import { OpencodeAgent } from '../../lib/agents/opencode';
 import { resolveAgentType } from '../../lib/agents';
 import { getQuotaRows } from '../../lib/agent-quota-display';
@@ -15,11 +15,27 @@ test('OpenCode preserves variants and strips whitespace-delimited comments', () 
   expect(parseOpencodeModelList(['# note', '', 'opencode-go/glm-5.3 # coding'])).toEqual(['opencode-go/glm-5.3']);
 });
 
+test('OpenCode groups recognize legacy free models, preserve variants, and avoid duplicates', () => {
+  const groups = getOpencodeModelGroups({ availableModels: [
+    'opencode-go/glm-5.3 # paid',
+    'opencode-go/beam-free#high # free variant',
+    'opencode/big-pickle # free without suffix',
+    'opencode/beam-free',
+  ] });
+  expect(parseOpencodeModelList(groups[0].models)).toEqual(['opencode-go/glm-5.3']);
+  const free = parseOpencodeModelList(groups[1].models);
+  expect(free).toContain('opencode-go/beam-free#high');
+  expect(free.filter((m) => m === 'opencode/big-pickle')).toHaveLength(1);
+  expect(free.filter((m) => m === 'opencode/beam-free')).toHaveLength(1);
+  expect(getOpencodeModelGroups({ availableModels: [], freeModels: [] }).every((g) => !g.models.length)).toBe(true);
+});
+
 test('OpenCode settings validate, persist, and resolve default and explicit models', async ({ request }) => {
   const before = await (await request.get('/api/settings', { headers })).json();
   try {
     const invalid = await request.post('/api/settings', { headers, data: { agentModels: { opencode: { availableModels: [1] } } } });
     expect(invalid.status()).toBe(400);
+    expect((await request.post('/api/settings', { headers, data: { agentModels: { opencode: { freeModels: [1] } } } })).status()).toBe(400);
     const forbidden = await request.post('/api/settings', {
       headers: { 'x-arondo-token': 'test-user-token-7890' },
       data: { agentModels: { opencode: { defaultModel: 'opencode-go/glm-5.3' } } },
@@ -28,10 +44,12 @@ test('OpenCode settings validate, persist, and resolve default and explicit mode
     const save = await request.post('/api/settings', { headers, data: { agentModels: { opencode: {
       defaultModel: 'opencode-go/gemini-4-argon#high # default',
       availableModels: ['opencode-go/gemini-4-argon#high', 'opencode-go/glm-5.3'],
+      freeModels: ['opencode/big-pickle', 'opencode-go/beam-free#high # notes'],
     } } } });
     expect(save.ok()).toBeTruthy();
     const settings = await (await request.get('/api/settings', { headers })).json();
     expect(settings.agentModels.opencode.availableModels).toContain('opencode-go/gemini-4-argon#high');
+    expect(settings.agentModels.opencode.freeModels).toEqual(['opencode/big-pickle', 'opencode-go/beam-free#high # notes']);
     expect(settings.agentModels.claude).toEqual(before.agentModels.claude);
     const resolved = await resolveAgentType('opencode', ['opencode']);
     expect(resolved.model).toBe('opencode-go/gemini-4-argon#high');
@@ -77,6 +95,24 @@ test('Runner fetches OpenCode Go quota and serves all windows through the quota 
       FiveHourRemain: 0.8, WeeklyRemain: 0.7, MonthlyRemain: 0.6,
       FiveHourResetAt: 1793778908, WeeklyResetAt: 1794182400, MonthlyResetAt: 1796292553,
     });
+    const draft = await request.post('/api/sessions', { headers, data: {
+      prompt: 'Choose a free model', agentType: 'claude', runnerId: runner.runnerId, noProject: true, isDraft: true, draftTrigger: 'manual', model: 'opus',
+    } });
+    expect(draft.status()).toBe(201);
+    const draftSession = await draft.json();
+    try {
+      const switched = await request.patch(`/api/sessions/${draftSession.id}`, { headers, data: { agentType: 'opencode', model: 'opencode/big-pickle' } });
+      expect(switched.ok()).toBeTruthy();
+      expect(await switched.json()).toMatchObject({ agentType: 'opencode', model: 'opencode/big-pickle' });
+      const sent = await request.post(`/api/sessions/${draftSession.id}/messages`, { headers, data: { message: 'Run the free model', force: true } });
+      expect(sent.ok()).toBeTruthy();
+      const messages = await (await request.get(`/api/messages?sessionId=${draftSession.id}`, { headers })).json();
+      expect(messages).toContainEqual(expect.objectContaining({ type: 'agent-run', resolvedModel: 'opencode/big-pickle', content: expect.stringContaining('--model "opencode/big-pickle"') }));
+      const cleared = await request.patch(`/api/sessions/${draftSession.id}`, { headers, data: { agentType: 'claude' } });
+      expect((await cleared.json()).model).toBeUndefined();
+    } finally {
+      await request.delete(`/api/sessions/${draftSession.id}`, { headers });
+    }
     const create = await request.post('/api/sessions', { headers, data: {
       prompt: 'Use OpenCode Go automatically', agentType: 'auto', runnerId: runner.runnerId, noProject: true,
     } });

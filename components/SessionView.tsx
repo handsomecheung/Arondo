@@ -24,6 +24,7 @@ import type { AgentCommand } from "@/lib/agentCommands";
 import { CHAT_INPUT_TIPS } from "@/lib/chatInputTips";
 import type { AgentModelsConfig } from "@/lib/agentModels";
 import AgentDropdownMenu from "@/components/AgentDropdownMenu";
+import SessionAgentSwitchMenu from "@/components/SessionAgentSwitchMenu";
 import ModelDropdownMenu from "@/components/ModelDropdownMenu";
 
 function MiddleTruncatePath({ path, className }: { path: string; className?: string }) {
@@ -138,7 +139,7 @@ interface SessionViewProps {
   onExecuteAgentCommand: (promptText: string) => void;
   onSelectScriptCommand: (promptText: string) => void;
   onTriggerRunFileSelector: () => void;
-  onSwitchAgent: (agentType: string) => void;
+  onSwitchAgent: (agentType: string, model?: string) => void;
   pendingFiles: File[];
   onSelectFiles: (files: File[]) => void;
   onRemovePendingFile: (index: number) => void;
@@ -654,25 +655,17 @@ export default function SessionView({
                   </span>
                 </button>
                 {agentSwitchOpen && agentSwitchMenuPos && (
-                  <AgentDropdownMenu
+                  <SessionAgentSwitchMenu
                     runnerId={selectedSession.runnerId}
                     agentType={selectedSession.agentType}
+                    selectedModel={selectedSession.model}
+                    config={agentModelsConfig}
                     isAgentAvailable={isAgentAvailable}
-                    onSelect={(value) => {
+                    onSelect={(value, model) => {
                       setAgentSwitchOpen(false);
-                      if (value !== selectedSession.agentType) onSwitchAgent(value);
+                      onSwitchAgent(value, model);
                     }}
-                    className="session-agent-switch-menu"
-                    style={{
-                      position: "fixed",
-                      top: agentSwitchMenuPos.top,
-                      left: agentSwitchMenuPos.left,
-                      right: "auto",
-                      bottom: "auto",
-                      maxHeight: `min(400px, calc(100dvh - ${agentSwitchMenuPos.top + 8}px))`,
-                      boxShadow: "var(--shadow-card)",
-                      transformOrigin: "top right",
-                    }}
+                    position={agentSwitchMenuPos}
                   />
                 )}
               </div>

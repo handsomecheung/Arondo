@@ -29,6 +29,7 @@ import {
   type AgentModelsConfig,
   DEFAULT_AGENT_MODELS,
   getDefaultAgentModels,
+  mergeOpencodeModels,
   parseModelLine,
   parseModelList,
 } from "./agentModels";
@@ -964,11 +965,7 @@ export async function getAppSettings(): Promise<AppSettings> {
   }
 
   const mergedAgentModels: AgentModelsConfig = {
-    opencode: {
-      defaultModel: rawAgentModels?.opencode?.defaultModel ?? defaults.opencode?.defaultModel,
-      availableModels: Array.isArray(rawAgentModels?.opencode?.availableModels)
-        ? rawAgentModels.opencode.availableModels : defaults.opencode?.availableModels,
-    },
+    opencode: mergeOpencodeModels(rawAgentModels?.opencode),
     antigravity: {
       gemini: {
         defaultModel: rawAgyGemini?.defaultModel !== undefined
