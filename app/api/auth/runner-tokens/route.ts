@@ -50,9 +50,10 @@ export async function POST(request: NextRequest) {
     }
 
     const generatedRunnerToken = generateToken();
+    const id = generateUUID();
     await updateTokensConfig((config) => {
       config.runners.push({
-        id: generateUUID(),
+        id,
         token: generatedRunnerToken,
         name: name.trim(),
         createdAt: Date.now(),
@@ -63,6 +64,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       token: generatedRunnerToken,
+      id,
     });
   } catch {
     return NextResponse.json({ error: "Failed to generate runner token" }, { status: 500 });

@@ -102,7 +102,7 @@ Configure default models and available model lists in **Admin Settings → Agent
 - **Antigravity CLI (agy)**: Configured separately for **Gemini Group**, **Others Group** (Claude/other models), and **Gemini 4 Argon Group**, aligning with Antigravity quota tiers.
 - **Claude Code (claude)**: Customize default models and recognized model options passed via `--model`.
 - **Codex CLI (codex)**: Customize default model and reasoning effort options passed to OpenAI Codex.
-- **OpenCode (opencode)**: Defaults to `opencode-go/minimax-m3` (MiniMax M3), with separate **Go / Pay-as-you-go** and **Free** groups. The Free group includes Go subscription free models and free `opencode/` models, including Big Pickle. Recognized free models in existing lists appear in the Free group automatically. Edit or reset each group in Admin Settings, then select **Save Agent Models**. Configure models as `provider/model` or `provider/model#variant`; put whitespace before `#` comments to preserve attached variants. `opencode-go/` requires a Go subscription, including for its free models; `opencode/` provides both paid and free models.
+- **OpenCode (opencode)**: Defaults to `opencode-go/minimax-m3` (MiniMax M3), with separate **Go / Pay-as-you-go** and **Free** groups. The Free group includes Go subscription free models and free `opencode/` models, including Big Pickle. Recognized free models in existing lists appear in the Free group automatically. Edit or reset each group in Admin Settings, then select **Save**. Configure models as `provider/model` or `provider/model#variant`; put whitespace before `#` comments to preserve attached variants. `opencode-go/` requires a Go subscription, including for its free models; `opencode/` provides both paid and free models.
 
 The OpenCode Free list is stored as `setitngs.agentModels.opencode.freeModels` in `arondo.json`. Missing lists use the built-in defaults; administrators can edit the list as model availability changes. The Free group does not display Go subscription quota bars.
 
@@ -130,6 +130,8 @@ When an agent fails, Arondo uses Jev System One to classify the failure, includi
 ## Admin Settings
 
 Open **Admin Settings** (`/admin/settings`) to choose a section. Each section has its own page and a back button that returns to the settings index. All pages require an admin token; personal and device preferences remain in **Settings** (`/settings`).
+
+Each section ends with **Save** and **Cancel**. Changes remain local until you select **Save**. A successful save returns to the Admin Settings index; **Cancel** discards unsaved edits and returns to the same index. Failed saves keep the editor open for correction or retry. This includes toggles, API key removals, runner permissions, commands, and token creation, renaming, or revocation. Newly created token values appear in a dialog after returning to the index so they can be copied securely.
 
 | Section | Page |
 | --- | --- |

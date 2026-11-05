@@ -3,6 +3,7 @@ export interface AdminSettingsData {
   sessionArchiveDays: number;
   automationSessionRetentionHours: number;
   showHiddenFiles?: boolean;
+  showAutomationSessions?: boolean;
   enableAutomodel?: boolean;
   agentModels?: AgentModelsConfig;
   webPushContactEmail?: string;

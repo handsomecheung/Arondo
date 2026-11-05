@@ -31,6 +31,12 @@ test("admin settings sections have separate pages with working return navigation
     await expect(
       page.getByRole("navigation", { name: "Admin settings sections" }),
     ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Save", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Cancel", exact: true }),
+    ).toBeVisible();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -47,9 +53,13 @@ test("admin settings sections have separate pages with working return navigation
   }
 });
 
-test("session settings still autosave on their subpage", async ({ page }) => {
+test("session settings Save and Cancel return to the settings index", async ({
+  page,
+}) => {
+  const writes: unknown[] = [];
   await page.route("**/api/settings", async (route) => {
     if (route.request().method() === "POST") {
+      writes.push(route.request().postDataJSON());
       await route.fulfill({ json: route.request().postDataJSON() });
     } else {
       await route.fulfill({
@@ -64,12 +74,35 @@ test("session settings still autosave on their subpage", async ({ page }) => {
   await page.goto("/admin/settings/sessions-and-files");
   const archiveDays = page.getByRole("spinbutton").first();
   await expect(archiveDays).toHaveValue("30");
-  const saved = page.waitForRequest(
-    (request) =>
-      request.url().endsWith("/api/settings") && request.method() === "POST",
-  );
   await archiveDays.fill("14");
-  expect((await saved).postDataJSON()).toEqual({ sessionArchiveDays: 14 });
+  await page
+    .getByRole("checkbox", { name: "Show automation sessions" })
+    .check();
+  await page.getByRole("checkbox", { name: "Show hidden files" }).uncheck();
+  await page.waitForTimeout(700);
+  expect(writes).toEqual([]);
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page).toHaveURL("/admin/settings");
+  await page.goto("/admin/settings/sessions-and-files");
+  await expect(archiveDays).toHaveValue("30");
+  await expect(
+    page.getByRole("checkbox", { name: "Show hidden files" }),
+  ).toBeChecked();
+  await expect(
+    page.getByRole("checkbox", { name: "Show automation sessions" }),
+  ).not.toBeChecked();
+  expect(writes).toEqual([]);
+  await archiveDays.fill("14");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page).toHaveURL("/admin/settings");
+  expect(writes).toEqual([
+    {
+      sessionArchiveDays: 14,
+      automationSessionRetentionHours: 72,
+      showHiddenFiles: true,
+      showAutomationSessions: false,
+    },
+  ]);
 });
 
 test("regular users cannot open the settings index or subpages directly", async ({

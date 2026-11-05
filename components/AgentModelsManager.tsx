@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { SettingsActions } from "@/components/admin/SettingsForm";
 import { type AgentModelsConfig, DEFAULT_AGENT_MODELS, getOpencodeModelGroups, parseModelList, parseOpencodeModelList } from "@/lib/agentModels";
 
 interface AgentModelsManagerProps {
   initialConfig?: AgentModelsConfig;
   onSaved?: (updated: AgentModelsConfig) => void;
+  onCancel: () => void;
 }
 
 interface GroupFormState {
@@ -56,10 +58,9 @@ function configToFormState(config?: AgentModelsConfig): FormState {
   };
 }
 
-export default function AgentModelsManager({ initialConfig, onSaved }: AgentModelsManagerProps) {
+export default function AgentModelsManager({ initialConfig, onSaved, onCancel }: AgentModelsManagerProps) {
   const [form, setForm] = useState<FormState>(() => configToFormState(initialConfig));
   const [saving, setSaving] = useState(false);
-  const [savedSuccess, setSavedSuccess] = useState(false);
 
   useEffect(() => {
     if (initialConfig) {
@@ -107,7 +108,6 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    setSavedSuccess(false);
 
     const payload: AgentModelsConfig = {
       opencode: {
@@ -162,9 +162,7 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
       });
 
       if (res.ok) {
-        setSavedSuccess(true);
         onSaved?.(payload);
-        setTimeout(() => setSavedSuccess(false), 3000);
       } else {
         alert("Failed to save agent model settings");
       }
@@ -327,6 +325,7 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
       </div>
 
       <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <fieldset disabled={saving} style={{ display: "contents", border: 0, padding: 0, margin: 0 }}>
         {/* Antigravity CLI Group */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
@@ -418,7 +417,7 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
             "Free OpenCode models. Models with opencode-go/ require a Go subscription. Availability may change.",
             form.opencodeFree,
             (k, v) => handleChange("opencodeFree", k, v),
-            () => setForm((prev) => ({ ...prev, opencodeFree: { defaultModel: "", availableModelsText: (DEFAULT_AGENT_MODELS.opencode.freeModels ?? []).join("\n") } })),
+            () => { setForm((prev) => ({ ...prev, opencodeFree: { defaultModel: "", availableModelsText: (DEFAULT_AGENT_MODELS.opencode.freeModels ?? []).join("\n") } })); },
             "",
             "opencode/big-pickle\nopencode/beam-free",
             "opencode-free",
@@ -427,30 +426,11 @@ export default function AgentModelsManager({ initialConfig, onSaved }: AgentMode
 
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
-          <button
-            type="submit"
-            disabled={saving}
-            style={{
-              padding: "7px 14px",
-              fontSize: 13,
-              fontWeight: 600,
-              color: "#ffffff",
-              background: "var(--accent, #3b82f6)",
-              border: "none",
-              borderRadius: "var(--radius-sm)",
-              cursor: saving ? "default" : "pointer",
-              opacity: saving ? 0.7 : 1,
-            }}
-          >
-            {saving ? "Saving..." : "Save Agent Models"}
-          </button>
-          {savedSuccess && (
-            <span style={{ fontSize: 12, color: "var(--success, #22c55e)", fontWeight: 500 }}>
-              ✓ Agent models saved successfully
-            </span>
-          )}
-        </div>
+        </fieldset>
+        <SettingsActions
+          saving={saving}
+          onCancel={onCancel}
+        />
       </form>
     </section>
   );

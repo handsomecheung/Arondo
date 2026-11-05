@@ -155,14 +155,20 @@ app/
         route.ts        # POST: trigger an immediate or delayed (e.g. 30s) test push notification
     auth/
       client-tokens/
-        route.ts        # GET/POST/DELETE: manage client access tokens (admin role only)
+        route.ts        # GET/POST/PUT/DELETE: manage client access tokens (admin role only)
       runner-tokens/
-        route.ts        # GET/POST/DELETE: manage per-runner access tokens (admin role only)
+        route.ts        # GET/POST/PUT/DELETE: manage per-runner access tokens (admin role only); POST returns the generated token and its id
       verify/
         route.ts        # POST: verify token validity
 public/
   sw.js                 # Service Worker: background Web Push notification display, notificationclick deep-linking, and lifecycle events
 components/
+  admin/
+    SettingsForm.tsx    # Shared local drafts, Save/Cancel actions, error handling, and return navigation
+    SettingsForm.module.css # Scoped admin form, card, token row, and responsive styles
+    TokenSettings.tsx   # Deferred token creation, renaming, and revocation for client and runner tokens
+    RunnerSettings.tsx  # Deferred runner access and global rule synchronization settings
+    GeneratedTokensProvider.tsx # Keeps generated tokens visible in a dialog after returning to the index
   Terminal.tsx          # xterm.js terminal component (live WS mode + history replay mode)
   ShellTerminal.tsx     # Interactive shell terminal component (spawns server-side PTY via WebSocket)
   UserAgentCommandCard.tsx # Exec card representing a user-initiated agent slash command in the timeline
@@ -482,7 +488,7 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **Manual Agent Switching**: The session header uses `components/SessionAgentSwitchMenu.tsx` as a single dropdown: each agent row expands in place to a secondary list of its models (Default first), sharing `ModelOptions` and `AgentOptionQuota` with the New Session dropdowns. OpenCode includes the Free group; Antigravity retains its three groups. Auto is selected directly. `PATCH /api/sessions/[id]` accepts `agentType` and optional string `model`, saves the explicit model for subsequent runs, and clears Auto locks. Changing agents clears the previous model if a replacement is omitted; an empty model selects the configured default. The menus show the Runner’s quota, fit the available viewport, and scroll vertically.
 - **Decision Mode (Jev System One)**: Allows running fast categorical decisions directly without spawning an agent process on a runner. Configurable via `agentType: "decision"` (or `--agent decision` / `--agent jev` in `cli/arondo-cli send`). The server-side Decision Engine (`lib/decision/runner.ts`) parses user prompts for explicit candidate choices (or defaults to Yes/No or action verdict criteria), evaluates them via TypeSafe AI System One (`TYPESAFE_API_KEY` / `https://api.typesafe.ai/v1/systemone`), and records probability distributions, risk levels, and response latency directly in the session card. Decision Mode works both with connected runners (incorporating git diff context when available) and standalone (`--no-path` / runner-free).
 - **Admin Settings Navigation**: `/admin/settings` is an index linking to nine section subpages. A shared layout enforces admin access and provides navigation back to the index; each subpage loads only its own required data.
-- **Settings Session Controls**: **Admin Settings → Session & File Settings** (`/admin/settings/sessions-and-files`) groups session archive and file browser controls together. `sessionArchiveDays` auto-saves after edits instead of requiring a Save button, and the hidden-files toggle persists immediately.
+- **Settings Session Controls**: **Admin Settings → Session & File Settings** (`/admin/settings/sessions-and-files`) groups session archive and file browser controls together. All Admin Settings sections use explicit Save/Cancel actions: edits remain local until Save. Successful saves and Cancel return to `/admin/settings`; Cancel discards unsaved edits, while failed saves keep the editor open. Generated tokens remain available in a layout-owned dialog after navigation. This also applies to automation visibility, automodel keys, runner rule sync/access, commands, and token creation/renaming/revocation. Shared draft handling and actions live in `components/admin/SettingsForm.tsx`; successful individual writes checkpoint the saved state so retries do not repeat completed operations.
 - **Authentication UI**: The old Settings-page reset-token button moved into the app sidebar as a Log Out action with a confirmation dialog.
 - **Inline Runner Details**: The Runners dashboard displays the runner details panel inline directly below the selected runner card for better usability.
 - **Disconnected Runner Deletion**: Allows deleting registered but disconnected runners from the Runners dashboard, which purges their corresponding metadata and directories.
