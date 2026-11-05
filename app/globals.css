@@ -22,6 +22,8 @@
   --success-bg: rgba(16, 185, 129, 0.1);
   --warning: #d97706;
   --warning-bg: rgba(217, 119, 6, 0.1);
+  --info: #0284c7;
+  --info-bg: rgba(2, 132, 199, 0.1);
   --error: #e11d48;
   --error-bg: rgba(225, 29, 72, 0.1);
   --error-text: #be123c;

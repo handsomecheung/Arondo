@@ -14,9 +14,17 @@ const tagStyle: CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-export default function SessionTags({ session }: { session: Pick<Session, "automation" | "once"> }) {
+export default function SessionTags({ session }: { session: Pick<Session, "automation" | "once"> & { agentType?: string } }) {
   return (
     <>
+      {(session.agentType === "decision" || session.agentType === "jev") && (
+        <span
+          title="Decision session (Jev System One)"
+          style={{ ...tagStyle, color: "var(--info, #0284c7)", background: "var(--info-bg, rgba(2, 132, 199, 0.1))" }}
+        >
+          Jev
+        </span>
+      )}
       {session.automation && (
         <span title="Automation session" style={{ ...tagStyle, color: "var(--accent)", background: "var(--accent-glow)" }}>
           Automation

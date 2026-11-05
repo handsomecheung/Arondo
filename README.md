@@ -409,7 +409,7 @@ Set `automation: true` on `POST /api/sessions`, or use `arondo-cli send --automa
 
 Automation sessions are hidden from session lists, archived lists, search, Tasks, Todo lists, and completion notifications by default. An admin can enable **Admin Settings → Show automation sessions** (`setitngs.showAutomationSessions`). Direct session-ID access and polling remain available. Automation sessions are retained for `automationSessionRetentionHours` (default 72 hours, configurable in Admin Settings or via `ARONDO_AUTOMATION_SESSION_RETENTION_HOURS_DEFAULT`) before automatic session cleanup; workspaces are retained until manually removed, including after session deletion. No automatic workspace deletion is performed.
 
-The sidebar's active and archived session lists label automation sessions with an **Automation** tag and single-use sessions with a **Once** tag. Sessions with both attributes display both tags.
+The sidebar's active and archived session lists label Jev decision sessions with a **Jev** tag, automation sessions with an **Automation** tag, and single-use sessions with a **Once** tag. Sessions with multiple attributes display each applicable tag.
 
 `--automation` cannot be combined with `--path`, `--no-path`, `--resume`, or `--session-id`. It permits follow-up messages via a later `send --session-id <id>` unless `--once` was used. Both `--automation --once` and `--automation --once --cache on` are supported.
 
