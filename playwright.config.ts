@@ -4,6 +4,13 @@ import os from 'os';
 
 const testConfigDir = path.join(os.tmpdir(), 'arondo-test-config');
 const testHomeDir = path.join(testConfigDir, 'home');
+// Keep installed browsers accessible when test workers inherit the isolated home.
+const browserCacheDir = process.platform === 'darwin'
+  ? path.join(os.homedir(), 'Library', 'Caches')
+  : process.platform === 'win32'
+    ? process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local')
+    : process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache');
+process.env.PLAYWRIGHT_BROWSERS_PATH ??= path.join(browserCacheDir, 'ms-playwright');
 process.env.ARONDO_CONFIG_DIR = testConfigDir;
 process.env.HOME = testHomeDir;
 process.env.USERPROFILE = testHomeDir;

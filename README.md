@@ -30,7 +30,7 @@ Review the agent result and diff, run validation, provide follow-up instructions
 
 ## Agent Commands
 
-Create reusable slash commands in **Settings → Agent Commands** by defining the command name, the instruction sent to the agent, and, when needed, a regular-expression matcher whose capture groups can be inserted as `$1`, `$2`, and so on; type `/` in a session to browse and run built-in and custom commands.
+Create reusable slash commands in **Admin Settings → Default Agent Commands** by defining the command name, the instruction sent to the agent, and, when needed, a regular-expression matcher whose capture groups can be inserted as `$1`, `$2`, and so on; type `/` in a session to browse and run built-in and custom commands.
 
 Two built-in commands start an agent in a fresh, separate context without continuing or changing the parent agent conversation:
 
@@ -127,9 +127,25 @@ Auto Mode includes OpenCode only with verified Go subscription capacity. Its fal
 
 When an agent fails, Arondo uses Jev System One to classify the failure, including invalid model selections, quota exhaustion, agent-side failures, and invalid invocation parameters. Configure Jev in Admin Settings to enable this classification and its quota retry follow-up.
 
+## Admin Settings
+
+Open **Admin Settings** (`/admin/settings`) to choose a section. Each section has its own page and a back button that returns to the settings index. All pages require an admin token; personal and device preferences remain in **Settings** (`/settings`).
+
+| Section | Page |
+| --- | --- |
+| Session & File Settings | `/admin/settings/sessions-and-files` |
+| Agent Models & Defaults | `/admin/settings/agent-models` |
+| Automodel & LLM API Keys | `/admin/settings/automodel` |
+| Web Push Notifications | `/admin/settings/web-push` |
+| Default Agent Commands | `/admin/settings/agent-commands` |
+| Global Agent Rules | `/admin/settings/global-rules` |
+| System Access Tokens | `/admin/settings/system-tokens` |
+| Runner Tokens | `/admin/settings/runner-tokens` |
+| Runner Access Control | `/admin/settings/runner-access` |
+
 ## Access Control
 
-Configure authentication from **Settings** with three related controls:
+Configure authentication from **Admin Settings** using three separate pages:
 
 - **System Access Tokens** authenticate people and automations to Arondo. Create `admin` tokens for full administrative access and `user` tokens for restricted access; token values are only shown in full when generated, so store them securely.
 - **Runner Tokens** authenticate each Runner machine. Generate one dedicated token per Runner and pass it with `--token` or `ARONDO_RUNNER_TOKEN`; it binds to the first Runner identity that connects, preventing a leaked token from impersonating a different Runner.
@@ -154,7 +170,7 @@ All execution goes through a Runner — there is no local fallback on the server
 
 - **Multi-Machine Runners**: Install Go runners on any development machine. The UI lets you pick which runner runs each session. Administrators can deliberately disconnect a runner (stopping its active tasks) and delete disconnected runners from the Runners dashboard.
 - **Todo Messages (Drafts, Scheduled Send, Auto-Queue Follow-ups & Quota Retry)**: "Send this message later" is a single `user-todo` chat message with a status/trigger (manual, codebaseReady, afterSession, quotaAvailable, or a fixed time), rendered inline with a three-dot menu (Cancel / Send Now / Change Trigger). Covers TODO drafts saved while a project has uncommitted changes or a running agent, follow-ups queued behind a running agent, and automatic quota-exhaustion retries — all shown as first-class tasks in the Tasks dashboard. A session can queue multiple todo messages at once; the chat input stays enabled while a draft/pending todo exists so you can keep composing further follow-ups. The chat input's "+" popup menu offers "Upload File", "Send Later" (manual), "Send When Clean" (codebaseReady), and "Schedule Send" (pick a future date/time) — all backed by the same todo-messages plumbing. Scheduled ("at") todos left stuck mid-send by a server restart are automatically resolved to `failed` instead of hanging.
-- **Session Archiving**: Automatically archive sessions idle for more than a configured period, or manually archive/unarchive them. Pinned sessions are exempted from auto-archiving. Archived sessions are read-only to prevent sending new messages, while preserving history, logs, and diff views. The default idle day count before auto-archiving is configurable in the Settings page. Unarchiving a session is disabled if its parent project has been deleted. Before deleting a project, a warning dialog flags any associated archived sessions that would become unusable.
+- **Session Archiving**: Automatically archive sessions idle for more than a configured period, or manually archive/unarchive them. Pinned sessions are exempted from auto-archiving. Archived sessions are read-only to prevent sending new messages, while preserving history, logs, and diff views. The default idle day count before auto-archiving is configurable in **Admin Settings → Session & File Settings**. Unarchiving a session is disabled if its parent project has been deleted. Before deleting a project, a warning dialog flags any associated archived sessions that would become unusable.
 - **Recent Sessions, Pinning, Filtering & Three-dot Menu**: The sidebar is centered on recent sessions, with a lightweight Archived Sessions hint instead of a separate Projects tab. Pin important sessions to the top (ordered by pinned timestamp), filter by project or runner when needed (the selected filters are kept in the URL as `?runner=` and `?project=` query parameters, so they survive a refresh), and use each session's three-dot menu to Pin, Rename, Archive, or Delete it.
 - **Project Readiness Warnings**: Warns before creating a session or sending the first message on an empty session when the project has uncommitted changes or a running agent, offering options to send anyway, auto-send once ready, or save as a TODO session. The "Send now anyway" option is hidden when an agent is already running, since the server always rejects it in that case. Follow-up messages on a session that already has history skip this check and only block on that session's own running state or an already-queued todo.
 - **Project Page Navigation & Three-dot Menu**: The Project Page header includes a back button to return to the previous session (with the previous session highlighted in the project's session list) and offers a three-dot menu with File Browser, Open Terminal, Show Changes (a sessionless visual diff of the project's working tree, disabled when clean), and Delete Project. The Scripts section shows running project-scoped scripts with live execution time, inline log streaming, and stop controls.
@@ -297,7 +313,7 @@ Open [http://localhost:3251](http://localhost:3251) in your browser. Select the 
     }
   }
   ```
-  If no token with `type: "admin"` exists on startup, one is generated automatically, written to the config, and printed in the server logs. Runner tokens are created and managed individually by an admin in Settings (Runner Tokens section); each locks to the first runner identity that registers with it (`boundRunnerId`).
+  If no token with `type: "admin"` exists on startup, one is generated automatically, written to the config, and printed in the server logs. Runner tokens are created and managed individually in **Admin Settings → Runner Tokens**; each locks to the first runner identity that registers with it (`boundRunnerId`).
   The CLI reads `cli.server` and `cli.clientToken` from this same file. Its connection-setting precedence is `--server` / `--client-token`, then `ARONDO_SERVER` / `ARONDO_CLIENT_TOKEN`, then this config file.
 - `global-rules.md` – Rules synced to `~/.gemini/GEMINI.md`, `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, and `~/.config/opencode/AGENTS.md` on connected runners.
 - `agent-commands.json` – User-defined agent slash commands.
@@ -516,10 +532,53 @@ Tagged releases build both `runner/arondo-runner` and `cli/arondo-cli` binaries 
 
 Integration tests are implemented using Playwright. They spawn a mock-configured server and a Go runner to test API endpoints and WebSocket operations end-to-end.
 
+The Admin Settings navigation tests also launch Chromium, which requires a Playwright browser installation and its system libraries.
+
 To run the integration tests:
 
 ```bash
+npx playwright install --with-deps chromium
 npm run test:integration
+```
+
+The browser tests use Playwright's normal browser cache (or `PLAYWRIGHT_BROWSERS_PATH` when set), while the server and test runners use an isolated home directory.
+
+On Ubuntu 24.04, you can install the Chromium libraries explicitly instead of using `--with-deps`:
+
+```bash
+sudo apt install -y libnspr4 libnss3 libatk1.0-0t64 libatk-bridge2.0-0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libxkbcommon-x11-0 libasound2t64
+npx playwright install chromium
+npm run test:integration
+```
+
+On Linux with Nix and a `nixpkgs` channel, supply Chromium's shared libraries without installing system packages:
+
+```bash
+npx playwright install chromium
+nix-shell --expr '
+  let pkgs = import <nixpkgs> { }; in
+  pkgs.mkShell {
+    LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (with pkgs; [
+      alsa-lib
+      at-spi2-core
+      dbus
+      expat
+      glib
+      libgbm
+      libx11
+      libxcb
+      libxcomposite
+      libxdamage
+      libxext
+      libxfixes
+      libxkbcommon
+      libxrandr
+      nspr
+      nss
+      systemd
+    ]);
+  }
+' --run 'npm run test:integration'
 ```
 
 The test runner will:

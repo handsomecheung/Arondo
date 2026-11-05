@@ -72,7 +72,9 @@ app/
     page.tsx            # Standalone page for user/device-level preferences (e.g. Web Push toggle, test push, reset service worker)
   admin/
     settings/
-      page.tsx          # Standalone page for server-level administration (runners, tokens, agent models, automodel keys, global rules, VAPID contact email)
+      layout.tsx        # Shared admin authorization, header, and return navigation
+      page.tsx          # Section index linking to dedicated administration subpages
+      */page.tsx        # Session/file settings, agent models, automodel keys, VAPID contact, commands, global rules, system/runner tokens, and runner access
   tasks/
     page.tsx            # Tasks management page (session list, shell terminal, status monitoring)
   layout.tsx            # Root layout
@@ -406,7 +408,7 @@ The application enforces token-based authentication on all API routes and WebSoc
   ```
 - **Automatic Initialization**: On server startup, `initializeAuth()` in `lib/auth.ts` verifies if at least one token of type `admin` exists in `clients`. If not, it automatically generates a 32-character hexadecimal token with a default color (`#3b82f6`), writes it to `arondo.json`, and outputs it to the server console.
 - **Runner Connection Authentication (per-runner tokens)**:
-  - Each runner authenticates with its own individually generated token, created and managed by an admin in Settings (Runner Tokens section) via `/api/auth/runner-tokens`, stored alongside client tokens under `runners` in `arondo.json`.
+  - Each runner authenticates with its own individually generated token, created and managed in **Admin Settings → Runner Tokens** via `/api/auth/runner-tokens`, stored alongside client tokens under `runners` in `arondo.json`.
   - The token is sent only via the `x-runner-token` header (no longer accepted as a URL query param) and compared using a constant-time check (`timingSafeEqualStrings()` in `lib/auth.ts`).
   - A runner token **locks to the first runner identity** that successfully registers with it (`boundRunnerId`), so a leaked token can't be replayed to impersonate a different, already-registered runner. Revoking a token disconnects its bound runner immediately. Deleting a disconnected runner clears `boundRunnerId` on its token so a future reconnect starts as a fresh identity.
   - The runner binary has no `--name` flag; it has no notion of its own display name. The bound runner token's own `name` (configured by an admin in Settings) is the runner's display name everywhere in the system (`RunnerInfo.name`, session/project lists, Runners dashboard).
@@ -479,7 +481,8 @@ The application enforces token-based authentication on all API routes and WebSoc
     - **ARONDO_INNER_AUTOMODEL_METHOD**: Controls automodel decision routing strategy (`DM` [default] vs `LLM`). When set to `DM` (Decision Model), automodel prioritizes Jev System One (if `TYPESAFE_API_KEY` is configured), falling back to standard LLMs if Jev is unavailable or fails. When set to `LLM`, automodel routes directly using standard LLMs (Anthropic -> OpenAI -> Google), bypassing Jev. Configured strictly via server environment variable (validated on startup).
 - **Manual Agent Switching**: The session header uses `components/SessionAgentSwitchMenu.tsx` as a single dropdown: each agent row expands in place to a secondary list of its models (Default first), sharing `ModelOptions` and `AgentOptionQuota` with the New Session dropdowns. OpenCode includes the Free group; Antigravity retains its three groups. Auto is selected directly. `PATCH /api/sessions/[id]` accepts `agentType` and optional string `model`, saves the explicit model for subsequent runs, and clears Auto locks. Changing agents clears the previous model if a replacement is omitted; an empty model selects the configured default. The menus show the Runner’s quota, fit the available viewport, and scroll vertically.
 - **Decision Mode (Jev System One)**: Allows running fast categorical decisions directly without spawning an agent process on a runner. Configurable via `agentType: "decision"` (or `--agent decision` / `--agent jev` in `cli/arondo-cli send`). The server-side Decision Engine (`lib/decision/runner.ts`) parses user prompts for explicit candidate choices (or defaults to Yes/No or action verdict criteria), evaluates them via TypeSafe AI System One (`TYPESAFE_API_KEY` / `https://api.typesafe.ai/v1/systemone`), and records probability distributions, risk levels, and response latency directly in the session card. Decision Mode works both with connected runners (incorporating git diff context when available) and standalone (`--no-path` / runner-free).
-- **Settings Session Controls**: The Settings page groups session archive and file browser controls together. `sessionArchiveDays` auto-saves after edits instead of requiring a Save button, and the hidden-files toggle persists immediately.
+- **Admin Settings Navigation**: `/admin/settings` is an index linking to nine section subpages. A shared layout enforces admin access and provides navigation back to the index; each subpage loads only its own required data.
+- **Settings Session Controls**: **Admin Settings → Session & File Settings** (`/admin/settings/sessions-and-files`) groups session archive and file browser controls together. `sessionArchiveDays` auto-saves after edits instead of requiring a Save button, and the hidden-files toggle persists immediately.
 - **Authentication UI**: The old Settings-page reset-token button moved into the app sidebar as a Log Out action with a confirmation dialog.
 - **Inline Runner Details**: The Runners dashboard displays the runner details panel inline directly below the selected runner card for better usability.
 - **Disconnected Runner Deletion**: Allows deleting registered but disconnected runners from the Runners dashboard, which purges their corresponding metadata and directories.
