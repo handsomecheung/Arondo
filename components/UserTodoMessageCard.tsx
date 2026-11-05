@@ -23,13 +23,14 @@ export interface UserTodoMessageCardProps {
 
 const FIRST_MESSAGE_TRIGGER_OPTIONS: { kind: TodoTriggerKind; label: string; title: string }[] = [
   { kind: "manual", label: "Manual", title: "Send only when I choose" },
-  { kind: "codebaseReady", label: "Auto", title: "Send automatically once no agent is running and the codebase is clean" },
+  { kind: "codebaseReady", label: "When Clean", title: "Send automatically once no agent is running and the codebase is clean" },
   { kind: "at", label: "Scheduled", title: "Send at a specific date and time" },
 ];
 
 const FOLLOWUP_TRIGGER_OPTIONS: { kind: TodoTriggerKind; label: string; title: string }[] = [
   { kind: "manual", label: "Manual", title: "Send only when I choose" },
-  { kind: "afterSession", label: "Auto", title: "Send automatically once the current run finishes successfully" },
+  { kind: "afterSession", label: "After Run", title: "Send automatically once the current run finishes successfully" },
+  { kind: "codebaseReady", label: "When Clean", title: "Send automatically once no agent is running and the codebase is clean" },
   { kind: "at", label: "Scheduled", title: "Send at a specific date and time" },
 ];
 
@@ -89,7 +90,8 @@ export default function UserTodoMessageCard({
   userName,
   userColor,
 }: UserTodoMessageCardProps) {
-  const triggerOptions = isFollowup ? FOLLOWUP_TRIGGER_OPTIONS : FIRST_MESSAGE_TRIGGER_OPTIONS;
+  const effectiveIsFollowup = isFollowup ?? (trigger?.kind === "afterSession");
+  const triggerOptions = effectiveIsFollowup ? FOLLOWUP_TRIGGER_OPTIONS : FIRST_MESSAGE_TRIGGER_OPTIONS;
   const [menuOpen, setMenuOpen] = useState(false);
   const [triggerPickerOpen, setTriggerPickerOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);

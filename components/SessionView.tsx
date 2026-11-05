@@ -1477,7 +1477,7 @@ export default function SessionView({
                     onClick={() => onSetDraftTrigger("codebaseReady")}
                     id="draft-trigger-auto"
                   >
-                    Auto
+                    When Clean
                   </button>
                   <button
                     type="button"
