@@ -381,7 +381,7 @@ export default function HomePage() {
     if (selectedProjectId) url = `/project/${selectedProjectId}`;
     else if (selectedSessionId) url = `/session/${selectedSessionId}`;
     if (url !== lastPushedUrlRef.current) {
-      window.history.pushState(null, "", url);
+      window.history.pushState(null, "", url + window.location.search);
       lastPushedUrlRef.current = url;
     }
   }, [selectedSessionId, selectedProjectId]);

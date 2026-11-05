@@ -128,6 +128,24 @@ export function readUrlState(): { session: string | null; project: string | null
   };
 }
 
+export function readSidebarFilterFromUrl(): { runner: string | null; project: string | null } {
+  if (typeof window === "undefined") return { runner: null, project: null };
+  const params = new URLSearchParams(window.location.search);
+  return { runner: params.get("runner") || null, project: params.get("project") || null };
+}
+
+export function writeSidebarFilterToUrl(filter: { runner: string | null; project: string | null }) {
+  const params = new URLSearchParams(window.location.search);
+  if (filter.runner) params.set("runner", filter.runner);
+  else params.delete("runner");
+  if (filter.project) params.set("project", filter.project);
+  else params.delete("project");
+  const search = params.toString();
+  const next = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
+  const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (next !== current) window.history.replaceState(window.history.state, "", next);
+}
+
 export function agentTypeLabel(type: string): string {
   if (type === "antigravity") return "Antigravity CLI";
   if (type === "claude") return "Claude Code";

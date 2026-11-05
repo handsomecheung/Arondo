@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { IconPlus, IconInbox, IconSettings, IconServer, IconMoreVertical, IconArchive, IconArrowLeft, IconTrash, IconPin, IconEdit, IconLogout, IconSearch, IconX } from "@/components/Icons";
 import { formatRelative, isUnviewedCompletion } from "@/lib/homeUtils";
+import { useSidebarFilters } from "@/lib/hooks/useSidebarFilters";
 import type { Session, Project, Runner } from "@/types/home";
 import SessionTags from "@/components/SessionTags";
 
@@ -66,8 +67,7 @@ export default function AppSidebar({
   const [sessionMenuPos, setSessionMenuPos] = useState<{ top: number; left: number } | null>(null);
   const sessionMenuTriggerRef = useRef<HTMLDivElement>(null);
   const sessionMenuPortalRef = useRef<HTMLDivElement>(null);
-  const [selectedRunnerFilter, setSelectedRunnerFilter] = useState<string | null>(null);
-  const [selectedProjectFilter, setSelectedProjectFilter] = useState<string | null>(null);
+  const { runnerFilter: selectedRunnerFilter, setRunnerFilter: setSelectedRunnerFilter, projectFilter: selectedProjectFilter, setProjectFilter: setSelectedProjectFilter } = useSidebarFilters(projects, runners);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<{ query: string; sessionIds: Set<string> } | null>(null);
