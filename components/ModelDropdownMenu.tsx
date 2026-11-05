@@ -18,7 +18,9 @@ interface Props {
   onSelect: (model: string) => void;
 }
 
-export function ModelDropdownOptions({ agentType, selectedModel, config, onSelect, quotas, loading = false, className = "new-session-dropdown-menu new-session-model-dropdown-menu", style, header }: Omit<Props, "runnerId"> & { quotas: ModelQuotas | null; loading?: boolean }) {
+type ModelOptionsProps = Pick<Props, "agentType" | "selectedModel" | "config" | "onSelect"> & { quotas: ModelQuotas | null; loading?: boolean };
+
+export function ModelOptions({ agentType, selectedModel, config, onSelect, quotas, loading = false }: ModelOptionsProps) {
   const agy = config?.antigravity;
   const groups = agentType === "antigravity"
     ? [
@@ -39,8 +41,7 @@ export function ModelDropdownOptions({ agentType, selectedModel, config, onSelec
     </button>
   );
   return (
-    <div className={`custom-dropdown-menu ${className}`} style={style}>
-      {header}
+    <>
       {option("")}
       {groups.map((group) => {
         const models = (agentType === "opencode" ? parseOpencodeModelList : parseModelList)(group.models);
@@ -59,6 +60,15 @@ export function ModelDropdownOptions({ agentType, selectedModel, config, onSelec
           </div>
         );
       })}
+    </>
+  );
+}
+
+export function ModelDropdownOptions({ className = "new-session-dropdown-menu new-session-model-dropdown-menu", style, header, ...props }: Omit<Props, "runnerId"> & { quotas: ModelQuotas | null; loading?: boolean }) {
+  return (
+    <div className={`custom-dropdown-menu ${className}`} style={style}>
+      {header}
+      <ModelOptions {...props} />
     </div>
   );
 }

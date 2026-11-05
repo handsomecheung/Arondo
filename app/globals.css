@@ -3633,6 +3633,20 @@ pre.agent-exec-output {
   padding-left: 12px;
 }
 
+.session-agent-model-list {
+  background: var(--bg-elevated);
+}
+
+.session-agent-model-list .custom-dropdown-item {
+  min-height: 42px;
+  padding: 10px 14px 10px 30px;
+  font-size: 14px;
+}
+
+.session-agent-model-list .custom-dropdown-item.active {
+  padding-left: 28px;
+}
+
 .new-session-dropdown-container .new-session-dropdown-menu {
   left: 0;
   right: auto;

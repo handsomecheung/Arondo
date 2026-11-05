@@ -15,17 +15,45 @@ interface Props {
   style?: CSSProperties;
 }
 
-export function AgentDropdownOptions({ agentType, isAgentAvailable, onSelect, quotas, loading = false, className = "new-session-dropdown-menu", style }: Omit<Props, "runnerId"> & { quotas: ModelQuotas | null; loading?: boolean }) {
+export function availableAgentItems(isAgentAvailable: (command: string) => boolean) {
   const agents = [
     { value: "antigravity", label: "Antigravity CLI", cmd: "agy" },
     { value: "claude", label: "Claude Code", cmd: "claude" },
     { value: "codex", label: "Codex", cmd: "codex" },
     { value: "opencode", label: "OpenCode", cmd: "opencode" },
   ].filter(({ cmd }) => isAgentAvailable(cmd));
-  const items = [...(agents.length > 1 ? [{ value: "auto", label: "Auto" }] : []), ...agents];
+  return [...(agents.length > 1 ? [{ value: "auto", label: "Auto" }] : []), ...agents];
+}
+
+export function AgentOptionQuota({ value, quotas, loading = false }: { value: string; quotas: ModelQuotas | null; loading?: boolean }) {
+  if (value === "antigravity") {
+    return (
+      <>
+        {[
+          ["Gemini", "Gemini"], ["Anthropic & Other", "Other"], ["Gemini 4 Argon", "Argon"],
+        ].map(([name, group]) => (
+          <span key={group} className="dropdown-option-quota">
+            <span className="agent-quota-line">{name}</span>
+            <DropdownQuotaBars quotas={quotas} agent="antigravity" group={group} loading={loading} />
+          </span>
+        ))}
+      </>
+    );
+  }
+  if (value === "claude" || value === "codex" || value === "opencode") {
+    return (
+      <span className="dropdown-option-quota">
+        <DropdownQuotaBars quotas={quotas} agent={value} loading={loading} />
+      </span>
+    );
+  }
+  return null;
+}
+
+export function AgentDropdownOptions({ agentType, isAgentAvailable, onSelect, quotas, loading = false, className = "new-session-dropdown-menu", style }: Omit<Props, "runnerId"> & { quotas: ModelQuotas | null; loading?: boolean }) {
   return (
     <div className={`custom-dropdown-menu ${className}`} style={style}>
-      {items.map(({ value, label }) => (
+      {availableAgentItems(isAgentAvailable).map(({ value, label }) => (
         <button
           key={value}
           type="button"
@@ -33,19 +61,7 @@ export function AgentDropdownOptions({ agentType, isAgentAvailable, onSelect, qu
           onClick={() => onSelect(value)}
         >
           <span className="dropdown-option-name">{label}</span>
-          {value === "antigravity" && [
-            ["Gemini", "Gemini"], ["Anthropic & Other", "Other"], ["Gemini 4 Argon", "Argon"],
-          ].map(([name, group]) => (
-            <span key={group} className="dropdown-option-quota">
-              <span className="agent-quota-line">{name}</span>
-              <DropdownQuotaBars quotas={quotas} agent="antigravity" group={group} loading={loading} />
-            </span>
-          ))}
-          {(value === "claude" || value === "codex" || value === "opencode") && (
-            <span className="dropdown-option-quota">
-              <DropdownQuotaBars quotas={quotas} agent={value} loading={loading} />
-            </span>
-          )}
+          <AgentOptionQuota value={value} quotas={quotas} loading={loading} />
         </button>
       ))}
     </div>
