@@ -1796,7 +1796,7 @@ export default function AdminSettingsPage() {
               }}
             >
               Define global rules that automatically apply to all AI Agents.
-              These will be synced to <code>~/.gemini/GEMINI.md</code> (agy) and <code>~/.claude/CLAUDE.md</code> (claude) on the runners.
+              These will be synced to <code>~/.gemini/GEMINI.md</code> (agy), <code>~/.claude/CLAUDE.md</code> (claude), <code>~/.codex/AGENTS.md</code> (codex), and <code>~/.config/opencode/AGENTS.md</code> (opencode) on the runners.
             </p>
 
             {runners.length > 0 && (
