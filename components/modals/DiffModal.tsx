@@ -15,7 +15,7 @@ interface Props {
 
 export default function DiffModal({ open, onClose, sessionId, messageId, filePath, projectId, commit }: Props) {
   const [optionsOpen, setOptionsOpen] = useState(false);
-  const [wordWrap, setWordWrap] = useState(false);
+  const [wordWrap, setWordWrap] = useState(true);
 
   if (!open) return null;
 

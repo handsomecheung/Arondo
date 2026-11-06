@@ -106,7 +106,7 @@ export async function GET(
 ) {
   const { id } = await params;
   const { searchParams } = new URL(req.url);
-  const wrap = searchParams.get("wrap") === "true";
+  const wrap = searchParams.get("wrap") !== "false";
   const messageId = searchParams.get("messageId");
   const filePath = searchParams.get("path");
   const projectId = searchParams.get("projectId") || undefined;
