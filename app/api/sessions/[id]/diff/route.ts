@@ -217,9 +217,25 @@ export async function GET(
       font-size: 10px !important;
     }
     ${wrap ? `
-    .d2h-code-line-ctn {
+    .d2h-code-line {
+      display: flex !important;
+      box-sizing: border-box !important;
+      width: 100% !important;
+      padding: 0 8px 0 8em !important;
       white-space: pre-wrap !important;
       word-break: break-all !important;
+      overflow-wrap: anywhere !important;
+    }
+    .d2h-code-line-prefix {
+      flex: 0 0 auto !important;
+    }
+    .d2h-code-line-ctn {
+      flex: 1 1 auto !important;
+      min-width: 0 !important;
+      width: auto !important;
+      white-space: pre-wrap !important;
+      word-break: break-all !important;
+      overflow-wrap: anywhere !important;
     }
     ` : ""}
     /* Maximize horizontal space on mobile devices */
@@ -387,9 +403,25 @@ export async function GET(
       }
     }
     ${wrap ? `
-    .d2h-code-line-ctn {
+    .d2h-code-line {
+      display: flex !important;
+      box-sizing: border-box !important;
+      width: 100% !important;
+      padding: 0 8px 0 8em !important;
       white-space: pre-wrap !important;
       word-break: break-all !important;
+      overflow-wrap: anywhere !important;
+    }
+    .d2h-code-line-prefix {
+      flex: 0 0 auto !important;
+    }
+    .d2h-code-line-ctn {
+      flex: 1 1 auto !important;
+      min-width: 0 !important;
+      width: auto !important;
+      white-space: pre-wrap !important;
+      word-break: break-all !important;
+      overflow-wrap: anywhere !important;
     }
     ` : ""}
     ${diffCollapseStyles}
