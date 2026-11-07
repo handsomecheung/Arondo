@@ -210,6 +210,11 @@ export function execCardInfoToItem(info: ExecCardInfo): ExecCardItem {
     messageId: info.runMsg.id,
     timestamp: formatTime(info.runMsg.createdAt),
     waitingForInput: !isDone && info.isScript && !!info.runMsg.waitingForInput,
+    exitCode: info.runMsg.exitCode,
+    rawExitCode: info.returnMsg?.rawExitCode ?? info.runMsg.rawExitCode ?? info.runMsg.exitCode,
+    statusOverride: info.returnMsg?.statusOverride ?? info.runMsg.statusOverride ?? false,
+    failureKind: info.returnMsg?.failureKind ?? info.runMsg.failureKind,
+    overrideReason: info.returnMsg?.overrideReason ?? info.runMsg.overrideReason,
   };
 }
 

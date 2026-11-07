@@ -17,6 +17,11 @@ export interface ExecCardItem {
   messageId?: string;
   timestamp?: string;
   waitingForInput?: boolean;
+  exitCode?: number;
+  rawExitCode?: number;
+  statusOverride?: boolean;
+  failureKind?: string;
+  overrideReason?: string;
 }
 
 export interface ExecCardProps {

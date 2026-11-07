@@ -46,6 +46,7 @@ export {
 };
 
 import type { LlmApiKeyName } from "./llm/config";
+import type { AgentFailureKind } from "./agent-failure-classifier";
 
 export interface AppSettings {
   sessionArchiveDays?: number;
@@ -164,6 +165,10 @@ export interface Message {
   pid?: number;
   runnerId?: string;
   exitCode?: number;
+  rawExitCode?: number;
+  statusOverride?: boolean;
+  failureKind?: AgentFailureKind;
+  overrideReason?: string;
   command?: string;
   projectId?: string;
   stoppedByUser?: boolean;

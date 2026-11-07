@@ -1547,7 +1547,8 @@ class RunnerManager {
     if (!ctx.sessionId) {
       return;
     }
-    const success = exitCode === 0;
+    const rawExitCode = exitCode;
+    let success = exitCode === 0;
 
     const session = await getSession(ctx.sessionId);
     const messages = await getMessages(ctx.sessionId);
@@ -1599,26 +1600,60 @@ class RunnerManager {
 
     let failureKind: AgentFailureKind | undefined;
     let classificationUnavailable: "not_configured" | "request_failed" | undefined;
+    let statusOverride = false;
+    let overrideReason: string | undefined;
+
     if (!success && !ctx.stoppedByUser) {
       const [stdoutLog, stderrLog] = await Promise.all([
         getSessionLog(ctx.sessionId, ctx.messageId, "agent", ctx.projectId),
         getSessionLog(ctx.sessionId, ctx.messageId, "agent", ctx.projectId, "stderr"),
       ]);
+      const msgIdx = messages.findIndex((m) => m.id === ctx.messageId);
+      const lastUserMsg = [...messages.slice(0, msgIdx)].reverse().find((m) => m.role === "user");
+      const userPrompt = ctx.prompt || lastUserMsg?.prompt || lastUserMsg?.content;
+
       const classification = await classifyAgentFailure({
         agentType: resolvedAgentType,
         exitCode,
         command: ctx.command || "",
+        userPrompt,
         stdout: stdoutLog,
         stderr: stderrLog,
       });
-      if (classification.status === "classified") failureKind = classification.kind;
-      else classificationUnavailable = classification.reason;
+      if (classification.status === "classified") {
+        failureKind = classification.kind;
+        if (classification.kind === "completed_with_warnings") {
+          success = true;
+          statusOverride = true;
+          overrideReason = "Process exited with non-zero code, but Jev verified that the agent completed the task and provided a substantive answer in stdout.";
+        }
+      } else {
+        classificationUnavailable = classification.reason;
+      }
     } else if (resolvedAgentType === "antigravity") {
       const [stdoutLog, stderrLog] = await Promise.all([
         getSessionLog(ctx.sessionId, ctx.messageId, "agent", ctx.projectId),
         getSessionLog(ctx.sessionId, ctx.messageId, "agent", ctx.projectId, "stderr"),
       ]);
       if (!`${stdoutLog}${stderrLog}`.trim()) failureKind = "unknown";
+    }
+
+    if (ctx.messageId) {
+      try {
+        await updateMessage(
+          ctx.sessionId,
+          ctx.messageId,
+          {
+            rawExitCode,
+            statusOverride,
+            failureKind,
+            overrideReason,
+          },
+          ctx.projectId,
+        );
+      } catch (err) {
+        console.error("[runner-manager] failed to update message with exit metadata:", err);
+      }
     }
 
     const quotaExhausted = failureKind === "quota_exhausted";
@@ -1648,12 +1683,14 @@ class RunnerManager {
               ? "Jev System One could not determine why the agent failed, so Arondo cannot perform follow-up actions."
               : emptySuccessfulOutput
                 ? "The agent exited successfully but produced no output. Arondo cannot determine the cause, so no follow-up action will be performed."
-                : failureKind === "agent_error"
-                  ? "The agent itself failed. Please try again later."
-                  : failureKind === "arondo_parameter_error"
-                    ? "Arondo may have passed invalid parameters to the agent."
-                    : failureKind === "unknown"
-                      ? "Arondo could not determine why the agent failed."
+                : failureKind === "completed_with_warnings"
+                  ? undefined
+                  : failureKind === "agent_error"
+                    ? "The agent itself failed. Please try again later."
+                    : failureKind === "arondo_parameter_error"
+                      ? "Arondo may have passed invalid parameters to the agent."
+                      : failureKind === "unknown"
+                        ? "Arondo could not determine why the agent failed."
           : success
             ? undefined
             : `Agent exited with code ${exitCode}`,
@@ -1702,6 +1739,10 @@ class RunnerManager {
       type: "agent-return",
       parentId: ctx.messageId,
       cache: shouldCache ? "on" : undefined,
+      rawExitCode,
+      statusOverride,
+      failureKind,
+      overrideReason,
     });
 
     eventBus.publish({ type: "message_added", payload: agentMsg });

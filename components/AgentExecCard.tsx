@@ -8,9 +8,10 @@ import remarkFileLinks, { extractCandidatePaths, candidateToPath, isPathCandidat
 import remarkSoftLineBreaks from "@/lib/remarkSoftLineBreaks";
 import { resolveRepoFilePath } from "@/lib/homeUtils";
 import ExecCard, { ExecCardProps } from "@/components/ExecCard";
-import { IconTerminal, IconFileText, IconCopy, IconCode } from "@/components/Icons";
+import { IconTerminal, IconFileText, IconCopy, IconCode, IconInfo } from "@/components/Icons";
 import DiffModal from "@/components/modals/DiffModal";
 import CommandModal from "@/components/modals/CommandModal";
+import ResultStatusModal from "@/components/modals/ResultStatusModal";
 
 const RENDERED_HTML_CACHE_MARKER = "<!--arondo-agent-output-html-v4-->";
 
@@ -48,6 +49,7 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
   const [diffModalOpen, setDiffModalOpen] = useState(false);
   const [selectedDiffPath, setSelectedDiffPath] = useState("");
   const [stderrText, setStderrText] = useState<string | null>(null);
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
   const outputRef = useRef<HTMLDivElement>(null);
 
   // Fetch cached HTML if exists
@@ -308,6 +310,15 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
               <span>Show Stderr</span>
             </button>
           )}
+          {hasLog && (
+            <button
+              className="task-menu-item"
+              onClick={() => { closeMenu(); setStatusModalOpen(true); }}
+            >
+              <IconInfo />
+              <span>Show Status</span>
+            </button>
+          )}
         </>
       )
     : undefined;
@@ -406,6 +417,17 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
         text={stderrText}
         onClose={() => setStderrText(null)}
         title="Stderr Log"
+      />
+      <ResultStatusModal
+        open={statusModalOpen}
+        onClose={() => setStatusModalOpen(false)}
+        status={props.item.status}
+        statusText={props.item.statusText}
+        exitCode={props.item.exitCode}
+        rawExitCode={props.item.rawExitCode}
+        statusOverride={props.item.statusOverride}
+        failureKind={props.item.failureKind}
+        overrideReason={props.item.overrideReason}
       />
     </>
   );

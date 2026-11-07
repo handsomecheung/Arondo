@@ -76,6 +76,11 @@ export interface Message {
   agentSessionKey?: string;
   deleted?: boolean;
   waitingForInput?: boolean;
+  exitCode?: number;
+  rawExitCode?: number;
+  statusOverride?: boolean;
+  failureKind?: string;
+  overrideReason?: string;
   files?: Array<{ name: string; serverFilename?: string; size?: number; mimeType?: string }>;
 }
 
