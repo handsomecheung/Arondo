@@ -106,6 +106,8 @@ Configure default models and available model lists in **Admin Settings → Agent
 
 The OpenCode Free list is stored as `setitngs.agentModels.opencode.freeModels` in `arondo.json`. Missing lists use the built-in defaults; administrators can edit the list as model availability changes. The Free group does not display Go subscription quota bars.
 
+The **Auto Agent** section at the top of the page lists agy, Claude Code, Codex CLI, and OpenCode with a checkbox each, all checked by default. Unchecking an agent temporarily excludes it from Auto Mode selection; agents chosen directly are not affected. Excluded agents are stored in `setitngs.agentModels.autoAgentExcluded` in `arondo.json`.
+
 Choose a model when creating a session, or open an existing session’s agent selector, expand an agent, and choose one of its models (Default is listed first). The model is saved on the session and takes precedence over the admin default on subsequent runs and resumes. Selecting **Default** clears the session’s explicit model and uses the configured admin default; switching agents also clears the previous model unless a new one is selected. For OpenCode, leaving the admin default blank omits `--model` and lets OpenCode select its own model, including a resumed session’s saved selection.
 
 For signed-in OpenCode v2 installations, Arondo reads Go quota through `opencode api GET /api/experimental/usage/limits` on the Runner. The Runners page and Agent dropdown show the reported 5-hour, weekly, and monthly remaining quota and reset times. Initial discovery, stale refresh, and manual refresh use the same quota pipeline as other agents.

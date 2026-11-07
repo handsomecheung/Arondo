@@ -29,6 +29,7 @@ import {
   type AgentModelsConfig,
   DEFAULT_AGENT_MODELS,
   getDefaultAgentModels,
+  isAutoAgentExcludable,
   mergeOpencodeModels,
   parseModelLine,
   parseModelList,
@@ -1008,6 +1009,9 @@ export async function getAppSettings(): Promise<AppSettings> {
         ? rawAgentModels.codex.availableModels
         : defaults.codex.availableModels,
     },
+    autoAgentExcluded: Array.isArray(rawAgentModels?.autoAgentExcluded)
+      ? rawAgentModels.autoAgentExcluded.filter(isAutoAgentExcludable)
+      : [],
   };
   return {
     ...settings,

@@ -2,6 +2,7 @@ import { getShowAutomationSessions } from "@/lib/automation";
 import { NextRequest, NextResponse } from "next/server";
 import { getArondoToken, getRoleByToken, isValidToken } from "@/lib/auth";
 import { updateAppSettings, getAppSettings, getSessionArchiveDays, getAutomationSessionRetentionHours, getShowHiddenFiles, getEnableAutomodel, getAgentModelsConfig, type AgentModelsConfig } from "@/lib/store";
+import { isAutoAgentExcludable } from "@/lib/agentModels";
 import { getLlmApiKeyEnvStatus, type LlmApiKeyName } from "@/lib/llm/config";
 import { getWebPushContactEmail, updateWebPushContactEmail } from "@/lib/web-push-server";
 import fs from "fs/promises";
@@ -147,6 +148,10 @@ export async function POST(request: NextRequest) {
     (!Array.isArray(agentModels.opencode.freeModels) || !agentModels.opencode.freeModels.every((m: unknown) => typeof m === "string"))) {
     return NextResponse.json({ error: "agentModels.opencode.freeModels must be an array of strings" }, { status: 400 });
   }
+  if (agentModels?.autoAgentExcluded !== undefined &&
+    (!Array.isArray(agentModels.autoAgentExcluded) || !agentModels.autoAgentExcluded.every(isAutoAgentExcludable))) {
+    return NextResponse.json({ error: "agentModels.autoAgentExcluded must be an array of agy, claude, codex, or opencode" }, { status: 400 });
+  }
 
   const patch: {
     sessionArchiveDays?: number;
@@ -231,6 +236,9 @@ export async function POST(request: NextRequest) {
       defaultModel: agentModels.opencode?.defaultModel?.trim() ?? current.opencode?.defaultModel,
       availableModels: agentModels.opencode?.availableModels?.map((m: string) => m.trim()).filter(Boolean) ?? current.opencode?.availableModels,
     };
+    next.autoAgentExcluded = agentModels.autoAgentExcluded !== undefined
+      ? agentModels.autoAgentExcluded.filter(isAutoAgentExcludable)
+      : current.autoAgentExcluded ?? [];
     patch.agentModels = next;
   }
 

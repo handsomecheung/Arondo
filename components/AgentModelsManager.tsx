@@ -2,7 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { SettingsActions } from "@/components/admin/SettingsForm";
-import { type AgentModelsConfig, DEFAULT_AGENT_MODELS, getOpencodeModelGroups, parseModelList, parseOpencodeModelList } from "@/lib/agentModels";
+import { type AgentModelsConfig, type AutoAgentExcludable, DEFAULT_AGENT_MODELS, getOpencodeModelGroups, parseModelList, parseOpencodeModelList } from "@/lib/agentModels";
+
+const AUTO_AGENT_OPTIONS: { key: AutoAgentExcludable; label: string }[] = [
+  { key: "agy", label: "Antigravity CLI (agy)" },
+  { key: "claude", label: "Claude Code (claude)" },
+  { key: "codex", label: "Codex CLI (codex)" },
+  { key: "opencode", label: "OpenCode (opencode)" },
+];
 
 interface AgentModelsManagerProps {
   initialConfig?: AgentModelsConfig;
@@ -23,10 +30,12 @@ interface FormState {
   codex: GroupFormState;
   opencode: GroupFormState;
   opencodeFree: GroupFormState;
+  autoAgentExcluded: AutoAgentExcludable[];
 }
 
 function configToFormState(config?: AgentModelsConfig): FormState {
   return {
+    autoAgentExcluded: config?.autoAgentExcluded ?? [],
     opencodeFree: {
       defaultModel: "",
       availableModelsText: getOpencodeModelGroups(config?.opencode)[1].models.join("\n"),
@@ -78,6 +87,15 @@ export default function AgentModelsManager({ initialConfig, onSaved, onCancel }:
     }));
   };
 
+  const toggleAutoAgentExcluded = (agent: AutoAgentExcludable) => {
+    setForm((prev) => ({
+      ...prev,
+      autoAgentExcluded: prev.autoAgentExcluded.includes(agent)
+        ? prev.autoAgentExcluded.filter((a) => a !== agent)
+        : [...prev.autoAgentExcluded, agent],
+    }));
+  };
+
   const handleResetAgyGroup = (group: "gemini" | "other" | "argon") => {
     const def = DEFAULT_AGENT_MODELS.antigravity[group];
     const fieldKey: keyof FormState = group === "gemini"
@@ -110,6 +128,7 @@ export default function AgentModelsManager({ initialConfig, onSaved, onCancel }:
     setSaving(true);
 
     const payload: AgentModelsConfig = {
+      autoAgentExcluded: form.autoAgentExcluded,
       opencode: {
         freeModels: form.opencodeFree.availableModelsText.split("\n").map((m) => m.trim()).filter(Boolean),
         defaultModel: form.opencode.defaultModel.trim(),
@@ -326,6 +345,43 @@ export default function AgentModelsManager({ initialConfig, onSaved, onCancel }:
 
       <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <fieldset disabled={saving} style={{ display: "contents", border: 0, padding: 0, margin: 0 }}>
+        {/* Auto Agent Exclusions */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
+            Auto Agent
+          </h3>
+          <div
+            style={{
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-sm)",
+              padding: 14,
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            <p style={{ fontSize: 11, color: "var(--text-muted)", margin: 0 }}>
+              Unchecked agents are temporarily excluded from Auto Agent selection. Agents you select directly are not affected.
+            </p>
+            {AUTO_AGENT_OPTIONS.map(({ key, label }) => (
+              <label
+                key={key}
+                htmlFor={`auto-agent-include-${key}`}
+                style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-primary)", cursor: "pointer" }}
+              >
+                <input
+                  id={`auto-agent-include-${key}`}
+                  type="checkbox"
+                  checked={!form.autoAgentExcluded.includes(key)}
+                  onChange={() => toggleAutoAgentExcluded(key)}
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+        </div>
+
         {/* Antigravity CLI Group */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>

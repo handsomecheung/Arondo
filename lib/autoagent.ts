@@ -5,7 +5,7 @@ import { getSessionLog, getAgentModelsConfig, getDefaultAgentModels, parseModelL
 import { getConfigDir } from "./config";
 import { stripAnsi } from "./ansi";
 import type { AutoModelCostTier, AutoModelEffort, AutoModelOption } from "./llm/automodel";
-import { parseOpencodeModelLine } from "./agentModels";
+import { parseOpencodeModelLine, type AutoAgentExcludable } from "./agentModels";
 import { getAutoagentQuotaScore, getAutoagentWeekTimeRemain } from "./autoagent-score";
 
 const CONFIG_DIR = getConfigDir();
@@ -355,10 +355,14 @@ async function selectAgentFromQuota(
   opencodeQuotaRef?: OpencodeQuotaRef | null,
 ): Promise<ResolvedAgent | null> {
   const agentModels = await getAgentModelsConfig();
-  const hasAgy = runnerAgentBinaries.includes("agy");
-  const hasClaude = runnerAgentBinaries.includes("claude");
-  const hasCodex = runnerAgentBinaries.includes("codex");
-  const hasOpencode = runnerAgentBinaries.includes("opencode");
+  const excluded = new Set<AutoAgentExcludable>(agentModels.autoAgentExcluded ?? []);
+  if (excluded.size > 0) {
+    log(`[autoagent] Excluded by settings: ${[...excluded].join(", ")}`);
+  }
+  const hasAgy = runnerAgentBinaries.includes("agy") && !excluded.has("agy");
+  const hasClaude = runnerAgentBinaries.includes("claude") && !excluded.has("claude");
+  const hasCodex = runnerAgentBinaries.includes("codex") && !excluded.has("codex");
+  const hasOpencode = runnerAgentBinaries.includes("opencode") && !excluded.has("opencode");
   const quota = await readQuota();
   const latestEntryByType = getLatestQuotaByType(quota, opencodeQuotaRef);
 

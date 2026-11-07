@@ -13,11 +13,20 @@ export interface AntigravityModelsConfig {
   argon?: AgentModelConfig;
 }
 
+export const AUTO_AGENT_EXCLUDABLE = ["agy", "claude", "codex", "opencode"] as const;
+
+export type AutoAgentExcludable = (typeof AUTO_AGENT_EXCLUDABLE)[number];
+
+export function isAutoAgentExcludable(value: unknown): value is AutoAgentExcludable {
+  return typeof value === "string" && (AUTO_AGENT_EXCLUDABLE as readonly string[]).includes(value);
+}
+
 export interface AgentModelsConfig {
   antigravity: AntigravityModelsConfig;
   claude: AgentModelConfig;
   codex: AgentModelConfig;
   opencode?: OpencodeModelsConfig;
+  autoAgentExcluded?: AutoAgentExcludable[];
 }
 
 export const DEFAULT_AGENT_MODELS: AgentModelsConfig & { opencode: OpencodeModelsConfig } = {
