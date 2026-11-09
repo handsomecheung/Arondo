@@ -34,6 +34,7 @@ Options:
   --server <url>               Arondo server base URL (overrides ARONDO_SERVER and cli.server in arondo.json)
   --client-token <token>       Client access token (overrides ARONDO_CLIENT_TOKEN and cli.clientToken in arondo.json)
   --runner-id <id>             Target runner ID (default: connected runner with the current hostname)
+  --runner-name <name>         Target runner name
   --path <path>                Repository path on the runner (default: current working directory)
   --automation                 Create a hidden automation session in a dedicated runner workspace
   --no-path                    Create the session in a dedicated temporary directory without a project path
@@ -63,9 +64,9 @@ Commands:
 Run cli/arondo-cli <command> --help for command options.`
 
 type arguments struct {
-	server, token, runnerID, repoPath, sessionID, agentType, prompt, output, confirmation, cache string
-	pollInterval, timeout                                                                        float64
-	noProject, automation, resume, once                                                          bool
+	server, token, runnerID, runnerName, repoPath, sessionID, agentType, prompt, output, confirmation, cache string
+	pollInterval, timeout                                                                                    float64
+	noProject, automation, resume, once                                                                      bool
 }
 
 type apiError struct {
@@ -126,7 +127,7 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 		args.token = token
 	}
 	valueOptions := map[string]*string{
-		"--server": &args.server, "--client-token": &args.token, "--runner-id": &args.runnerID, "--path": &args.repoPath,
+		"--server": &args.server, "--client-token": &args.token, "--runner-id": &args.runnerID, "--runner-name": &args.runnerName, "--path": &args.repoPath,
 		"--session-id": &args.sessionID, "--agent": &args.agentType, "--output": &args.output,
 		"--confirmation": &args.confirmation, "--cache": &args.cache,
 	}
@@ -211,6 +212,9 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 	}
 	if args.prompt == "" {
 		return arguments{}, errors.New("a message is required")
+	}
+	if args.runnerID != "" && args.runnerName != "" {
+		return arguments{}, errors.New("--runner-id cannot be used with --runner-name")
 	}
 	if args.resume && args.sessionID != "" {
 		return arguments{}, errors.New("--resume cannot be used with --session-id")
@@ -428,6 +432,7 @@ func (c *client) renderedHTML(sessionID, messageID string) (string, error) {
 
 type runner struct {
 	ID        string   `json:"id"`
+	Name      string   `json:"name"`
 	Hostname  string   `json:"hostname"`
 	Connected bool     `json:"connected"`
 	Agents    []string `json:"agents"`
@@ -489,6 +494,26 @@ func resolveRunnerID(c *client, hostname string) (string, error) {
 		return "", fmt.Errorf("no connected runner matches hostname %q; specify --runner-id <id>", hostname)
 	}
 	return "", fmt.Errorf("multiple connected runners match hostname %q; specify --runner-id <id>", hostname)
+}
+
+func resolveRunnerIDByName(c *client, name string) (string, error) {
+	runners, err := c.listRunners()
+	if err != nil {
+		return "", err
+	}
+	var matches []runner
+	for _, runner := range runners {
+		if runner.Name == name {
+			matches = append(matches, runner)
+		}
+	}
+	if len(matches) == 1 {
+		return matches[0].ID, nil
+	}
+	if len(matches) == 0 {
+		return "", fmt.Errorf("no runner matches name %q; hint: use --runner-id instead of --runner-name", name)
+	}
+	return "", fmt.Errorf("multiple runners match name %q; hint: use --runner-id instead of --runner-name", name)
 }
 
 func resolveRecentSessionID(c *client, runnerID, repoPath string) (string, error) {
@@ -645,6 +670,14 @@ func run(argv []string) error {
 	ws, _ := dialWebSocket(args.server, args.token, 5*time.Second)
 	if ws != nil {
 		defer ws.Close()
+	}
+
+	if args.runnerName != "" {
+		fmt.Fprintf(os.Stderr, "Resolving runner for name %s...\n", args.runnerName)
+		args.runnerID, err = resolveRunnerIDByName(c, args.runnerName)
+		if err != nil {
+			return err
+		}
 	}
 
 	if args.resume {

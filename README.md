@@ -438,7 +438,7 @@ cli/arondo-cli send \
 ```
 
 When creating a session without `--automation`, `--no-path`, or `--path`, the script uses its current working directory as the repository path.
-For sessions using an existing path, omitting `--runner-id` selects the connected runner with the current hostname; use `--runner-id` when no runner or multiple runners share that hostname. `--automation` and `--no-path` instead select an accessible connected Runner at random.
+For sessions using an existing path, omitting `--runner-id` and `--runner-name` selects the connected runner with the current hostname; use `--runner-id` or `--runner-name` when no runner or multiple runners share that hostname (if multiple runners share the same name, use `--runner-id` instead of `--runner-name`). `--automation` and `--no-path` instead select an accessible connected Runner at random.
 Use `--resume` to send the message to the most recently updated session for the selected runner and repository path. It cannot be combined with `--session-id`, `--automation`, or `--no-path`.
 Pass an Agent Command as the message, for example `cli/arondo-cli send --resume "/commit"`, to run its configured prompt. Matcher capture groups such as `$1` are expanded, and project commands take priority over default and built-in commands. This works for new sessions, follow-ups, and messages queued with `--confirmation auto` or `--confirmation draft`; `/review` and `/btw` require an existing session.
 Use `--once` with `--automation` to create a single-use session that disallows follow-up messages; subsequent `--resume` or `--session-id` requests targeting this session will be rejected.

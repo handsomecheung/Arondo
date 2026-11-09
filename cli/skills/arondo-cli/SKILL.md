@@ -24,7 +24,7 @@ Confirm that the target Arondo checkout provides the built `cli/arondo-cli` bina
 cli/arondo-cli send --server "$ARONDO_SERVER" --client-token "$ARONDO_CLIENT_TOKEN" ...
 ```
 
-Treat the token as a secret: do not echo it, include it in prompts, or put it in reports. Choose a connected Runner with `--runner-id` whenever the local hostname does not uniquely identify the intended Runner.
+Treat the token as a secret: do not echo it, include it in prompts, or put it in reports. Choose a connected Runner with `--runner-id` or `--runner-name` whenever the local hostname does not uniquely identify the intended Runner (if multiple runners share the same name, use `--runner-id` instead of `--runner-name`).
 
 ## Start a task (`send`)
 
@@ -42,7 +42,7 @@ cli/arondo-cli send \
 ```
 
 - **Agent selection (`--agent`)**: Choose from `auto`, `antigravity`, `claude`, `codex`, `opencode`, or `decision`. Prefer `auto` unless a specific agent is requested. Auto Mode can select OpenCode when the execution Runner has verified Go subscription quota above 2% in its 5-hour, weekly, and monthly windows. OpenCode Auto runs use only `opencode-go/` models; API-billed and unknown-quota OpenCode installations are excluded.
-- **Automation (`--automation`)**: Create a project-free session marked `automation: true` with a fresh Runner-side workspace in `${ARONDO_CONFIG_DIR:-$HOME/.arondo}/automation-workspaces/`, named with a UTC datetime and random suffix. Without `--runner-id`, an accessible connected Runner is selected at random. Decision agents need neither a Runner nor a workspace. Sessions, tasks, search results, todos, and notifications are hidden unless an admin enables **Show automation sessions**. Direct session-ID access still works. Workspaces are retained until manually removed, including after session deletion. Do not combine with `--path`, `--no-path`, `--resume`, or `--session-id`. To continue later, use `send --session-id <id>` without `--automation`.
+- **Automation (`--automation`)**: Create a project-free session marked `automation: true` with a fresh Runner-side workspace in `${ARONDO_CONFIG_DIR:-$HOME/.arondo}/automation-workspaces/`, named with a UTC datetime and random suffix. Without `--runner-id` or `--runner-name`, an accessible connected Runner is selected at random. Decision agents need neither a Runner nor a workspace. Sessions, tasks, search results, todos, and notifications are hidden unless an admin enables **Show automation sessions**. Direct session-ID access still works. Workspaces are retained until manually removed, including after session deletion. Do not combine with `--path`, `--no-path`, `--resume`, or `--session-id`. To continue later, use `send --session-id <id>` without `--automation`.
 - **Standalone runs (`--no-path`)**: Use `--no-path` to create a visible session in a dedicated temporary directory without a project path (mutually exclusive with `--path` and `--automation`; cannot be combined with `--resume` or `--session-id`).
 - **Single-use & caching (`--once`, `--cache`)**: Pass `--once` with `--automation` to create a single-use session that rejects follow-up messages. Add `--cache on` (default: `off`, requires `--once`) to return cached results from `${ARONDO_CONFIG_DIR}/cache/once/` for matching prompt hashes without invoking an agent for seven days. Expired files remain on disk and are refreshed after a successful agent run.
 - **Polling & Timeout**: The command blocks until completion (defaults: 3-second polling via `--poll-interval` and 600-second timeout via `--timeout`).
