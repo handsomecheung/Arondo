@@ -170,6 +170,7 @@ export interface Message {
   statusOverride?: boolean;
   failureKind?: AgentFailureKind;
   overrideReason?: string;
+  runnerLost?: boolean;
   command?: string;
   projectId?: string;
   stoppedByUser?: boolean;

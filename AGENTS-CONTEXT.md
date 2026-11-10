@@ -315,7 +315,7 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 - **Runner resolution**: `resolveRunnerId()` falls back to any connected runner when a session's stored runnerId is stale.
 - **Global rules sync toggle**: `updateRunnerSyncGlobalRules()` persists a per-runner `syncGlobalRules` flag (`RunnerInfo.syncGlobalRules`, cached in `cachedSyncGlobalRules`, default `true`). Enabling it re-syncs rules via `syncGlobalRulesToRunner()`; disabling it calls `removeGlobalRulesFromRunner()` (sends `rules.remove`) to strip the previously written block from the runner's `GEMINI.md`/`CLAUDE.md`. `syncGlobalRulesToRunner()` is a no-op when the flag is `false`.
 - **Stream/event handling**: Routes `exec.output` streams to the correct session's log file and event bus. Handles `exec.exit` to update session status and add completion messages.
-- **Disconnect cleanup**: Fails orphaned active tasks when a runner disconnects (skips already-completed tasks).
+- **Disconnect cleanup**: When a runner disconnects, its active tasks stay open and are marked `logsMayBeIncomplete`, since the runner drops output and exit events sent while disconnected. A task that the reconnected runner no longer reports, or a task of a deleted runner, is finalized with `runnerLost` and no exit code. A real exit reported later corrects that task's return message with `statusOverride`.
 
 Uses the `process` singleton pattern (shared across tsx and Turbopack contexts).
 
@@ -444,7 +444,7 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **Real-time Streaming**: Both agent and script output stream via WebSocket `terminal:output` (base64-encoded PTY data), forwarded through the event bus. The frontend renders script logs via xterm.js and agent logs via the plain wrapped text view.
 - **Concurrency**: Multiple background scripts can run concurrently in a single session. The chat prompt stays active during execution. Also allows running project scripts while an agent is executing.
 - **Task Persistence**: Active task contexts survive server restarts by restoring metadata from session and project `messages.json` files and dynamically restored on server restart. Active session scripts are derived from unmatched `script-run` messages. Runner IDs are stable across reconnections.
-- **Runner Disconnect Handling**: When a runner disconnects, orphaned tasks are automatically failed with exit code -1, updating session status and notifying the UI.
+- **Runner Disconnect Handling**: When a runner disconnects, its active tasks are not failed. After the runner reconnects, its `task.status` report decides the outcome: a reported exit finalizes the task, while a task the runner no longer reports is recorded as `runnerLost` (no exit code). Failure classification receives `exitCodeSynthetic` and `logsMayBeIncomplete` hints so Jev does not treat a synthetic code or dropped output as agent failure.
 - **Agent Session Continuity (Session Resume)**: Retains conversation context for AI agents across different runs. Agent session mappings are stored in `~/.arondo/agent-sessions.json` as `{ "agy": {}, "codex": {}, "opencode": {} }`.
   - **Claude Code**: Supports `--session-id` (bound to the session) and `--resume` flags for native session continuity.
   - **Codex CLI**: Uses `codex exec` with sandbox/approval bypass flags before the optional `resume` subcommand, stores returned Codex session IDs in the shared agent session map, and passes the resolved prompt from `ARONDO_PROMPT_FILE`.

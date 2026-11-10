@@ -103,6 +103,8 @@ export interface TaskContext {
   cache?: "on" | "off";
   tokenUuid?: string;
   waitingForInput?: boolean;
+  logsMayBeIncomplete?: boolean;
+  runnerLost?: boolean;
 }
 
 interface PendingRequest {
@@ -265,6 +267,7 @@ class RunnerManager {
             stoppedByUser: m.stoppedByUser,
             tokenUuid: m.tokenUuid || s.tokenUuid,
             waitingForInput: m.waitingForInput,
+            logsMayBeIncomplete: !completedAt,
           };
           this.tasks.set(taskId, ctx);
           const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
@@ -320,6 +323,7 @@ class RunnerManager {
             stoppedByUser: m.stoppedByUser,
             tokenUuid: m.tokenUuid,
             waitingForInput: m.waitingForInput,
+            logsMayBeIncomplete: !completedAt,
           };
           this.tasks.set(taskId, ctx);
           const ptyKey = `${ctx.sessionId}:${ctx.messageId}`;
@@ -532,18 +536,14 @@ class RunnerManager {
         this.pending.delete(reqId);
       }
 
-      // Collect active tasks to fail before iterating (async cleanup modifies the map)
-      const orphanedTaskIds: string[] = [];
-      for (const [taskId, ctx] of this.tasks) {
+      // The runner keeps its processes alive across a disconnect, so the task
+      // stays open until the runner reports its real state after reconnecting.
+      // Output and exit events sent while disconnected are dropped by the runner.
+      for (const ctx of this.tasks.values()) {
         if (ctx.runnerId === runnerId && !ctx.completedAt) {
-          orphanedTaskIds.push(taskId);
+          ctx.logsMayBeIncomplete = true;
+          console.log(`[runner-manager] task ${ctx.taskId} is waiting for runner ${runnerId} to reconnect`);
         }
-      }
-      for (const taskId of orphanedTaskIds) {
-        console.log(`[runner-manager] failing orphaned task: ${taskId}`);
-        this.onExecExit({ taskId, exitCode: -1 }).catch((err) => {
-          console.error("[runner-manager] failed to clean up task:", err);
-        });
       }
     }
   }
@@ -551,6 +551,15 @@ class RunnerManager {
   async deleteRunner(id: string): Promise<boolean> {
     if (this.runners.has(id)) {
       throw new Error("Cannot delete a connected runner");
+    }
+
+    const orphanedTaskIds = Array.from(this.tasks.values())
+      .filter((ctx) => ctx.runnerId === id && !ctx.completedAt)
+      .map((ctx) => ctx.taskId);
+    for (const taskId of orphanedTaskIds) {
+      this.onExecExit({ taskId, exitCode: -1, runnerLost: true }).catch((err) => {
+        console.error("[runner-manager] failed to finalize task of deleted runner:", err);
+      });
     }
 
     // Unbind the runner token so a future reconnect with the same token is
@@ -969,6 +978,7 @@ class RunnerManager {
       return true;
     } catch (err) {
       console.error(`[runner-manager] failed to kill task ${taskId}:`, err);
+      ctx.stoppedByUser = false;
       return false;
     }
   }
@@ -1426,13 +1436,20 @@ class RunnerManager {
     taskId: string;
     exitCode: number;
     agyConversationId?: string;
+    runnerLost?: boolean;
   }): Promise<void> {
     const ctx = this.tasks.get(payload.taskId);
     if (!ctx) return;
-    if (ctx.completedAt) return;
+    if (ctx.completedAt) {
+      if (ctx.runnerLost && !payload.runnerLost) {
+        await this.correctLostAgentTask(ctx, payload.exitCode);
+      }
+      return;
+    }
 
     ctx.completedAt = Date.now();
-    ctx.exitCode = payload.exitCode;
+    ctx.exitCode = payload.runnerLost ? undefined : payload.exitCode;
+    ctx.runnerLost = payload.runnerLost;
     if (ctx.type === "script" && ctx.messageId) {
       ctx.waitingForInput = false;
       const message = await updateMessage(ctx.sessionId, ctx.messageId, { waitingForInput: false }, ctx.projectId);
@@ -1540,14 +1557,29 @@ class RunnerManager {
     });
   }
 
+  private async correctLostAgentTask(ctx: TaskContext, exitCode: number): Promise<void> {
+    if (ctx.type !== "agent") {
+      console.warn(`[runner-manager] ignoring late exit for runner lost ${ctx.type} task ${ctx.taskId}`);
+      return;
+    }
+    console.log(`[runner-manager] correcting runner lost task ${ctx.taskId} with exit code ${exitCode}`);
+    ctx.runnerLost = false;
+    ctx.exitCode = exitCode;
+    if (ctx.messageId) {
+      await updateMessage(ctx.sessionId, ctx.messageId, { exitCode }, ctx.projectId);
+    }
+    await this.handleAgentExit(ctx, exitCode, { correction: true });
+  }
+
   private async handleAgentExit(
     ctx: TaskContext,
     exitCode: number,
+    options: { correction?: boolean } = {},
   ): Promise<void> {
     if (!ctx.sessionId) {
       return;
     }
-    const rawExitCode = exitCode;
+    const rawExitCode = ctx.runnerLost ? undefined : exitCode;
     let success = exitCode === 0;
 
     const session = await getSession(ctx.sessionId);
@@ -1615,6 +1647,8 @@ class RunnerManager {
       const classification = await classifyAgentFailure({
         agentType: resolvedAgentType,
         exitCode,
+        exitCodeSynthetic: !!ctx.runnerLost,
+        logsMayBeIncomplete: !!ctx.logsMayBeIncomplete,
         command: ctx.command || "",
         userPrompt,
         stdout: stdoutLog,
@@ -1636,6 +1670,11 @@ class RunnerManager {
         getSessionLog(ctx.sessionId, ctx.messageId, "agent", ctx.projectId, "stderr"),
       ]);
       if (!`${stdoutLog}${stderrLog}`.trim()) failureKind = "unknown";
+    }
+
+    if (options.correction) {
+      statusOverride = true;
+      overrideReason = "The runner reported the agent's real exit after Arondo had marked the task as lost.";
     }
 
     if (ctx.messageId) {
@@ -1685,6 +1724,8 @@ class RunnerManager {
                 ? "The agent exited successfully but produced no output. Arondo cannot determine the cause, so no follow-up action will be performed."
                 : failureKind === "completed_with_warnings"
                   ? undefined
+                  : ctx.runnerLost && !success
+                    ? "The runner lost track of this task before the agent finished. Arondo cannot confirm the agent's exit status."
                   : failureKind === "agent_error"
                     ? "The agent itself failed. Please try again later."
                     : failureKind === "arondo_parameter_error"
@@ -1723,6 +1764,8 @@ class RunnerManager {
             ? "⚠️ Error: Jev System One could not determine the failure cause, so Arondo cannot perform follow-up actions."
             : emptySuccessfulOutput
               ? "⚠️ Agent exited successfully but produced no output. No follow-up action will be performed."
+              : ctx.runnerLost && !success
+                ? "⚠️ The runner lost track of this task before the agent finished. Arondo cannot confirm the agent's exit status."
               : failureKind === "agent_error"
                 ? "⚠️ The agent itself failed. Please try again later."
                 : failureKind === "arondo_parameter_error"
@@ -1732,20 +1775,38 @@ class RunnerManager {
         : success
           ? "✅ Done!"
           : `❌ Error: Agent exited with code ${exitCode}`;
-    const agentMsg = await addMessage({
-      sessionId: ctx.sessionId,
-      role: success && !quotaExhausted && !invalidModelSelection && !emptySuccessfulOutput ? "agent" : "system",
-      content,
-      type: "agent-return",
-      parentId: ctx.messageId,
-      cache: shouldCache ? "on" : undefined,
-      rawExitCode,
-      statusOverride,
-      failureKind,
-      overrideReason,
-    });
-
-    eventBus.publish({ type: "message_added", payload: agentMsg });
+    const returnRole = success && !quotaExhausted && !invalidModelSelection && !emptySuccessfulOutput ? "agent" : "system";
+    const previousReturn = options.correction
+      ? messages.find((m) => m.parentId === ctx.messageId && m.type === "agent-return")
+      : undefined;
+    if (previousReturn) {
+      const correctedMsg = await updateMessage(ctx.sessionId, previousReturn.id, {
+        role: returnRole,
+        content,
+        cache: shouldCache ? "on" : undefined,
+        rawExitCode,
+        statusOverride,
+        failureKind,
+        overrideReason,
+        runnerLost: false,
+      }, ctx.projectId);
+      if (correctedMsg) eventBus.publish({ type: "message_updated", payload: correctedMsg });
+    } else {
+      const agentMsg = await addMessage({
+        sessionId: ctx.sessionId,
+        role: returnRole,
+        content,
+        type: "agent-return",
+        parentId: ctx.messageId,
+        cache: shouldCache ? "on" : undefined,
+        rawExitCode,
+        statusOverride,
+        failureKind,
+        overrideReason,
+        runnerLost: ctx.runnerLost ? true : undefined,
+      });
+      eventBus.publish({ type: "message_added", payload: agentMsg });
+    }
     eventBus.publish({ type: "session_updated", payload: (await getSession(ctx.sessionId)) || updated });
 
     if (
@@ -1774,9 +1835,13 @@ class RunnerManager {
             ? promptPreview
               ? `${promptPreview}: Agent finished successfully.`
               : `Session "${sessionTitle}": Agent finished successfully.`
-            : promptPreview
-              ? `${promptPreview}: Agent exited with error code ${exitCode}.`
-              : `Session "${sessionTitle}": Agent exited with error code ${exitCode}.`;
+            : ctx.runnerLost
+              ? promptPreview
+                ? `${promptPreview}: Runner lost track of the task.`
+                : `Session "${sessionTitle}": Runner lost track of the task.`
+              : promptPreview
+                ? `${promptPreview}: Agent exited with error code ${exitCode}.`
+                : `Session "${sessionTitle}": Agent exited with error code ${exitCode}.`;
 
       const targetUserTokenUuid = ctx.tokenUuid || session?.tokenUuid;
       sendWebPushNotification({
@@ -1800,7 +1865,9 @@ class RunnerManager {
       ? "✅ Done!"
       : stoppedByUser
         ? "🛑 Stopped by user"
-        : `❌ Error: Agent exited with code ${exitCode}`;
+        : ctx.runnerLost
+          ? "❌ Error: Runner lost track of the agent"
+          : `❌ Error: Agent exited with code ${exitCode}`;
     const message = await addMessage({
       sessionId: ctx.sessionId,
       role: success ? "agent" : "system",
@@ -1829,7 +1896,9 @@ class RunnerManager {
     const stoppedByUser = !!ctx.stoppedByUser;
     const errorMessage = stoppedByUser
       ? "Stopped by user"
-      : `Script exited with code ${exitCode}`;
+      : ctx.runnerLost
+        ? "Runner lost track of the script"
+        : `Script exited with code ${exitCode}`;
     const returnMessage = await addMessage({
       sessionId: ctx.sessionId,
       projectId: ctx.projectId,
@@ -1941,8 +2010,8 @@ class RunnerManager {
       }
     }
 
-    // Clean up stale tasks that belong to this runner but weren't reported
-    // (runner restarted and lost track of them)
+    // Tasks that belong to this runner but weren't reported (runner restarted
+    // and lost track of them) will never produce an exit event
     // Skip already-completed tasks — they are retained for history
     for (const [taskId, ctx] of this.tasks) {
       if (
@@ -1951,10 +2020,10 @@ class RunnerManager {
         !reportedTaskIds.has(taskId)
       ) {
         console.log(
-          `[runner-manager] task ${taskId} not reported by runner ${runnerId}, cleaning up`,
+          `[runner-manager] task ${taskId} not reported by runner ${runnerId}, marking as runner lost`,
         );
-        this.onExecExit({ taskId, exitCode: -1 }).catch((err) => {
-          console.error("[runner-manager] stale task cleanup error:", err);
+        this.onExecExit({ taskId, exitCode: -1, runnerLost: true }).catch((err) => {
+          console.error("[runner-manager] runner lost task cleanup error:", err);
         });
       }
     }

@@ -110,6 +110,45 @@ test.describe('agent failure classifier', () => {
     }
   });
 
+  test('tells Jev when the exit code is synthetic and the logs may be incomplete', async () => {
+    const originalKey = process.env.TYPESAFE_API_KEY;
+    const originalUrl = process.env.TYPESAFE_API_URL;
+    const originalFetch = global.fetch;
+    let request: any;
+    process.env.TYPESAFE_API_KEY = 'test-jev-key';
+    process.env.TYPESAFE_API_URL = 'https://jev.test/systemone';
+    global.fetch = (async (_url, init) => {
+      request = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify({
+        answers: { failure_kind: { choice: 'unknown', confidence: 0.5 } },
+      }), { status: 200 });
+    }) as typeof fetch;
+
+    try {
+      await classifyAgentFailure({
+        agentType: 'codex',
+        exitCode: -1,
+        exitCodeSynthetic: true,
+        logsMayBeIncomplete: true,
+        command: 'codex exec',
+        stdout: 'partial',
+        stderr: '',
+      });
+
+      const stateObj = JSON.parse(request.state);
+      expect(stateObj.exitCodeSynthetic).toBe(true);
+      expect(stateObj.logsMayBeIncomplete).toBe(true);
+      expect(request.questions.failure_kind.instructions).toContain('exitCodeSynthetic');
+      expect(request.questions.failure_kind.instructions).toContain('logsMayBeIncomplete');
+    } finally {
+      global.fetch = originalFetch;
+      if (originalKey === undefined) delete process.env.TYPESAFE_API_KEY;
+      else process.env.TYPESAFE_API_KEY = originalKey;
+      if (originalUrl === undefined) delete process.env.TYPESAFE_API_URL;
+      else process.env.TYPESAFE_API_URL = originalUrl;
+    }
+  });
+
   test('falls back to stderr when stdout is empty and keeps its tail', async () => {
     const originalKey = process.env.TYPESAFE_API_KEY;
     const originalUrl = process.env.TYPESAFE_API_URL;
