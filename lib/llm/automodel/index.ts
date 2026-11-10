@@ -274,7 +274,7 @@ export async function routeModel(
 
   // 1. Try Jev (TypeSafe AI System One) first if method is DM and configured
   if (method === "DM") {
-    const jevConfig = getJevConfig(1500);
+    const jevConfig = getJevConfig();
     if (jevConfig) {
       logParts.push(formatLogSection("Config (Jev)", {
         provider: "typesafe",

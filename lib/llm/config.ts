@@ -84,7 +84,7 @@ function readApiKey(keyName: LlmApiKeyName, stored: Partial<Record<LlmApiKeyName
   return stored[keyName]?.trim();
 }
 
-export function getJevConfig(timeoutMs = 1500): JevConfig | null {
+export function getJevConfig(timeoutMs = 3000): JevConfig | null {
   const stored = readStoredApiKeys();
   const apiKey = readApiKey("TYPESAFE_API_KEY", stored);
   if (apiKey) {
@@ -120,7 +120,7 @@ export function getAutomodelConfig(): (LlmConfig | { provider: "typesafe"; model
   }
   const method = getInnerAutomodelMethod();
   if (method === "DM") {
-    const jev = getJevConfig(1500);
+    const jev = getJevConfig();
     if (jev) {
       return {
         provider: "typesafe",

@@ -58,11 +58,12 @@ test.describe('Jev System One Automodel Tests', () => {
 
   test('getJevConfig returns correct config when TYPESAFE_API_KEY is present', () => {
     process.env.TYPESAFE_API_KEY = 'test-jev-key-123';
-    const cfg = getJevConfig(1500);
+    const cfg = getJevConfig();
     expect(cfg).not.toBeNull();
     expect(cfg?.apiKey).toBe('test-jev-key-123');
     expect(cfg?.model).toBe('jev-latest');
-    expect(cfg?.timeoutMs).toBe(1500);
+    expect(cfg?.timeoutMs).toBe(3000);
+    expect(getJevConfig(1500)?.timeoutMs).toBe(1500);
   });
 
   test('routeModel routes successfully via Jev when configured', async () => {

@@ -119,12 +119,21 @@ test('keeps the previous agy variant when Jev fails', async () => {
 });
 
 test('times out Jev and retains the previous effort', async () => {
-  delayMs = 1700;
+  delayMs = 3200;
   const result = await resolveAgentType('claude', [], {
     model: 'sonnet', prompt: 'Continue',
     previousRun: { agentType: 'claude', model: 'sonnet', effort: 'medium' },
   });
   expect(result).toMatchObject({ model: 'sonnet', effort: 'medium' });
+  expect(payloads).toHaveLength(1);
+});
+
+test('accepts a first-turn Jev decision taking longer than the old timeout', async () => {
+  delayMs = 2000;
+  const result = await resolveAgentType('codex', ['codex'], {
+    model: 'gpt-6.1-sol', prompt: 'Implement a directory traversal function in C',
+  });
+  expect(result).toMatchObject({ model: 'gpt-6.1-sol', effort: 'high' });
   expect(payloads).toHaveLength(1);
 });
 
