@@ -151,7 +151,7 @@ Because a quota record now always exists for OpenCode, the Runner page lists Ope
 
 Auto Mode includes OpenCode only with verified Go subscription capacity. Its fallback model uses the configured OpenCode default when it belongs to `opencode-go/`; automodel options are restricted to that provider, preserving `#variant` suffixes and using inline comments as model descriptions.
 
-When an agent exits non-zero, Arondo uses Jev System One to classify the outcome, distinguishing actionable failures (invalid model selections, quota exhaustion, agent-side failures, invalid invocation parameters) from tasks completed with warnings where substantive answers were produced despite intermediate errors. Configure Jev in Admin Settings to enable this classification and its quota retry follow-up.
+When an agent exits non-zero, Arondo uses Jev System One to classify the outcome, distinguishing actionable failures (invalid model selections, quota exhaustion, agent-side failures, invalid invocation parameters) from tasks completed with warnings where a substantive answer was produced in stdout. When stdout is present, Jev evaluates only stdout, so stderr messages alone do not turn a run into a failure; stderr is sent only when stdout is empty. Both logs remain available in the UI. Configure Jev in Admin Settings to enable this classification and its quota retry follow-up.
 
 ## Admin Settings
 

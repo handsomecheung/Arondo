@@ -61,7 +61,7 @@ test.describe('agent failure classifier', () => {
     }
   });
 
-  test('truncates long stdout, stderr, and userPrompt and marks truncation in state', async () => {
+  test('sends only stdout as evidence when stdout is present, ignoring stderr', async () => {
     const originalKey = process.env.TYPESAFE_API_KEY;
     const originalUrl = process.env.TYPESAFE_API_URL;
     const originalFetch = global.fetch;
@@ -92,14 +92,59 @@ test.describe('agent failure classifier', () => {
       expect(result).toEqual({ status: 'classified', kind: 'completed_with_warnings', confidence: 0.95 });
 
       const stateObj = JSON.parse(request.state);
-      expect(stateObj.stdoutTruncated).toBe(true);
-      expect(stateObj.stdout).toContain('START_');
-      expect(stateObj.stdout).toContain('_END');
-      expect(stateObj.stdout).toContain('[... middle omitted:');
-      expect(stateObj.stderrTruncated).toBe(true);
-      expect(stateObj.stderr).toContain('ERR_START_');
-      expect(stateObj.stderr).toContain('_ERR_END');
+      expect(stateObj.evidenceSource).toBe('stdout');
+      expect(stateObj.evidenceTruncated).toBe(true);
+      expect(stateObj.evidence).toContain('START_');
+      expect(stateObj.evidence).toContain('_END');
+      expect(stateObj.evidence).toContain('[... middle omitted:');
+      expect(stateObj.evidence).not.toContain('ERR_START_');
+      expect(stateObj.stderr).toBeUndefined();
+      expect(stateObj.stdout).toBeUndefined();
       expect(stateObj.userPromptTruncated).toBe(true);
+    } finally {
+      global.fetch = originalFetch;
+      if (originalKey === undefined) delete process.env.TYPESAFE_API_KEY;
+      else process.env.TYPESAFE_API_KEY = originalKey;
+      if (originalUrl === undefined) delete process.env.TYPESAFE_API_URL;
+      else process.env.TYPESAFE_API_URL = originalUrl;
+    }
+  });
+
+  test('falls back to stderr when stdout is empty and keeps its tail', async () => {
+    const originalKey = process.env.TYPESAFE_API_KEY;
+    const originalUrl = process.env.TYPESAFE_API_URL;
+    const originalFetch = global.fetch;
+    let request: any;
+    process.env.TYPESAFE_API_KEY = 'test-jev-key';
+    process.env.TYPESAFE_API_URL = 'https://jev.test/systemone';
+    global.fetch = (async (_url, init) => {
+      request = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify({
+        answers: { failure_kind: { choice: 'invalid_model', confidence: 0.9 } },
+      }), { status: 200 });
+    }) as typeof fetch;
+
+    try {
+      const longStderr = 'ERR_START_' + 'B'.repeat(15_000) + '_ERR_END';
+
+      const result = await classifyAgentFailure({
+        agentType: 'codex',
+        exitCode: 1,
+        command: 'codex exec',
+        stdout: '   \n',
+        stderr: longStderr,
+      });
+
+      expect(result).toEqual({ status: 'classified', kind: 'invalid_model', confidence: 0.9 });
+
+      const stateObj = JSON.parse(request.state);
+      expect(stateObj.evidenceSource).toBe('stderr');
+      expect(stateObj.evidenceTruncated).toBe(true);
+      expect(stateObj.evidence).toContain('ERR_START_');
+      expect(stateObj.evidence).toContain('_ERR_END');
+      expect(stateObj.evidence).toContain('[... middle omitted:');
+      expect(stateObj.stdout).toBeUndefined();
+      expect(stateObj.stderr).toBeUndefined();
     } finally {
       global.fetch = originalFetch;
       if (originalKey === undefined) delete process.env.TYPESAFE_API_KEY;

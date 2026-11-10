@@ -17,6 +17,8 @@ export interface AgentFailureClassificationInput {
   stderr: string;
 }
 
+export type FailureEvidenceSource = "stdout" | "stderr";
+
 export type AgentFailureClassificationResult =
   | { status: "classified"; kind: AgentFailureKind; confidence?: number }
   | { status: "unavailable"; reason: "not_configured" | "request_failed" };
@@ -58,8 +60,10 @@ export async function classifyAgentFailure(
   const config = getJevConfig(5_000);
   if (!config) return { status: "unavailable", reason: "not_configured" };
 
-  const truncatedStdout = truncateLog(input.stdout, 2_000, 10_000);
-  const truncatedStderr = truncateLog(input.stderr, 2_000, 6_000);
+  const evidenceSource: FailureEvidenceSource = input.stdout.trim() ? "stdout" : "stderr";
+  const evidence = evidenceSource === "stdout"
+    ? truncateLog(input.stdout, 2_000, 10_000)
+    : truncateLog(input.stderr, 1_000, 9_000);
   const truncatedPrompt = input.userPrompt ? truncateLog(input.userPrompt, 1_000, 2_000) : undefined;
 
   const state = JSON.stringify({
@@ -68,12 +72,10 @@ export async function classifyAgentFailure(
     command: input.command,
     userPrompt: truncatedPrompt?.text,
     userPromptTruncated: truncatedPrompt?.truncated || undefined,
-    stdout: truncatedStdout.text,
-    stdoutTruncated: truncatedStdout.truncated,
-    stdoutOmittedChars: truncatedStdout.truncated ? truncatedStdout.omittedChars : undefined,
-    stderr: truncatedStderr.text,
-    stderrTruncated: truncatedStderr.truncated,
-    stderrOmittedChars: truncatedStderr.truncated ? truncatedStderr.omittedChars : undefined,
+    evidenceSource,
+    evidence: evidence.text,
+    evidenceTruncated: evidence.truncated,
+    evidenceOmittedChars: evidence.truncated ? evidence.omittedChars : undefined,
   });
   const payload = {
     model: config.model,
@@ -81,12 +83,12 @@ export async function classifyAgentFailure(
     questions: {
       failure_kind: {
         type: "choice",
-        instructions: "Classify the cause and outcome of this AI coding-agent execution failure or non-zero exit code using the supplied execution evidence. Select exactly one category. If stdout or stderr is marked as truncated, the middle content was omitted due to length limits; evaluate completeness using the preserved start and finish. Do not infer quota exhaustion without concrete evidence.",
+        instructions: "Classify the cause and outcome of this AI coding-agent execution failure or non-zero exit code using the supplied evidence. evidenceSource states which stream the evidence comes from. If it is stdout, the agent produced output and stderr is intentionally not supplied; judge by whether stdout is a complete answer, and do not assume errors that are absent from the evidence. If it is stderr, stdout was empty and stderr is the only evidence. Select exactly one category. If the evidence is marked as truncated, the middle content was omitted due to length limits; evaluate completeness using the preserved start and finish. Do not infer quota exhaustion without concrete evidence.",
         criteria: {
-          completed_with_warnings: "The agent process exited with a non-zero exit code or encountered intermediate tool/service errors (in stderr or tool traces), but recovered and produced a complete, substantive final answer to userPrompt in stdout.",
+          completed_with_warnings: "The agent exited with a non-zero exit code, but the evidence is stdout and contains a complete, substantive final answer to userPrompt. Only applicable when evidenceSource is stdout.",
           invalid_model: "The selected model is unavailable, invalid, deprecated, or rejected by the agent CLI.",
           quota_exhausted: "The agent account, subscription, rate, usage, or quota limit prevented execution.",
-          agent_error: "The agent CLI, its service, authentication, network, or its own runtime failed without producing a complete answer; retrying later may help.",
+          agent_error: "The agent CLI, its service, authentication, network, or its own runtime failed without producing a complete answer; retrying later may help. With evidenceSource stdout, a missing or incomplete final answer indicates this.",
           arondo_parameter_error: "Arondo passed an invalid command, argument, work directory, model option, or other invocation parameter.",
           unknown: "The evidence does not reliably support any other category.",
         },
