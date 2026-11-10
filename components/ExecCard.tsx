@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { IconClaude, IconAntigravity, IconCodex, IconOpencode, IconTerminal, IconChevronDown } from "@/components/Icons";
 import { useTaskMenuPlacement } from "@/components/useTaskMenuPlacement";
+import type { AutoModelEffort } from "@/lib/llm/automodel/types";
 
 export interface ExecCardItem {
   id: string;
@@ -10,6 +11,7 @@ export interface ExecCardItem {
   agentType?: string;
   title: string;
   model?: string;
+  effort?: AutoModelEffort;
   subtitle?: string;
   status: "running" | "done" | "error" | "stopped";
   statusText: string;
@@ -220,7 +222,7 @@ export default function ExecCard({
           </div>
           {item.model && (
             <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, overflowWrap: "anywhere" }}>
-              {item.model}
+              {item.model}{item.effort && ` · ${item.effort}`}
             </div>
           )}
           {item.subtitle && (

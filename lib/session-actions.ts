@@ -20,6 +20,7 @@ import {
 import { getAgent, resolveAgentType, PROMPT_ENV_VAR, type ConcreteAgentType } from "./agents";
 import { buildCrossAgentContext } from "./autoagent";
 import type { AutoModelEffort } from "./llm/automodel";
+import { buildEffortContext } from "./llm/automodel/context";
 import { eventBus } from "./event-bus";
 import { runnerManager } from "./runner-manager";
 import { readTokensConfig } from "./auth";
@@ -126,6 +127,7 @@ export async function dispatchDetachedAgent(
     command,
     resolvedAgentType: resolved.agentType,
     resolvedModel: resolved.model,
+    resolvedEffort: resolved.effort,
     prompt: fullPrompt,
     detachedKind: kind,
     agentSessionKey,
@@ -291,6 +293,12 @@ export async function dispatchFollowupMessage(
     autoagentLog: (text) => appendAutoagentLog(sessionId, systemMessageId, text),
     automodelLog: (text) => appendAutomodelLog(sessionId, systemMessageId, text),
     model: session.model,
+    previousRun: lastAgentRun ? {
+      agentType: lastAgentRun.resolvedAgentType as ConcreteAgentType,
+      model: lastAgentRun.resolvedModel,
+      effort: lastAgentRun.resolvedEffort,
+    } : undefined,
+    context: session.once ? undefined : await buildEffortContext(sessionId, messages),
     lockedAgent: session.agentType === "auto" && autoLockedType &&
       (!prevQuotaError || autoLockedType === "antigravity")
       ? {
@@ -358,6 +366,7 @@ export async function dispatchFollowupMessage(
     command,
     resolvedAgentType: resolvedType,
     resolvedModel: resolved.model,
+    resolvedEffort: resolved.effort,
     resolvedAgyQuotaGroup: resolved.agyQuotaGroup,
     prompt: fullPrompt,
     tokenUuid: opts.tokenUuid || session.tokenUuid,
@@ -633,6 +642,7 @@ export async function dispatchCreateSession(
     command,
     resolvedAgentType: resolvedType,
     resolvedModel: resolved.model,
+    resolvedEffort: resolved.effort,
     resolvedAgyQuotaGroup: resolved.agyQuotaGroup,
     prompt: fullPrompt,
     cache: opts.cache === "on" ? "on" : undefined,

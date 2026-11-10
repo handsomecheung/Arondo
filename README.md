@@ -89,7 +89,30 @@ Auto Mode uses the following order of preference:
 
 Session locks are preserved only while the locked agent/quota group is not exhausted. If every installed choice is exhausted, Auto Mode returns HTTP 503 without starting an agent; queued messages remain pending for retry. Quota retry checks also require weekly quota above 2% and hourly quota of at least 15% when known. OpenCode additionally requires monthly quota above 2%; its retries wait until the last blocking quota window resets.
 
-After Auto Mode has selected the agent, **automodel** can optionally choose that agent's model and reasoning effort. When configured with a Jev Key (`TYPESAFE_API_KEY`), automodel prioritizes TypeSafe AI's System One model (`jev-latest`) for ultra-fast categorical decision making. If Jev is unconfigured or encounters an error, it seamlessly falls back to standard lightweight LLMs (Anthropic Claude Haiku 4.5, OpenAI GPT-5.4-mini, or Google Gemini 3.5 Flash Lite) through the Vercel AI SDK. automodel is only enabled when a Jev, Anthropic, OpenAI, or Google API key is configured in Settings or through the server environment. It receives the selected agent, the quota-filtered model options for that agent, and the user message, then must choose one of those provided options. If no key is configured, the request times out, the provider returns an error, or the model choice is invalid, Arondo falls back to the predefined model selected by the existing quota-based logic.
+Enable **automodel** in **Admin Settings → Automodel & LLM API Keys**, or set `ARONDO_ENABLE_AUTOMODEL=true`. It selects inference settings (model and reasoning effort) in two ways:
+
+- **Single-use Auto sessions (`--once`)**: After Auto Mode selects the agent and quota group, automodel can choose a model and effort from that choice’s allowed options. `ARONDO_INNER_AUTOMODEL_METHOD=DM` (default) tries Jev System One (`TYPESAFE_API_KEY`) first, with a 1.5-second timeout. If Jev is unavailable or fails, it selects the first configured standard LLM provider in Anthropic → OpenAI → Google order, with a 2-second timeout. A standard LLM failure does not retry the next provider. Invalid or failed routing keeps the quota-selected default model.
+- **Ongoing sessions and explicitly selected agents**: On the first message and each follow-up, Jev selects only the current model family’s effort, using the user message, bounded recent conversation context, and previous effort. This path always uses Jev, regardless of `ARONDO_INNER_AUTOMODEL_METHOD`, and never falls back to a standard LLM. An unavailable key, timeout, error, or invalid choice keeps the previous inference settings, or the configured default on the first turn. Explicitly selected agents keep their model family even with `--once`.
+
+Codex passes effort through `model_reasoning_effort`; Claude Code uses `--effort`. Known models receive model-specific effort candidates, while unknown models require explicitly configured candidates. Antigravity uses configured names such as `Gemini 4 Argon (Low)` and `(High)` within the same family and quota group. OpenCode expands known `opencode-go/` models into their native reasoning variants, including bare model entries in single-use Auto routing. For example, MiniMax M3 offers `#none` (thinking disabled) and `#thinking` (adaptive thinking enabled), rather than low/medium/high. Automodel excludes `opencode-go/claude-haiku-5-5#none`, including explicitly configured candidates, to avoid invalid Anthropic effort values when switching from `none` to a graded effort. Explicitly configured `provider/model#variant` entries take precedence for that model; unknown models and other providers require configured variants in **Agent Models & Defaults**. If there are fewer than two supported effort choices, routing is skipped. Auto-selected OpenCode remains restricted to `opencode-go/`; explicitly selected OpenCode can use its configured non-Go and Free models. Model families without a resolved model or supported effort choices keep their settings.
+
+Environment API keys take precedence over saved keys. Turn logs record the applied `resolvedEffort` alongside `resolvedModel`, and follow-ups reuse those values when Jev fails. Agent execution cards display a separately recorded effort after the model name, for example `gpt-6-sol · high`. Antigravity and OpenCode variants remain part of the displayed model name.
+
+Excluding Haiku’s `#none` prevents new Automodel selections but does not repair existing OpenCode session history. In OpenCode v2.2.5, a resumed Haiku session that previously used `none` can still fail when switching to a graded effort. To recover it, merge the following into the Runner’s OpenCode configuration and reload it before retrying. This disables cache-preserving per-message effort updates for that model and sends the current effort directly:
+
+```json
+{
+  "providers": {
+    "opencode-go": {
+      "models": {
+        "claude-haiku-5-5": {
+          "compatibility": { "supportsEffortUpdates": false }
+        }
+      }
+    }
+  }
+}
+```
 
 Auto Mode writes its agent selection trace to `${ARONDO_CONFIG_DIR}/sessions/${sessionId}/logs/${messageId}.autoagent.log` (the configuration directory defaults to `~/.arondo`). The log includes available candidates, quota records and timestamps used for selection, filtering, scores, candidate order, and the selected agent/quota group, including session lock overrides. Model routing is recorded separately in `${messageId}.automodel.log`.
 
@@ -282,7 +305,7 @@ Open [http://localhost:3251](http://localhost:3251) in your browser. Select the 
 - `ARONDO_FILE_SHOW_HIDDEN_DEFAULT` – (Optional) Default for whether hidden files/directories (dotfiles) appear in the file browser and @ path selector, used when no override is set in Settings. Defaults to `true`; set to `false` to hide dotfiles by default.
 - `TYPESAFE_API_KEY` (or `JEV_API_KEY`), `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY` – Provider API keys used by `automodel` (with Jev prioritized first for model routing, falling back to Anthropic -> OpenAI -> Google) and LLM-assisted quota extraction (using standard LLMs). These can also be configured from Settings and stored as `setitngs.llmApiKeys` in `arondo.json`; environment variables take precedence and disable editing for that provider in the UI. If none are configured, Auto Mode keeps using the predefined model selected by the existing quota-based logic.
 - `ARONDO_INNER_RUNNER_QUOTA_METHOD` – (Optional) Runner agent quota fetching strategy (`AUTO` | `LLM`). Defaults to `AUTO` (uses fast regex extraction, falling back to an interactive LLM loop if parsing fails and an LLM API key is configured). Set to `LLM` to force using the interactive LLM loop directly from the initial screen upon agent launch. Configured strictly via server environment variable (invalid values cause the server to fail on startup).
-- `ARONDO_INNER_AUTOMODEL_METHOD` – (Optional) Automodel decision routing strategy (`DM` | `LLM`). Defaults to `DM` (prioritizes TypeSafe AI Jev System One for ultra-fast categorical model/effort decisions when configured, falling back to standard LLMs if Jev is unavailable or fails). Set to `LLM` to force routing directly with standard LLMs (Anthropic -> OpenAI -> Google), bypassing Jev. Configured strictly via server environment variable (invalid values cause the server to fail on startup).
+- `ARONDO_INNER_AUTOMODEL_METHOD` – (Optional) Automodel decision routing strategy for single-use Auto sessions (`DM` | `LLM`); per-turn effort routing always uses Jev. Defaults to `DM` (prioritizes TypeSafe AI Jev System One for ultra-fast categorical model/effort decisions when configured, falling back to standard LLMs if Jev is unavailable or fails). Set to `LLM` to force routing directly with standard LLMs (Anthropic -> OpenAI -> Google), bypassing Jev. Configured strictly via server environment variable (invalid values cause the server to fail on startup).
 
 ### Configuration Files (in `ARONDO_CONFIG_DIR` or `~/.arondo/`)
 

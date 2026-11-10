@@ -1,3 +1,5 @@
+import type { AutoModelEffort } from "@/lib/llm/automodel/types";
+
 export type SessionStatus = "idle" | "running" | "script-running" | "done" | "error";
 
 export type TodoTriggerKind = "manual" | "codebaseReady" | "afterSession" | "quotaAvailable" | "at";
@@ -62,6 +64,7 @@ export interface Message {
   parentId?: string;
   resolvedAgentType?: string;
   resolvedModel?: string;
+  resolvedEffort?: AutoModelEffort;
   prompt?: string;
   createdAt: string;
   todoStatus?: "pending" | "triggered" | "done" | "failed" | "cancelled" | "expired";

@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import fsSync from "fs";
 import path from "path";
 import crypto from "crypto";
+import type { AutoModelEffort } from "./llm/automodel/types";
 import { getConfigDir } from "./config";
 import { withFileLock, writeJsonAtomic } from "./fileLock";
 
@@ -177,6 +178,7 @@ export interface Message {
   deleted?: boolean;
   resolvedAgentType?: string;
   resolvedModel?: string;
+  resolvedEffort?: AutoModelEffort;
   resolvedAgyQuotaGroup?: "gemini" | "other" | "argon";
   prompt?: string;
   tokenUuid?: string;

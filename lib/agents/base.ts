@@ -1,3 +1,5 @@
+import type { AutoModelEffort } from "../llm/automodel/types";
+
 export const PROMPT_ENV_VAR = "ARONDO_PROMPT_FILE";
 
 /**
@@ -18,7 +20,7 @@ export interface AgentRunOptions {
   /** Model to run the agent with */
   model?: string;
   /** Reasoning effort to run the agent with, when supported */
-  effort?: "minimal" | "low" | "medium" | "high";
+  effort?: AutoModelEffort;
 }
 
 

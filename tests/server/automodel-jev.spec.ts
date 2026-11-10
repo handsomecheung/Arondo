@@ -256,7 +256,7 @@ test.describe('Jev System One Automodel Tests', () => {
     }
   });
 
-  test('routeModel skips and logs when once is false', async () => {
+  test('routeModel keeps settings when the current model has no effort variants', async () => {
     process.env.ARONDO_ENABLE_AUTOMODEL = 'true';
     let logOutput = '';
     const decision = await routeModel(
@@ -275,6 +275,6 @@ test.describe('Jev System One Automodel Tests', () => {
     );
 
     expect(decision).toBeNull();
-    expect(logOutput).toContain('skipped: automodel only applies to once sessions');
+    expect(logOutput).toContain('skipped: fewer than two supported effort options');
   });
 });

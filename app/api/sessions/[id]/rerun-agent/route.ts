@@ -4,6 +4,8 @@ import { getAgent, resolveAgentType, PROMPT_ENV_VAR } from "@/lib/agents";
 import { eventBus } from "@/lib/event-bus";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, verifySessionPermission, getUuidByToken } from "@/lib/auth";
+import { buildEffortContext } from "@/lib/llm/automodel/context";
+import type { ConcreteAgentType } from "@/lib/agents";
 
 export async function POST(
   req: NextRequest,
@@ -80,6 +82,12 @@ export async function POST(
     automodelLog: (text) => appendAutomodelLog(id, systemMessageId, text),
     once: session.once,
     model: targetMsg.resolvedModel || (rerunAgentType === session.agentType ? session.model : undefined),
+    previousRun: {
+      agentType: rerunAgentType as ConcreteAgentType,
+      model: targetMsg.resolvedModel,
+      effort: targetMsg.resolvedEffort,
+    },
+    context: session.once ? undefined : await buildEffortContext(id, messages.slice(0, targetMsgIndex)),
   });
   if (!resolved) {
     return NextResponse.json({ error: "No Auto Mode agent has available quota above 2%" }, { status: 503 });
@@ -118,6 +126,7 @@ export async function POST(
     command,
     resolvedAgentType: resolvedType,
     resolvedModel: resolved.model,
+    resolvedEffort: resolved.effort,
     resolvedAgyQuotaGroup: resolved.agyQuotaGroup,
     prompt: fullPrompt,
     tokenUuid,

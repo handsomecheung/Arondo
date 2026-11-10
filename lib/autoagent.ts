@@ -7,6 +7,7 @@ import { stripAnsi } from "./ansi";
 import type { AutoModelCostTier, AutoModelEffort, AutoModelOption } from "./llm/automodel";
 import { parseOpencodeModelLine, type AutoAgentExcludable } from "./agentModels";
 import { getAutoagentQuotaScore, getAutoagentWeekTimeRemain } from "./autoagent-score";
+import { splitCodexModel } from "./llm/automodel/effort-options";
 
 const CONFIG_DIR = getConfigDir();
 
@@ -206,12 +207,9 @@ export function buildModelOption(modelStr: string, agentType: ConcreteAgentType)
   let effort: AutoModelEffort | undefined;
   let modelName = modelStr;
   if (agentType === "codex") {
-    const parts = modelStr.trim().split(/\s+/);
-    const last = parts[parts.length - 1]?.toLowerCase();
-    if (["minimal", "low", "medium", "high"].includes(last)) {
-      effort = last as AutoModelEffort;
-      modelName = parts.slice(0, -1).join(" ");
-    }
+    const parsed = splitCodexModel(modelStr);
+    effort = parsed.effort;
+    modelName = parsed.model;
   }
   const lower = modelStr.toLowerCase();
   const costTier: AutoModelCostTier = (lower.includes("pro") || lower.includes("opus") || lower.includes("high") || lower.includes("max"))
@@ -260,6 +258,7 @@ export function getModelOptionsForAgent(
   agentType: ConcreteAgentType,
   agyQuotaGroup?: AgyQuotaGroup,
   agentModels?: AgentModelsConfig,
+  options?: { includeAllOpencode?: boolean },
 ): AutoModelOption[] {
   const configs = agentModels || getDefaultAgentModels();
   if (agentType === "antigravity") {
@@ -282,9 +281,13 @@ export function getModelOptionsForAgent(
     ];
   }
   if (agentType === "opencode") {
-    return (configs.opencode?.availableModels ?? []).flatMap((line) => {
+    const lines = [
+      ...(configs.opencode?.availableModels ?? []),
+      ...(options?.includeAllOpencode ? configs.opencode?.freeModels ?? [] : []),
+    ];
+    return lines.flatMap((line) => {
       const model = parseOpencodeModelLine(line);
-      if (!model || !isOpencodeGoModel(model)) return [];
+      if (!model || (!options?.includeAllOpencode && !isOpencodeGoModel(model))) return [];
       const option = buildModelOption(model, "opencode");
       const description = line.match(/\s+#(.*)$/)?.[1]?.trim();
       return [{ ...option, description: description || option.description }];

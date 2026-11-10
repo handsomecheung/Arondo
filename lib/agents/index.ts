@@ -6,6 +6,8 @@ import { OpencodeAgent } from "./opencode";
 import { getAgyQuotaGroupForModel, getConfiguredDefaultModel, getModelOptionsForAgent, isAgentQuotaExhausted, isOpencodeGoModel, selectAgent, type AgyQuotaGroup, type OpencodeQuotaRef } from "../autoagent";
 import { routeModel, type AutoModelEffort, type AutoModelOption } from "../llm/automodel";
 import { getAgentModelsConfig } from "../store";
+import { getModelFamily, splitCodexModel } from "../llm/automodel/effort-options";
+import { isAutomodelEnabled } from "../llm/config";
 
 export type ConcreteAgentType = "antigravity" | "claude" | "codex" | "opencode";
 export type AgentType = ConcreteAgentType | "auto" | "decision";
@@ -59,13 +61,15 @@ interface ResolveAgentOptions {
   lockedAgent?: Pick<ResolvedAgent, "agentType" | "model" | "effort" | "agyQuotaGroup">;
   once?: boolean;
   model?: string;
+  previousRun?: Pick<ResolvedAgent, "agentType" | "model" | "effort">;
+  context?: string;
 }
 
 /**
  * Resolves "auto" to a concrete AgentType by running the quota-based selection
  * algorithm against the agents installed on the given runner.
  * Returns null when Auto Mode has no eligible choice.
- * Non-"auto" types are returned unchanged.
+ * Explicit agents keep their model family and can route effort only.
  */
 export function resolveAgentType(
   agentType: ConcreteAgentType,
@@ -84,12 +88,13 @@ export async function resolveAgentType(
 ): Promise<ResolvedAgent | null> {
   const agentModels = await getAgentModelsConfig();
   if (agentType !== "auto") {
-    const defaultModel = options.model?.trim()
-      || getConfiguredDefaultModel(agentType as ConcreteAgentType, undefined, agentModels);
-    return {
-      agentType: agentType as ConcreteAgentType,
-      model: defaultModel,
-    };
+    const concrete = agentType as ConcreteAgentType;
+    const model = options.model?.trim() || getConfiguredDefaultModel(concrete, undefined, agentModels);
+    return routeSelectedAgent({
+      agentType: concrete,
+      model,
+      modelOptions: getModelOptionsForAgent(concrete, getAgyQuotaGroupForModel(model), agentModels, { includeAllOpencode: true }),
+    }, options, true);
   }
   const resolved = await selectAgent(runnerAgentBinaries, options.autoagentLog, options.lockedAgent?.agentType, options.opencodeQuotaRef);
   const lockedGroup = options.lockedAgent?.agyQuotaGroup ?? getAgyQuotaGroupForModel(options.lockedAgent?.model);
@@ -124,6 +129,24 @@ export async function resolveAgentType(
     "",
   ].join("\n"));
   if (!selected) return null;
+  return routeSelectedAgent(selected, options, !options.once);
+}
+
+async function routeSelectedAgent(
+  selected: ResolvedAgent,
+  options: ResolveAgentOptions,
+  effortOnly: boolean,
+): Promise<ResolvedAgent> {
+  const enabled = isAutomodelEnabled();
+  const previous = options.previousRun;
+  if (enabled && effortOnly && previous?.agentType === selected.agentType
+    && getModelFamily(selected.agentType, previous.model) === getModelFamily(selected.agentType, selected.model)) {
+    selected = { ...selected, model: previous.model, effort: previous.effort ?? selected.effort };
+  }
+  if (enabled && selected.agentType === "codex" && selected.model) {
+    const parsed = splitCodexModel(selected.model);
+    selected = { ...selected, model: parsed.model, effort: selected.effort ?? parsed.effort };
+  }
   const routed = options.prompt && selected.modelOptions
     ? await routeModel({
       agentType: selected.agentType,
@@ -131,6 +154,9 @@ export async function resolveAgentType(
       defaultModel: selected.model,
       modelOptions: selected.modelOptions,
       once: options.once ?? false,
+      effortOnly,
+      previousEffort: selected.effort,
+      context: options.context,
     }, {
       writeLog: options.automodelLog,
     })

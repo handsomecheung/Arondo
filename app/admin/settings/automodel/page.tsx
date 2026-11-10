@@ -26,7 +26,7 @@ const LLM_API_KEYS: {
     name: "TYPESAFE_API_KEY",
     label: "Jev (TypeSafe AI)",
     description:
-      "Highest priority System One router for choosing model and effort.",
+      "Chooses effort each turn and routes models in single-use Auto sessions.",
   },
   {
     name: "ANTHROPIC_API_KEY",
@@ -113,10 +113,12 @@ export default function SettingsPage() {
           margin: "8px 0 16px",
         }}
       >
-        Automodel chooses the model and reasoning effort for single-use sessions
-        after Auto Mode selects an agent. Environment variables take precedence
-        over saved keys. Without a configured key, Arondo uses the default
-        model.
+        Automodel chooses the model and reasoning effort for single-use Auto
+        sessions. For ongoing sessions and explicitly selected agents, Jev
+        chooses reasoning effort each turn while keeping the model family.
+        Models without multiple supported effort options keep their settings.
+        If Jev is unavailable, the previous settings are kept. Environment
+        variables take precedence over saved keys.
       </p>
       <label>
         <input

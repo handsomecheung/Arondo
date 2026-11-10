@@ -1,7 +1,8 @@
 import type { ConcreteAgentType } from "../../agents";
 
 export type AutoModelProvider = "openai" | "google" | "anthropic";
-export type AutoModelEffort = "minimal" | "low" | "medium" | "high";
+export const MODEL_EFFORTS = ["minimal", "low", "medium", "high", "xhigh", "max", "ultra"] as const;
+export type AutoModelEffort = (typeof MODEL_EFFORTS)[number];
 export type AutoModelTaskClass = "question" | "small_change" | "debug" | "review" | "large_change";
 export type AutoModelCostTier = "cheap" | "standard" | "strong";
 
@@ -28,4 +29,7 @@ export interface AutoModelInput {
   defaultModel?: string;
   modelOptions: AutoModelOption[];
   once?: boolean;
+  effortOnly?: boolean;
+  previousEffort?: AutoModelEffort;
+  context?: string;
 }

@@ -1,6 +1,7 @@
 import { BaseAgent, AgentRunOptions, PROMPT_ENV_VAR } from "./base";
 import { stripAnsi } from "../ansi";
 import { getAgentSessionIdSync, saveAgentSessionId } from "./sessionMap";
+import { splitCodexModel } from "../llm/automodel/effort-options";
 
 // Codex prints this header line (bolded) at the start of every `exec` run
 // (fresh or resumed), e.g. "\x1b[1msession id:\x1b[0m 019f9883-...\r".
@@ -39,14 +40,10 @@ export async function saveCodexSessionId(sessionId: string, codexId: string): Pr
 // Codex has no dedicated reasoning-effort flag on `--model`; it's set via the
 // `-c model_reasoning_effort=` config override instead. Callers (e.g. the auto
 // mode selector) pass model strings as "<model> <effort>" (e.g. "gpt-5.5 medium").
-const REASONING_EFFORTS = new Set(["minimal", "low", "medium", "high"]);
-
 function buildModelArgs(model: string): string {
-  const parts = model.trim().split(/\s+/);
-  const last = parts[parts.length - 1]?.toLowerCase();
-  if (parts.length > 1 && REASONING_EFFORTS.has(last)) {
-    const modelName = parts.slice(0, -1).join(" ");
-    return ` --model "${modelName}" -c model_reasoning_effort="${last}"`;
+  const parsed = splitCodexModel(model);
+  if (parsed.effort) {
+    return ` --model "${parsed.model}" -c model_reasoning_effort="${parsed.effort}"`;
   }
   return ` --model "${model}"`;
 }
@@ -60,7 +57,7 @@ export class CodexAgent extends BaseAgent {
     // args instead and silently fail to take effect.
     const modelArg = model
       ? effort
-        ? ` --model "${model}" -c model_reasoning_effort="${effort}"`
+        ? ` --model "${splitCodexModel(model).model}" -c model_reasoning_effort="${effort}"`
         : buildModelArgs(model)
       : "";
     const codexId = isResume && sessionId ? getCodexSessionIdSync(sessionId) : undefined;
