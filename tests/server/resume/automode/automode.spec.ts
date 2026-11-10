@@ -84,7 +84,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
     await expect(selectAgent(['agy', 'claude', 'codex'], (text) => { logs.push(text); })).resolves.toMatchObject({
       agentType: 'codex',
     });
-    expect(logs.join('')).toContain('Final Candidate Order: [D]');
+    expect(logs.join('')).toContain('Final Candidate Order: [D, A, B, E, C]');
     expect(logs.join('')).toContain('WeekRemain=0.500, WeekTimeRemain=0.000');
   });
 
