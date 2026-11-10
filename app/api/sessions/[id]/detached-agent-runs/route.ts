@@ -32,7 +32,7 @@ export async function POST(
   if (kind !== "review" && kind !== "btw") {
     return NextResponse.json({ error: "kind must be review or btw" }, { status: 400 });
   }
-  if (agentType && !["auto", "antigravity", "claude", "codex", "opencode"].includes(agentType)) {
+  if (agentType && !["auto", "antigravity", "claude", "codex", "opencode", "pi"].includes(agentType)) {
     return NextResponse.json({ error: "agentType is invalid" }, { status: 400 });
   }
   if (kind === "btw" && !message.trim()) {

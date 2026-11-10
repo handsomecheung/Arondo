@@ -286,6 +286,16 @@ export function IconOpencode() {
   );
 }
 
+export function IconPi({ size = 16 }: { size?: number } = {}) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="4" y1="7" x2="20" y2="7" />
+      <path d="M9 7v11c0 .5-.5 1-1 1" />
+      <path d="M16 7v10c0 1.5 1 2 2 2" />
+    </svg>
+  );
+}
+
 export function IconFileText() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

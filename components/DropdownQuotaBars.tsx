@@ -2,12 +2,13 @@ import { getQuotaRows, getQuotaScoreColors, type ModelQuotas, type QuotaGroup } 
 
 export default function DropdownQuotaBars({ quotas, agent, group = "", loading = false }: {
   quotas: ModelQuotas | null;
-  agent: "antigravity" | "claude" | "codex" | "opencode";
+  agent: "antigravity" | "claude" | "codex" | "opencode" | "pi";
   group?: string;
   loading?: boolean;
 }) {
   const quota = quotas?.[agent];
   if (loading) return <span>Loading quota…</span>;
+  if (agent === "pi") return <span>Quota fetching not supported</span>;
   if (quota?.IsAPIKey) return <span>API key billing · Quota unavailable</span>;
   if (agent === "opencode" && quota?.Plan === "Free") return <span>No Go subscription · Quota unavailable</span>;
   if (agent === "opencode" && quota?.Plan === "Unknown") return <span>Quota unavailable</span>;

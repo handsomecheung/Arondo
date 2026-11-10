@@ -9,6 +9,7 @@ const AUTO_AGENT_OPTIONS: { key: AutoAgentExcludable; label: string }[] = [
   { key: "claude", label: "Claude Code (claude)" },
   { key: "codex", label: "Codex CLI (codex)" },
   { key: "opencode", label: "OpenCode (opencode)" },
+  { key: "pi", label: "Pi (pi)" },
 ];
 
 interface AgentModelsManagerProps {
@@ -30,12 +31,17 @@ interface FormState {
   codex: GroupFormState;
   opencode: GroupFormState;
   opencodeFree: GroupFormState;
+  pi: GroupFormState;
   autoAgentExcluded: AutoAgentExcludable[];
 }
 
 function configToFormState(config?: AgentModelsConfig): FormState {
   return {
     autoAgentExcluded: config?.autoAgentExcluded ?? [],
+    pi: {
+      defaultModel: config?.pi?.defaultModel ?? DEFAULT_AGENT_MODELS.pi.defaultModel ?? "",
+      availableModelsText: (config?.pi?.availableModels ?? DEFAULT_AGENT_MODELS.pi.availableModels ?? []).join("\n"),
+    },
     opencodeFree: {
       defaultModel: "",
       availableModelsText: getOpencodeModelGroups(config?.opencode)[1].models.join("\n"),
@@ -112,7 +118,7 @@ export default function AgentModelsManager({ initialConfig, onSaved, onCancel }:
     }));
   };
 
-  const handleResetAgent = (agent: "claude" | "codex" | "opencode") => {
+  const handleResetAgent = (agent: "claude" | "codex" | "opencode" | "pi") => {
     const def = DEFAULT_AGENT_MODELS[agent];
     setForm((prev) => ({
       ...prev,
@@ -129,6 +135,13 @@ export default function AgentModelsManager({ initialConfig, onSaved, onCancel }:
 
     const payload: AgentModelsConfig = {
       autoAgentExcluded: form.autoAgentExcluded,
+      pi: {
+        defaultModel: form.pi.defaultModel.trim(),
+        availableModels: form.pi.availableModelsText
+          .split("\n")
+          .map((m) => m.trim())
+          .filter(Boolean),
+      },
       opencode: {
         freeModels: form.opencodeFree.availableModelsText.split("\n").map((m) => m.trim()).filter(Boolean),
         defaultModel: form.opencode.defaultModel.trim(),
@@ -480,6 +493,23 @@ export default function AgentModelsManager({ initialConfig, onSaved, onCancel }:
             false,
           )}
 
+        </div>
+
+        {/* Pi */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
+            Pi (pi)
+          </h3>
+          {renderGroupCard(
+            "Pi Models",
+            "Configure default model and model options passed to the pi CLI.",
+            form.pi,
+            (k, v) => handleChange("pi", k, v),
+            () => handleResetAgent("pi"),
+            "e.g. litellm/balanced-model",
+            "litellm/balanced-model # LiteLLM balanced model",
+            "pi",
+          )}
         </div>
 
         </fieldset>

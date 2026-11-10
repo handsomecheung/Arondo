@@ -1,6 +1,6 @@
 import type { DetachedAgentKind } from "@/lib/store";
 
-const DETACHED_AGENT_TYPES = ["auto", "antigravity", "claude", "codex", "opencode"] as const;
+const DETACHED_AGENT_TYPES = ["auto", "antigravity", "claude", "codex", "opencode", "pi"] as const;
 
 export interface DetachedAgentCommand {
   kind: DetachedAgentKind;

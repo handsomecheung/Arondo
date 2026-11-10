@@ -13,7 +13,7 @@ export interface AntigravityModelsConfig {
   argon?: AgentModelConfig;
 }
 
-export const AUTO_AGENT_EXCLUDABLE = ["agy", "claude", "codex", "opencode"] as const;
+export const AUTO_AGENT_EXCLUDABLE = ["agy", "claude", "codex", "opencode", "pi"] as const;
 
 export type AutoAgentExcludable = (typeof AUTO_AGENT_EXCLUDABLE)[number];
 
@@ -26,10 +26,17 @@ export interface AgentModelsConfig {
   claude: AgentModelConfig;
   codex: AgentModelConfig;
   opencode?: OpencodeModelsConfig;
+  pi?: AgentModelConfig;
   autoAgentExcluded?: AutoAgentExcludable[];
 }
 
-export const DEFAULT_AGENT_MODELS: AgentModelsConfig & { opencode: OpencodeModelsConfig } = {
+export const DEFAULT_AGENT_MODELS: AgentModelsConfig & { opencode: OpencodeModelsConfig; pi: AgentModelConfig } = {
+  pi: {
+    defaultModel: "litellm/balanced-model",
+    availableModels: [
+      "litellm/balanced-model # LiteLLM balanced model",
+    ],
+  },
   opencode: {
     defaultModel: "opencode-go/minimax-m3",
     freeModels: [

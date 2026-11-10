@@ -8,9 +8,10 @@ import type { BaseAgent } from '../lib/agents/base';
 import { ClaudeCodeAgent } from '../lib/agents/claude';
 import { CodexAgent, saveCodexSessionId } from '../lib/agents/codex';
 import { OpencodeAgent, saveOpencodeSessionId } from '../lib/agents/opencode';
+import { PiAgent } from '../lib/agents/pi';
 
 let tempDir: string;
-const agents: BaseAgent[] = [new ClaudeCodeAgent(), new CodexAgent(), new OpencodeAgent()];
+const agents: BaseAgent[] = [new ClaudeCodeAgent(), new CodexAgent(), new OpencodeAgent(), new PiAgent()];
 const sessionId = '019f9883-1234-5678-9abc-def012345678';
 const codexId = '019f9883-1234-5678-9abc-def012345679';
 const opencodeId = 'ses_prompt_arguments';
@@ -50,6 +51,7 @@ for (const isResume of [false, true]) {
             session: { type: 'string' },
             title: { type: 'string' },
             model: { type: 'string' },
+            p: { type: 'boolean' },
           },
         });
 
@@ -61,6 +63,9 @@ for (const isResume of [false, true]) {
           expect(values[isResume ? 'resume' : 'session-id']).toBe(sessionId);
         } else if (agent.name === 'codex') {
           expect(positionals).toEqual(isResume ? ['exec', 'resume', codexId, prompt] : ['exec', prompt]);
+        } else if (agent.name === 'pi') {
+          expect(positionals).toEqual([prompt]);
+          expect(values['session-id']).toBe(sessionId);
         } else {
           expect(positionals).toEqual(['run', prompt]);
           expect(isResume ? values.session : values.title).toBe(isResume ? opencodeId : `arondo-${sessionId}`);

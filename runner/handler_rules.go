@@ -40,6 +40,7 @@ func (h *Handler) handleRulesSync(msg *Message) {
 		filepath.Join(home, ".claude", "CLAUDE.md"),
 		filepath.Join(home, ".codex", "AGENTS.md"),
 		filepath.Join(home, ".config", "opencode", "AGENTS.md"),
+		filepath.Join(home, ".pi", "agent", "AGENTS.md"),
 	}
 
 	for _, target := range targets {
@@ -99,6 +100,7 @@ func (h *Handler) handleRulesRemove(msg *Message) {
 		filepath.Join(home, ".claude", "CLAUDE.md"),
 		filepath.Join(home, ".codex", "AGENTS.md"),
 		filepath.Join(home, ".config", "opencode", "AGENTS.md"),
+		filepath.Join(home, ".pi", "agent", "AGENTS.md"),
 	}
 
 	for _, target := range targets {

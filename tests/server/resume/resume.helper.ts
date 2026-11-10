@@ -54,6 +54,10 @@ export async function setupRunner(request: any, name: string, mockBinDir: string
   const { token: runnerToken } = await tokenRes.json();
 
   console.log(`[resume-test] Spawning Go runner process for ${name}...`);
+  const sanitizedPath = (process.env.PATH || '')
+    .split(':')
+    .filter((dir) => !dir.includes('npm-packages/bin') && !dir.includes('.local/bin'))
+    .join(':');
   const runnerProcess = spawn(runnerBinary, [
     '--server', 'ws://localhost:3252/runner',
     '--token', runnerToken
@@ -61,7 +65,7 @@ export async function setupRunner(request: any, name: string, mockBinDir: string
     stdio: 'pipe',
     env: {
       ...process.env,
-      PATH: `${mockBinDir}:${process.env.PATH}`,
+      PATH: `${mockBinDir}:${sanitizedPath}`,
       ...extraEnv,
     }
   });

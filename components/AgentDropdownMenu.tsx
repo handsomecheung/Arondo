@@ -21,6 +21,7 @@ export function availableAgentItems(isAgentAvailable: (command: string) => boole
     { value: "claude", label: "Claude Code", cmd: "claude" },
     { value: "codex", label: "Codex", cmd: "codex" },
     { value: "opencode", label: "OpenCode", cmd: "opencode" },
+    { value: "pi", label: "Pi", cmd: "pi" },
   ].filter(({ cmd }) => isAgentAvailable(cmd));
   return [...(agents.length > 1 ? [{ value: "auto", label: "Auto" }] : []), ...agents];
 }

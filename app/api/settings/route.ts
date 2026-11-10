@@ -2,7 +2,7 @@ import { getShowAutomationSessions } from "@/lib/automation";
 import { NextRequest, NextResponse } from "next/server";
 import { getArondoToken, getRoleByToken, isValidToken } from "@/lib/auth";
 import { updateAppSettings, getAppSettings, getSessionArchiveDays, getAutomationSessionRetentionHours, getShowHiddenFiles, getEnableAutomodel, getAgentModelsConfig, type AgentModelsConfig } from "@/lib/store";
-import { isAutoAgentExcludable } from "@/lib/agentModels";
+import { isAutoAgentExcludable, DEFAULT_AGENT_MODELS } from "@/lib/agentModels";
 import { getLlmApiKeyEnvStatus, type LlmApiKeyName } from "@/lib/llm/config";
 import { getWebPushContactEmail, updateWebPushContactEmail } from "@/lib/web-push-server";
 import fs from "fs/promises";
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
         }
       }
     }
-    for (const agent of ["claude", "codex", "opencode"] as const) {
+    for (const agent of ["claude", "codex", "opencode", "pi"] as const) {
       if (agent in agentModels) {
         const cfg = agentModels[agent];
         if (typeof cfg !== "object" || cfg === null || Array.isArray(cfg)) {
@@ -229,6 +229,14 @@ export async function POST(request: NextRequest) {
         availableModels: Array.isArray(agentModels.codex?.availableModels)
           ? agentModels.codex.availableModels.map((m: string) => m.trim()).filter(Boolean)
           : current.codex.availableModels,
+      },
+      pi: {
+        defaultModel: agentModels.pi?.defaultModel !== undefined
+          ? agentModels.pi.defaultModel.trim()
+          : current.pi?.defaultModel ?? DEFAULT_AGENT_MODELS.pi.defaultModel,
+        availableModels: Array.isArray(agentModels.pi?.availableModels)
+          ? agentModels.pi.availableModels.map((m: string) => m.trim()).filter(Boolean)
+          : current.pi?.availableModels ?? DEFAULT_AGENT_MODELS.pi.availableModels,
       },
     };
     next.opencode = {

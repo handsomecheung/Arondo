@@ -108,7 +108,16 @@ function getLatestQuotaByType(quota: Record<string, QuotaEntry>, opencodeQuotaRe
   return latest;
 }
 
-function getQuotaMetrics(entry?: QuotaEntry, group?: AgyQuotaGroup) {
+function getQuotaMetrics(entry?: QuotaEntry, group?: AgyQuotaGroup, agentType?: ConcreteAgentType) {
+  if (agentType === "pi") {
+    return {
+      hourRemain: null,
+      weekRemain: null,
+      resetsAt: null,
+      monthRemain: null,
+      isAPIKey: true,
+    };
+  }
   if (entry?.Type === "antigravity") {
     return {
       hourRemain: group === "argon" ? null : group === "other" ? entry.OtherHourRemain ?? null : entry.GeminiHourRemain ?? null,
@@ -145,13 +154,14 @@ function hasOpencodeSubscriptionQuota(entry?: QuotaEntry): boolean {
 }
 
 export async function isAgentQuotaExhausted(agentType: ConcreteAgentType, group?: AgyQuotaGroup, opencodeQuotaRef?: OpencodeQuotaRef | null): Promise<boolean> {
+  if (agentType === "pi") return false;
   const entry = getLatestQuotaByType(await readQuota(), opencodeQuotaRef).get(agentType);
   if (agentType === "opencode") return !hasOpencodeSubscriptionQuota(entry);
-  return isExhausted(getQuotaMetrics(entry, group));
+  return isExhausted(getQuotaMetrics(entry, group, agentType));
 }
 
 interface AgentChoice {
-  id: "A" | "B" | "C" | "D" | "E" | "F";
+  id: "A" | "B" | "C" | "D" | "E" | "F" | "G";
   agentType: ConcreteAgentType;
   model?: string;
   modelOptions: AutoModelOption[];
@@ -186,6 +196,7 @@ const PREDEFINED_MODEL_OPTIONS: Record<string, Omit<AutoModelOption, "model">> =
   "gpt-5.4-mini low": { id: "codex-gpt-5.4-mini-low", effort: "low", costTier: "cheap", description: "Cheaper Codex option for small questions and low-risk changes." },
   "gpt-5.5 medium": { id: "codex-gpt-5.5-medium", effort: "medium", costTier: "standard", description: "Default Codex option for normal coding tasks." },
   "gpt-5.5 high": { id: "codex-gpt-5.5-high", effort: "high", costTier: "strong", description: "Stronger Codex reasoning for hard debugging and broad changes." },
+  "litellm/balanced-model": { id: "pi-litellm-balanced-model", costTier: "standard", description: "LiteLLM balanced model" },
 };
 
 const CLAUDE_DEFAULT_OPTION: AutoModelOption = {
@@ -251,6 +262,9 @@ export function getConfiguredDefaultModel(
   if (agentType === "opencode") {
     return parseOpencodeModelLine(configs.opencode?.defaultModel) || undefined;
   }
+  if (agentType === "pi") {
+    return parseModelLine(configs.pi?.defaultModel) || undefined;
+  }
   return undefined;
 }
 
@@ -315,6 +329,13 @@ export function getModelOptionsForAgent(
       buildModelOption("gpt-5.6-luna", "codex"),
     ];
   }
+  if (agentType === "pi") {
+    const models = parseModelList(configs.pi?.availableModels);
+    if (models.length > 0) {
+      return models.map((m) => buildModelOption(m, "pi"));
+    }
+    return [buildModelOption("litellm/balanced-model", "pi")];
+  }
   return [];
 }
 
@@ -366,6 +387,7 @@ async function selectAgentFromQuota(
   const hasClaude = runnerAgentBinaries.includes("claude") && !excluded.has("claude");
   const hasCodex = runnerAgentBinaries.includes("codex") && !excluded.has("codex");
   const hasOpencode = runnerAgentBinaries.includes("opencode") && !excluded.has("opencode");
+  const hasPi = runnerAgentBinaries.includes("pi") && !excluded.has("pi");
   const quota = await readQuota();
   const latestEntryByType = getLatestQuotaByType(quota, opencodeQuotaRef);
 
@@ -375,6 +397,7 @@ async function selectAgentFromQuota(
   // D: codex + gpt-6-sol
   // E: agy + Gemini 4 Argon models
   // F: OpenCode Go subscription models
+  // G: pi
   const choices: AgentChoice[] = [];
   if (hasAgy) {
     const geminiOptions = getModelOptionsForAgent("antigravity", "gemini", agentModels);
@@ -442,6 +465,17 @@ async function selectAgentFromQuota(
     }
   }
 
+  if (hasPi) {
+    const piOptions = getModelOptionsForAgent("pi", undefined, agentModels);
+    const piDefault = getConfiguredDefaultModel("pi", undefined, agentModels);
+    choices.push({
+      id: "G",
+      agentType: "pi",
+      model: piDefault,
+      modelOptions: piOptions,
+    });
+  }
+
   log(`[autoagent] Available runner binaries: ${runnerAgentBinaries.join(", ")}`);
   log(`[autoagent] Initial choices: ${choices.map((c) => c.id).join(", ")}`);
 
@@ -454,7 +488,7 @@ async function selectAgentFromQuota(
   }
 
   const getMetrics = (choice: AgentChoice) => getQuotaMetrics(
-    latestEntryByType.get(choice.agentType as QuotaEntry["Type"]), choice.agyQuotaGroup,
+    latestEntryByType.get(choice.agentType as QuotaEntry["Type"]), choice.agyQuotaGroup, choice.agentType,
   );
 
   for (const choice of choices) {
@@ -487,7 +521,10 @@ async function selectAgentFromQuota(
   const apiKeyChoices = eligibleChoices.filter((choice) => getMetrics(choice).isAPIKey);
 
   if (knownQuotaChoices.length === 0) {
-    const fallbackChoices = unknownQuotaChoices.length > 0 ? unknownQuotaChoices : apiKeyChoices;
+    const fallbackChoices = [
+      ...unknownQuotaChoices,
+      ...apiKeyChoices,
+    ];
     const prioritizedFallback = preferredAgentType
       ? [
         ...fallbackChoices.filter((c) => c.agentType === preferredAgentType),
@@ -551,6 +588,8 @@ async function selectAgentFromQuota(
   let candidateAgents = [
     ...scoredChoices.map((sc) => sc.choice),
     ...excludedChoices,
+    ...unknownQuotaChoices,
+    ...apiKeyChoices,
   ];
 
   if (preferredAgentType) {
@@ -583,6 +622,7 @@ export async function isQuotaAvailable(
   agyQuotaGroup?: AgyQuotaGroup,
   opencodeQuotaRef?: OpencodeQuotaRef | null,
 ): Promise<boolean> {
+  if (agentType === "pi") return true;
   const latest = getLatestQuotaByType(await readQuota(), opencodeQuotaRef);
   if (agentType === "opencode" && !hasOpencodeSubscriptionQuota(latest.get("opencode"))) return false;
   if (latest.size === 0) return true;
@@ -593,7 +633,7 @@ export async function isQuotaAvailable(
       ? agyQuotaGroup ? [agyQuotaGroup] : ["gemini", "other", "argon"]
       : [undefined];
     return groups.some((group) => {
-      const metrics = getQuotaMetrics(entry, group);
+      const metrics = getQuotaMetrics(entry, group, entry?.Type);
       return !isExhausted(metrics) && (metrics.isAPIKey || (metrics.hourRemain ?? 1) >= 0.15);
     });
   });
@@ -606,6 +646,7 @@ const AGENT_LABEL: Record<string, string> = {
   antigravity: "Antigravity CLI",
   codex: "Codex CLI",
   opencode: "OpenCode",
+  pi: "Pi",
 };
 
 /**

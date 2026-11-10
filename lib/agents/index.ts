@@ -3,13 +3,14 @@ import { AntigravityAgent } from "./antigravity";
 import { ClaudeCodeAgent } from "./claude";
 import { CodexAgent } from "./codex";
 import { OpencodeAgent } from "./opencode";
+import { PiAgent } from "./pi";
 import { getAgyQuotaGroupForModel, getConfiguredDefaultModel, getModelOptionsForAgent, isAgentQuotaExhausted, isOpencodeGoModel, selectAgent, type AgyQuotaGroup, type OpencodeQuotaRef } from "../autoagent";
 import { routeModel, type AutoModelEffort, type AutoModelOption } from "../llm/automodel";
 import { getAgentModelsConfig } from "../store";
 import { getModelFamily, splitCodexModel } from "../llm/automodel/effort-options";
 import { isAutomodelEnabled } from "../llm/config";
 
-export type ConcreteAgentType = "antigravity" | "claude" | "codex" | "opencode";
+export type ConcreteAgentType = "antigravity" | "claude" | "codex" | "opencode" | "pi";
 export type AgentType = ConcreteAgentType | "auto" | "decision";
 
 /**
@@ -27,6 +28,7 @@ const AGENTS: Record<ConcreteAgentType, AgentEntry> = {
   claude:      { factory: () => new ClaudeCodeAgent(),  binary: "claude" },
   codex:       { factory: () => new CodexAgent(),       binary: "codex" },
   opencode:    { factory: () => new OpencodeAgent(),    binary: "opencode" },
+  pi:          { factory: () => new PiAgent(),          binary: "pi" },
 };
 
 /**

@@ -1016,6 +1016,14 @@ export async function getAppSettings(): Promise<AppSettings> {
         ? rawAgentModels.codex.availableModels
         : defaults.codex.availableModels,
     },
+    pi: {
+      defaultModel: rawAgentModels?.pi?.defaultModel !== undefined
+        ? rawAgentModels.pi.defaultModel
+        : defaults.pi?.defaultModel,
+      availableModels: Array.isArray(rawAgentModels?.pi?.availableModels)
+        ? rawAgentModels.pi.availableModels
+        : defaults.pi?.availableModels,
+    },
     autoAgentExcluded: Array.isArray(rawAgentModels?.autoAgentExcluded)
       ? rawAgentModels.autoAgentExcluded.filter(isAutoAgentExcludable)
       : [],

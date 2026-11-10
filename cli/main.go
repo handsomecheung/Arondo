@@ -43,7 +43,7 @@ Options:
   --session-id <id>            Send the message to an existing session
   --resume                     Resume the most recently updated session for the runner and repository path
   --confirmation <value>       Resolve a needs-confirmation response: auto, draft, or force
-  --agent <type>               auto, antigravity, claude, codex, opencode, or decision (default: auto)
+  --agent <type>               auto, antigravity, claude, codex, opencode, pi, or decision (default: auto)
   --poll-interval <seconds>    Seconds between status polls (default: 3)
   --timeout <seconds>          Maximum seconds to wait for completion (default: 600)
   --output <format>            Output format: plain, json, or html (default: plain)
@@ -251,8 +251,8 @@ func parseArgs(argv []string, config cliConfig) (arguments, error) {
 	if args.agentType == "jev" {
 		args.agentType = "decision"
 	}
-	if !map[string]bool{"auto": true, "antigravity": true, "claude": true, "codex": true, "opencode": true, "decision": true}[args.agentType] {
-		return arguments{}, errors.New("--agent must be auto, antigravity, claude, codex, opencode, or decision")
+	if !map[string]bool{"auto": true, "antigravity": true, "claude": true, "codex": true, "opencode": true, "pi": true, "decision": true}[args.agentType] {
+		return arguments{}, errors.New("--agent must be auto, antigravity, claude, codex, opencode, pi, or decision")
 	}
 	if args.output != "plain" && args.output != "json" && args.output != "html" {
 		return arguments{}, errors.New("--output must be plain, json, or html")

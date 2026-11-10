@@ -60,9 +60,11 @@ export default function QuotaCard({
         <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
           {title}
         </div>
-        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
-          {account} · {plan}
-        </div>
+        {(account || plan) ? (
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+            {account && plan && account !== plan ? `${account} · ${plan}` : (account || plan)}
+          </div>
+        ) : null}
         <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{model}</div>
       </div>
       {unavailableMessage ? (

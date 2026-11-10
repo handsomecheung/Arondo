@@ -12,7 +12,7 @@ interface Props {
   className?: string;
   style?: CSSProperties;
   header?: ReactNode;
-  agentType: "antigravity" | "claude" | "codex" | "opencode";
+  agentType: "antigravity" | "claude" | "codex" | "opencode" | "pi";
   selectedModel: string;
   config?: AgentModelsConfig | null;
   onSelect: (model: string) => void;
@@ -33,7 +33,7 @@ export function ModelOptions({ agentType, selectedModel, config, onSelect, quota
       { name: "Gemini 4 Argon", key: "Argon", models: agy?.argon?.availableModels ?? DEFAULT_AGENT_MODELS.antigravity.argon?.availableModels },
     ]
     : agentType === "opencode" ? getOpencodeModelGroups(config?.opencode, { freeOnly: isOpencodeFree })
-    : [{ name: "", key: "", models: config?.[agentType]?.availableModels ?? DEFAULT_AGENT_MODELS[agentType].availableModels }];
+    : [{ name: "", key: "", models: config?.[agentType]?.availableModels ?? DEFAULT_AGENT_MODELS[agentType]?.availableModels ?? [] }];
   const option = (model: string) => (
     <button
       key={model}

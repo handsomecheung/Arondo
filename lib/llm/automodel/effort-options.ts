@@ -43,6 +43,9 @@ function nativeEfforts(agent: ConcreteAgentType, model: string): AutoModelEffort
       return ["low", "medium", "high", "max"];
     }
   }
+  if (agent === "pi") {
+    return ["low", "medium", "high", "xhigh", "max"];
+  }
   return [];
 }
 

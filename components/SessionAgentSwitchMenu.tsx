@@ -6,7 +6,7 @@ import { useAgentQuotas } from "@/lib/hooks/useAgentQuotas";
 import { AgentOptionQuota, availableAgentItems } from "./AgentDropdownMenu";
 import { ModelOptions } from "./ModelDropdownMenu";
 
-type ModelAgent = "antigravity" | "claude" | "codex" | "opencode";
+type ModelAgent = "antigravity" | "claude" | "codex" | "opencode" | "pi";
 
 export default function SessionAgentSwitchMenu({ runnerId, agentType, selectedModel, config, isAgentAvailable, onSelect, position }: {
   runnerId: string;

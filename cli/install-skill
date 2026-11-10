@@ -6,12 +6,12 @@ const path = require('node:path');
 
 const SKILL_NAME = 'arondo-cli';
 const SOURCE = path.join(__dirname, 'skills', SKILL_NAME);
-const TARGETS = new Set(['codex', 'claude', 'agy', 'opencode']);
+const TARGETS = new Set(['codex', 'claude', 'agy', 'opencode', 'pi']);
 
 const USAGE = `Install the bundled Arondo CLI skill for supported coding agents.
 
 Usage:
-  cli/install-skill [codex|claude|agy|opencode ...] [--force]
+  cli/install-skill [codex|claude|agy|opencode|pi ...] [--force]
 
 Options:
   --force    Replace an existing ${SKILL_NAME} skill.
@@ -30,6 +30,8 @@ function destinationFor(target) {
       return path.join(home, '.gemini', 'antigravity-cli', 'skills', SKILL_NAME);
     case 'opencode':
       return path.join(process.env.XDG_CONFIG_HOME || path.join(home, '.config'), 'opencode', 'skills', SKILL_NAME);
+    case 'pi':
+      return path.join(process.env.PI_CODING_AGENT_DIR || path.join(home, '.pi', 'agent'), 'skills', SKILL_NAME);
     default:
       throw new Error(`unsupported target: ${target}`);
   }

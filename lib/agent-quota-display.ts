@@ -7,7 +7,7 @@ export type AgentQuota = { Account?: string; IsAPIKey?: boolean; Plan?: string }
   | 'GeminiHourRemain' | 'GeminiHourResetsAt' | 'GeminiWeeklyRemain' | 'GeminiWeeklyResetsAt'
   | 'OtherHourRemain' | 'OtherHourResetsAt' | 'OtherWeeklyRemain' | 'OtherWeeklyResetsAt'
   | 'ArgonHourRemain' | 'ArgonHourResetsAt' | 'ArgonWeeklyRemain' | 'ArgonWeeklyResetsAt', number | null>>;
-export type ModelQuotas = Partial<Record<"antigravity" | "claude" | "codex" | "opencode", AgentQuota | null>>;
+export type ModelQuotas = Partial<Record<"antigravity" | "claude" | "codex" | "opencode" | "pi", AgentQuota | null>>;
 export type QuotaGroup = "claude" | "codex" | "opencode" | "gemini" | "other" | "argon";
 
 export function quotaNumber(quota: AgentQuota | null | undefined, key: string): number | null {
@@ -15,7 +15,8 @@ export function quotaNumber(quota: AgentQuota | null | undefined, key: string): 
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-export function getQuotaRows(quota: AgentQuota | null | undefined, agent: "antigravity" | "claude" | "codex" | "opencode", group: string) {
+export function getQuotaRows(quota: AgentQuota | null | undefined, agent: "antigravity" | "claude" | "codex" | "opencode" | "pi", group: string) {
+  if (agent === "pi") return [];
   const windows = agent === "antigravity"
     ? [["hour", `${group}HourRemain`, `${group}HourResetsAt`], ["week", `${group}WeeklyRemain`, `${group}WeeklyResetsAt`]]
     : agent === "claude"

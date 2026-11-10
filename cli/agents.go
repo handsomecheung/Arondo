@@ -48,6 +48,7 @@ var knownAgents = []struct {
 	{"claude", "claude"},
 	{"codex", "codex"},
 	{"opencode", "opencode"},
+	{"pi", "pi"},
 }
 
 func parseListAgentsArgs(argv []string, config cliConfig) (listAgentsArguments, error) {

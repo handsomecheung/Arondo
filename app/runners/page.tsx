@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import Link from "next/link";
 import ConfirmDialog from "@/components/modals/ConfirmDialog";
 import { IconArrowLeft, IconLogo, IconInbox, IconRefresh } from "@/components/Icons";
@@ -49,11 +49,20 @@ interface CodexQuota {
   IsAPIKey?: boolean;
 }
 
+interface PiQuota {
+  Account: string;
+  Plan: string;
+  DefaultModel?: string;
+  IsAPIKey?: boolean;
+  updatedAt?: number | null;
+}
+
 interface AgentsQuota {
   claude: ClaudeQuota | null;
   antigravity: AgyQuota | null;
   codex: CodexQuota | null;
   opencode?: (Omit<CodexQuota, "DefaultModel"> & { MonthlyRemain?: number | null; MonthlyResetAt?: number | null }) | null;
+  pi?: PiQuota | null;
 }
 
 // OpenCode only reports subscription quota for a Go plan. A Console account
@@ -415,12 +424,145 @@ export default function RunnersPage() {
                     { label: "Claude Code", cmd: "claude", comingSoon: false },
                     { label: "Codex", cmd: "codex", comingSoon: false },
                     { label: "OpenCode", cmd: "opencode", comingSoon: false },
+                    { label: "Pi", cmd: "pi", comingSoon: false },
                   ];
                   const hasAgentInfo = Array.isArray(r.agents);
                   const isSelected = selectedRunnerId === r.id;
                   const rProjects = projects.filter(
                     (p) => p.runnerId === r.id,
                   );
+
+                  // Collect and order quota cards: standard quota first, API Key cards at the bottom.
+                  const quotaCards: Array<{ key: string; isApiKey: boolean; card: ReactNode }> = [];
+                  if (isSelected && agentsQuota) {
+                    if (agentsQuota.claude) {
+                      quotaCards.push({
+                        key: "claude",
+                        isApiKey: Boolean(agentsQuota.claude.IsAPIKey),
+                        card: (
+                          <QuotaCard
+                            key="claude"
+                            title="Claude"
+                            account={agentsQuota.claude.Account}
+                            plan={agentsQuota.claude.Plan}
+                            model={agentsQuota.claude.DefaultModel}
+                            updatedAt={agentsQuota.claude.updatedAt}
+                            unavailableMessage={agentsQuota.claude.IsAPIKey ? "Quota is unavailable when using API Key billing." : undefined}
+                            rows={[
+                              { label: "Hour", used: agentsQuota.claude.HourRemain == null ? null : 1 - agentsQuota.claude.HourRemain, remaining: agentsQuota.claude.HourRemain, resetsAt: agentsQuota.claude.HourResetAt, scoreColor: quotaScoreColors.claude },
+                              { label: "Week", used: agentsQuota.claude.WeekRemain == null ? null : 1 - agentsQuota.claude.WeekRemain, remaining: agentsQuota.claude.WeekRemain, resetsAt: agentsQuota.claude.WeekResetsAt, scoreColor: quotaScoreColors.claude },
+                            ]}
+                            onRefresh={r.connected && !agentsQuota.claude.IsAPIKey ? () => refreshQuota(r.id, "claude") : undefined}
+                            isRefreshing={refreshingQuota[`${r.id}:claude`]}
+                            refreshNotice={quotaRefreshNotice[`${r.id}:claude`]}
+                          />
+                        ),
+                      });
+                    }
+                    if (agentsQuota.antigravity) {
+                      quotaCards.push({
+                        key: "antigravity",
+                        isApiKey: Boolean(agentsQuota.antigravity.IsAPIKey),
+                        card: (
+                          <QuotaCard
+                            key="antigravity"
+                            title="Antigravity"
+                            account={agentsQuota.antigravity.Account}
+                            plan={agentsQuota.antigravity.Plan}
+                            model={agentsQuota.antigravity.DefaultModel}
+                            updatedAt={agentsQuota.antigravity.updatedAt}
+                            unavailableMessage={agentsQuota.antigravity.IsAPIKey ? "Quota is unavailable when using API Key billing." : undefined}
+                            rows={[
+                              { label: "Gemini Hour", used: agentsQuota.antigravity.GeminiHourRemain == null ? null : 1 - agentsQuota.antigravity.GeminiHourRemain, remaining: agentsQuota.antigravity.GeminiHourRemain, resetsAt: agentsQuota.antigravity.GeminiHourResetsAt, scoreColor: quotaScoreColors.gemini },
+                              { label: "Gemini Weekly", used: agentsQuota.antigravity.GeminiWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.GeminiWeeklyRemain, remaining: agentsQuota.antigravity.GeminiWeeklyRemain, resetsAt: agentsQuota.antigravity.GeminiWeeklyResetsAt, scoreColor: quotaScoreColors.gemini },
+                              { label: "Other Hour", used: agentsQuota.antigravity.OtherHourRemain == null ? null : 1 - agentsQuota.antigravity.OtherHourRemain, remaining: agentsQuota.antigravity.OtherHourRemain, resetsAt: agentsQuota.antigravity.OtherHourResetsAt, scoreColor: quotaScoreColors.other },
+                              { label: "Other Weekly", used: agentsQuota.antigravity.OtherWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.OtherWeeklyRemain, remaining: agentsQuota.antigravity.OtherWeeklyRemain, resetsAt: agentsQuota.antigravity.OtherWeeklyResetsAt, scoreColor: quotaScoreColors.other },
+                              ...(agentsQuota.antigravity.ArgonWeeklyRemain !== undefined && agentsQuota.antigravity.ArgonWeeklyRemain !== null
+                                ? [{ label: "Argon Weekly", used: 1 - agentsQuota.antigravity.ArgonWeeklyRemain, remaining: agentsQuota.antigravity.ArgonWeeklyRemain, resetsAt: agentsQuota.antigravity.ArgonWeeklyResetsAt ?? null, scoreColor: quotaScoreColors.argon }]
+                                : []),
+                            ]}
+                            onRefresh={r.connected && !agentsQuota.antigravity.IsAPIKey ? () => refreshQuota(r.id, "agy") : undefined}
+                            isRefreshing={refreshingQuota[`${r.id}:agy`]}
+                            refreshNotice={quotaRefreshNotice[`${r.id}:agy`]}
+                          />
+                        ),
+                      });
+                    }
+                    if (agentsQuota.opencode) {
+                      quotaCards.push({
+                        key: "opencode",
+                        isApiKey: Boolean(agentsQuota.opencode.IsAPIKey),
+                        card: (
+                          <QuotaCard
+                            key="opencode"
+                            title="OpenCode"
+                            account={agentsQuota.opencode.Account}
+                            plan={agentsQuota.opencode.Plan}
+                            updatedAt={agentsQuota.opencode.updatedAt}
+                            unavailableMessage={opencodeQuotaUnavailableMessage(agentsQuota.opencode)}
+                            rows={getQuotaRows(agentsQuota.opencode, "opencode", "").map((row) => ({
+                              label: row.label === "hour" ? "5-Hour" : row.label === "week" ? "Weekly" : "Monthly",
+                              used: 1 - row.remaining,
+                              remaining: row.remaining,
+                              resetsAt: row.resetsAt,
+                              scoreColor: quotaScoreColors.opencode,
+                            }))}
+                            onRefresh={r.connected ? () => refreshQuota(r.id, "opencode") : undefined}
+                            isRefreshing={refreshingQuota[`${r.id}:opencode`]}
+                            refreshNotice={quotaRefreshNotice[`${r.id}:opencode`]}
+                          />
+                        ),
+                      });
+                    }
+                    if (agentsQuota.codex) {
+                      quotaCards.push({
+                        key: "codex",
+                        isApiKey: Boolean(agentsQuota.codex.IsAPIKey),
+                        card: (
+                          <QuotaCard
+                            key="codex"
+                            title="Codex"
+                            account={agentsQuota.codex.Account}
+                            plan={agentsQuota.codex.Plan}
+                            model={agentsQuota.codex.DefaultModel}
+                            updatedAt={agentsQuota.codex.updatedAt}
+                            unavailableMessage={agentsQuota.codex.IsAPIKey ? "Quota is unavailable when using API Key billing." : undefined}
+                            rows={[
+                              ...(agentsQuota.codex.FiveHourRemain !== undefined && agentsQuota.codex.FiveHourRemain !== null
+                                ? [{ label: "5-Hour", used: 1 - agentsQuota.codex.FiveHourRemain, remaining: agentsQuota.codex.FiveHourRemain, resetsAt: agentsQuota.codex.FiveHourResetAt ?? null }]
+                                : []),
+                              { label: "Weekly", used: agentsQuota.codex.WeeklyRemain == null ? null : 1 - agentsQuota.codex.WeeklyRemain, remaining: agentsQuota.codex.WeeklyRemain, resetsAt: agentsQuota.codex.WeeklyResetAt, scoreColor: quotaScoreColors.codex },
+                            ]}
+                            onRefresh={r.connected && !agentsQuota.codex.IsAPIKey ? () => refreshQuota(r.id, "codex") : undefined}
+                            isRefreshing={refreshingQuota[`${r.id}:codex`]}
+                            refreshNotice={quotaRefreshNotice[`${r.id}:codex`]}
+                          />
+                        ),
+                      });
+                    }
+                    if (agentsQuota.pi || r.agents?.includes("pi")) {
+                      quotaCards.push({
+                        key: "pi",
+                        isApiKey: true,
+                        card: (
+                          <QuotaCard
+                            key="pi"
+                            title="Pi"
+                            account=""
+                            plan=""
+                            model={agentsQuota.pi?.DefaultModel}
+                            updatedAt={agentsQuota.pi?.updatedAt ?? null}
+                            unavailableMessage="Quota fetching is not currently supported for Pi."
+                            rows={[]}
+                          />
+                        ),
+                      });
+                    }
+                  }
+                  const sortedQuotaCards = [...quotaCards].sort((a, b) => {
+                    if (a.isApiKey === b.isApiKey) return 0;
+                    return a.isApiKey ? 1 : -1;
+                  });
                   return (
                     <div key={r.id} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                       <div
@@ -693,7 +835,7 @@ export default function RunnersPage() {
                           </div>
 
                           {/* Agent Quota */}
-                          {agentsQuota && (agentsQuota.claude || agentsQuota.antigravity || agentsQuota.codex || agentsQuota.opencode) && (
+                          {sortedQuotaCards.length > 0 && (
                             <div>
                               <h3
                                 style={{
@@ -712,81 +854,7 @@ export default function RunnersPage() {
                                   gap: 12,
                                 }}
                               >
-                                {agentsQuota.claude && (
-                                  <QuotaCard
-                                    title="Claude"
-                                    account={agentsQuota.claude.Account}
-                                    plan={agentsQuota.claude.Plan}
-                                    model={agentsQuota.claude.DefaultModel}
-                                    updatedAt={agentsQuota.claude.updatedAt}
-                                    unavailableMessage={agentsQuota.claude.IsAPIKey ? "Quota is unavailable when using API Key billing." : undefined}
-                                    rows={[
-                                      { label: "Hour", used: agentsQuota.claude.HourRemain == null ? null : 1 - agentsQuota.claude.HourRemain, remaining: agentsQuota.claude.HourRemain, resetsAt: agentsQuota.claude.HourResetAt, scoreColor: quotaScoreColors.claude },
-                                      { label: "Week", used: agentsQuota.claude.WeekRemain == null ? null : 1 - agentsQuota.claude.WeekRemain, remaining: agentsQuota.claude.WeekRemain, resetsAt: agentsQuota.claude.WeekResetsAt, scoreColor: quotaScoreColors.claude },
-                                    ]}
-                                    onRefresh={r.connected && !agentsQuota.claude.IsAPIKey ? () => refreshQuota(r.id, "claude") : undefined}
-                                    isRefreshing={refreshingQuota[`${r.id}:claude`]}
-                                    refreshNotice={quotaRefreshNotice[`${r.id}:claude`]}
-                                  />
-                                )}
-                                {agentsQuota.antigravity && (
-                                  <QuotaCard
-                                    title="Antigravity"
-                                    account={agentsQuota.antigravity.Account}
-                                    plan={agentsQuota.antigravity.Plan}
-                                    model={agentsQuota.antigravity.DefaultModel}
-                                    updatedAt={agentsQuota.antigravity.updatedAt}
-                                    rows={[
-                                      { label: "Gemini Hour", used: agentsQuota.antigravity.GeminiHourRemain == null ? null : 1 - agentsQuota.antigravity.GeminiHourRemain, remaining: agentsQuota.antigravity.GeminiHourRemain, resetsAt: agentsQuota.antigravity.GeminiHourResetsAt, scoreColor: quotaScoreColors.gemini },
-                                      { label: "Gemini Weekly", used: agentsQuota.antigravity.GeminiWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.GeminiWeeklyRemain, remaining: agentsQuota.antigravity.GeminiWeeklyRemain, resetsAt: agentsQuota.antigravity.GeminiWeeklyResetsAt, scoreColor: quotaScoreColors.gemini },
-                                      { label: "Other Hour", used: agentsQuota.antigravity.OtherHourRemain == null ? null : 1 - agentsQuota.antigravity.OtherHourRemain, remaining: agentsQuota.antigravity.OtherHourRemain, resetsAt: agentsQuota.antigravity.OtherHourResetsAt, scoreColor: quotaScoreColors.other },
-                                      { label: "Other Weekly", used: agentsQuota.antigravity.OtherWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.OtherWeeklyRemain, remaining: agentsQuota.antigravity.OtherWeeklyRemain, resetsAt: agentsQuota.antigravity.OtherWeeklyResetsAt, scoreColor: quotaScoreColors.other },
-                                      ...(agentsQuota.antigravity.ArgonWeeklyRemain !== undefined && agentsQuota.antigravity.ArgonWeeklyRemain !== null
-                                        ? [{ label: "Argon Weekly", used: 1 - agentsQuota.antigravity.ArgonWeeklyRemain, remaining: agentsQuota.antigravity.ArgonWeeklyRemain, resetsAt: agentsQuota.antigravity.ArgonWeeklyResetsAt ?? null, scoreColor: quotaScoreColors.argon }]
-                                        : []),
-                                    ]}
-                                    onRefresh={r.connected && !agentsQuota.antigravity.IsAPIKey ? () => refreshQuota(r.id, "agy") : undefined}
-                                    isRefreshing={refreshingQuota[`${r.id}:agy`]}
-                                    refreshNotice={quotaRefreshNotice[`${r.id}:agy`]}
-                                  />
-                                )}
-                                {agentsQuota.opencode && (
-                                  <QuotaCard
-                                    title="OpenCode"
-                                    account={agentsQuota.opencode.Account}
-                                    plan={agentsQuota.opencode.Plan}
-                                    updatedAt={agentsQuota.opencode.updatedAt}
-                                    unavailableMessage={opencodeQuotaUnavailableMessage(agentsQuota.opencode)}
-                                    rows={getQuotaRows(agentsQuota.opencode, "opencode", "").map((row) => ({
-                                      label: row.label === "hour" ? "5-Hour" : row.label === "week" ? "Weekly" : "Monthly",
-                                      used: 1 - row.remaining,
-                                      remaining: row.remaining,
-                                      resetsAt: row.resetsAt,
-                                      scoreColor: quotaScoreColors.opencode,
-                                    }))}
-                                    onRefresh={r.connected ? () => refreshQuota(r.id, "opencode") : undefined}
-                                    isRefreshing={refreshingQuota[`${r.id}:opencode`]}
-                                    refreshNotice={quotaRefreshNotice[`${r.id}:opencode`]}
-                                  />
-                                )}
-                                {agentsQuota.codex && (
-                                  <QuotaCard
-                                    title="Codex"
-                                    account={agentsQuota.codex.Account}
-                                    plan={agentsQuota.codex.Plan}
-                                    model={agentsQuota.codex.DefaultModel}
-                                    updatedAt={agentsQuota.codex.updatedAt}
-                                    rows={[
-                                      ...(agentsQuota.codex.FiveHourRemain !== undefined && agentsQuota.codex.FiveHourRemain !== null
-                                        ? [{ label: "5-Hour", used: 1 - agentsQuota.codex.FiveHourRemain, remaining: agentsQuota.codex.FiveHourRemain, resetsAt: agentsQuota.codex.FiveHourResetAt ?? null }]
-                                        : []),
-                                      { label: "Weekly", used: agentsQuota.codex.WeeklyRemain == null ? null : 1 - agentsQuota.codex.WeeklyRemain, remaining: agentsQuota.codex.WeeklyRemain, resetsAt: agentsQuota.codex.WeeklyResetAt, scoreColor: quotaScoreColors.codex },
-                                    ]}
-                                    onRefresh={r.connected && !agentsQuota.codex.IsAPIKey ? () => refreshQuota(r.id, "codex") : undefined}
-                                    isRefreshing={refreshingQuota[`${r.id}:codex`]}
-                                    refreshNotice={quotaRefreshNotice[`${r.id}:codex`]}
-                                  />
-                                )}
+                                {sortedQuotaCards.map((item) => item.card)}
                               </div>
                             </div>
                           )}

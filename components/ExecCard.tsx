@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { IconClaude, IconAntigravity, IconCodex, IconOpencode, IconTerminal, IconChevronDown } from "@/components/Icons";
+import { IconClaude, IconAntigravity, IconCodex, IconOpencode, IconPi, IconTerminal, IconChevronDown } from "@/components/Icons";
 import { useTaskMenuPlacement } from "@/components/useTaskMenuPlacement";
 import type { AutoModelEffort } from "@/lib/llm/automodel/types";
 
@@ -212,6 +212,8 @@ export default function ExecCard({
             <IconCodex />
           ) : item.agentType === "opencode" ? (
             <IconOpencode />
+          ) : item.agentType === "pi" ? (
+            <IconPi />
           ) : (
             <IconAntigravity />
           )}

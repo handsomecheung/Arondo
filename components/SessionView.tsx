@@ -16,7 +16,7 @@ import {
   IconLogo, IconPlus, IconSend, IconCheck,
   IconPlay, IconTerminal, IconEdit, IconTrash,
   IconMoreVertical, IconFolder, IconChevronDown, IconFileSearch,
-  IconClaude, IconAntigravity, IconCodex, IconOpencode, IconClock,
+  IconClaude, IconAntigravity, IconCodex, IconOpencode, IconPi, IconClock,
   IconArchive, IconPin, IconPaperclip, IconX, IconCommit,
 } from "@/components/Icons";
 import { agentCommandAcceptsArguments, getTriggerWord, isAgentCommand } from "@/lib/agentCommands";
@@ -457,6 +457,7 @@ export default function SessionView({
     if (type === "claude") return "Claude Code";
     if (type === "codex") return "Codex";
     if (type === "opencode") return "OpenCode";
+    if (type === "pi") return "Pi";
     if (type === "auto") return "Auto";
     return type;
   }
@@ -540,6 +541,8 @@ export default function SessionView({
                     return <IconCodex />;
                   } else if (activeAgentType === "opencode") {
                     return <IconOpencode />;
+                  } else if (activeAgentType === "pi") {
+                    return <IconPi />;
                   } else {
                     return <IconAntigravity />;
                   }
@@ -1412,7 +1415,7 @@ export default function SessionView({
               </div>
             </div>
 
-            {(agentType === "antigravity" || agentType === "codex" || agentType === "claude" || agentType === "opencode") && (
+            {(agentType === "antigravity" || agentType === "codex" || agentType === "claude" || agentType === "opencode" || agentType === "pi") && (
               <div className="input-meta-row model-meta-row">
                 <span className="input-label input-meta-row-label">Model:</span>
                 <div
