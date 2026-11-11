@@ -160,9 +160,12 @@ app/
         route.ts        # GET/POST/PUT/DELETE: manage per-runner access tokens (admin role only); POST returns the generated token and its id
       verify/
         route.ts        # POST: verify token validity
+    gen/
+      route.ts          # GET/POST: experimental Gen Main Agent global chat, memory state, and sub-agent delegation
 public/
   sw.js                 # Service Worker: background Web Push notification display, notificationclick deep-linking, and lifecycle events
 components/
+  GenView.tsx           # Experimental Gen Main Agent chat interface with active sub-agent status banner and inline sub-agent cards
   admin/
     SettingsForm.tsx    # Shared local drafts, Save/Cancel actions, error handling, and return navigation
     SettingsForm.module.css # Scoped admin form, card, token row, and responsive styles
@@ -197,6 +200,9 @@ lib/
   autoagent.ts          # Auto Mode agent selector; reads quota from ~/.arondo/autoagent/agent/quota.json and returns agent plus allowed model options
   project-actions.ts    # Extracted action helpers for executing project-scoped scripts
   session-actions.ts    # Extracted action helpers for session messages, normal agent runs, and detached review/side-question runs
+  gen/
+    store.ts            # Persistent storage for Gen Main Agent messages and self-compacting memory under ~/.arondo/gen/
+    orchestrator.ts     # Server-side Gen Main Agent orchestrator (project inference/clarification, sub-agent delegation via autoagent/automodel, completion callback, and Web Push notification)
   llm/
     index.ts            # Re-exports LLM configuration and model creation helpers
     config.ts           # Pure LLM provider/key lookup: env first, then arondo.json settings, fixed provider priority/model/timeout
@@ -229,6 +235,7 @@ tests/                  # Playwright integration tests
     sessions.spec.ts    # Session lifecycle (create, update, delete) integration
     detached-agent-runs.spec.ts # Detached review and side-question agent integration
     web-push.spec.ts    # Web Push (VAPID) API and settings integration test suite
+    gen.spec.ts         # Experimental Gen Main Agent integration test suite
     server.spec.ts      # Health check and basic connectivity tests
   runner/               # Test suites for Go Runner handler capabilities
     fs.spec.ts          # File browsing and read capability tests
@@ -262,6 +269,11 @@ tests/                  # Playwright integration tests
   archived/
     sessions/
       [sessionId]/      # Archived sessions are moved here (idle or manually archived)
+  gen/                  # Experimental Gen Main Agent data directory
+    messages.json       # Global Gen conversation timeline and inline sub-agent execution metadata
+    memory.json         # Gen self-managed and auto-compacted memory state
+    sessions/
+      [gen-sub-id]/     # Sub-agent sessions and logs created by Gen
 ```
 
 ## Runner Protocol
@@ -345,7 +357,7 @@ Two WebSocket endpoints:
 - **WebSocket Reconnection Optimization**: The browser WebSocket hook (`lib/hooks/useWebSocket.ts`) uses a ref for the selected session ID, avoiding redundant WebSocket reconnections when switching sessions.
 
 **Browser WebSocket protocol (`/ws`):**
-- Server → Client: `session:updated`, `message:added`, `session:deleted`, `terminal:output`, `terminal:exit`
+- Server → Client: `session:updated`, `message:added`, `session:deleted`, `terminal:output`, `terminal:exit`, `gen:updated`
 - Client → Server: `terminal:input`, `terminal:resize`, `terminal:attach`
 - Shell PTY (remote runner-side terminals managed via RunnerManager):
   - Client → Server: `shell:spawn` (includes `runnerId`, `sessionId`, `cwd`, etc.), `shell:input`, `shell:resize`, `shell:kill`
@@ -509,6 +521,7 @@ The application enforces token-based authentication on all API routes and WebSoc
   - **Settings Separation**: Client device preferences (enable/disable push for this device, 30s test push, Service Worker cache reset) live in `/settings`, while global VAPID server configuration (`contactEmail`) is managed exclusively in `/admin/settings`.
   - **PWA & iOS Support**: Works across modern browsers (Chrome, Edge, Firefox, Safari). On iOS/iPadOS 16.4+, Web Push is fully supported when Arondo is added to the Home Screen as a PWA.
 - **PWA Installability**: `app/manifest.ts` provides the web app manifest (name, icons, standalone display). `components/ClientInit.tsx` registers `public/sw.js` on load to enable standalone installation across platforms as well as background Web Push notification handling.
+- **Experimental Gen Main Agent (`/gen`)**: Accessed via the `Gen EXP` button to the left of `+ Session` in the sidebar (`components/AppSidebar.tsx`, `components/GenView.tsx`). Operates as a single global conversation without manual session, project, or agent/model selection. The server-side orchestrator (`lib/gen/orchestrator.ts`) infers the target project from user context (or asks for clarification in chat when multiple projects are ambiguous or none is specified), delegates execution to a sub-agent (`id: "gen-sub-<uuid>"`, `agentType: "auto"`, `once: true`) reusing `autoagent` and `automodel`, tracks live sub-agent status in the chat card and banner, posts the sub-agent result back to the Gen chat window upon completion, compacts memory automatically, and sends a Web Push notification (`url: "/gen"`). All Gen messages, memory, and sub-agent session directories are stored strictly under `${ARONDO_CONFIG_DIR}/gen/`.
 
 ## Project & Script History Management
 - **Project Scoping**: Sessions are mapped to projects by repository path + runnerId. Projects store metadata at `~/.arondo/projects/[projectId]/project.json`.

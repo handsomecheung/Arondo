@@ -15,7 +15,8 @@ export interface SseEvent {
     | "terminal_exit"
     | "project_deleted"
     | "shell_output"
-    | "shell_exit";
+    | "shell_exit"
+    | "gen_updated";
   payload: any;
 }
 

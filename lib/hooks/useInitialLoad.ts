@@ -6,7 +6,7 @@ import type { AgentCommand } from "@/lib/agentCommands";
 import { sortSessionsForSidebar } from "@/lib/homeUtils";
 
 interface UseInitialLoadParams {
-  initUrl: { session: string | null; project: string | null };
+  initUrl: { session: string | null; project: string | null; gen?: boolean };
   setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
   setSelectedSessionId: React.Dispatch<React.SetStateAction<string | null>>;
   setTaskQueue: React.Dispatch<React.SetStateAction<TaskItem[]>>;
@@ -40,7 +40,7 @@ export function useInitialLoad({
         } else if (urlSession) {
           // URL points at a session that no longer exists — show the new-session prompt
           setSelectedSessionId(null);
-        } else if (!urlProject && data.length > 0) {
+        } else if (!urlProject && !initUrl.gen && data.length > 0) {
           const sortedData = sortSessionsForSidebar(data);
 
           const latestSession = sortedData[0];

@@ -41,12 +41,12 @@ test.describe('Decision Mode integration tests', () => {
       questions: {
         symphony_count: {
           type: 'choice',
-          instructions: '勃拉姆斯一共写了几部交响曲？',
+          instructions: 'How many symphonies did Brahms write in total?',
           choices: ['2', '4', '9', '15'],
         },
         is_nine: {
           type: 'noul',
-          instructions: '勃拉姆斯一生是否写了九部交响曲？',
+          instructions: 'Did Brahms write nine symphonies in his lifetime?',
         },
         risk: {
           type: 'score',
@@ -111,7 +111,7 @@ test.describe('Decision Mode integration tests', () => {
       messageId,
       JSON.stringify({
         questions: {
-          is_nine: { type: 'noul', instructions: '勃拉姆斯一生是否写了九部交响曲？' },
+          is_nine: { type: 'noul', instructions: 'Did Brahms write nine symphonies in his lifetime?' },
         },
       }),
     );
@@ -169,12 +169,12 @@ test.describe('Decision Mode integration tests', () => {
         questions: {
           symphony_count: {
             type: 'choice',
-            instructions: '勃拉姆斯一共写了几部交响曲？',
+            instructions: 'How many symphonies did Brahms write in total?',
             choices: ['2', '4', '9', '15'],
           },
           is_nine: {
             type: 'noul',
-            instructions: '勃拉姆斯一生是否写了九部交响曲？',
+            instructions: 'Did Brahms write nine symphonies in his lifetime?',
           },
         },
       });

@@ -169,6 +169,14 @@ export function IconPlay() {
   );
 }
 
+export function IconStop({ size = 14 }: { size?: number } = {}) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      <rect x="5" y="5" width="14" height="14" rx="2" />
+    </svg>
+  );
+}
+
 export function IconClock({ size = 16, strokeWidth = 2 }: { size?: number; strokeWidth?: number } = {}) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">

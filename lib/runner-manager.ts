@@ -11,6 +11,7 @@ import {
   updateMessage,
   getMessages,
   getRunningSessionScriptRuns,
+  isGenSubSessionId,
   writeOnceCache,
 } from "./store";
 import {
@@ -139,6 +140,7 @@ class RunnerManager {
   }
 
   private async shouldSendSessionNotification(sessionId: string): Promise<boolean> {
+    if (isGenSubSessionId(sessionId)) return false;
     const session = await getSession(sessionId);
     if (!session) return true;
     if (session.automation) return getShowAutomationSessions();
@@ -204,8 +206,9 @@ class RunnerManager {
 
   async restoreTasks(): Promise<void> {
     try {
-      const { getSessions, getProjects, getMessages } = await import("./store");
-      const sessions = await getSessions();
+      const { getSessions, getGenSubSessions, getProjects, getMessages } = await import("./store");
+      const [normalSessions, genSubSessions] = await Promise.all([getSessions(), getGenSubSessions()]);
+      const sessions = [...normalSessions, ...genSubSessions];
       const projects = await getProjects();
       
       const now = Date.now();

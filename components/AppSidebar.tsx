@@ -18,6 +18,8 @@ interface Props {
   selectedSessionId: string | null;
   onSelectSession: (id: string) => void;
   onNewSession: () => void;
+  genActive?: boolean;
+  onOpenGen?: () => void;
   onDeleteSession: (id: string) => void;
   onArchiveSession: (id: string) => void;
   onSwipeArchiveSession?: (id: string) => void;
@@ -43,6 +45,8 @@ export default function AppSidebar({
   selectedSessionId,
   onSelectSession,
   onNewSession,
+  genActive,
+  onOpenGen,
   onDeleteSession,
   onArchiveSession,
   onSwipeArchiveSession,
@@ -265,6 +269,18 @@ export default function AppSidebar({
               >
                 <IconSearch />
               </button>
+              {onOpenGen && (
+                <button
+                  type="button"
+                  className={`gen-btn${genActive ? " active" : ""}`}
+                  onClick={onOpenGen}
+                  id="gen-btn"
+                  title="Open Gen (Experimental — Under Development)"
+                >
+                  <span>Gen</span>
+                  <span className="gen-exp-badge">EXP</span>
+                </button>
+              )}
               <button className="new-task-btn" onClick={onNewSession} id="new-session-btn">
                 <IconPlus /> Session
               </button>

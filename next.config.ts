@@ -14,6 +14,7 @@ const nextConfig: NextConfig = {
       beforeFiles: [
         { source: "/session/:id", destination: "/" },
         { source: "/project/:id", destination: "/" },
+        { source: "/gen", destination: "/" },
       ],
       afterFiles: [],
       fallback: [],

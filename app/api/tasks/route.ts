@@ -2,7 +2,7 @@ import { getShowAutomationSessions } from "@/lib/automation";
 import { NextRequest, NextResponse } from "next/server";
 import { runnerManager } from "@/lib/runner-manager";
 import { getArondoToken, isValidToken } from "@/lib/auth";
-import { getMessages, getProjects, getSessions, isSessionArchived } from "@/lib/store";
+import { getMessages, getProjects, getSessions, isGenSubSessionId, isSessionArchived } from "@/lib/store";
 
 export async function GET(request: NextRequest) {
   const token = getArondoToken(request);
@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
 
   const filtered = [];
   for (const task of tasks) {
+    if (task.sessionId && isGenSubSessionId(task.sessionId)) continue;
     const session = task.sessionId ? sessionsById.get(task.sessionId) : undefined;
     if (session?.automation && !showAutomationSessions) continue;
     const projectId = task.projectId || session?.projectId;

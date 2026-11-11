@@ -17,6 +17,7 @@ const EVENT_TYPE_MAP: Record<string, string> = {
   terminal_exit: "terminal:exit",
   shell_output: "shell:output",
   shell_exit: "shell:exit",
+  gen_updated: "gen:updated",
 };
 
 const HEARTBEAT_INTERVAL = 30_000;
@@ -91,7 +92,9 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
       for (const [ws, clientToken] of openClients) {
         if (hideAutomation && uiClients.has(ws)) continue;
         let allowed = true;
-        if (sessionTokenUuid) {
+        if (event.type === "gen_updated" && !sessionTokenUuid) {
+          allowed = isValidToken(clientToken);
+        } else if (sessionTokenUuid) {
           const { getUuidByToken } = await import("./auth");
           const clientUuid = getUuidByToken(clientToken);
           allowed = clientUuid === sessionTokenUuid;

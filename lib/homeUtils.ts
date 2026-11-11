@@ -118,13 +118,17 @@ export function formatDuration(ms: number): string {
   return `${seconds}s`;
 }
 
-export function readUrlState(): { session: string | null; project: string | null } {
-  if (typeof window === "undefined") return { session: null, project: null };
+export function readUrlState(): { session: string | null; project: string | null; gen?: boolean } {
+  if (typeof window === "undefined") return { session: null, project: null, gen: false };
+  if (window.location.pathname === "/gen") {
+    return { session: null, project: null, gen: true };
+  }
   const m = window.location.pathname.match(/^\/(session|project)\/(.+)$/);
-  if (!m) return { session: null, project: null };
+  if (!m) return { session: null, project: null, gen: false };
   return {
     session: m[1] === "session" ? m[2] : null,
     project: m[1] === "project" ? m[2] : null,
+    gen: false,
   };
 }
 

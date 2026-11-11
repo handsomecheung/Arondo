@@ -9,7 +9,7 @@ var (
 	// ansiRegex matches standard ANSI and terminal control escape sequences.
 	ansiRegex = regexp.MustCompile(`\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[PX^_][^\x1b]*\x1b\\|\x1b.`)
 
-	// sudoPromptRegex matches sudo password prompts (e.g., "[sudo] password for user:", "[sudo] user のパスワード:").
+	// sudoPromptRegex matches sudo password prompts in English, Japanese, and Chinese locales (e.g., "[sudo] password for user:").
 	sudoPromptRegex = regexp.MustCompile(`(?i)^\[sudo\]\s*(?:(?:password|パスワード|密码)(?:\s+(?:for|の|为)\s+.+?)?|.+?\s+(?:のパスワード|的密码))\s*[:：]\s*$`)
 )
 

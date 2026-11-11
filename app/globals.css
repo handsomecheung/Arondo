@@ -3905,3 +3905,231 @@ pre.agent-exec-output {
   border-color: var(--accent) !important;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
 }
+
+/* ─── Gen Main Agent View ────────────────────────────────────────────────────── */
+.gen-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 9px;
+  min-height: 36px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.gen-exp-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(245, 158, 11, 0.16);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  line-height: 1.2;
+}
+
+.gen-btn:hover,
+.gen-btn.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+  box-shadow: 0 0 16px rgba(99, 102, 241, 0.25);
+}
+
+.gen-btn:hover .gen-exp-badge,
+.gen-btn.active .gen-exp-badge {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.gen-experimental-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: rgba(245, 158, 11, 0.08);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.25);
+  font-size: 11px;
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+  text-align: center;
+}
+
+.gen-experimental-pill {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.16);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.gen-experimental-text {
+  color: var(--text-muted);
+}
+
+.gen-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.gen-avatar {
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--accent-glow);
+  color: var(--accent);
+  border: 1px solid var(--border-accent);
+}
+
+.gen-status-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 14px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.gen-status-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.gen-status-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: agentPulseKeyframe 1.4s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.gen-status-title {
+  color: var(--text-primary);
+}
+
+.gen-status-meta {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.gen-status-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gen-subagent-card {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.gen-subagent-card.running {
+  border-color: var(--border-accent);
+}
+
+.gen-subagent-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gen-subagent-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+}
+
+.gen-subagent-badge.running {
+  background: var(--accent-glow);
+  color: var(--accent);
+}
+
+.gen-subagent-badge.done {
+  color: var(--success, #22c55e);
+}
+
+.gen-subagent-badge.error {
+  color: var(--error, #ef4444);
+}
+
+.gen-subagent-agent {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.gen-subagent-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.gen-subagent-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.gen-subagent-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.gen-subagent-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.gen-subagent-btn.danger:hover {
+  border-color: var(--error, #ef4444);
+  color: var(--error, #ef4444);
+}

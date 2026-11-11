@@ -9,6 +9,7 @@ import { IconTaskQueue, IconLogo, IconMenu, IconRefresh } from "@/components/Ico
 import AppSidebar from "@/components/AppSidebar";
 import ProjectPanel from "@/components/ProjectPanel";
 import SessionView from "@/components/SessionView";
+import GenView from "@/components/GenView";
 import FileExplorerModal from "@/components/modals/FileExplorerModal";
 import ChatFileSelectorModal from "@/components/modals/ChatFileSelectorModal";
 import LogConsoleModal from "@/components/modals/LogConsoleModal";
@@ -78,6 +79,12 @@ export default function HomePage() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     initUrl.session,
   );
+  const [genView, setGenView] = useState<boolean>(Boolean(initUrl.gen));
+  const [genLogTarget, setGenLogTarget] = useState<{
+    sessionId: string;
+    messageId: string;
+    isRunning: boolean;
+  } | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [prompt, setPrompt] = useState("");
   const [showCommandMenu, setShowCommandMenu] = useState(false);
@@ -378,22 +385,29 @@ export default function HomePage() {
   );
   useEffect(() => {
     let url = "/";
-    if (selectedProjectId) url = `/project/${selectedProjectId}`;
+    if (genView) url = "/gen";
+    else if (selectedProjectId) url = `/project/${selectedProjectId}`;
     else if (selectedSessionId) url = `/session/${selectedSessionId}`;
     if (url !== lastPushedUrlRef.current) {
       window.history.pushState(null, "", url + window.location.search);
       lastPushedUrlRef.current = url;
     }
-  }, [selectedSessionId, selectedProjectId]);
+  }, [selectedSessionId, selectedProjectId, genView]);
 
   useEffect(() => {
     const onPopState = () => {
       lastPushedUrlRef.current = window.location.pathname;
-      const { session, project } = readUrlState();
-      if (project) {
+      const { session, project, gen } = readUrlState();
+      if (gen) {
+        setGenView(true);
+        setSelectedProjectId(null);
+        setSelectedSessionId(null);
+      } else if (project) {
+        setGenView(false);
         setSelectedProjectId(project);
         setSelectedSessionId(null);
       } else {
+        setGenView(false);
         setSelectedProjectId(null);
         setSelectedSessionId(session);
       }
@@ -697,6 +711,7 @@ export default function HomePage() {
   };
 
   const handleSelectArchivedSession = (id: string) => {
+    setGenView(false);
     setSelectedSessionId(id);
     setSelectedProjectId(null);
     setIsNewSession(false);
@@ -1197,7 +1212,20 @@ export default function HomePage() {
     }
   };
 
+  const handleOpenGen = () => {
+    setGenView(true);
+    setSelectedSessionId(null);
+    setSelectedProjectId(null);
+    setIsNewSession(false);
+    setIsNewDraft(false);
+    setSidebarOpen(false);
+    setActiveLogMsgId(null);
+    setLogModalOpen(false);
+    setMenuOpen(false);
+  };
+
   const handleNewSession = () => {
+    setGenView(false);
     setSelectedSessionId(null);
     setSelectedProjectId(null);
     setIsNewSession(true);
@@ -1385,6 +1413,7 @@ export default function HomePage() {
     if (selectedSessionId) {
       setPreviousSessionId(selectedSessionId);
     }
+    setGenView(false);
     setSelectedProjectId(projectId);
     setSelectedSessionId(null);
     setIsNewSession(false);
@@ -1419,6 +1448,7 @@ export default function HomePage() {
   }, []);
 
   const handleSelectSession = (id: string) => {
+    setGenView(false);
     setSelectedSessionId(id);
     setSelectedProjectId(null);
     setIsNewSession(false);
@@ -1700,6 +1730,8 @@ export default function HomePage() {
         selectedSessionId={selectedSessionId}
         onSelectSession={handleSelectSession}
         onNewSession={handleNewSession}
+        genActive={genView}
+        onOpenGen={handleOpenGen}
         onDeleteSession={handleDeleteSession}
         onArchiveSession={handleArchiveSession}
         onSwipeArchiveSession={handleSwipeArchiveSession}
@@ -1733,7 +1765,16 @@ export default function HomePage() {
 
       {/* Main */}
       <main className="main">
-        {selectedProjectId ? (
+        {genView ? (
+          <GenView
+            ws={wsInstance}
+            onViewSubAgentLog={(subSessionId, messageId, isRunningSub) => {
+              setGenLogTarget({ sessionId: subSessionId, messageId, isRunning: isRunningSub });
+              setActiveLogMsgId(messageId);
+              setLogModalOpen(true);
+            }}
+          />
+        ) : selectedProjectId ? (
           (() => {
             const project = projects.find((p) => p.id === selectedProjectId);
             if (!project) return null;
@@ -2023,16 +2064,19 @@ export default function HomePage() {
         onClose={() => {
           setLogModalOpen(false);
           setActiveLogMsgId(null);
+          setGenLogTarget(null);
         }}
         activeLogMsgId={activeLogMsgId}
         isRunning={Boolean(
-          activeLogMsgId && (
-            execCards.get(activeLogMsgId)?.returnMsg === null ||
-            taskQueue.some((t) => t.messageId === activeLogMsgId && t.status === "running")
-          )
+          genLogTarget
+            ? genLogTarget.isRunning
+            : activeLogMsgId && (
+                execCards.get(activeLogMsgId)?.returnMsg === null ||
+                taskQueue.some((t) => t.messageId === activeLogMsgId && t.status === "running")
+              )
         )}
         isScriptLog={isScriptLog || Boolean(taskQueue.some((t) => t.messageId === activeLogMsgId && t.type === "script"))}
-        selectedSessionId={selectedSessionId}
+        selectedSessionId={genLogTarget ? genLogTarget.sessionId : selectedSessionId}
         projectId={selectedProjectId}
         ws={wsInstance}
       />

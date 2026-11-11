@@ -8,6 +8,7 @@ import { withFileLock, writeJsonAtomic } from "./fileLock";
 
 const CONFIG_DIR = getConfigDir();
 const SESSIONS_DIR = path.join(CONFIG_DIR, "sessions");
+const GEN_SESSIONS_DIR = path.join(CONFIG_DIR, "gen", "sessions");
 const ARCHIVED_SESSIONS_DIR = path.join(CONFIG_DIR, "archived", "sessions");
 const PROJECTS_DIR = path.join(CONFIG_DIR, "projects");
 const ARONDO_CONFIG_FILE = path.join(CONFIG_DIR, "arondo.json");
@@ -253,7 +254,14 @@ export async function deleteOnceCache(prompt: string): Promise<void> {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+export function isGenSubSessionId(id: string): boolean {
+  return id.startsWith("gen-sub-");
+}
+
 function getSessionDir(id: string): string {
+  if (isGenSubSessionId(id)) {
+    return path.join(GEN_SESSIONS_DIR, id);
+  }
   const activeDir = path.join(SESSIONS_DIR, id);
   if (!fsSync.existsSync(activeDir) && fsSync.existsSync(path.join(ARCHIVED_SESSIONS_DIR, id))) {
     return path.join(ARCHIVED_SESSIONS_DIR, id);
@@ -337,6 +345,23 @@ export async function getSession(id: string): Promise<Session | undefined> {
   const filePath = getSessionFilePath(id);
   const session = await readJson<Session | null>(filePath, null);
   return session ? withDerivedSessionError(session) : undefined;
+}
+
+export async function getGenSubSessions(): Promise<Session[]> {
+  try {
+    await ensureDir(GEN_SESSIONS_DIR);
+    const entries = await fs.readdir(GEN_SESSIONS_DIR, { withFileTypes: true });
+    const sessions: Session[] = [];
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const session = await readJson<Session | null>(getSessionFilePath(entry.name), null);
+        if (session) sessions.push(await withDerivedSessionError(session));
+      }
+    }
+    return sessions;
+  } catch {
+    return [];
+  }
 }
 
 export async function getArchivedSessions(): Promise<Session[]> {
