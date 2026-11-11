@@ -25,6 +25,9 @@ export interface GenSubAgentRunInfo {
   startedAt: string;
   completedAt?: string;
   errorMessage?: string;
+  turnNumber?: number;
+  isContinuedSession?: boolean;
+  continuedFromGenMessageId?: string;
 }
 
 export interface GenMessage {

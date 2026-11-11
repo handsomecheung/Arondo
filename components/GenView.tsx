@@ -14,6 +14,10 @@ interface Props {
   onViewSubAgentLog: (subSessionId: string, messageId: string, isRunning: boolean) => void;
 }
 
+function formatShortSubSessionId(subSessionId: string): string {
+  return subSessionId.replace(/^gen-sub-/, "").slice(0, 8);
+}
+
 export default function GenView({ ws, onViewSubAgentLog }: Props) {
   const [messages, setMessages] = useState<GenMessage[]>([]);
   const [input, setInput] = useState("");
@@ -132,6 +136,17 @@ export default function GenView({ ws, onViewSubAgentLog }: Props) {
               {activeSubAgent.model ? ` · ${activeSubAgent.model}` : ""}
               {activeSubAgent.effort ? ` (${activeSubAgent.effort})` : ""}
             </span>
+            <span
+              className={`gen-subagent-session-badge ${
+                activeSubAgent.isContinuedSession || (activeSubAgent.turnNumber ?? 1) > 1
+                  ? "continued"
+                  : ""
+              }`}
+            >
+              {activeSubAgent.isContinuedSession || (activeSubAgent.turnNumber ?? 1) > 1
+                ? `↻ Session #${formatShortSubSessionId(activeSubAgent.subSessionId)} · Turn #${activeSubAgent.turnNumber ?? 2}`
+                : `Session #${formatShortSubSessionId(activeSubAgent.subSessionId)} · Turn #1`}
+            </span>
             <span className="gen-status-meta">
               {activeSubAgent.noProject || !activeSubAgent.repoPath
                 ? "No Project"
@@ -198,6 +213,9 @@ export default function GenView({ ws, onViewSubAgentLog }: Props) {
                 ? "No Project"
                 : sub.repoPath.split("/").filter(Boolean).pop() || sub.repoPath
               : "";
+            const turnNumber = sub ? (sub.turnNumber ?? 1) : 1;
+            const isContinued = Boolean(sub && (sub.isContinuedSession || turnNumber > 1));
+            const shortSessionId = sub ? formatShortSubSessionId(sub.subSessionId) : "";
 
             return (
               <div key={msg.id} className="message agent gen-message">
@@ -212,17 +230,31 @@ export default function GenView({ ws, onViewSubAgentLog }: Props) {
                     </ReactMarkdown>
 
                     {sub && (
-                      <div className={`gen-subagent-card ${sub.status}`}>
+                      <div
+                        className={`gen-subagent-card ${sub.status}`}
+                        data-sub-session-id={sub.subSessionId}
+                        data-turn-number={turnNumber}
+                      >
                         <div className="gen-subagent-card-header">
-                          <span className={`gen-subagent-badge ${sub.status}`}>
-                            {sub.status === "running"
-                              ? "● Running"
-                              : sub.status === "done"
-                                ? "✓ Completed"
-                                : sub.status === "stopped"
-                                  ? "■ Stopped"
-                                  : "✕ Failed"}
-                          </span>
+                          <div className="gen-subagent-card-badges">
+                            <span className={`gen-subagent-badge ${sub.status}`}>
+                              {sub.status === "running"
+                                ? "● Running"
+                                : sub.status === "done"
+                                  ? "✓ Completed"
+                                  : sub.status === "stopped"
+                                    ? "■ Stopped"
+                                    : "✕ Failed"}
+                            </span>
+                            <span
+                              className={`gen-subagent-session-badge ${isContinued ? "continued" : ""}`}
+                              title={`Sub-Agent Session ID: ${sub.subSessionId}`}
+                            >
+                              {isContinued
+                                ? `↻ Session #${shortSessionId} · Turn #${turnNumber} (Continued)`
+                                : `Session #${shortSessionId} · Turn #${turnNumber}`}
+                            </span>
+                          </div>
                           <span className="gen-subagent-agent">
                             {agentTypeLabel(sub.agentType)}
                             {sub.model ? ` · ${sub.model}` : ""}
@@ -239,6 +271,10 @@ export default function GenView({ ws, onViewSubAgentLog }: Props) {
                               Runner: <strong>{sub.runnerName}</strong>
                             </span>
                           )}
+                          <span>
+                            Session: <strong>#{shortSessionId}</strong>
+                            {isContinued ? ` (Continued · Call #${turnNumber})` : ` (Call #${turnNumber})`}
+                          </span>
                         </div>
                         {sub.messageId && (
                           <div className="gen-subagent-card-actions">

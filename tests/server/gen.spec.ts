@@ -85,10 +85,14 @@ test.describe("Gen Main Agent integration tests", () => {
 
     const subSessionId: string = postData.genMessage.subAgent.subSessionId;
 
-    // Sub-agent session files must live inside ${ARONDO_CONFIG_DIR}/gen/sessions/
+    // Sub-agent session files must live inside ${ARONDO_CONFIG_DIR}/gen/sessions/ and not have once: true
     const subSessionJsonPath = path.join(genDir, "sessions", subSessionId, "session.json");
     const stat = await fs.stat(subSessionJsonPath);
     expect(stat.isFile()).toBe(true);
+    const subSessionRecord = JSON.parse(await fs.readFile(subSessionJsonPath, "utf-8"));
+    expect(subSessionRecord.once).toBeUndefined();
+    expect(postData.genMessage.subAgent.turnNumber).toBe(1);
+    expect(postData.genMessage.subAgent.isContinuedSession).toBe(false);
 
     // Normal /api/sessions list must not include gen-sub-* sessions
     const sessionsRes = await request.get("/api/sessions", { headers: adminHeaders });
@@ -153,7 +157,7 @@ test.describe("Gen Main Agent integration tests", () => {
     expect(askData.genMessage.content).toContain(path.basename(repoAlpha));
     expect(askData.genMessage.content).toContain(path.basename(repoBeta));
 
-    // User clarifies target project -> Gen delegates to that project
+    // User clarifies target project -> Gen delegates to that project (Turn #1)
     const clarifyRes = await request.post("/api/gen", {
       headers: adminHeaders,
       data: { message: `Use ${path.basename(repoAlpha)}` },
@@ -162,5 +166,86 @@ test.describe("Gen Main Agent integration tests", () => {
     const clarifyData = await clarifyRes.json();
     expect(clarifyData.genMessage?.subAgent?.repoPath).toBe(repoAlpha);
     expect(clarifyData.genMessage?.subAgent?.subSessionId).toMatch(/^gen-sub-/);
+    expect(clarifyData.genMessage?.subAgent?.turnNumber).toBe(1);
+    expect(clarifyData.genMessage?.subAgent?.isContinuedSession).toBe(false);
+
+    const firstSubSessionId = clarifyData.genMessage.subAgent.subSessionId;
+
+    const waitForSubAgentTurnDone = async (genMessageId: string) => {
+      for (let i = 0; i < 25; i++) {
+        const getRes = await request.get("/api/gen", { headers: adminHeaders });
+        const state = await getRes.json();
+        const msg = state.messages.find((m: any) => m.id === genMessageId);
+        if (msg?.subAgent?.status === "done") return msg;
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      }
+      throw new Error(`Timed out waiting for genMessage ${genMessageId} to finish`);
+    };
+
+    await waitForSubAgentTurnDone(clarifyData.genMessage.id);
+
+    // Turn #2 on the same fix (without repeating project name) -> reuses firstSubSessionId
+    const turn2Res = await request.post("/api/gen", {
+      headers: adminHeaders,
+      data: { message: "Also replace Clanavi in the header component" },
+    });
+    expect(turn2Res.ok()).toBeTruthy();
+    const turn2Data = await turn2Res.json();
+    expect(turn2Data.genMessage?.subAgent?.subSessionId).toBe(firstSubSessionId);
+    expect(turn2Data.genMessage?.subAgent?.turnNumber).toBe(2);
+    expect(turn2Data.genMessage?.subAgent?.isContinuedSession).toBe(true);
+    expect(turn2Data.genMessage?.subAgent?.continuedFromGenMessageId).toBe(clarifyData.genMessage.id);
+
+    await waitForSubAgentTurnDone(turn2Data.genMessage.id);
+
+    // Turn #3 on the same fix -> reuses firstSubSessionId again (Turn #3)
+    const turn3Res = await request.post("/api/gen", {
+      headers: adminHeaders,
+      data: { message: "Update the unit tests for that change too" },
+    });
+    expect(turn3Res.ok()).toBeTruthy();
+    const turn3Data = await turn3Res.json();
+    expect(turn3Data.genMessage?.subAgent?.subSessionId).toBe(firstSubSessionId);
+    expect(turn3Data.genMessage?.subAgent?.turnNumber).toBe(3);
+    expect(turn3Data.genMessage?.subAgent?.isContinuedSession).toBe(true);
+    expect(turn3Data.genMessage?.subAgent?.continuedFromGenMessageId).toBe(turn2Data.genMessage.id);
+
+    await waitForSubAgentTurnDone(turn3Data.genMessage.id);
+
+    // Verify all 3 runs were recorded inside the single sub-session's messages.json
+    const subMessagesPath = path.join(genDir, "sessions", firstSubSessionId, "messages.json");
+    const subMessages = JSON.parse(await fs.readFile(subMessagesPath, "utf-8"));
+    const agentRuns = subMessages.filter((m: any) => m.type === "agent-run");
+    expect(agentRuns.length).toBe(3);
+
+    // Switching to a different project (repoBeta) -> starts a brand-new subSessionId (Turn #1)
+    const betaRes = await request.post("/api/gen", {
+      headers: adminHeaders,
+      data: { message: `In ${path.basename(repoBeta)}, update package.json` },
+    });
+    expect(betaRes.ok()).toBeTruthy();
+    const betaData = await betaRes.json();
+    expect(betaData.genMessage?.subAgent?.repoPath).toBe(repoBeta);
+    expect(betaData.genMessage?.subAgent?.subSessionId).not.toBe(firstSubSessionId);
+    expect(betaData.genMessage?.subAgent?.turnNumber).toBe(1);
+    expect(betaData.genMessage?.subAgent?.isContinuedSession).toBe(false);
+
+    await waitForSubAgentTurnDone(betaData.genMessage.id);
+
+    // Returning to repoAlpha after an intervening repoBeta session -> looks up repoAlpha's
+    // latest session (firstSubSessionId), checks relevance, and continues it (Turn #4)
+    const returnToAlphaRes = await request.post("/api/gen", {
+      headers: adminHeaders,
+      data: { message: `Commit the changes in ${path.basename(repoAlpha)}` },
+    });
+    expect(returnToAlphaRes.ok()).toBeTruthy();
+    const returnToAlphaData = await returnToAlphaRes.json();
+    expect(returnToAlphaData.genMessage?.subAgent?.repoPath).toBe(repoAlpha);
+    expect(returnToAlphaData.genMessage?.subAgent?.subSessionId).toBe(firstSubSessionId);
+    expect(returnToAlphaData.genMessage?.subAgent?.turnNumber).toBe(4);
+    expect(returnToAlphaData.genMessage?.subAgent?.isContinuedSession).toBe(true);
+    expect(returnToAlphaData.genMessage?.subAgent?.continuedFromGenMessageId).toBe(
+      turn3Data.genMessage.id,
+    );
   });
 });

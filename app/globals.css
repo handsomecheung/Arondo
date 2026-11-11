@@ -4117,6 +4117,13 @@ pre.agent-exec-output {
   flex-wrap: wrap;
 }
 
+.gen-subagent-card-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 .gen-subagent-badge {
   font-size: 11px;
   font-weight: 600;
@@ -4124,6 +4131,23 @@ pre.agent-exec-output {
   border-radius: 999px;
   background: var(--bg-input);
   color: var(--text-secondary);
+}
+
+.gen-subagent-session-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--bg-input);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  font-family: var(--font-mono, monospace);
+}
+
+.gen-subagent-session-badge.continued {
+  background: var(--accent-glow);
+  color: var(--accent);
+  border-color: var(--border-accent);
 }
 
 .gen-subagent-badge.running {
