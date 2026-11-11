@@ -1162,24 +1162,7 @@ body {
   gap: 8px;
 }
 
-.agent-meta-row {
-  order: 2;
-}
-
-.model-meta-row {
-  order: 3;
-}
-
-.runner-meta-row {
-  order: 1;
-}
-
-.project-meta-row {
-  order: 4;
-}
-
 .project-optional-hint {
-  order: 5;
   margin: -2px 0 0 60px;
   color: var(--text-muted);
   font-size: 11px;
