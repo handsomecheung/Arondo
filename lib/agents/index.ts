@@ -91,11 +91,15 @@ export async function resolveAgentType(
   const agentModels = await getAgentModelsConfig();
   if (agentType !== "auto") {
     const concrete = agentType as ConcreteAgentType;
-    const model = options.model?.trim() || getConfiguredDefaultModel(concrete, undefined, agentModels);
+    const configured = options.model?.trim() || getConfiguredDefaultModel(concrete, undefined, agentModels);
+    const parsed: { model?: string; effort?: AutoModelEffort } = configured && (concrete === "claude" || concrete === "codex" || concrete === "pi")
+      ? splitCodexModel(configured)
+      : { model: configured };
     return routeSelectedAgent({
       agentType: concrete,
-      model,
-      modelOptions: getModelOptionsForAgent(concrete, getAgyQuotaGroupForModel(model), agentModels, { includeAllOpencode: true }),
+      model: parsed.model,
+      effort: parsed.effort,
+      modelOptions: getModelOptionsForAgent(concrete, getAgyQuotaGroupForModel(configured), agentModels, { includeAllOpencode: true }),
     }, options, true);
   }
   const resolved = await selectAgent(runnerAgentBinaries, options.autoagentLog, options.lockedAgent?.agentType, options.opencodeQuotaRef);

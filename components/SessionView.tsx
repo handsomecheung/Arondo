@@ -23,6 +23,7 @@ import { agentCommandAcceptsArguments, getTriggerWord, isAgentCommand } from "@/
 import type { AgentCommand } from "@/lib/agentCommands";
 import { CHAT_INPUT_TIPS } from "@/lib/chatInputTips";
 import type { AgentModelsConfig } from "@/lib/agentModels";
+import { getEffectiveModel, getEffortChoices, getFamilyDefaultModel, isEffortAgent, modelFamilyOf } from "@/lib/model-effort";
 import AgentDropdownMenu from "@/components/AgentDropdownMenu";
 import SessionAgentSwitchMenu from "@/components/SessionAgentSwitchMenu";
 import ModelDropdownMenu from "@/components/ModelDropdownMenu";
@@ -394,6 +395,11 @@ export default function SessionView({
   }, []);
 
   const showComposer = !!selectedSession || isNewSession || isNewDraft;
+  const selectedFamily = modelFamilyOf(agentType, selectedModel);
+  const effectiveModel = getEffectiveModel(agentType, selectedModel, agentModelsConfig);
+  const effortChoices = isEffortAgent(agentType) && effectiveModel
+    ? getEffortChoices(agentType, effectiveModel, agentModelsConfig)
+    : [];
   const [chatInputTipIndex, setChatInputTipIndex] = useState(0);
   const visibleChatInputTips = CHAT_INPUT_TIPS.filter(
     (tip) => !tip.existingSessionOnly || (!isNewSession && !!selectedSessionId),
@@ -1430,7 +1436,7 @@ export default function SessionView({
                     }
                     id="model-select-trigger"
                   >
-                    <span>{selectedModel || "Default"}</span>
+                    <span>{selectedFamily || "Default"}</span>
                     <IconChevronDown
                       className={`arrow-icon ${modelDropdownOpen ? "open" : ""}`}
                     />
@@ -1439,14 +1445,35 @@ export default function SessionView({
                     <ModelDropdownMenu
                       runnerId={runnerId}
                       agentType={agentType}
-                      selectedModel={selectedModel}
+                      selectedModel={selectedFamily}
                       config={agentModelsConfig}
-                      onSelect={(model) => {
-                        onSetSelectedModel?.(model);
+                      byFamily
+                      onSelect={(family) => {
+                        onSetSelectedModel?.(getFamilyDefaultModel(agentType, family, agentModelsConfig));
                         onSetModelDropdownOpen?.(false);
                       }}
                     />
                   )}
+                </div>
+              </div>
+            )}
+
+            {effortChoices.length > 1 && (
+              <div className="input-meta-row effort-meta-row">
+                <span className="input-label input-meta-row-label">Effort:</span>
+                <div className="sidebar-mode-toggle effort-toggle" role="tablist" aria-label="Thinking effort">
+                  {effortChoices.map((choice) => (
+                    <button
+                      key={choice.model}
+                      type="button"
+                      role="tab"
+                      aria-selected={effectiveModel === choice.model}
+                      className={`sidebar-mode-tab${effectiveModel === choice.model ? " active" : ""}`}
+                      onClick={() => onSetSelectedModel?.(choice.model)}
+                    >
+                      {choice.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             )}

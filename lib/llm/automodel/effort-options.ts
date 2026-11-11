@@ -18,7 +18,7 @@ export function splitCodexModel(model: string): { model: string; effort?: AutoMo
 
 export function getModelFamily(agent: ConcreteAgentType, model?: string): string | undefined {
   if (!model) return undefined;
-  if (agent === "codex") return splitCodexModel(model).model;
+  if (agent === "claude" || agent === "codex" || agent === "pi") return splitCodexModel(model).model;
   if (agent === "antigravity") return model.replace(/\s+\((Low|Medium|High|XHigh|Max)\)$/i, "");
   if (agent === "opencode") return model.split("#")[0];
   return model;

@@ -442,6 +442,16 @@ body {
   box-sizing: border-box !important;
 }
 
+.effort-toggle {
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.effort-toggle .sidebar-mode-tab {
+  flex: 1 1 auto;
+}
+
 .draft-trigger-hint {
   margin-top: 6px;
   padding: 0 2px;
@@ -3618,18 +3628,58 @@ pre.agent-exec-output {
   padding-left: 12px;
 }
 
-.session-agent-model-list {
-  background: var(--bg-elevated);
+.session-agent-popup {
+  max-width: 340px;
+  width: calc(100vw - 32px);
+  max-height: min(70dvh, 560px);
 }
 
-.session-agent-model-list .custom-dropdown-item {
+.session-agent-popup-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px 0 16px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.session-agent-popup-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.session-agent-popup-section.session-agent-popup-models {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.session-agent-popup-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.session-agent-popup-label {
+  padding: 0 16px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.session-agent-popup-list .custom-dropdown-item {
   min-height: 42px;
-  padding: 10px 14px 10px 30px;
+  padding: 10px 16px;
   font-size: 14px;
 }
 
-.session-agent-model-list .custom-dropdown-item.active {
-  padding-left: 28px;
+.session-agent-popup-effort {
+  margin: 0 16px;
+  width: auto;
 }
 
 .new-session-dropdown-container .new-session-dropdown-menu {

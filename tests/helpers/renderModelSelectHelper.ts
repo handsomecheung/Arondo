@@ -1,6 +1,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import SessionView from '../../components/SessionView';
+import SessionAgentSwitchMenu from '../../components/SessionAgentSwitchMenu';
 import { DEFAULT_AGENT_MODELS } from '../../lib/agentModels';
 import { AGENT_COMMANDS } from '../../lib/agentCommands';
 
@@ -118,6 +119,35 @@ const agyHtml = renderToStaticMarkup(
   })
 );
 
+const chips = (html: string) =>
+  [...html.matchAll(/<button([^>]*)>([^<]+)<\/button>/g)]
+    .filter((match) => match[1].includes('sidebar-mode-tab'))
+    .map((match) => ({ label: match[2], selected: match[1].includes('aria-selected="true"') }));
+
+const agyEffortHtml = renderToStaticMarkup(
+  React.createElement(SessionView, { ...baseProps, agentType: 'antigravity', selectedModel: 'Gemini 4 Argon (Medium)', modelDropdownOpen: false })
+);
+const claudeEffortHtml = renderToStaticMarkup(
+  React.createElement(SessionView, { ...baseProps, agentType: 'claude', selectedModel: 'opus', modelDropdownOpen: false })
+);
+const opencodeEffortHtml = renderToStaticMarkup(
+  React.createElement(SessionView, { ...baseProps, agentType: 'opencode', selectedModel: 'opencode-go/minimax-m3', modelDropdownOpen: false })
+);
+const headerEffortHtml = renderToStaticMarkup(
+  React.createElement(SessionAgentSwitchMenu, {
+    runnerId: 'runner-1',
+    agentType: 'opencode',
+    selectedModel: 'opencode-go/minimax-m3#thinking',
+    config: DEFAULT_AGENT_MODELS,
+    isAgentAvailable: () => true,
+    onSelect: () => {},
+    position: { top: 0, left: 0 },
+  })
+);
+const agyNoModelEffortHtml = renderToStaticMarkup(
+  React.createElement(SessionView, { ...baseProps, agentType: 'antigravity', selectedModel: '', modelDropdownOpen: false })
+);
+
 const claudeHtml = renderToStaticMarkup(
   React.createElement(SessionView, {
     ...baseProps,
@@ -156,11 +186,21 @@ console.log(
       hasGeminiGroup: agyHtml.includes('Gemini'),
       hasAnthropicGroup: agyHtml.includes('Anthropic &amp; Other'),
       hasArgonGroup: agyHtml.includes('Gemini 4 Argon'),
-      hasGeminiModel: agyHtml.includes('Gemini 3.8 Flash (High)'),
-      hasClaudeModel: agyHtml.includes('Claude Sonnet 5.5 (Medium)'),
-      hasArgonModel: agyHtml.includes('Gemini 4 Argon (Medium)'),
-      hasGptOssModel: agyHtml.includes('GPT-OSS 120B (Medium)'),
+      hasGeminiModel: agyHtml.includes('dropdown-option-name">Gemini 3.8 Flash<'),
+      hasClaudeModel: agyHtml.includes('dropdown-option-name">Claude Sonnet 5.5<'),
+      hasArgonModel: agyHtml.includes('dropdown-option-name">Gemini 4 Argon<'),
+      hasGptOssModel: agyHtml.includes('dropdown-option-name">GPT-OSS 120B<'),
+      hasVariantInModelList: agyHtml.includes('(High)</span>') || agyHtml.includes('(Medium)</span>'),
       hasInlineCommentExcluded: !agyHtml.includes('# Best for complex tasks'),
+      effort: chips(agyEffortHtml),
+      effortWithoutModel: chips(agyNoModelEffortHtml),
+    },
+    effort: {
+      claude: chips(claudeEffortHtml),
+      opencode: chips(opencodeEffortHtml),
+      header: chips(headerEffortHtml),
+      headerHasMinimaxFamily: headerEffortHtml.includes('minimax-m3'),
+      headerAgentRows: [...headerEffortHtml.matchAll(/dropdown-option-name">([^<]+)</g)].map((match) => match[1]),
     },
     claude: {
       hasModelRow: claudeHtml.includes('model-meta-row'),

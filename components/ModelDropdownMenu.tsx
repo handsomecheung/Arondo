@@ -4,6 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { useAgentQuotas } from "@/lib/hooks/useAgentQuotas";
 import { type ModelQuotas } from "@/lib/agent-quota-display";
 import { DEFAULT_AGENT_MODELS, getOpencodeModelGroups, parseModelList, parseOpencodeModelList, type AgentModelsConfig } from "@/lib/agentModels";
+import { modelFamilyOf } from "@/lib/model-effort";
 
 import DropdownQuotaBars from "./DropdownQuotaBars";
 
@@ -15,12 +16,14 @@ interface Props {
   agentType: "antigravity" | "claude" | "codex" | "opencode" | "pi";
   selectedModel: string;
   config?: AgentModelsConfig | null;
+  /** Lists model families only, with effort variants folded into one entry. */
+  byFamily?: boolean;
   onSelect: (model: string) => void;
 }
 
-type ModelOptionsProps = Pick<Props, "agentType" | "selectedModel" | "config" | "onSelect"> & { quotas: ModelQuotas | null; loading?: boolean };
+type ModelOptionsProps = Pick<Props, "agentType" | "selectedModel" | "config" | "byFamily" | "onSelect"> & { quotas: ModelQuotas | null; loading?: boolean };
 
-export function ModelOptions({ agentType, selectedModel, config, onSelect, quotas, loading = false }: ModelOptionsProps) {
+export function ModelOptions({ agentType, selectedModel, config, byFamily = false, onSelect, quotas, loading = false }: ModelOptionsProps) {
   const isOpencodeFree = agentType === "opencode" && (
     quotas?.opencode?.Plan?.toLowerCase() === "free" ||
     quotas?.opencode?.Account === "unauthenticated"
@@ -48,7 +51,8 @@ export function ModelOptions({ agentType, selectedModel, config, onSelect, quota
     <>
       {option("")}
       {groups.map((group) => {
-        const models = (agentType === "opencode" ? parseOpencodeModelList : parseModelList)(group.models);
+        const lines = (agentType === "opencode" ? parseOpencodeModelList : parseModelList)(group.models);
+        const models = byFamily ? [...new Set(lines.map((line) => modelFamilyOf(agentType, line)))] : lines;
         if (!models.length) return null;
         return (
           <div key={group.key} className="custom-dropdown-group">

@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import { execFileSync } from 'child_process';
 import path from 'path';
 import { resolveAgentType } from '../../lib/agents';
+import { getEffectiveModel, getEffortChoices, getFamilyDefaultModel, modelFamilyOf } from '../../lib/model-effort';
+import { getDefaultAgentModels } from '../../lib/agentModels';
 
 test.describe('New Session Model Select UI & Logic', () => {
   test('SessionView renders Model dropdown with 3 groups for agy, correct models for claude/codex, includes OpenCode, and hides for auto', () => {
@@ -24,6 +26,17 @@ test.describe('New Session Model Select UI & Logic', () => {
     expect(result.agy.hasArgonModel).toBe(true);
     expect(result.agy.hasGptOssModel).toBe(true);
     expect(result.agy.hasInlineCommentExcluded).toBe(true);
+    expect(result.agy.hasVariantInModelList).toBe(false);
+    expect(result.agy.effort).toEqual([
+      { label: 'Low', selected: false },
+      { label: 'Medium', selected: true },
+      { label: 'High', selected: false },
+    ]);
+    expect(result.agy.effortWithoutModel).toEqual([
+      { label: 'Low', selected: false },
+      { label: 'Medium', selected: true },
+      { label: 'High', selected: false },
+    ]);
 
     // 2. Claude Code
     expect(result.claude.hasModelRow).toBe(true);
@@ -43,6 +56,73 @@ test.describe('New Session Model Select UI & Logic', () => {
     expect(result.opencode.hasFreeGroup).toBe(true);
     expect(result.opencode.hasGoFree).toBe(true);
     expect(result.opencode.hasBigPickle).toBe(true);
+
+    // 5. Effort row under Model
+    expect(result.effort.claude).toEqual([
+      { label: 'Default', selected: true },
+      { label: 'low', selected: false },
+      { label: 'medium', selected: false },
+      { label: 'high', selected: false },
+      { label: 'xhigh', selected: false },
+      { label: 'max', selected: false },
+    ]);
+    expect(result.effort.opencode).toEqual([
+      { label: 'Default', selected: true },
+      { label: 'none', selected: false },
+      { label: 'thinking', selected: false },
+    ]);
+
+    // 6. Session header dropdown lists agents only; model and effort live in the popup
+    expect(result.effort.headerHasMinimaxFamily).toBe(false);
+    expect(result.effort.header).toEqual([]);
+    expect(result.effort.headerAgentRows).toEqual(['Auto', 'Antigravity CLI', 'Claude Code', 'Codex', 'OpenCode', 'Pi']);
+  });
+
+  test('effort choices split model names and default to Medium for Antigravity', () => {
+    expect(modelFamilyOf('antigravity', 'Gemini 4 Argon (High)')).toBe('Gemini 4 Argon');
+    expect(getFamilyDefaultModel('antigravity', 'Gemini 4 Argon')).toBe('Gemini 4 Argon (Medium)');
+    expect(getFamilyDefaultModel('antigravity', 'GPT-OSS 120B')).toBe('GPT-OSS 120B (Medium)');
+    expect(getFamilyDefaultModel('claude', 'opus')).toBe('opus');
+    expect(getEffectiveModel('claude', undefined)).toBe('opus');
+    expect(getEffectiveModel('codex', '')).toBe('gpt-6-sol');
+    expect(getEffectiveModel('antigravity', undefined)).toBe('Gemini 3.8 Flash (Medium)');
+    expect(getEffectiveModel('claude', 'sonnet high')).toBe('sonnet high');
+    expect(getEffectiveModel('auto', undefined)).toBe('');
+    expect(getEffortChoices('antigravity', 'GPT-OSS 120B (Medium)')).toHaveLength(1);
+    expect(getEffortChoices('opencode', 'opencode-go/minimax-m3#thinking').map((c: { model: string }) => c.model))
+      .toEqual(['opencode-go/minimax-m3', 'opencode-go/minimax-m3#none', 'opencode-go/minimax-m3#thinking']);
+    expect(getEffortChoices('codex', 'gpt-6-sol high').map((c: { model: string }) => c.model).slice(0, 2))
+      .toEqual(['gpt-6-sol', 'gpt-6-sol low']);
+  });
+
+  test('selecting an effort keeps the same family and choices for every agent', () => {
+    for (const [agent, model] of [
+      ['claude', 'opus'],
+      ['codex', 'gpt-6-sol'],
+      ['pi', 'litellm/balanced-model'],
+      ['opencode', 'opencode-go/minimax-m3'],
+      ['antigravity', 'Gemini 4 Argon (Medium)'],
+    ] as const) {
+      const choices = getEffortChoices(agent, model);
+      expect(choices.length).toBeGreaterThan(1);
+      for (const choice of choices) {
+        expect(modelFamilyOf(agent, choice.model)).toBe(modelFamilyOf(agent, model));
+        expect(getEffortChoices(agent, choice.model)).toEqual(choices);
+      }
+    }
+  });
+
+  test('explicitly configured effort options work for custom model families', () => {
+    const config = getDefaultAgentModels();
+    for (const agent of ['claude', 'codex', 'pi'] as const) {
+      config[agent] = { defaultModel: 'custom-model high', availableModels: ['custom-model low', 'custom-model high # Expensive'] };
+      const model = getEffectiveModel(agent, undefined, config);
+      expect(getEffortChoices(agent, model, config)).toEqual([
+        { label: 'Default', model: 'custom-model' },
+        { label: 'low', model: 'custom-model low' },
+        { label: 'high', model: 'custom-model high' },
+      ]);
+    }
   });
 
   test('colored quota bars appear in agent options and Antigravity model group headers', () => {
@@ -108,6 +188,10 @@ test.describe('New Session Model Select UI & Logic', () => {
     });
     expect(codexResolved.agentType).toBe('codex');
     expect(codexResolved.model).toBe('gpt-6-sol');
+
+    expect(await resolveAgentType('claude', [], { model: 'opus high' })).toMatchObject({ model: 'opus', effort: 'high' });
+    expect(await resolveAgentType('pi', [], { model: 'litellm/balanced-model medium' })).toMatchObject({ model: 'litellm/balanced-model', effort: 'medium' });
+    expect(await resolveAgentType('antigravity', [], { model: 'Gemini 4 Argon (High)' })).toMatchObject({ model: 'Gemini 4 Argon (High)', effort: undefined });
   });
 
   test('resolveAgentType always uses configured defaultModel and only omits model when defaultModel is empty', async ({ request }) => {
