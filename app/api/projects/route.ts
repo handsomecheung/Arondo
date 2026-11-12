@@ -14,20 +14,20 @@ export async function GET(request: NextRequest) {
   // filtered by runner allowance only, and admins are always allowed).
   const isAdmin = getRoleByToken(token) === "admin";
 
-  const clientUuid = getUuidByToken(token);
+  const clientId = getUuidByToken(token);
   const clientProjectIds = new Set<string>();
-  if (!isAdmin && clientUuid) {
+  if (!isAdmin && clientId) {
     const [activeSessions, archivedSessions] = await Promise.all([
       getSessions(),
       getArchivedSessions(),
     ]);
     for (const s of activeSessions) {
-      if (s.tokenUuid === clientUuid && s.projectId) {
+      if (s.tokenUuid === clientId && s.projectId) {
         clientProjectIds.add(s.projectId);
       }
     }
     for (const s of archivedSessions) {
-      if (s.tokenUuid === clientUuid && s.projectId) {
+      if (s.tokenUuid === clientId && s.projectId) {
         clientProjectIds.add(s.projectId);
       }
     }

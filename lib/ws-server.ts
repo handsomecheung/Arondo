@@ -96,8 +96,8 @@ export function setupWebSocketServer(wss: WebSocketServer): void {
           allowed = isValidToken(clientToken);
         } else if (sessionTokenUuid) {
           const { getUuidByToken } = await import("./auth");
-          const clientUuid = getUuidByToken(clientToken);
-          allowed = clientUuid === sessionTokenUuid;
+          const clientId = getUuidByToken(clientToken);
+          allowed = clientId === sessionTokenUuid;
         } else if (runnerId) {
           allowed = await runnerManager.isTokenAllowedForRunnerId(runnerId, clientToken);
         } else {
