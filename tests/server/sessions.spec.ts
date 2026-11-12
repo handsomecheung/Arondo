@@ -7,9 +7,16 @@ import os from 'os';
 test.describe('Sessions API integration tests', () => {
   let runnerProcess: ChildProcess;
   let runnerId: string;
+  let mockLogDir: string;
 
   test.beforeAll(async ({ request }) => {
     const runnerBinary = path.resolve(__dirname, '../../runner/arondo-runner');
+    const mockBinDir = `${path.resolve(__dirname, '../mocks/bin/agy')}:${path.resolve(__dirname, '../mocks/bin/claude')}:${path.resolve(__dirname, '../mocks/bin/codex')}`;
+    mockLogDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arondo-sessions-logs-'));
+    const sanitizedPath = (process.env.PATH || '')
+      .split(':')
+      .filter((dir) => !dir.includes('npm-packages/bin') && !dir.includes('.local/bin'))
+      .join(':');
     
     console.log('[sessions-test] Spawning Go runner process...');
     runnerProcess = spawn(runnerBinary, [
@@ -17,6 +24,12 @@ test.describe('Sessions API integration tests', () => {
       '--token', 'test-runner-token-sessions'
     ], {
       stdio: 'pipe',
+      env: {
+        ...process.env,
+        PATH: `${mockBinDir}:${sanitizedPath}`,
+        AGY_DIR_LOG: mockLogDir,
+        CLAUDE_DIR_LOG: mockLogDir,
+      },
     });
 
     runnerProcess.stdout?.on('data', (data) => {
@@ -49,6 +62,9 @@ test.describe('Sessions API integration tests', () => {
   });
 
   test.afterAll(async () => {
+    if (mockLogDir) {
+      await fs.rm(mockLogDir, { recursive: true, force: true }).catch(() => {});
+    }
     if (runnerProcess) {
       console.log('[sessions-test] Stopping Go runner process...');
       runnerProcess.kill('SIGTERM');

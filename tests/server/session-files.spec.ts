@@ -35,6 +35,10 @@ test.describe('Session files and UserMessageCard attachment rendering', () => {
     await fs.writeFile(path.join(sessionFilesDir, '1728000000100_document.pdf'), Buffer.from('%PDF-1.4 test document'));
   });
 
+  test.afterAll(async () => {
+    await fs.rm(sessionDir, { recursive: true, force: true });
+  });
+
   test('UserMessageCard renders image directly and provides a download button', () => {
     const helperPath = path.resolve(__dirname, '../helpers/renderUserMessageCardHelper.ts');
     const output = execFileSync('npx', ['tsx', helperPath, 'image'], {

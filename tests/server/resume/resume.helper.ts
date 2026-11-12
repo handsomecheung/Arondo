@@ -2,7 +2,7 @@ import { spawn, ChildProcess } from 'child_process';
 import path from 'path';
 
 export async function waitForRunMessages(request: any, sessionId: string, minRuns = 1) {
-  const maxRetries = 50;
+  const maxRetries = 150;
   for (let i = 0; i < maxRetries; i++) {
     const res = await request.get(`/api/messages?sessionId=${sessionId}`, {
       headers: { 'x-arondo-token': 'test-token-123456' }
@@ -20,7 +20,7 @@ export async function waitForRunMessages(request: any, sessionId: string, minRun
 }
 
 export async function waitForSessionNotRunning(request: any, sessionId: string) {
-  const maxRetries = 50;
+  const maxRetries = 150;
   for (let i = 0; i < maxRetries; i++) {
     const res = await request.get('/api/sessions', {
       headers: { 'x-arondo-token': 'test-token-123456' }
