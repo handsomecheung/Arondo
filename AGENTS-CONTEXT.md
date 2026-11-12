@@ -269,11 +269,12 @@ tests/                  # Playwright integration tests
   archived/
     sessions/
       [sessionId]/      # Archived sessions are moved here (idle or manually archived)
-  gen/                  # Experimental Gen Main Agent data directory
-    messages.json       # Global Gen conversation timeline and inline sub-agent execution metadata
-    memory.json         # Gen self-managed and auto-compacted memory state
-    sessions/
-      [gen-sub-id]/     # Sub-agent sessions and logs created by Gen
+  gen/                  # Experimental Gen Main Agent data directory (isolated per client)
+    [clientId]/         # Client/user isolated Gen workspace
+      messages.json     # Client-specific Gen conversation timeline and inline sub-agent execution metadata
+      memory.json       # Client-specific Gen self-managed and auto-compacted memory state
+      sessions/
+        [gen-sub-id]/   # Sub-agent sessions and logs created by Gen for this client
 ```
 
 ## Runner Protocol
@@ -522,7 +523,7 @@ The application enforces token-based authentication on all API routes and WebSoc
   - **Settings Separation**: Client device preferences (enable/disable push for this device, 30s test push, Service Worker cache reset) live in `/settings`, while global VAPID server configuration (`contactEmail`) is managed exclusively in `/admin/settings`.
   - **PWA & iOS Support**: Works across modern browsers (Chrome, Edge, Firefox, Safari). On iOS/iPadOS 16.4+, Web Push is fully supported when Arondo is added to the Home Screen as a PWA.
 - **PWA Installability**: `app/manifest.ts` provides the web app manifest (name, icons, standalone display). `components/ClientInit.tsx` registers `public/sw.js` on load to enable standalone installation across platforms as well as background Web Push notification handling.
-- **Experimental Gen Main Agent (`/gen`)**: Accessed via the `Gen EXP` button to the left of `+ Session` in the sidebar (`components/AppSidebar.tsx`, `components/GenView.tsx`). Operates as a single global conversation without manual session, project, or agent/model selection. The server-side orchestrator (`lib/gen/orchestrator.ts`) first infers the target project from user context (or asks for clarification in chat when multiple projects are ambiguous or none is specified), then checks the most recent sub-agent session (`id: "gen-sub-<uuid>"`) for that target project (ignoring any intervening sessions for other repositories) by comparing its `messages.json` and execution logs against the new request. When related, Gen continues that existing sub-agent session via `dispatchFollowupMessage` (preserving native CLI resume and tracking `turnNumber` / `isContinuedSession`); otherwise it creates a new follow-up-capable session (`agentType: "auto"`) via `dispatchCreateSession`, reusing `autoagent` and `automodel`. Sub-agent cards and the active status banner display the linked short session ID and turn count (`Session #xxxxxxxx · Turn #N`), post results back to the Gen chat window upon completion, compact memory automatically, and send a Web Push notification (`url: "/gen"`). All Gen messages, memory, and sub-agent session directories are stored strictly under `${ARONDO_CONFIG_DIR}/gen/`.
+- **Experimental Gen Main Agent (`/gen`)**: Accessed via the `Gen EXP` button to the left of `+ Session` in the sidebar (`components/AppSidebar.tsx`, `components/GenView.tsx`). Operates as a single conversational interface per client without manual session, project, or agent/model selection. The server-side orchestrator (`lib/gen/orchestrator.ts`) first infers the target project from user context (or asks for clarification in chat when multiple projects are ambiguous or none is specified), then checks the most recent sub-agent session (`id: "gen-sub-<uuid>"`) for that target project (ignoring any intervening sessions for other repositories) by comparing its `messages.json` and execution logs against the new request. When related, Gen continues that existing sub-agent session via `dispatchFollowupMessage` (preserving native CLI resume and tracking `turnNumber` / `isContinuedSession`); otherwise it creates a new follow-up-capable session (`agentType: "auto"`) via `dispatchCreateSession`, reusing `autoagent` and `automodel`. Sub-agent cards and the active status banner display the linked short session ID and turn count (`Session #xxxxxxxx · Turn #N`), post results back to the Gen chat window upon completion, compact memory automatically, and send a Web Push notification (`url: "/gen"`). All Gen messages, memory, and sub-agent session directories are stored strictly under `${ARONDO_CONFIG_DIR}/gen/${clientId}/` with runtime states isolated per user/client token.
 
 ## Project & Script History Management
 - **Project Scoping**: Sessions are mapped to projects by repository path + runnerId. Projects store metadata at `~/.arondo/projects/[projectId]/project.json`.

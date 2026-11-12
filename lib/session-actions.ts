@@ -8,6 +8,8 @@ import {
   appendSessionLog,
   appendAutomodelLog,
   appendAutoagentLog,
+  isGenSubSessionId,
+  registerGenSubSession,
   getMessages,
   getRunningSessionScriptRuns,
   recordScriptHistory,
@@ -98,8 +100,8 @@ export async function dispatchDetachedAgent(
   const resolved = await resolveAgentType(selectedAgentType, runner?.info.agents ?? [], {
     opencodeQuotaRef: runner?.info.quotaAgents?.find((entry) => entry.Type === "opencode") ?? null,
     prompt,
-    autoagentLog: (text) => appendAutoagentLog(sessionId, runMessageId, text),
-    automodelLog: (text) => appendAutomodelLog(sessionId, runMessageId, text),
+    autoagentLog: (text) => appendAutoagentLog(sessionId, runMessageId, text, session.tokenUuid),
+    automodelLog: (text) => appendAutomodelLog(sessionId, runMessageId, text, session.tokenUuid),
     once: session.once,
     model: !agentType || agentType === session.agentType ? session.model : undefined,
   });
@@ -290,8 +292,8 @@ export async function dispatchFollowupMessage(
   const resolved = await resolveAgentType(session.agentType, runnerConn?.info.agents ?? [], {
     opencodeQuotaRef: runnerConn?.info.quotaAgents?.find((entry) => entry.Type === "opencode") ?? null,
     prompt: trimmedPrompt || trimmedMessage,
-    autoagentLog: (text) => appendAutoagentLog(sessionId, systemMessageId, text),
-    automodelLog: (text) => appendAutomodelLog(sessionId, systemMessageId, text),
+    autoagentLog: (text) => appendAutoagentLog(sessionId, systemMessageId, text, session.tokenUuid),
+    automodelLog: (text) => appendAutomodelLog(sessionId, systemMessageId, text, session.tokenUuid),
     model: session.model,
     previousRun: lastAgentRun ? {
       agentType: lastAgentRun.resolvedAgentType as ConcreteAgentType,
@@ -581,11 +583,14 @@ export async function dispatchCreateSession(
 
   const sessionId = opts.id || crypto.randomUUID();
   const systemMessageId = crypto.randomUUID();
+  if (opts.tokenUuid && isGenSubSessionId(sessionId)) {
+    registerGenSubSession(sessionId, opts.tokenUuid);
+  }
   const resolved = await resolveAgentType(agentType, run.info.agents, {
     opencodeQuotaRef: run.info.quotaAgents?.find((entry) => entry.Type === "opencode") ?? null,
     prompt: trimmedPrompt,
-    autoagentLog: (text) => appendAutoagentLog(sessionId, systemMessageId, text),
-    automodelLog: (text) => appendAutomodelLog(sessionId, systemMessageId, text),
+    autoagentLog: (text) => appendAutoagentLog(sessionId, systemMessageId, text, opts.tokenUuid),
+    automodelLog: (text) => appendAutomodelLog(sessionId, systemMessageId, text, opts.tokenUuid),
     once: opts.once,
     model: opts.model,
   });

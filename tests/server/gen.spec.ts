@@ -85,8 +85,20 @@ test.describe("Gen Main Agent integration tests", () => {
 
     const subSessionId: string = postData.genMessage.subAgent.subSessionId;
 
-    // Sub-agent session files must live inside ${ARONDO_CONFIG_DIR}/gen/sessions/ and not have once: true
-    const subSessionJsonPath = path.join(genDir, "sessions", subSessionId, "session.json");
+    async function findSubSessionFile(subId: string, filename: string): Promise<string> {
+      const clientDirs = await fs.readdir(genDir);
+      for (const cd of clientDirs) {
+        const candidate = path.join(genDir, cd, "sessions", subId, filename);
+        try {
+          await fs.stat(candidate);
+          return candidate;
+        } catch {}
+      }
+      return path.join(genDir, "sessions", subId, filename);
+    }
+
+    // Sub-agent session files must live inside ${ARONDO_CONFIG_DIR}/gen/${clientId}/sessions/ and not have once: true
+    const subSessionJsonPath = await findSubSessionFile(subSessionId, "session.json");
     const stat = await fs.stat(subSessionJsonPath);
     expect(stat.isFile()).toBe(true);
     const subSessionRecord = JSON.parse(await fs.readFile(subSessionJsonPath, "utf-8"));
@@ -212,8 +224,20 @@ test.describe("Gen Main Agent integration tests", () => {
 
     await waitForSubAgentTurnDone(turn3Data.genMessage.id);
 
+    async function findSubSessionFile(subId: string, filename: string): Promise<string> {
+      const clientDirs = await fs.readdir(genDir);
+      for (const cd of clientDirs) {
+        const candidate = path.join(genDir, cd, "sessions", subId, filename);
+        try {
+          await fs.stat(candidate);
+          return candidate;
+        } catch {}
+      }
+      return path.join(genDir, "sessions", subId, filename);
+    }
+
     // Verify all 3 runs were recorded inside the single sub-session's messages.json
-    const subMessagesPath = path.join(genDir, "sessions", firstSubSessionId, "messages.json");
+    const subMessagesPath = await findSubSessionFile(firstSubSessionId, "messages.json");
     const subMessages = JSON.parse(await fs.readFile(subMessagesPath, "utf-8"));
     const agentRuns = subMessages.filter((m: any) => m.type === "agent-run");
     expect(agentRuns.length).toBe(3);

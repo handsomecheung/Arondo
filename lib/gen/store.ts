@@ -1,14 +1,39 @@
 import fs from "fs/promises";
+import fsSync from "fs";
 import path from "path";
 import crypto from "crypto";
 import { getConfigDir } from "../config";
 import { withFileLock, writeJsonAtomic } from "../fileLock";
 import type { AutoModelEffort } from "../llm/automodel/types";
+import { getDefaultClientId } from "./sub-sessions";
 
 const CONFIG_DIR = getConfigDir();
 export const GEN_DIR = path.join(CONFIG_DIR, "gen");
-const GEN_MESSAGES_FILE = path.join(GEN_DIR, "messages.json");
-const GEN_MEMORY_FILE = path.join(GEN_DIR, "memory.json");
+
+export function getGenDir(clientId?: string | null): string {
+  const safeId = clientId && clientId.trim() ? clientId.trim() : getDefaultClientId();
+  return path.join(GEN_DIR, safeId);
+}
+
+function getGenMessagesFile(clientId?: string | null): string {
+  return path.join(getGenDir(clientId), "messages.json");
+}
+
+function getGenMemoryFile(clientId?: string | null): string {
+  return path.join(getGenDir(clientId), "memory.json");
+}
+
+export async function getAllGenClientIds(): Promise<string[]> {
+  try {
+    if (!fsSync.existsSync(GEN_DIR)) return [];
+    const entries = await fs.readdir(GEN_DIR, { withFileTypes: true });
+    return entries
+      .filter((e) => e.isDirectory() && e.name !== "sessions" && e.name !== "default")
+      .map((e) => e.name);
+  } catch {
+    return [];
+  }
+}
 
 export interface GenSubAgentRunInfo {
   subSessionId: string;
@@ -74,22 +99,56 @@ async function writeJson<T>(filePath: string, data: T): Promise<void> {
   await writeJsonAtomic(filePath, data);
 }
 
-export async function getGenMessages(): Promise<GenMessage[]> {
-  return readJson<GenMessage[]>(GEN_MESSAGES_FILE, []);
+async function readGenMessagesWithMigration(clientId?: string | null): Promise<GenMessage[]> {
+  const targetFile = getGenMessagesFile(clientId);
+  if (fsSync.existsSync(targetFile)) {
+    return readJson<GenMessage[]>(targetFile, []);
+  }
+  const legacyFile = path.join(GEN_DIR, "messages.json");
+  if (fsSync.existsSync(legacyFile)) {
+    const legacy = await readJson<GenMessage[]>(legacyFile, []);
+    if (legacy.length > 0) {
+      await writeJson(targetFile, legacy);
+      return legacy;
+    }
+  }
+  return [];
+}
+
+async function readGenMemoryWithMigration(clientId?: string | null): Promise<GenMemory> {
+  const targetFile = getGenMemoryFile(clientId);
+  if (fsSync.existsSync(targetFile)) {
+    return readJson<GenMemory>(targetFile, { ...DEFAULT_MEMORY });
+  }
+  const legacyFile = path.join(GEN_DIR, "memory.json");
+  if (fsSync.existsSync(legacyFile)) {
+    const legacy = await readJson<GenMemory>(legacyFile, { ...DEFAULT_MEMORY });
+    await writeJson(targetFile, legacy);
+    return legacy;
+  }
+  return { ...DEFAULT_MEMORY };
+}
+
+export async function getGenMessages(clientId?: string | null): Promise<GenMessage[]> {
+  return readGenMessagesWithMigration(clientId);
 }
 
 export async function addGenMessage(
   msg: Omit<GenMessage, "id" | "createdAt"> & { id?: string; createdAt?: string },
+  clientId?: string | null,
 ): Promise<GenMessage> {
-  return withFileLock(GEN_MESSAGES_FILE, async () => {
-    const messages = await readJson<GenMessage[]>(GEN_MESSAGES_FILE, []);
+  const effectiveClientId = clientId ?? msg.tokenUuid ?? null;
+  const targetFile = getGenMessagesFile(effectiveClientId);
+  return withFileLock(targetFile, async () => {
+    const messages = await readGenMessagesWithMigration(effectiveClientId);
     const record: GenMessage = {
       ...msg,
       id: msg.id || crypto.randomUUID(),
       createdAt: msg.createdAt || new Date().toISOString(),
+      ...(effectiveClientId && !msg.tokenUuid ? { tokenUuid: effectiveClientId } : {}),
     };
     messages.push(record);
-    await writeJson(GEN_MESSAGES_FILE, messages);
+    await writeJson(targetFile, messages);
     return record;
   });
 }
@@ -97,32 +156,55 @@ export async function addGenMessage(
 export async function updateGenMessage(
   id: string,
   patch: Partial<GenMessage>,
+  clientId?: string | null,
 ): Promise<GenMessage | null> {
-  return withFileLock(GEN_MESSAGES_FILE, async () => {
-    const messages = await readJson<GenMessage[]>(GEN_MESSAGES_FILE, []);
-    const idx = messages.findIndex((m) => m.id === id);
-    if (idx === -1) return null;
-    messages[idx] = { ...messages[idx], ...patch };
-    await writeJson(GEN_MESSAGES_FILE, messages);
-    return messages[idx];
-  });
+  if (clientId) {
+    const targetFile = getGenMessagesFile(clientId);
+    return withFileLock(targetFile, async () => {
+      const messages = await readGenMessagesWithMigration(clientId);
+      const idx = messages.findIndex((m) => m.id === id);
+      if (idx === -1) return null;
+      messages[idx] = { ...messages[idx], ...patch };
+      await writeJson(targetFile, messages);
+      return messages[idx];
+    });
+  }
+
+  const clientIds = await getAllGenClientIds();
+  const searchDirs = clientIds.length > 0 ? clientIds : [getDefaultClientId()];
+  for (const cid of searchDirs) {
+    const targetFile = getGenMessagesFile(cid);
+    if (!fsSync.existsSync(targetFile)) continue;
+    const res = await withFileLock(targetFile, async () => {
+      const messages = await readGenMessagesWithMigration(cid);
+      const idx = messages.findIndex((m) => m.id === id);
+      if (idx === -1) return null;
+      messages[idx] = { ...messages[idx], ...patch };
+      await writeJson(targetFile, messages);
+      return messages[idx];
+    });
+    if (res) return res;
+  }
+  return null;
 }
 
-export async function getGenMemory(): Promise<GenMemory> {
-  return readJson<GenMemory>(GEN_MEMORY_FILE, { ...DEFAULT_MEMORY });
+export async function getGenMemory(clientId?: string | null): Promise<GenMemory> {
+  return readGenMemoryWithMigration(clientId);
 }
 
 export async function updateGenMemory(
   patch: Partial<GenMemory>,
+  clientId?: string | null,
 ): Promise<GenMemory> {
-  return withFileLock(GEN_MEMORY_FILE, async () => {
-    const current = await readJson<GenMemory>(GEN_MEMORY_FILE, { ...DEFAULT_MEMORY });
+  const targetFile = getGenMemoryFile(clientId);
+  return withFileLock(targetFile, async () => {
+    const current = await readGenMemoryWithMigration(clientId);
     const next: GenMemory = {
       ...current,
       ...patch,
       updatedAt: new Date().toISOString(),
     };
-    await writeJson(GEN_MEMORY_FILE, next);
+    await writeJson(targetFile, next);
     return next;
   });
 }

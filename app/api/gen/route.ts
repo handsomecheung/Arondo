@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getArondoToken, isValidToken } from "@/lib/auth";
+import { getArondoToken, isValidToken, getUuidByToken } from "@/lib/auth";
 import { getGenMessages, getGenMemory } from "@/lib/gen/store";
 import { handleUserGenMessage, reconcileRunningGenSubAgents } from "@/lib/gen/orchestrator";
 
@@ -9,10 +9,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  await reconcileRunningGenSubAgents();
+  const clientId = getUuidByToken(token);
+  await reconcileRunningGenSubAgents(clientId);
   const [messages, memory] = await Promise.all([
-    getGenMessages(),
-    getGenMemory(),
+    getGenMessages(clientId),
+    getGenMemory(clientId),
   ]);
 
   return NextResponse.json({ messages, memory });

@@ -252,15 +252,19 @@ export async function deleteOnceCache(prompt: string): Promise<void> {
   ]);
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+import {
+  isGenSubSessionId,
+  findGenSubSessionDir,
+  registerGenSubSession,
+  deleteGenSubSessionCache,
+  readGenSubSessions,
+} from "./gen/sub-sessions";
 
-export function isGenSubSessionId(id: string): boolean {
-  return id.startsWith("gen-sub-");
-}
+export { isGenSubSessionId, registerGenSubSession };
 
-function getSessionDir(id: string): string {
+function getSessionDir(id: string, tokenUuid?: string | null): string {
   if (isGenSubSessionId(id)) {
-    return path.join(GEN_SESSIONS_DIR, id);
+    return findGenSubSessionDir(id, tokenUuid);
   }
   const activeDir = path.join(SESSIONS_DIR, id);
   if (!fsSync.existsSync(activeDir) && fsSync.existsSync(path.join(ARCHIVED_SESSIONS_DIR, id))) {
@@ -273,8 +277,8 @@ export function isSessionArchived(id: string): boolean {
   return fsSync.existsSync(path.join(ARCHIVED_SESSIONS_DIR, id));
 }
 
-function getSessionFilePath(id: string): string {
-  return path.join(getSessionDir(id), "session.json");
+function getSessionFilePath(id: string, tokenUuid?: string | null): string {
+  return path.join(getSessionDir(id, tokenUuid), "session.json");
 }
 
 function getMessagesFilePath(id: string, projectId?: string): string {
@@ -347,21 +351,8 @@ export async function getSession(id: string): Promise<Session | undefined> {
   return session ? withDerivedSessionError(session) : undefined;
 }
 
-export async function getGenSubSessions(): Promise<Session[]> {
-  try {
-    await ensureDir(GEN_SESSIONS_DIR);
-    const entries = await fs.readdir(GEN_SESSIONS_DIR, { withFileTypes: true });
-    const sessions: Session[] = [];
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        const session = await readJson<Session | null>(getSessionFilePath(entry.name), null);
-        if (session) sessions.push(await withDerivedSessionError(session));
-      }
-    }
-    return sessions;
-  } catch {
-    return [];
-  }
+export async function getGenSubSessions(clientId?: string | null): Promise<Session[]> {
+  return readGenSubSessions(readJson, withDerivedSessionError, clientId);
 }
 
 export async function getArchivedSessions(): Promise<Session[]> {
@@ -495,7 +486,10 @@ export async function createSession(
   opts: { noProject?: boolean; automation?: boolean } = {}
 ): Promise<Session> {
   const id = data.id || crypto.randomUUID();
-  const filePath = getSessionFilePath(id);
+  if (isGenSubSessionId(id) && data.tokenUuid) {
+    registerGenSubSession(id, data.tokenUuid);
+  }
+  const filePath = getSessionFilePath(id, data.tokenUuid);
   if (fsSync.existsSync(filePath) || fsSync.existsSync(path.join(ARCHIVED_SESSIONS_DIR, id))) {
     throw new Error(`Session with id ${id} already exists`);
   }
@@ -714,7 +708,7 @@ const EXECUTION_LOG_SUFFIXES = [
   ".script.stderr.md",
 ];
 
-function getLogFilePath(sessionId: string, messageId: string, kind: LogKind, projectId?: string, stream: LogStream = "stdout"): string {
+function getLogFilePath(sessionId: string, messageId: string, kind: LogKind, projectId?: string, stream: LogStream = "stdout", tokenUuid?: string | null): string {
   const filename = `${messageId}.${kind}.${stream}.md`;
   if (!sessionId) {
     if (!projectId) {
@@ -722,11 +716,11 @@ function getLogFilePath(sessionId: string, messageId: string, kind: LogKind, pro
     }
     return path.join(getProjectDir(projectId), "logs", filename);
   }
-  return path.join(getSessionDir(sessionId), "logs", filename);
+  return path.join(getSessionDir(sessionId, tokenUuid), "logs", filename);
 }
 
-function getAutomodelLogFilePath(sessionId: string, messageId: string): string {
-  return path.join(getSessionDir(sessionId), "logs", `${messageId}.automodel.log`);
+function getAutomodelLogFilePath(sessionId: string, messageId: string, tokenUuid?: string | null): string {
+  return path.join(getSessionDir(sessionId, tokenUuid), "logs", `${messageId}.automodel.log`);
 }
 
 export async function clearSessionLog(sessionId: string, messageId: string, kind: LogKind, projectId?: string): Promise<void> {
@@ -744,14 +738,14 @@ export async function appendSessionLog(sessionId: string, messageId: string, kin
   await fs.appendFile(logPath, raw ? text : `${text}\n`, "utf-8");
 }
 
-export async function appendAutoagentLog(sessionId: string, messageId: string, text: string): Promise<void> {
-  const logPath = path.join(getSessionDir(sessionId), "logs", `${messageId}.autoagent.log`);
+export async function appendAutoagentLog(sessionId: string, messageId: string, text: string, tokenUuid?: string | null): Promise<void> {
+  const logPath = path.join(getSessionDir(sessionId, tokenUuid), "logs", `${messageId}.autoagent.log`);
   await ensureDir(path.dirname(logPath));
   await fs.appendFile(logPath, text.endsWith("\n") ? text : `${text}\n`, "utf-8");
 }
 
-export async function appendAutomodelLog(sessionId: string, messageId: string, text: string): Promise<void> {
-  const logPath = getAutomodelLogFilePath(sessionId, messageId);
+export async function appendAutomodelLog(sessionId: string, messageId: string, text: string, tokenUuid?: string | null): Promise<void> {
+  const logPath = getAutomodelLogFilePath(sessionId, messageId, tokenUuid);
   await ensureDir(path.dirname(logPath));
   await fs.appendFile(logPath, text.endsWith("\n") ? text : `${text}\n`, "utf-8");
 }
@@ -942,6 +936,7 @@ export async function deleteSession(id: string): Promise<void> {
     // Ignore errors reading session or messages during deletion
   }
   const sessionDir = getSessionDir(id);
+  deleteGenSubSessionCache(id);
   await fs.rm(sessionDir, { recursive: true, force: true });
 }
 
