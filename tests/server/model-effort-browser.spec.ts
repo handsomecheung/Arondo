@@ -12,7 +12,7 @@ const agents = [
   { label: 'Antigravity CLI', value: 'antigravity', family: 'Gemini 3.8 Flash', effort: 'High' },
 ];
 
-async function mockSessionPage(page: Page, existing = false) {
+async function mockSessionPage(page: Page, existing = false, installedAgents = ['agy', 'claude', 'codex', 'opencode', 'pi']) {
   let session: Session = {
     id: 'effort-session', name: 'Effort session', agentType: 'antigravity',
     status: 'idle', runnerId: 'effort-runner', repoPath: '/tmp/effort-test',
@@ -25,7 +25,7 @@ async function mockSessionPage(page: Page, existing = false) {
     if (pathname === '/api/settings') return route.fulfill({ json: { agentModels: DEFAULT_AGENT_MODELS } });
     if (pathname === '/api/runners') return route.fulfill({ json: [{
       id: 'effort-runner', name: 'Effort Runner', connected: true,
-      hostname: 'localhost', os: 'linux', arch: 'amd64', agents: ['agy', 'claude', 'codex', 'opencode', 'pi'],
+      hostname: 'localhost', os: 'linux', arch: 'amd64', agents: installedAgents,
     }] });
     if (pathname === '/api/sessions') return route.fulfill({ json: existing ? [session] : [] });
     if (pathname === `/api/sessions/${session.id}`) {
@@ -48,13 +48,57 @@ async function mockSessionPage(page: Page, existing = false) {
   return writes;
 }
 
+async function expectMessageInputDisabled(page: Page) {
+  const requests: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && /\/api\/sessions(?:$|\/[^/]+\/(?:messages|todo-messages|detached-agent-runs)$)/.test(new URL(request.url()).pathname)) {
+      requests.push(request.url());
+    }
+  });
+  const input = page.locator('#chat-input');
+  const send = page.locator('#send-btn');
+  await expect(input).toBeDisabled();
+  await expect(input).toHaveAttribute('placeholder', 'Install an Agent CLI on this Runner to send messages.');
+  await expect(page.getByRole('button', { name: 'Attach a file or schedule this message', exact: true })).toBeDisabled();
+  await expect(send).toBeDisabled();
+  await expect(send).toHaveAttribute('title', 'Install an Agent CLI on this Runner to send messages.');
+  await input.dispatchEvent('keydown', { key: 'Enter' });
+  await send.dispatchEvent('click');
+  await expect(input).toHaveValue('');
+  expect(requests).toEqual([]);
+}
+
 for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 900 }]) {
   test.describe(`Thinking effort at ${viewport.width}px`, () => {
     test.use({ viewport });
     test.setTimeout(120_000);
 
+    test('empty Runner disables agent selection and shows installation advice', async ({ page }) => {
+      await mockSessionPage(page, false, []);
+      const trigger = page.locator('#agent-select-trigger');
+      await expect(trigger).toBeDisabled();
+      await expect(trigger).toHaveText('No agents available');
+      await expect(page.locator('#agent-install-advice')).toBeVisible();
+      await expect(trigger).toHaveAccessibleDescription('Install an Agent CLI on this Runner to select an agent.');
+      await trigger.dispatchEvent('click');
+      await expect(page.locator('.agent-meta-row .custom-dropdown-menu')).toHaveCount(0);
+      await expectMessageInputDisabled(page);
+    });
+
+    test('empty Runner disables the session agent switch and shows installation advice', async ({ page }) => {
+      await mockSessionPage(page, true, []);
+      const trigger = page.getByTitle('Install an Agent CLI on this Runner to select an agent.', { exact: true });
+      await expect(trigger).toBeDisabled();
+      await expect(page.locator('#session-agent-install-advice')).toBeVisible();
+      await expect(trigger).toHaveAccessibleDescription('Install an Agent CLI on this Runner to select an agent.');
+      await trigger.dispatchEvent('click');
+      await expect(page.locator('.session-agent-switch-menu')).toHaveCount(0);
+      await expectMessageInputDisabled(page);
+    });
+
     test('New Session keeps effort visible after changing it and the model family', async ({ page }) => {
       await mockSessionPage(page);
+      await expect(page.locator('#chat-input')).toBeEnabled();
       const choices = page.getByRole('tablist', { name: 'Thinking effort' });
       for (const agent of agents) {
         await page.locator('#agent-select-trigger').click();
@@ -72,6 +116,7 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 900 
 
     test('header shows effort for other agents, persists choices and keeps it above the scrolling models', async ({ page }) => {
       const writes = await mockSessionPage(page, true);
+      await expect(page.locator('#chat-input')).toBeEnabled();
       for (const agent of agents) {
         await page.getByTitle('Switch agent', { exact: true }).click();
         await expect(page.locator('.session-agent-switch-menu').getByText(agent.family, { exact: true })).toHaveCount(0);

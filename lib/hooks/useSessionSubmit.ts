@@ -9,6 +9,7 @@ import { autoResizeTextarea } from "@/lib/homeUtils";
 
 interface UseSessionSubmitParams {
   prompt: string;
+  hasAvailableAgents: boolean;
   repoPath: string;
   agentType: string;
   runnerId: string;
@@ -53,6 +54,7 @@ interface UseSessionSubmitParams {
 
 export function useSessionSubmit({
   prompt,
+  hasAvailableAgents,
   repoPath,
   agentType,
   runnerId,
@@ -200,7 +202,7 @@ export function useSessionSubmit({
   }, [selectedSession, loadProjects]);
 
   const sendAgentMessage = useCallback(async (originalMessage: string, agentMessage: string) => {
-    if (!selectedSessionId) return;
+    if (!hasAvailableAgents || !selectedSessionId) return;
     setPrompt("");
     setShowCommandMenu(false);
     if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
@@ -241,10 +243,11 @@ export function useSessionSubmit({
       console.error(err);
       setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
     }
-  }, [selectedSessionId, repoPath, agentType, runnerId, setTaskQueue, setApiError]);
+  }, [hasAvailableAgents, selectedSessionId, repoPath, agentType, runnerId, setTaskQueue, setApiError]);
 
   // Called from SessionView with the raw prompt text (e.g. "/commit foo")
   const handleAgentCommand = useCallback(async (promptText: string) => {
+    if (!hasAvailableAgents) return;
     const detached = parseDetachedAgentCommand(promptText);
     if (detached && selectedSessionId) {
       if (detached.kind === "btw" && !detached.message) {
@@ -273,7 +276,7 @@ export function useSessionSubmit({
     const agentMessage = resolveAgentCommand(promptText, agentCommands);
     if (agentMessage === null) return;
     await sendAgentMessage(promptText, agentMessage);
-  }, [sendAgentMessage, agentCommands, selectedSessionId, setApiError, setPrompt, setShowCommandMenu, textareaRef]);
+  }, [hasAvailableAgents, sendAgentMessage, agentCommands, selectedSessionId, setApiError, setPrompt, setShowCommandMenu, textareaRef]);
 
   const handleSendMessage = useCallback(async (text: string) => {
     if (!selectedSessionId || !text.trim()) return;
@@ -401,7 +404,7 @@ export function useSessionSubmit({
   // Resolves the "project not ready" confirmation dialog: send anyway, queue
   // an auto-send draft, or create a manual draft — all reuse the same /api/sessions POST.
   const resolvePendingConfirmation = useCallback(async (choice: "force" | "pendingAuto" | "draft") => {
-    if (!pendingConfirmation) return;
+    if (!hasAvailableAgents || !pendingConfirmation) return;
     const { displayMessage, agentPrompt, repoPath: pendingRepoPath, agentType: pendingAgentType, runnerId: pendingRunnerId, existingSessionId, isFollowup } = pendingConfirmation;
     setPendingConfirmation(null);
 
@@ -483,7 +486,7 @@ export function useSessionSubmit({
     } catch (err: any) {
       setApiError({ title: "Send Error", message: err.message || "Failed to create session" });
     }
-  }, [pendingConfirmation, finalizeNewSession, setApiError, setTaskQueue, setToast]);
+  }, [hasAvailableAgents, pendingConfirmation, finalizeNewSession, setApiError, setTaskQueue, setToast]);
 
   const cancelPendingConfirmation = useCallback(() => {
     if (!pendingConfirmation) return;
@@ -492,6 +495,7 @@ export function useSessionSubmit({
   }, [pendingConfirmation, setPrompt]);
 
   const handleSubmit = useCallback(async () => {
+    if (!hasAvailableAgents) return;
     const trimmed = prompt.trim();
     const isBlankSession = (isNewSession || (!selectedSessionId && !isNewDraft)) && !trimmed && pendingFiles.length === 0;
 
@@ -698,7 +702,7 @@ export function useSessionSubmit({
     } catch (err) {
       console.error(err);
     }
-  }, [prompt, repoPath, agentType, runnerId, selectedModel, isNewSession, isNewDraft, pendingFiles, setPendingFiles, uploadPendingFile, draftTrigger, draftAt, sendScheduledAt, setSendScheduledAt, pendingSendTrigger, setPendingSendTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, setApiError, setToast, handleNewSessionCommand, handleRenameSessionCommand, sendAgentMessage, handleScriptCommand, agentCommands, finalizeNewSession]);
+  }, [hasAvailableAgents, prompt, repoPath, agentType, runnerId, selectedModel, isNewSession, isNewDraft, pendingFiles, setPendingFiles, uploadPendingFile, draftTrigger, draftAt, sendScheduledAt, setSendScheduledAt, pendingSendTrigger, setPendingSendTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, setApiError, setToast, handleNewSessionCommand, handleRenameSessionCommand, sendAgentMessage, handleScriptCommand, agentCommands, finalizeNewSession]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return;

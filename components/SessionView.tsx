@@ -24,7 +24,7 @@ import type { AgentCommand } from "@/lib/agentCommands";
 import { CHAT_INPUT_TIPS } from "@/lib/chatInputTips";
 import type { AgentModelsConfig } from "@/lib/agentModels";
 import { getEffectiveModel, getEffortChoices, getFamilyDefaultModel, isEffortAgent, modelFamilyOf } from "@/lib/model-effort";
-import AgentDropdownMenu from "@/components/AgentDropdownMenu";
+import AgentDropdownMenu, { availableAgentItems } from "@/components/AgentDropdownMenu";
 import SessionAgentSwitchMenu from "@/components/SessionAgentSwitchMenu";
 import ModelDropdownMenu from "@/components/ModelDropdownMenu";
 
@@ -254,6 +254,8 @@ export default function SessionView({
   const activeRunnerId = selectedSession ? selectedSession.runnerId : runnerId;
   const activeRunner = runners.find((r) => r.id === activeRunnerId) ?? null;
   const isRunnerOffline = !activeRunner || !activeRunner.connected;
+  const hasAvailableAgents = availableAgentItems(isAgentAvailable).length > 0;
+  const agentInstallAdvice = "Install an Agent CLI on this Runner to select an agent.";
   const isPathMissing = Boolean(isSessionPathMissing && !isNewSession && !isNewDraft);
   const sessionProjectExists = selectedSession?.projectId
     ? projects.some((p) => p.id === selectedSession.projectId)
@@ -294,7 +296,7 @@ export default function SessionView({
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (isRunnerOffline || isArchived || isPathMissing) return;
+    if (isRunnerOffline || !hasAvailableAgents || isArchived || isPathMissing) return;
     if (e.dataTransfer.types && Array.from(e.dataTransfer.types).includes("Files")) {
       dragCounterRef.current += 1;
       setIsDragging(true);
@@ -304,7 +306,7 @@ export default function SessionView({
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (isRunnerOffline || isArchived || isPathMissing) return;
+    if (isRunnerOffline || !hasAvailableAgents || isArchived || isPathMissing) return;
     if (e.dataTransfer.types && Array.from(e.dataTransfer.types).includes("Files")) {
       e.dataTransfer.dropEffect = "copy";
     }
@@ -313,7 +315,7 @@ export default function SessionView({
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (isRunnerOffline || isArchived || isPathMissing) return;
+    if (isRunnerOffline || !hasAvailableAgents || isArchived || isPathMissing) return;
     dragCounterRef.current -= 1;
     if (dragCounterRef.current <= 0) {
       dragCounterRef.current = 0;
@@ -326,7 +328,7 @@ export default function SessionView({
     e.stopPropagation();
     dragCounterRef.current = 0;
     setIsDragging(false);
-    if (isRunnerOffline || isArchived || isPathMissing) return;
+    if (isRunnerOffline || !hasAvailableAgents || isArchived || isPathMissing) return;
     const files = Array.from(e.dataTransfer.files ?? []);
     if (files.length > 0) {
       onSelectFiles(files);
@@ -427,6 +429,8 @@ export default function SessionView({
     ? "This is a single-use session. Chat is disabled."
     : isRunnerOffline
     ? "Runner is offline. Chat is disabled."
+    : !hasAvailableAgents
+    ? "Install an Agent CLI on this Runner to send messages."
     : isPathMissing
     ? "Path does not exist on runner. Chat is disabled."
     : isDraftSession
@@ -621,7 +625,7 @@ export default function SessionView({
                 <button
                   type="button"
                   onClick={(e) => {
-                    if (isArchived) return;
+                    if (isArchived || !hasAvailableAgents) return;
                     if (agentSwitchOpen) {
                       setAgentSwitchOpen(false);
                       return;
@@ -634,7 +638,8 @@ export default function SessionView({
                     });
                     setAgentSwitchOpen(true);
                   }}
-                  disabled={isArchived}
+                  disabled={isArchived || !hasAvailableAgents}
+                  aria-describedby={!hasAvailableAgents ? "session-agent-install-advice" : undefined}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -646,11 +651,11 @@ export default function SessionView({
                     fontSize: 11,
                     fontFamily: "monospace",
                     color: "var(--text-secondary)",
-                    cursor: "pointer",
-                    opacity: 1,
+                    cursor: isArchived || !hasAvailableAgents ? "not-allowed" : "pointer",
+                    opacity: isArchived || !hasAvailableAgents ? 0.5 : 1,
                     whiteSpace: "nowrap",
                   }}
-                  title="Switch agent"
+                  title={hasAvailableAgents ? "Switch agent" : agentInstallAdvice}
                 >
                   ({agentTypeLabel(selectedSession.agentType)})
                   <span
@@ -663,7 +668,7 @@ export default function SessionView({
                     <IconChevronDown className="" />
                   </span>
                 </button>
-                {agentSwitchOpen && agentSwitchMenuPos && (
+                {hasAvailableAgents && agentSwitchOpen && agentSwitchMenuPos && (
                   <SessionAgentSwitchMenu
                     runnerId={selectedSession.runnerId}
                     agentType={selectedSession.agentType}
@@ -679,6 +684,7 @@ export default function SessionView({
                 )}
               </div>
             </div>
+            {!hasAvailableAgents && <p id="session-agent-install-advice" className="agent-install-advice">{agentInstallAdvice}</p>}
           </div>
 
           <div
@@ -1393,21 +1399,23 @@ export default function SessionView({
                   type="button"
                   className="custom-dropdown-trigger"
                   onClick={() =>
-                    onSetAgentDropdownOpen(!agentDropdownOpen)
+                    onSetAgentDropdownOpen(hasAvailableAgents && !agentDropdownOpen)
                   }
                   style={{
                     ...((isNewSession || isNewDraft) && !agentType
                       ? { borderColor: "var(--error)" }
                       : {}),
                   }}
+                  disabled={!hasAvailableAgents}
+                  aria-describedby={!hasAvailableAgents ? "agent-install-advice" : undefined}
                   id="agent-select-trigger"
                 >
-                  <span>{agentTypeLabel(agentType)}</span>
+                  <span>{hasAvailableAgents ? agentTypeLabel(agentType) : "No agents available"}</span>
                   <IconChevronDown
                     className={`arrow-icon ${agentDropdownOpen ? "open" : ""}`}
                   />
                 </button>
-                {agentDropdownOpen && (
+                {hasAvailableAgents && agentDropdownOpen && (
                   <AgentDropdownMenu
                     runnerId={runnerId}
                     agentType={agentType}
@@ -1420,6 +1428,8 @@ export default function SessionView({
                 )}
               </div>
             </div>
+
+            {!hasAvailableAgents && <p id="agent-install-advice" className="agent-install-advice new-session-agent-install-advice">{agentInstallAdvice}</p>}
 
             {(agentType === "antigravity" || agentType === "codex" || agentType === "claude" || agentType === "opencode" || agentType === "pi") && (
               <div className="input-meta-row model-meta-row">
@@ -1737,7 +1747,7 @@ export default function SessionView({
             value={chatInputValue}
             onChange={onPromptChange}
             onKeyDown={onKeyDown}
-            disabled={isRunnerOffline || isArchived || isPathMissing || isOnceSession}
+            disabled={isRunnerOffline || !hasAvailableAgents || isArchived || isPathMissing || isOnceSession}
             readOnly={isArchived}
             rows={1}
             id="chat-input"
@@ -1747,7 +1757,7 @@ export default function SessionView({
               <button
                 className="upload-btn"
                 onClick={() => setAttachMenuOpen((v) => (v === "closed" ? "menu" : "closed"))}
-                disabled={isRunnerOffline || isArchived || isPathMissing || isOnceSession}
+                disabled={isRunnerOffline || !hasAvailableAgents || isArchived || isPathMissing || isOnceSession}
                 title="Attach a file or schedule this message"
                 type="button"
               >

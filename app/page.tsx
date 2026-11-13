@@ -9,6 +9,7 @@ import { IconTaskQueue, IconLogo, IconMenu, IconRefresh } from "@/components/Ico
 import AppSidebar from "@/components/AppSidebar";
 import ProjectPanel from "@/components/ProjectPanel";
 import SessionView from "@/components/SessionView";
+import { availableAgentItems } from "@/components/AgentDropdownMenu";
 import GenView from "@/components/GenView";
 import FileExplorerModal from "@/components/modals/FileExplorerModal";
 import ChatFileSelectorModal from "@/components/modals/ChatFileSelectorModal";
@@ -283,6 +284,7 @@ export default function HomePage() {
     if (!runnerAgents) return true;
     return runnerAgents.includes(agentCmd);
   };
+  const hasAvailableAgents = availableAgentItems(isAgentAvailable).length > 0;
 
   const {
     scriptHistory,
@@ -1138,6 +1140,7 @@ export default function HomePage() {
     isSessionPathMissing,
     selectedModel,
     onClearSelectedModel: () => setSelectedModel(""),
+    hasAvailableAgents,
   });
 
   const handleTriggerRunFileSelector = () => {
@@ -1565,6 +1568,7 @@ export default function HomePage() {
   const isDraftAutoSend = messages.find((m) => m.id === pendingDraftTodoId)?.todoTrigger?.kind === "codebaseReady";
 
   const canSubmit =
+    hasAvailableAgents &&
     selectedRunnerConnected &&
     !isArchivedSession &&
     !isSessionPathMissing &&
@@ -1585,6 +1589,9 @@ export default function HomePage() {
     }
     if (isArchivedSession) {
       return "Session is archived. Unarchive it to send messages.";
+    }
+    if (!hasAvailableAgents) {
+      return "Install an Agent CLI on this Runner to send messages.";
     }
     if (isNewDraft) {
       if (!runnerId) {

@@ -12,6 +12,8 @@ Arondo lets you delegate work to an AI agent from a mobile-friendly workspace, r
 
 Choose a Runner, project, and agent, then describe the task and send it.
 
+On regular Session pages, if the selected Runner has no supported Agent CLI installed, the Agent picker, message input, attachment controls, and Send button are disabled. An installation hint appears beside the Agent picker and in the message input. Install a supported Agent CLI on that Runner to enable chatting.
+
 The **Agent** dropdown shows the selected Runner's latest recorded quota as progress bars labeled `hour:` and `week:`, with remaining percentages and the same color scale as the Runners page. Antigravity CLI shows separate Gemini, Anthropic & Other, and Gemini 4 Argon quota groups; its **Model** dropdown also shows these bars under each group heading. Only known quota windows have bars; missing data and API-key billing are labeled explicitly.
 
 <img src="public/readme/basic-usage/01-create-session.jpg" alt="Creating a new session by choosing a runner, project, and agent, then entering a task" width="360">
