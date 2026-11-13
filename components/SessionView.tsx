@@ -254,8 +254,12 @@ export default function SessionView({
   const activeRunnerId = selectedSession ? selectedSession.runnerId : runnerId;
   const activeRunner = runners.find((r) => r.id === activeRunnerId) ?? null;
   const isRunnerOffline = !activeRunner || !activeRunner.connected;
-  const hasAvailableAgents = availableAgentItems(isAgentAvailable).length > 0;
-  const agentInstallAdvice = "Install an Agent CLI on this Runner to select an agent.";
+  const hasConnectedRunners = runners.some((runner) => runner.connected);
+  const runnerConnectionAdvice = "Connect a Runner to select an agent and send messages.";
+  const hasAvailableAgents = hasConnectedRunners && availableAgentItems(isAgentAvailable).length > 0;
+  const agentInstallAdvice = hasConnectedRunners
+    ? "Install an Agent CLI on this Runner to select an agent."
+    : runnerConnectionAdvice;
   const isPathMissing = Boolean(isSessionPathMissing && !isNewSession && !isNewDraft);
   const sessionProjectExists = selectedSession?.projectId
     ? projects.some((p) => p.id === selectedSession.projectId)
@@ -427,6 +431,8 @@ export default function SessionView({
     ? "This session is archived. Unarchive it to send messages."
     : isOnceSession
     ? "This is a single-use session. Chat is disabled."
+    : !hasConnectedRunners
+    ? runnerConnectionAdvice
     : isRunnerOffline
     ? "Runner is offline. Chat is disabled."
     : !hasAvailableAgents
@@ -1222,9 +1228,10 @@ export default function SessionView({
                   type="button"
                   className="custom-dropdown-trigger"
                   onClick={() =>
-                    !isRunning && onSetRunnerDropdownOpen(!runnerDropdownOpen)
+                    !isRunning && hasConnectedRunners && onSetRunnerDropdownOpen(!runnerDropdownOpen)
                   }
-                  disabled={isRunning}
+                  disabled={isRunning || !hasConnectedRunners}
+                  aria-describedby={!hasConnectedRunners ? "runner-connection-advice" : undefined}
                   style={{
                     ...((isNewSession || isNewDraft) && !runnerId
                       ? { borderColor: "var(--error)" }
@@ -1233,44 +1240,42 @@ export default function SessionView({
                   id="runner-select-trigger"
                 >
                   <span>
-                    {runners.find((r) => r.id === runnerId)
-                      ? `${runners.find((r) => r.id === runnerId)?.name} (${runners.find((r) => r.id === runnerId)?.hostname})`
-                      : "Select Runner"}
+                    {!hasConnectedRunners
+                      ? "No runners available"
+                      : runners.find((r) => r.id === runnerId)
+                        ? `${runners.find((r) => r.id === runnerId)?.name} (${runners.find((r) => r.id === runnerId)?.hostname})`
+                        : "Select Runner"}
                   </span>
                   <IconChevronDown
                     className={`arrow-icon ${runnerDropdownOpen ? "open" : ""}`}
                   />
                 </button>
-                {runnerDropdownOpen && (
+                {hasConnectedRunners && runnerDropdownOpen && (
                   <div className="custom-dropdown-menu new-session-dropdown-menu">
-                    {runners.filter((r) => r.connected).length === 0 ? (
-                      <div className="custom-dropdown-item disabled">
-                        No runners connected
-                      </div>
-                    ) : (
-                      runners
-                        .filter((r) => r.connected)
-                        .map((r) => (
-                          <button
-                            key={r.id}
-                            type="button"
-                            className={`custom-dropdown-item ${r.id === runnerId ? "active" : ""}`}
-                            onClick={() => {
-                              if (r.id !== runnerId) {
-                                onSetRunnerId(r.id);
-                                onSetRepoPath("");
-                              }
-                              onSetRunnerDropdownOpen(false);
-                            }}
-                          >
-                            {r.name} ({r.hostname})
-                          </button>
-                        ))
-                    )}
+                    {runners
+                      .filter((r) => r.connected)
+                      .map((r) => (
+                        <button
+                          key={r.id}
+                          type="button"
+                          className={`custom-dropdown-item ${r.id === runnerId ? "active" : ""}`}
+                          onClick={() => {
+                            if (r.id !== runnerId) {
+                              onSetRunnerId(r.id);
+                              onSetRepoPath("");
+                            }
+                            onSetRunnerDropdownOpen(false);
+                          }}
+                        >
+                          {r.name} ({r.hostname})
+                        </button>
+                      ))}
                   </div>
                 )}
               </div>
             </div>
+
+            {!hasConnectedRunners && <p id="runner-connection-advice" className="agent-install-advice new-session-agent-install-advice">{runnerConnectionAdvice}</p>}
 
             <div className="input-meta-row project-meta-row">
               <span className="input-label input-meta-row-label">Project:</span>
@@ -1407,7 +1412,7 @@ export default function SessionView({
                       : {}),
                   }}
                   disabled={!hasAvailableAgents}
-                  aria-describedby={!hasAvailableAgents ? "agent-install-advice" : undefined}
+                  aria-describedby={!hasConnectedRunners ? "runner-connection-advice" : !hasAvailableAgents ? "agent-install-advice" : undefined}
                   id="agent-select-trigger"
                 >
                   <span>{hasAvailableAgents ? agentTypeLabel(agentType) : "No agents available"}</span>
@@ -1429,7 +1434,7 @@ export default function SessionView({
               </div>
             </div>
 
-            {!hasAvailableAgents && <p id="agent-install-advice" className="agent-install-advice new-session-agent-install-advice">{agentInstallAdvice}</p>}
+            {hasConnectedRunners && !hasAvailableAgents && <p id="agent-install-advice" className="agent-install-advice new-session-agent-install-advice">{agentInstallAdvice}</p>}
 
             {(agentType === "antigravity" || agentType === "codex" || agentType === "claude" || agentType === "opencode" || agentType === "pi") && (
               <div className="input-meta-row model-meta-row">

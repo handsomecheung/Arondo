@@ -12,7 +12,7 @@ const agents = [
   { label: 'Antigravity CLI', value: 'antigravity', family: 'Gemini 3.8 Flash', effort: 'High' },
 ];
 
-async function mockSessionPage(page: Page, existing = false, installedAgents = ['agy', 'claude', 'codex', 'opencode', 'pi']) {
+async function mockSessionPage(page: Page, existing = false, installedAgents = ['agy', 'claude', 'codex', 'opencode', 'pi'], runnerState: 'connected' | 'offline' | 'missing' = 'connected') {
   let session: Session = {
     id: 'effort-session', name: 'Effort session', agentType: 'antigravity',
     status: 'idle', runnerId: 'effort-runner', repoPath: '/tmp/effort-test',
@@ -23,8 +23,8 @@ async function mockSessionPage(page: Page, existing = false, installedAgents = [
   await page.route('**/api/**', async (route) => {
     const pathname = new URL(route.request().url()).pathname;
     if (pathname === '/api/settings') return route.fulfill({ json: { agentModels: DEFAULT_AGENT_MODELS } });
-    if (pathname === '/api/runners') return route.fulfill({ json: [{
-      id: 'effort-runner', name: 'Effort Runner', connected: true,
+    if (pathname === '/api/runners') return route.fulfill({ json: runnerState === 'missing' ? [] : [{
+      id: 'effort-runner', name: 'Effort Runner', connected: runnerState === 'connected',
       hostname: 'localhost', os: 'linux', arch: 'amd64', agents: installedAgents,
     }] });
     if (pathname === '/api/sessions') return route.fulfill({ json: existing ? [session] : [] });
@@ -48,7 +48,7 @@ async function mockSessionPage(page: Page, existing = false, installedAgents = [
   return writes;
 }
 
-async function expectMessageInputDisabled(page: Page) {
+async function expectMessageInputDisabled(page: Page, advice = 'Install an Agent CLI on this Runner to send messages.') {
   const requests: string[] = [];
   page.on('request', (request) => {
     if (request.method() === 'POST' && /\/api\/sessions(?:$|\/[^/]+\/(?:messages|todo-messages|detached-agent-runs)$)/.test(new URL(request.url()).pathname)) {
@@ -58,10 +58,10 @@ async function expectMessageInputDisabled(page: Page) {
   const input = page.locator('#chat-input');
   const send = page.locator('#send-btn');
   await expect(input).toBeDisabled();
-  await expect(input).toHaveAttribute('placeholder', 'Install an Agent CLI on this Runner to send messages.');
+  await expect(input).toHaveAttribute('placeholder', advice);
   await expect(page.getByRole('button', { name: 'Attach a file or schedule this message', exact: true })).toBeDisabled();
   await expect(send).toBeDisabled();
-  await expect(send).toHaveAttribute('title', 'Install an Agent CLI on this Runner to send messages.');
+  await expect(send).toHaveAttribute('title', advice);
   await input.dispatchEvent('keydown', { key: 'Enter' });
   await send.dispatchEvent('click');
   await expect(input).toHaveValue('');
@@ -72,6 +72,23 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 900 
   test.describe(`Thinking effort at ${viewport.width}px`, () => {
     test.use({ viewport });
     test.setTimeout(120_000);
+
+    for (const runnerState of ['missing', 'offline'] as const) {
+      test(`${runnerState} Runners disable selection and chat with connection advice`, async ({ page }) => {
+        await mockSessionPage(page, false, [], runnerState);
+        const advice = 'Connect a Runner to select an agent and send messages.';
+        const trigger = page.locator('#runner-select-trigger');
+        await expect(trigger).toBeDisabled();
+        await expect(trigger).toHaveText('No runners available');
+        await expect(trigger).toHaveAccessibleDescription(advice);
+        await expect(page.locator('#runner-connection-advice')).toBeVisible();
+        await trigger.dispatchEvent('click');
+        await expect(page.locator('.runner-meta-row .custom-dropdown-menu')).toHaveCount(0);
+        await expect(page.locator('#agent-select-trigger')).toBeDisabled();
+        await expect(page.locator('#agent-install-advice')).toHaveCount(0);
+        await expectMessageInputDisabled(page, advice);
+      });
+    }
 
     test('empty Runner disables agent selection and shows installation advice', async ({ page }) => {
       await mockSessionPage(page, false, []);

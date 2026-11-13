@@ -281,10 +281,11 @@ export default function HomePage() {
   const selectedRunner = runners.find((r) => r.id === runnerId) ?? null;
   const runnerAgents = selectedRunner?.agents;
   const isAgentAvailable = (agentCmd: string): boolean => {
+    if (!selectedRunner) return false;
     if (!runnerAgents) return true;
     return runnerAgents.includes(agentCmd);
   };
-  const hasAvailableAgents = availableAgentItems(isAgentAvailable).length > 0;
+  const hasAvailableAgents = runners.some((runner) => runner.connected) && availableAgentItems(isAgentAvailable).length > 0;
 
   const {
     scriptHistory,
@@ -1581,6 +1582,9 @@ export default function HomePage() {
           : prompt.trim().length > 0 && !!selectedSessionId);
 
   const getSendTooltip = () => {
+    if (!runners.some((runner) => runner.connected)) {
+      return "Connect a Runner to select an agent and send messages.";
+    }
     if (!selectedRunnerConnected) {
       return "Runner is offline";
     }
