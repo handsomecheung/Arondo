@@ -112,7 +112,7 @@ for (const failure of ['http-error', 'invalid-choice'] as const) {
 test('keeps the previous agy variant when Jev fails', async () => {
   status = 500;
   const result = await resolveAgentType('antigravity', ['agy'], {
-    model: 'Gemini 4 Argon (Medium)', prompt: 'Continue',
+    model: 'Gemini 4 Argon', prompt: 'Continue',
     previousRun: { agentType: 'antigravity', model: 'Gemini 4 Argon (Low)' },
   });
   expect(result.model).toBe('Gemini 4 Argon (Low)');
@@ -233,11 +233,11 @@ test('manual OpenCode routes configured non-Go variants and preserves the varian
     const config = getDefaultAgentModels();
     config.opencode = { availableModels: ['custom/model#low', 'custom/model#high'] };
     await updateAppSettings({ agentModels: config });
-    const result = await resolveAgentType('opencode', [], { model: 'custom/model#low', prompt: 'Review' });
+    const result = await resolveAgentType('opencode', [], { model: 'custom/model', prompt: 'Review' });
     expect(result.model).toBe('custom/model#high');
     expect(getAgent('opencode').getCommand({ ...result, prompt: 'Review', repoPath: '/tmp' })).toContain('--model "custom/model#high"');
     status = 500;
-    const fallback = await resolveAgentType('opencode', [], { model: 'custom/model#low', prompt: 'Continue', previousRun: result });
+    const fallback = await resolveAgentType('opencode', [], { model: 'custom/model', prompt: 'Continue', previousRun: result });
     expect(fallback.model).toBe('custom/model#high');
   } finally {
     await updateAppSettings({ agentModels: before.agentModels });
@@ -274,3 +274,40 @@ test('effort context includes task history and excludes detached and deleted mes
     await deleteSession(session.id);
   }
 });
+
+test('does not dynamically route thinking effort when model and effort are explicitly selected', async () => {
+  selectedEffort = 'high';
+
+  const codex = await resolveAgentType('codex', ['codex'], {
+    model: 'gpt-6-sol low',
+    prompt: 'Investigate this complex concurrency failure',
+  });
+  expect(codex).toMatchObject({ model: 'gpt-6-sol', effort: 'low' });
+
+  const claude = await resolveAgentType('claude', ['claude'], {
+    model: 'opus low',
+    prompt: 'Refactor the entire authentication module',
+  });
+  expect(claude).toMatchObject({ model: 'opus', effort: 'low' });
+
+  const pi = await resolveAgentType('pi', ['pi'], {
+    model: 'litellm/balanced-model low',
+    prompt: 'Debug memory corruption across modules',
+  });
+  expect(pi).toMatchObject({ model: 'litellm/balanced-model', effort: 'low' });
+
+  const opencode = await resolveAgentType('opencode', ['opencode'], {
+    model: 'opencode-go/minimax-m3#none',
+    prompt: 'Design a distributed consensus engine',
+  });
+  expect(opencode.model).toBe('opencode-go/minimax-m3#none');
+
+  const antigravity = await resolveAgentType('antigravity', ['agy'], {
+    model: 'Gemini 4 Argon (Low)',
+    prompt: 'Review and rewrite the compiler backend',
+  });
+  expect(antigravity.model).toBe('Gemini 4 Argon (Low)');
+
+  expect(payloads).toHaveLength(0);
+});
+

@@ -24,6 +24,11 @@ export function getModelFamily(agent: ConcreteAgentType, model?: string): string
   return model;
 }
 
+export function hasExplicitEffort(agent: ConcreteAgentType, model?: string): boolean {
+  const trimmed = model?.trim();
+  return Boolean(trimmed && getModelFamily(agent, trimmed) !== trimmed);
+}
+
 function nativeEfforts(agent: ConcreteAgentType, model: string): AutoModelEffort[] {
   if (agent === "codex") {
     if (CODEX_EFFORT_MODELS.has(model)) {

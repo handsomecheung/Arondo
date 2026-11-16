@@ -7,7 +7,7 @@ import { PiAgent } from "./pi";
 import { getAgyQuotaGroupForModel, getConfiguredDefaultModel, getModelOptionsForAgent, isAgentQuotaExhausted, isOpencodeGoModel, selectAgent, type AgyQuotaGroup, type OpencodeQuotaRef } from "../autoagent";
 import { routeModel, type AutoModelEffort, type AutoModelOption } from "../llm/automodel";
 import { getAgentModelsConfig } from "../store";
-import { getModelFamily, splitCodexModel } from "../llm/automodel/effort-options";
+import { getModelFamily, hasExplicitEffort, splitCodexModel } from "../llm/automodel/effort-options";
 import { isAutomodelEnabled } from "../llm/config";
 
 export type ConcreteAgentType = "antigravity" | "claude" | "codex" | "opencode" | "pi";
@@ -71,7 +71,7 @@ interface ResolveAgentOptions {
  * Resolves "auto" to a concrete AgentType by running the quota-based selection
  * algorithm against the agents installed on the given runner.
  * Returns null when Auto Mode has no eligible choice.
- * Explicit agents keep their model family and can route effort only.
+ * Explicit agents keep their model family and route effort only when effort is not explicitly specified.
  */
 export function resolveAgentType(
   agentType: ConcreteAgentType,
@@ -91,10 +91,18 @@ export async function resolveAgentType(
   const agentModels = await getAgentModelsConfig();
   if (agentType !== "auto") {
     const concrete = agentType as ConcreteAgentType;
-    const configured = options.model?.trim() || getConfiguredDefaultModel(concrete, undefined, agentModels);
+    const explicitModel = options.model?.trim();
+    const configured = explicitModel || getConfiguredDefaultModel(concrete, undefined, agentModels);
     const parsed: { model?: string; effort?: AutoModelEffort } = configured && (concrete === "claude" || concrete === "codex" || concrete === "pi")
       ? splitCodexModel(configured)
       : { model: configured };
+    if (hasExplicitEffort(concrete, explicitModel)) {
+      return {
+        agentType: concrete,
+        model: parsed.model,
+        effort: parsed.effort,
+      };
+    }
     return routeSelectedAgent({
       agentType: concrete,
       model: parsed.model,
