@@ -706,7 +706,7 @@ export default function RunnersPage() {
                           }}
                         >
                           <span>Host: {r.hostname}</span>
-                          {r.ip && <span>IP: {r.ip}</span>}
+                          <span>Version: {r.version || "unknown"}</span>
                           {(r.connectedAt || r.lastSeenAt) && (
                             <span style={{ color: "var(--text-muted)" }}>
                               {r.connected ? "Connected: " : "Last connected: "}
