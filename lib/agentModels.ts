@@ -91,6 +91,10 @@ export const DEFAULT_AGENT_MODELS: AgentModelsConfig & { opencode: OpencodeModel
         "Gemini 3.8 Flash (High)",
         "Gemini 3.8 Flash (Medium)",
         "Gemini 3.8 Flash (Low)",
+        "Gemini 4 Hydrogen (High)",
+        "Gemini 4 Hydrogen (XHigh)",
+        "Gemini 4 Hydrogen (Medium)",
+        "Gemini 4 Hydrogen (Low)",
       ],
     },
     other: {
@@ -111,6 +115,7 @@ export const DEFAULT_AGENT_MODELS: AgentModelsConfig & { opencode: OpencodeModel
         "Gemini 4 Argon (High) # Best for complex tasks with deep reasoning in Gemini 4",
         "Gemini 4 Argon (Medium) # Default recommended Argon model",
         "Gemini 4 Argon (Low) # Fast and lightweight for simple requests",
+        "Orchestrator (Argon)",
       ],
     },
   },

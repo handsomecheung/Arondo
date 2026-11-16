@@ -408,7 +408,7 @@ export default function AgentModelsManager({ initialConfig, onSaved, onCancel }:
               (k, v) => handleChange("antigravityGemini", k, v),
               () => handleResetAgyGroup("gemini"),
               "e.g. Gemini 3.8 Flash (Medium)",
-              "Gemini 3.8 Flash (High)\nGemini 3.8 Flash (Medium)\nGemini 3.8 Flash (Low)",
+              "Gemini 3.8 Flash (High)\nGemini 3.8 Flash (Medium)\nGemini 3.8 Flash (Low)\nGemini 4 Hydrogen (High)\nGemini 4 Hydrogen (XHigh)\nGemini 4 Hydrogen (Medium)\nGemini 4 Hydrogen (Low)",
               "agy-gemini",
             )}
             {renderGroupCard(
@@ -428,7 +428,7 @@ export default function AgentModelsManager({ initialConfig, onSaved, onCancel }:
               (k, v) => handleChange("antigravityArgon", k, v),
               () => handleResetAgyGroup("argon"),
               "e.g. Gemini 4 Argon (Medium)",
-              "Gemini 4 Argon (High) # Best for complex tasks with deep reasoning in Gemini 4\nGemini 4 Argon (Medium) # Default recommended Argon model\nGemini 4 Argon (Low) # Fast and lightweight for simple requests",
+              "Gemini 4 Argon (High) # Best for complex tasks with deep reasoning in Gemini 4\nGemini 4 Argon (Medium) # Default recommended Argon model\nGemini 4 Argon (Low) # Fast and lightweight for simple requests\nOrchestrator (Argon)",
               "agy-argon",
             )}
           </div>
