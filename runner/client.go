@@ -145,7 +145,7 @@ func (c *Client) sendRegister() error {
 	hostname, _ := os.Hostname()
 
 	payload := map[string]any{
-		"version":  "0.3.17",
+		"version":  "0.3.18",
 		"hostname": hostname,
 		"os":       runtime.GOOS,
 		"arch":     runtime.GOARCH,
