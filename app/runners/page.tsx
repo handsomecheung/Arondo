@@ -65,13 +65,10 @@ interface AgentsQuota {
   pi?: PiQuota | null;
 }
 
-// OpenCode only reports subscription quota for a Go plan. A Console account
-// without Go, an installation billed by provider API keys, and a runner that
-// could not read its usage all have no Go usage windows to show.
 function opencodeQuotaUnavailableMessage(quota: NonNullable<AgentsQuota["opencode"]>): string | undefined {
-  if (quota.IsAPIKey) return "Quota is unavailable when using API Key billing.";
-  if (quota.Plan === "Free") return "No OpenCode Go subscription. Usage quota is unavailable.";
-  if (quota.Plan === "Unknown") return "OpenCode usage quota could not be read on this runner.";
+  if (quota.IsAPIKey || quota.Plan === "Free" || quota.Plan === "Unknown" || getQuotaRows(quota, "opencode", "").length === 0) {
+    return "OpenCode Go quota is unavailable. Sign in to your OpenCode Console account with an active Go subscription using `opencode auth login opencode` on this runner, then refresh. Configuring an OpenCode Go API key alone is not sufficient.";
+  }
   return undefined;
 }
 

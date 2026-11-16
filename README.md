@@ -144,6 +144,8 @@ The model is saved on the session and takes precedence over the admin default on
 
 For signed-in OpenCode v2 installations, Arondo reads Go quota through `opencode api GET /api/experimental/usage/limits` on the Runner. The Runners page and Agent dropdown show the reported 5-hour, weekly, and monthly remaining quota and reset times. Initial discovery, stale refresh, and manual refresh use the same quota pipeline as other agents.
 
+When OpenCode quota is unavailable, the Runners page shows a login hint. On that Runner, run `opencode auth login opencode`, sign in to an OpenCode Console account with an active Go subscription, then refresh the quota. Configuring only an `opencode-go` API key does not provide the Console authentication required by the usage endpoint.
+
 Arondo records `Account` as `data.workspace.id` and normalizes `Plan` to the literal `"Go"` only when `data.go` is present. This labels Go-family subscription quota; it does not identify the Go, Go Plus, or Go Teams tier. The reported usage percentages are converted to remaining ratios, and reset timestamps are converted from milliseconds to seconds.
 
 Installations without an OpenCode Console account are still reported instead of being left blank. The Runner reads the stored Console credential to tell the billing modes apart:
