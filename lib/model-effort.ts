@@ -47,7 +47,11 @@ export function getEffectiveModel(agent: string, model: string | undefined, conf
   if (model) return model;
   if (!isEffortAgent(agent)) return "";
   const defaults = config ?? DEFAULT_AGENT_MODELS;
-  if (agent === "antigravity") return parseModelLine(defaults.antigravity?.gemini?.defaultModel) ?? "";
+  if (agent === "antigravity") {
+    const model = parseModelLine(defaults.antigravity?.gemini?.defaultModel) ?? "";
+    const family = model && getModelFamily(agent, model);
+    return family && getEffortChoices(agent, family, config).length > 1 ? family : model;
+  }
   if (agent === "opencode") return parseOpencodeModelLine(defaults.opencode?.defaultModel) ?? "";
   return parseModelLine(defaults[agent]?.defaultModel) ?? "";
 }
@@ -72,15 +76,16 @@ export function getEffortChoices(agent: EffortAgent, model: string, config?: Age
       : option.effort ? `${family} ${option.effort}` : family,
   }));
   if (agent === "antigravity") {
-    return choices.sort((a, b) => ANTIGRAVITY_EFFORT_ORDER.indexOf(a.label.toLowerCase()) - ANTIGRAVITY_EFFORT_ORDER.indexOf(b.label.toLowerCase()));
+    choices.sort((a, b) => ANTIGRAVITY_EFFORT_ORDER.indexOf(a.label.toLowerCase()) - ANTIGRAVITY_EFFORT_ORDER.indexOf(b.label.toLowerCase()));
   }
-  if (choices.length === 0) return choices;
-  return [{ label: "Default", model: family }, ...choices];
+  if (choices.length === 0 || (agent === "antigravity" && choices.length < 2)) return choices;
+  return [{ label: "Auto", model: family }, ...choices];
 }
 
-/** Full model string to submit when a family is picked; Antigravity defaults to Medium. */
+/** Full model string to submit when a family is picked; Antigravity defaults to Auto, or Medium when the family has a single variant. */
 export function getFamilyDefaultModel(agent: string, family: string, config?: AgentModelsConfig | null): string {
   if (agent !== "antigravity") return family;
   const choices = getEffortChoices(agent, family, config);
+  if (choices.length > 1) return family;
   return (choices.find((choice) => choice.label === "Medium") ?? choices[0])?.model ?? family;
 }

@@ -28,13 +28,15 @@ test.describe('New Session Model Select UI & Logic', () => {
     expect(result.agy.hasInlineCommentExcluded).toBe(true);
     expect(result.agy.hasVariantInModelList).toBe(false);
     expect(result.agy.effort).toEqual([
+      { label: 'Auto', selected: false },
       { label: 'Low', selected: false },
       { label: 'Medium', selected: true },
       { label: 'High', selected: false },
     ]);
     expect(result.agy.effortWithoutModel).toEqual([
+      { label: 'Auto', selected: true },
       { label: 'Low', selected: false },
-      { label: 'Medium', selected: true },
+      { label: 'Medium', selected: false },
       { label: 'High', selected: false },
     ]);
 
@@ -59,7 +61,7 @@ test.describe('New Session Model Select UI & Logic', () => {
 
     // 5. Effort row under Model
     expect(result.effort.claude).toEqual([
-      { label: 'Default', selected: true },
+      { label: 'Auto', selected: true },
       { label: 'low', selected: false },
       { label: 'medium', selected: false },
       { label: 'high', selected: false },
@@ -67,7 +69,7 @@ test.describe('New Session Model Select UI & Logic', () => {
       { label: 'max', selected: false },
     ]);
     expect(result.effort.opencode).toEqual([
-      { label: 'Default', selected: true },
+      { label: 'Auto', selected: true },
       { label: 'none', selected: false },
       { label: 'thinking', selected: false },
     ]);
@@ -78,14 +80,14 @@ test.describe('New Session Model Select UI & Logic', () => {
     expect(result.effort.headerAgentRows).toEqual(['Auto', 'Antigravity CLI', 'Claude Code', 'Codex', 'OpenCode', 'Pi']);
   });
 
-  test('effort choices split model names and default to Medium for Antigravity', () => {
+  test('effort choices split model names and default to Auto for Antigravity', () => {
     expect(modelFamilyOf('antigravity', 'Gemini 4 Argon (High)')).toBe('Gemini 4 Argon');
-    expect(getFamilyDefaultModel('antigravity', 'Gemini 4 Argon')).toBe('Gemini 4 Argon (Medium)');
+    expect(getFamilyDefaultModel('antigravity', 'Gemini 4 Argon')).toBe('Gemini 4 Argon');
     expect(getFamilyDefaultModel('antigravity', 'GPT-OSS 120B')).toBe('GPT-OSS 120B (Medium)');
     expect(getFamilyDefaultModel('claude', 'opus')).toBe('opus');
     expect(getEffectiveModel('claude', undefined)).toBe('opus');
     expect(getEffectiveModel('codex', '')).toBe('gpt-6-sol');
-    expect(getEffectiveModel('antigravity', undefined)).toBe('Gemini 3.8 Flash (Medium)');
+    expect(getEffectiveModel('antigravity', undefined)).toBe('Gemini 3.8 Flash');
     expect(getEffectiveModel('claude', 'sonnet high')).toBe('sonnet high');
     expect(getEffectiveModel('auto', undefined)).toBe('');
     expect(getEffortChoices('antigravity', 'GPT-OSS 120B (Medium)')).toHaveLength(1);
@@ -118,7 +120,7 @@ test.describe('New Session Model Select UI & Logic', () => {
       config[agent] = { defaultModel: 'custom-model high', availableModels: ['custom-model low', 'custom-model high # Expensive'] };
       const model = getEffectiveModel(agent, undefined, config);
       expect(getEffortChoices(agent, model, config)).toEqual([
-        { label: 'Default', model: 'custom-model' },
+        { label: 'Auto', model: 'custom-model' },
         { label: 'low', model: 'custom-model low' },
         { label: 'high', model: 'custom-model high' },
       ]);

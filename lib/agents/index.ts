@@ -7,7 +7,7 @@ import { PiAgent } from "./pi";
 import { getAgyQuotaGroupForModel, getConfiguredDefaultModel, getModelOptionsForAgent, isAgentQuotaExhausted, isOpencodeGoModel, selectAgent, type AgyQuotaGroup, type OpencodeQuotaRef } from "../autoagent";
 import { routeModel, type AutoModelEffort, type AutoModelOption } from "../llm/automodel";
 import { getAgentModelsConfig } from "../store";
-import { getModelFamily, hasExplicitEffort, splitCodexModel } from "../llm/automodel/effort-options";
+import { getEffortOptions, getModelFamily, hasExplicitEffort, splitCodexModel } from "../llm/automodel/effort-options";
 import { isAutomodelEnabled } from "../llm/config";
 
 export type ConcreteAgentType = "antigravity" | "claude" | "codex" | "opencode" | "pi";
@@ -175,13 +175,23 @@ async function routeSelectedAgent(
       writeLog: options.automodelLog,
     })
     : null;
-  if (!routed) return selected;
-  return {
-    agentType: selected.agentType,
-    model: routed.model ?? selected.model,
-    effort: routed.effort ?? selected.effort,
-    agyQuotaGroup: selected.agyQuotaGroup,
-  };
+  const result = routed
+    ? {
+      agentType: selected.agentType,
+      model: routed.model ?? selected.model,
+      effort: routed.effort ?? selected.effort,
+      agyQuotaGroup: selected.agyQuotaGroup,
+    }
+    : selected;
+  return withAntigravityFallbackEffort(result, selected.modelOptions);
+}
+
+// Antigravity encodes effort in the model name, so a bare family is not a runnable model.
+function withAntigravityFallbackEffort(selected: ResolvedAgent, modelOptions?: AutoModelOption[]): ResolvedAgent {
+  if (selected.agentType !== "antigravity" || !selected.model || hasExplicitEffort("antigravity", selected.model)) return selected;
+  const variants = getEffortOptions("antigravity", selected.model, modelOptions ?? []);
+  const fallback = variants.find((option) => /\(Medium\)$/i.test(option.model!)) ?? variants[0];
+  return fallback ? { ...selected, model: fallback.model } : selected;
 }
 
 /**
