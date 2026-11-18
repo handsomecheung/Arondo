@@ -1,8 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -64,6 +68,102 @@ func TestSpawnPipedSeparatesStdoutAndStderr(t *testing.T) {
 	}
 	if got := stderr.String(); got != "err" {
 		t.Fatalf("stderr = %q, want %q", got, "err")
+	}
+}
+
+func TestKillTerminatesDetachedChildProcesses(t *testing.T) {
+	tm := NewTaskManager()
+	done := make(chan int, 1)
+
+	pidFile := filepath.Join(t.TempDir(), "child.pid")
+	cmdScript := fmt.Sprintf(`python3 -c '
+import subprocess, time, sys
+p = subprocess.Popen(["sleep", "30"], start_new_session=True)
+with open(%q, "w") as f:
+    f.write(str(p.pid))
+time.sleep(30)
+'`, pidFile)
+
+	_, err := tm.SpawnPiped(SpawnPipedOptions{
+		TaskID:  "test-kill-detached",
+		Command: "bash",
+		Args:    []string{"-c", cmdScript},
+		OnExit: func(exitCode int) {
+			done <- exitCode
+		},
+	})
+	if err != nil {
+		t.Fatalf("SpawnPiped failed: %v", err)
+	}
+
+	var childPid int
+	for i := 0; i < 50; i++ {
+		time.Sleep(50 * time.Millisecond)
+		data, err := os.ReadFile(pidFile)
+		if err == nil && len(data) > 0 {
+			childPid, _ = strconv.Atoi(strings.TrimSpace(string(data)))
+			if childPid > 0 {
+				break
+			}
+		}
+	}
+	if childPid <= 0 {
+		t.Fatal("failed to get child pid from spawned process")
+	}
+
+	if err := syscall.Kill(childPid, 0); err != nil {
+		t.Fatalf("child process %d should be running initially", childPid)
+	}
+
+	if err := tm.Kill("test-kill-detached", syscall.SIGTERM); err != nil {
+		t.Fatalf("Kill returned error: %v", err)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for task to exit after Kill")
+	}
+
+	time.Sleep(200 * time.Millisecond)
+	if err := syscall.Kill(childPid, 0); err == nil {
+		_ = syscall.Kill(childPid, syscall.SIGKILL)
+		t.Fatalf("detached child process %d is still running after task kill", childPid)
+	}
+}
+
+func TestKillEscalatesToSigkillWhenSigtermIgnored(t *testing.T) {
+	tm := NewTaskManager()
+	done := make(chan int, 1)
+
+	cmdScript := `python3 -c '
+import signal, time
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+time.sleep(30)
+'`
+
+	_, err := tm.SpawnPiped(SpawnPipedOptions{
+		TaskID:  "test-kill-ignored",
+		Command: "bash",
+		Args:    []string{"-c", cmdScript},
+		OnExit: func(exitCode int) {
+			done <- exitCode
+		},
+	})
+	if err != nil {
+		t.Fatalf("SpawnPiped failed: %v", err)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	if err := tm.Kill("test-kill-ignored", syscall.SIGTERM); err != nil {
+		t.Fatalf("Kill returned error: %v", err)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for task to be killed by escalated SIGKILL")
 	}
 }
 

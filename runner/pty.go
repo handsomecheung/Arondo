@@ -1,10 +1,15 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -492,7 +497,43 @@ func (tm *TaskManager) Kill(taskID string, signal syscall.Signal) error {
 	if t.cmd.Process == nil {
 		return fmt.Errorf("task %s process not started", taskID)
 	}
-	return killTaskProcess(t.cmd, signal)
+
+	rootPid := t.cmd.Process.Pid
+	descendants := getDescendantPIDs(rootPid)
+
+	if err := killTaskProcess(t.cmd, signal); err != nil {
+		return err
+	}
+
+	if signal != syscall.SIGKILL {
+		procDoneC := t.procDoneC
+		pidsToWatch := append(descendants, rootPid)
+		go func() {
+			select {
+			case <-procDoneC:
+				time.Sleep(100 * time.Millisecond)
+			case <-time.After(1 * time.Second):
+			}
+
+			t.mu.Lock()
+			cmd := t.cmd
+			t.mu.Unlock()
+			if cmd != nil && cmd.Process != nil {
+				_ = killTaskProcess(cmd, syscall.SIGKILL)
+			}
+			for _, pid := range pidsToWatch {
+				if err := syscall.Kill(pid, 0); err == nil {
+					log.Printf("[task-manager] escalating task %s process %d to SIGKILL", taskID, pid)
+					if pgid, pErr := syscall.Getpgid(pid); pErr == nil && pgid > 0 {
+						_ = syscall.Kill(-pgid, syscall.SIGKILL)
+					}
+					_ = syscall.Kill(pid, syscall.SIGKILL)
+				}
+			}
+		}()
+	}
+
+	return nil
 }
 
 func (tm *TaskManager) GetBuffer(taskID string) ([]byte, error) {
@@ -536,15 +577,111 @@ func (tm *TaskManager) Cleanup(taskID string) {
 	}
 }
 
-// killTaskProcess sends the specified signal to the process group of the command if possible,
-// falling back to the process itself.
+// getDescendantPIDs returns all descendant process IDs of rootPid.
+func getDescendantPIDs(rootPid int) []int {
+	if rootPid <= 0 {
+		return nil
+	}
+
+	parentToChildren := make(map[int][]int)
+
+	// Primary method: read /proc (Linux)
+	if entries, err := os.ReadDir("/proc"); err == nil {
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			pid, err := strconv.Atoi(entry.Name())
+			if err != nil {
+				continue
+			}
+
+			data, err := os.ReadFile(filepath.Join("/proc", entry.Name(), "stat"))
+			if err != nil {
+				continue
+			}
+
+			statStr := string(data)
+			lastParen := strings.LastIndex(statStr, ")")
+			if lastParen == -1 || lastParen+2 >= len(statStr) {
+				continue
+			}
+
+			fields := strings.Fields(statStr[lastParen+2:])
+			if len(fields) < 2 {
+				continue
+			}
+
+			ppid, err := strconv.Atoi(fields[1])
+			if err != nil {
+				continue
+			}
+
+			parentToChildren[ppid] = append(parentToChildren[ppid], pid)
+		}
+	} else {
+		// Fallback for non-Linux platforms (e.g. Darwin/macOS)
+		out, err := execCommand("ps", "-A", "-o", "pid=,ppid=").Output()
+		if err == nil {
+			for _, line := range strings.Split(string(out), "\n") {
+				fields := strings.Fields(line)
+				if len(fields) >= 2 {
+					pid, err1 := strconv.Atoi(fields[0])
+					ppid, err2 := strconv.Atoi(fields[1])
+					if err1 == nil && err2 == nil {
+						parentToChildren[ppid] = append(parentToChildren[ppid], pid)
+					}
+				}
+			}
+		}
+	}
+
+	var descendants []int
+	queue := []int{rootPid}
+	visited := map[int]bool{rootPid: true}
+
+	for len(queue) > 0 {
+		curr := queue[0]
+		queue = queue[1:]
+
+		for _, child := range parentToChildren[curr] {
+			if !visited[child] {
+				visited[child] = true
+				descendants = append(descendants, child)
+				queue = append(queue, child)
+			}
+		}
+	}
+
+	return descendants
+}
+
+// killTaskProcess sends the specified signal to the command, its process group,
+// and all descendant processes in the process tree.
 func killTaskProcess(cmd *exec.Cmd, sig syscall.Signal) error {
 	if cmd == nil || cmd.Process == nil {
 		return fmt.Errorf("process not started")
 	}
-	pgid, err := syscall.Getpgid(cmd.Process.Pid)
-	if err == nil {
-		return syscall.Kill(-pgid, sig)
+
+	rootPid := cmd.Process.Pid
+	descendants := getDescendantPIDs(rootPid)
+
+	// 1. Signal all descendant processes and their respective process groups
+	for _, childPid := range descendants {
+		if childPgid, err := syscall.Getpgid(childPid); err == nil && childPgid > 0 {
+			_ = syscall.Kill(-childPgid, sig)
+		}
+		_ = syscall.Kill(childPid, sig)
 	}
-	return cmd.Process.Signal(sig)
+
+	// 2. Signal the main process group
+	if pgid, err := syscall.Getpgid(rootPid); err == nil && pgid > 0 {
+		_ = syscall.Kill(-pgid, sig)
+	}
+
+	// 3. Signal the main process directly
+	if err := cmd.Process.Signal(sig); err != nil && !errors.Is(err, os.ErrProcessDone) && err != syscall.ESRCH {
+		return err
+	}
+	return nil
 }

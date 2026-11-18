@@ -930,7 +930,15 @@ class RunnerManager {
   }
 
   getTaskIdByPtyKey(sessionId: string, messageId: string): string | undefined {
-    return this.ptyKeyToTaskId.get(`${sessionId}:${messageId}`);
+    let taskId = this.ptyKeyToTaskId.get(`${sessionId}:${messageId}`);
+    if (!taskId) {
+      for (const [id, ctx] of this.tasks) {
+        if (ctx.messageId === messageId && !ctx.completedAt) {
+          return id;
+        }
+      }
+    }
+    return taskId;
   }
 
   getRunnerForTask(taskId: string): string | undefined {
@@ -951,7 +959,15 @@ class RunnerManager {
   }
 
   async killTask(sessionId: string, messageId: string): Promise<boolean> {
-    const taskId = this.ptyKeyToTaskId.get(`${sessionId}:${messageId}`);
+    let taskId = this.ptyKeyToTaskId.get(`${sessionId}:${messageId}`);
+    if (!taskId) {
+      for (const [id, ctx] of this.tasks) {
+        if (ctx.messageId === messageId && !ctx.completedAt) {
+          taskId = id;
+          break;
+        }
+      }
+    }
     if (!taskId) return false;
 
     const ctx = this.tasks.get(taskId);
@@ -978,6 +994,20 @@ class RunnerManager {
         taskId,
         signal: "SIGTERM",
       });
+
+      setTimeout(() => {
+        const currentCtx = this.tasks.get(taskId);
+        if (currentCtx && !currentCtx.completedAt) {
+          const currentRunnerId = this.resolveRunnerId(currentCtx.runnerId);
+          if (currentRunnerId) {
+            this.sendRequest(currentRunnerId, "exec.cancel", {
+              taskId,
+              signal: "SIGKILL",
+            }).catch(() => {});
+          }
+        }
+      }, 2500);
+
       return true;
     } catch (err) {
       console.error(`[runner-manager] failed to kill task ${taskId}:`, err);
