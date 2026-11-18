@@ -15,15 +15,17 @@ interface Props {
   style?: CSSProperties;
 }
 
-export function availableAgentItems(isAgentAvailable: (command: string) => boolean) {
+export function availableAgentItems(isAgentAvailable: (command: string) => boolean, quotas?: ModelQuotas | null) {
+  // Same order as the Runners page: API Key billed agents come last. Pi is always API Key billed.
   const agents = [
-    { value: "antigravity", label: "Antigravity CLI", cmd: "agy" },
-    { value: "claude", label: "Claude Code", cmd: "claude" },
-    { value: "codex", label: "Codex", cmd: "codex" },
-    { value: "opencode", label: "OpenCode", cmd: "opencode" },
-    { value: "pi", label: "Pi", cmd: "pi" },
-  ].filter(({ cmd }) => isAgentAvailable(cmd));
-  return [...(agents.length > 1 ? [{ value: "auto", label: "Auto" }] : []), ...agents];
+    { value: "claude", label: "Claude Code", cmd: "claude", isApiKey: Boolean(quotas?.claude?.IsAPIKey) },
+    { value: "antigravity", label: "Antigravity CLI", cmd: "agy", isApiKey: Boolean(quotas?.antigravity?.IsAPIKey) },
+    { value: "opencode", label: "OpenCode", cmd: "opencode", isApiKey: Boolean(quotas?.opencode?.IsAPIKey) },
+    { value: "codex", label: "Codex", cmd: "codex", isApiKey: Boolean(quotas?.codex?.IsAPIKey) },
+    { value: "pi", label: "Pi", cmd: "pi", isApiKey: true },
+  ].filter(({ cmd }) => isAgentAvailable(cmd))
+    .sort((x, y) => Number(x.isApiKey) - Number(y.isApiKey));
+  return [...(agents.length > 1 ? [{ value: "auto", label: "Auto" }] : []), ...agents.map(({ value, label }) => ({ value, label }))];
 }
 
 export function AgentOptionQuota({ value, quotas, loading = false }: { value: string; quotas: ModelQuotas | null; loading?: boolean }) {
@@ -54,7 +56,7 @@ export function AgentOptionQuota({ value, quotas, loading = false }: { value: st
 export function AgentDropdownOptions({ agentType, isAgentAvailable, onSelect, quotas, loading = false, className = "new-session-dropdown-menu", style }: Omit<Props, "runnerId"> & { quotas: ModelQuotas | null; loading?: boolean }) {
   return (
     <div className={`custom-dropdown-menu ${className}`} style={style}>
-      {availableAgentItems(isAgentAvailable).map(({ value, label }) => (
+      {availableAgentItems(isAgentAvailable, quotas).map(({ value, label }) => (
         <button
           key={value}
           type="button"

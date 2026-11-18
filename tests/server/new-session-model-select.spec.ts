@@ -77,7 +77,7 @@ test.describe('New Session Model Select UI & Logic', () => {
     // 6. Session header dropdown lists agents only; model and effort live in the popup
     expect(result.effort.headerHasMinimaxFamily).toBe(false);
     expect(result.effort.header).toEqual([]);
-    expect(result.effort.headerAgentRows).toEqual(['Auto', 'Antigravity CLI', 'Claude Code', 'Codex', 'OpenCode', 'Pi']);
+    expect(result.effort.headerAgentRows).toEqual(['Auto', 'Claude Code', 'Antigravity CLI', 'OpenCode', 'Codex', 'Pi']);
   });
 
   test('effort choices split model names and default to Auto for Antigravity', () => {

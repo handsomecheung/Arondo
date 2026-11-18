@@ -21,7 +21,7 @@ export default function SessionAgentSwitchMenu({ runnerId, agentType, selectedMo
 }) {
   const [modelAgent, setModelAgent] = useState<string | null>(null);
   const { quotas, loading } = useAgentQuotas(runnerId);
-  const items = availableAgentItems(isAgentAvailable);
+  const items = availableAgentItems(isAgentAvailable, quotas);
   const modelAgentLabel = items.find((item) => item.value === modelAgent)?.label ?? "";
   const modelAgentActive = modelAgent === agentType;
   const currentModel = getEffectiveModel(modelAgent ?? agentType, modelAgentActive ? selectedModel : undefined, config);
