@@ -1,2 +1,6 @@
 /arondo-runner
+/arondo-runner.previous
+/arondo-runner.update.lock
+/.arondo-runner-update-*
+/.arondo-runner-backup-*
 /runner

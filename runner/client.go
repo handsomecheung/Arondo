@@ -82,6 +82,7 @@ func (c *Client) Run() {
 }
 
 func (c *Client) Stop() {
+	c.handler.updater.cancel()
 	c.stopOnce.Do(func() {
 		close(c.done)
 	})
@@ -296,7 +297,6 @@ func (c *Client) readLoop() {
 		c.handler.HandleMessage(&msg)
 	}
 }
-
 
 func (c *Client) heartbeatLoop() {
 	ticker := time.NewTicker(pingPeriod)

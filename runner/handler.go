@@ -9,12 +9,15 @@ import (
 type Handler struct {
 	client      *Client
 	taskManager *TaskManager
+	updater     *runnerUpdater
+	autoUpdate  bool
 }
 
 func NewHandler(client *Client) *Handler {
 	return &Handler{
 		client:      client,
 		taskManager: NewTaskManager(),
+		updater:     newRunnerUpdater(),
 	}
 }
 
@@ -30,6 +33,13 @@ func (h *Handler) HandleMessage(msg *Message) {
 }
 
 func (h *Handler) handleRequest(msg *Message) {
+	if msg.Method != "runner.update" && msg.Method != "runner.shutdown" {
+		if err := h.taskManager.activity.begin(); err != nil {
+			h.sendError(msg.ID, "RUNNER_UPDATING", err.Error())
+			return
+		}
+		defer h.taskManager.activity.end()
+	}
 	switch msg.Method {
 	case "fs.list":
 		h.handleFsList(msg)
@@ -94,6 +104,7 @@ func (h *Handler) handleRunnerShutdown(msg *Message) {
 		payload.Reason = "Shutdown requested by server."
 	}
 	log.Printf("shutdown requested: %s", payload.Reason)
+	h.updater.cancel()
 	h.sendResponse(msg.ID, OkResponse{OK: true})
 	go func() {
 		time.Sleep(50 * time.Millisecond)

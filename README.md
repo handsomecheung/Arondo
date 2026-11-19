@@ -563,6 +563,8 @@ Flags:
   --server string     Server WebSocket URL (default "ws://localhost:3251/runner")
   --token string      Runner access token (optional, can also set ARONDO_RUNNER_TOKEN)
   --check-connection  Check server authentication and WebSocket Ping/Pong, then exit
+  --version           Print the runner version and exit
+  --auto-update       Automatically apply runner updates (default false; log notices only)
 ```
 
 `--check-connection` uses the same server URL and token options as normal startup, including `ARONDO_RUNNER_TOKEN` and the `--token` override. It makes one authenticated WebSocket connection and verifies a matching Pong within a total 10-second timeout covering connection setup and Ping/Pong. It logs the result and exits with code `0` on success or `1` on failure, without retrying. It sends no Runner registration or task messages, so it does not bind an unused token, create a Runner record, or disconnect an existing Runner using the same token.
@@ -581,7 +583,19 @@ https://github.com/handsomecheung/Arondo/releases/download/v${version}/arondo-ru
 
 The supported placeholders are `${version}` (the server's `package.json` version, without a leading `v`), `${os}` (the connecting runner's OS, with `darwin` mapped to `macos`), and `${arch}` (the runner's architecture, such as `amd64` or `arm64`). Templates must use an absolute HTTP or HTTPS URL. Save applies edits; Cancel discards them, and **Use default URL** restores the default in the editor.
 
-On registration, the server compares semantic versions and sends `runner.update` with `{ version, downloadUrl }` when the runner is older. The runner logs the version and URL to prompt a manual update; it does not download, replace files, or restart. Template edits apply to subsequent registrations. Equal or newer versions, and missing or invalid versions, receive no update notice.
+On registration, the server compares semantic versions and sends `runner.update` with `{ version, downloadUrl }` when the runner is older. Template edits apply to subsequent registrations. Equal or newer versions, and missing or invalid versions, receive no update instruction.
+
+Automatic updating is disabled by default. Without `--auto-update`, or with `--auto-update=false`, the runner only logs the target version and download URL when it receives an update instruction. Enable automatic updating explicitly at startup:
+
+```bash
+arondo-runner --server wss://your-server/runner --auto-update=true
+```
+
+With `--auto-update=true`, the runner downloads the binary into a temporary file beside its executable, checks that `--version` matches the requested version, and runs the new binary with its original arguments and environment plus `--check-connection`. Downloading and preflight leave the current runner connected and accepting work. Downloads time out after five minutes; the version and connection-check subprocesses have five- and fifteen-second limits respectively. The download request does not include the runner token.
+
+After preflight succeeds, the runner waits until all agents, scripts, and interactive terminals have finished, including their exit notifications and in-progress script restarts. It atomically stops accepting new task launches, backs up the existing binary as `<executable>.previous`, replaces it with the verified binary, and calls `execve`. The PID, original arguments, environment, and standard input/output/error redirections are preserved. Long-running tasks postpone the update; they are not terminated. Multiple processes sharing an executable serialize replacement using `<executable>.update.lock`.
+
+Download or preflight failure leaves the current runner running and removes the temporary file. If `execve` returns an error, the old binary is restored and task execution resumes on the existing connection. Failed updates can be retried by a later server update instruction; repeated instructions for the same version are limited to one attempt per minute. The previous binary remains available after a successful switch. Automatic rollback after a successful `execve` followed by a crash is not provided. Automatic updates require write access to the executable's directory and support for hard links for the backup; symlinked installations update the executable's resolved target.
 
 `runner/build.sh` embeds the current `package.json` version into the runner. Both local startup scripts (such as `scripts/local/run.runner1.sh`) and tagged release builds use this script, so the same version comparison applies in both environments. When building directly with `go build` or `go run`, supply `-ldflags "-X main.Version=<version>"` to embed the version.
 

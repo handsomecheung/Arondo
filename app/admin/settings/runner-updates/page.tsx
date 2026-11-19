@@ -44,10 +44,12 @@ export default function SettingsPage() {
       <p id="runner-download-url-help" style={{ color: "var(--text-muted)", fontSize: 12 }}>
         Use <code>{"${version}"}</code> for the server version, <code>{"${os}"}</code> for
         the runner OS (linux or macos), and <code>{"${arch}"}</code> for its architecture
-        (amd64 or arm64). Older runners receive a notice when they connect.
+        (amd64 or arm64). Older runners are checked for updates when they connect.
       </p>
       <p style={{ color: "var(--text-muted)", fontSize: 12 }}>
-        Runners currently log the download URL for manual updating.
+        By default, runners only log the update version and download URL. Start a
+        runner with <code>--auto-update=true</code> to enable automatic updates
+        after all scripts, agents, and terminals have exited.
       </p>
       <button type="button" onClick={() => editor.setDraft(DEFAULT_RUNNER_DOWNLOAD_URL)}>
         Use default URL

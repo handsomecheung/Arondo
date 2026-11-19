@@ -45,8 +45,9 @@ type task struct {
 }
 
 type TaskManager struct {
-	tasks map[string]*task
-	mu    sync.RWMutex
+	tasks    map[string]*task
+	mu       sync.RWMutex
+	activity taskActivity
 }
 
 func NewTaskManager() *TaskManager {
@@ -82,6 +83,10 @@ type SpawnPipedOptions struct {
 }
 
 func (tm *TaskManager) Spawn(opts SpawnOptions) (int, error) {
+	if err := tm.activity.begin(); err != nil {
+		return 0, err
+	}
+	defer tm.activity.end()
 	tm.mu.Lock()
 	if t, exists := tm.tasks[opts.TaskID]; exists {
 		fmt.Printf("[task-manager] task %s already exists, cleaning up older task first\n", opts.TaskID)
@@ -123,6 +128,10 @@ func (tm *TaskManager) Spawn(opts SpawnOptions) (int, error) {
 }
 
 func (tm *TaskManager) SpawnPiped(opts SpawnPipedOptions) (int, error) {
+	if err := tm.activity.begin(); err != nil {
+		return 0, err
+	}
+	defer tm.activity.end()
 	tm.mu.Lock()
 	if t, exists := tm.tasks[opts.TaskID]; exists {
 		fmt.Printf("[task-manager] task %s already exists, cleaning up older task first\n", opts.TaskID)
@@ -171,7 +180,9 @@ func (tm *TaskManager) SpawnPiped(opts SpawnPipedOptions) (int, error) {
 		return 0, fmt.Errorf("start: %w", err)
 	}
 
+	tm.activity.retainProcess()
 	go func() {
+		defer tm.activity.end()
 		var wg sync.WaitGroup
 		wg.Add(2)
 		go copyPipe(stdout, opts.OnStdout, &wg)
@@ -242,7 +253,9 @@ func (tm *TaskManager) launchProcess(t *task, cols, rows uint16) error {
 	// Capture per-launch values so the goroutine is not affected by future restarts.
 	procDoneC := t.procDoneC
 
+	tm.activity.retainProcess()
 	go func() {
+		defer tm.activity.end()
 		buf := make([]byte, 4096)
 		for {
 			n, err := ptmx.Read(buf)
@@ -303,6 +316,10 @@ func (tm *TaskManager) launchProcess(t *task, cols, rows uint16) error {
 // command, all within the same task slot. The server never sees an exec.exit
 // for the intermediate kill — only for the eventual exit of the new process.
 func (tm *TaskManager) Restart(taskID, command, workDir string, cols, rows uint16) (int, error) {
+	if err := tm.activity.begin(); err != nil {
+		return 0, err
+	}
+	defer tm.activity.end()
 	tm.mu.RLock()
 	t, ok := tm.tasks[taskID]
 	tm.mu.RUnlock()
@@ -482,6 +499,10 @@ func (tm *TaskManager) ResizePTY(taskID string, cols, rows uint16) error {
 }
 
 func (tm *TaskManager) Kill(taskID string, signal syscall.Signal) error {
+	if err := tm.activity.begin(); err != nil {
+		return err
+	}
+	defer tm.activity.end()
 	tm.mu.RLock()
 	t, ok := tm.tasks[taskID]
 	tm.mu.RUnlock()
@@ -508,7 +529,9 @@ func (tm *TaskManager) Kill(taskID string, signal syscall.Signal) error {
 	if signal != syscall.SIGKILL {
 		procDoneC := t.procDoneC
 		pidsToWatch := append(descendants, rootPid)
+		tm.activity.retainProcess()
 		go func() {
+			defer tm.activity.end()
 			select {
 			case <-procDoneC:
 				time.Sleep(100 * time.Millisecond)

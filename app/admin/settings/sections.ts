@@ -48,6 +48,6 @@ export const adminSettingsSections = [
   {
     slug: "runner-updates",
     title: "Runner Updates",
-    description: "Configure the download URL used in runner update notices.",
+    description: "Configure the runner binary download URL.",
   },
 ] as const;

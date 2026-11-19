@@ -1,6 +1,8 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { execFileSync, spawn } from 'child_process';
 import { once } from 'events';
+import { createServer } from 'http';
+import type { AddressInfo } from 'net';
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
@@ -25,6 +27,10 @@ test('compares semantic versions and resolves platform and repeated URL variable
     .toContain('arondo-runner-linux-amd64');
   expect(getRunnerUpdate({ ...runner, version: '1.0.0-rc.2' }, '1.0.0-rc.10')).not.toBeNull();
   expect(getRunnerUpdate({ ...runner, version: '1.0.0-rc.10' }, '1.0.0')).not.toBeNull();
+  expect(getRunnerUpdate(runner, '0.3.19+build.7')).toEqual({
+    version: '0.3.19+build.7',
+    downloadUrl: 'https://github.com/handsomecheung/Arondo/releases/download/v0.3.19%2Bbuild.7/arondo-runner-macos-arm64',
+  });
   for (const version of ['0.3.19', '0.4.0', '0.3.19+build.1', '', 'invalid']) {
     expect(getRunnerUpdate({ ...runner, version }, '0.3.19')).toBeNull();
   }
@@ -143,21 +149,28 @@ test.describe('Runner update settings and instructions', () => {
     }
   });
 
-  test('the Go runner logs the update URL and remains connected', async ({ request }) => {
+  test('the Go runner keeps its connection when the update download fails', async ({ request }) => {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'arondo-update-notice-'));
     const binary = path.join(directory, 'arondo-runner');
+    const downloadServer = createServer((_, response) => { response.writeHead(404); response.end(); });
+    downloadServer.listen(0, '127.0.0.1');
+    await once(downloadServer, 'listening');
     try {
+      const downloadUrl = `http://127.0.0.1:${(downloadServer.address() as AddressInfo).port}/missing-runner`;
+      const saved = await request.post('/api/settings', { headers, data: { runnerDownloadUrl: downloadUrl } });
+      expect(saved.ok()).toBeTruthy();
       execFileSync('go', ['build', '-ldflags', '-X main.Version=0.0.1', '-o', binary, '.'], {
         cwd: path.resolve(__dirname, '../../runner'),
       });
       const process = spawn(binary, [
-        '--server', 'ws://localhost:3252/runner', '--token', await createToken(request),
+        '--server', 'ws://localhost:3252/runner', '--token', await createToken(request), '--auto-update=true',
       ], { stdio: 'pipe' });
       let output = '';
       process.stderr!.on('data', data => { output += data.toString(); });
       try {
-        await expect.poll(() => output).toContain(`runner update available (v${SERVER_VERSION}); please update your runner:`);
-        expect(output).toContain(`https://github.com/handsomecheung/Arondo/releases/download/v${SERVER_VERSION}/arondo-runner-`);
+        await expect.poll(() => output).toContain('failed; keeping current runner');
+        expect(output).toContain(downloadUrl);
+        expect(output).toContain('HTTP 404');
         expect(output).not.toMatch(/\$\{(version|os|arch)\}/);
         expect(process.exitCode).toBeNull();
         const read = await request.get('/api/runners', { headers });
@@ -171,6 +184,7 @@ test.describe('Runner update settings and instructions', () => {
         }
       }
     } finally {
+      await new Promise<void>(resolve => downloadServer.close(() => resolve()));
       await fs.rm(directory, { recursive: true, force: true });
     }
   });

@@ -55,7 +55,11 @@ runner/                  # Go runner binary
   check_connection.go   # --check-connection: authenticated WebSocket Ping/Pong without registration, 10-second timeout
   protocol.go           # Message envelope struct (id, type, method, payload), constructors
   handler.go            # Request dispatcher by method string, response helpers, runner.shutdown
-  handler_update.go     # runner.update: log the target version and download URL for manual updating
+  handler_update.go     # runner.update: log a notice or schedule explicitly enabled automatic updating
+  updater.go            # Download, version/connection preflight, cancellation, and update preparation
+  lifecycle.go          # Main-loop update coordination and exec after tasks finish
+  task_activity.go      # Atomic task admission and process/callback accounting during updates
+  update_apply.go       # Serialize binary replacement, keep backup, and restore on exec failure
   handler_exec.go       # exec.agent, exec.script, exec.cancel, exec.restart (all PTY-based)
   handler_fs.go         # fs.list: directory listing; fs.mkdtemp: create a runner-side workspace for automation or standalone sessions
   handler_git.go        # git.status, git.diff
@@ -299,7 +303,7 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 | `exec.cancel` | S→R request | Kill a running task (SIGTERM/SIGKILL) |
 | `exec.restart` | S→R request | Kill current process and re-spawn with new command in the same task slot; shows ─── restarting ─── separator |
 | `runner.shutdown` | S→R request | Log the payload's `reason`, acknowledge, then stop the runner and its active tasks |
-| `runner.update` | S→R request | Log `{ version, downloadUrl }` to prompt manual updating, then acknowledge; no download or restart |
+| `runner.update` | S→R request | Acknowledge `{ version, downloadUrl }`; log only by default, or download/preflight and replace/exec when idle with `--auto-update=true` |
 | `exec.output` | R→S stream | Stdout/stderr data (base64-encoded) |
 | `exec.exit` | R→S event | Process exited with exit code |
 | `pty.input` | S→R request | Write stdin data to PTY |
@@ -328,7 +332,7 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 - **Runner discovery**: `getAllKnownRunners()` returns both connected runners and disconnected runners persisted on disk, used by the `/api/runners` route.
 - **Runner shutdown**: `shutdownRunner()` sends `runner.shutdown` with a reason; the runner logs it and acknowledges before closing. Admin Disconnect identifies the administrator action. A new registration with the same token replaces the active connection and sends shutdown directly to the previous connection, with a replacement reason.
 - **Runner connection check**: `--check-connection` branches before the normal client is initialized. It uses the normal URL/token flags and environment fallback, verifies the authenticated WebSocket handshake and a matching Pong within 10 seconds, then exits with code 0 or 1. It never registers, binds a token, reports tasks, or retries, and leaves any Runner already using the same token connected. No application protocol or server changes are needed.
-- **Runner update notices**: On registration, `lib/runner-server.ts` compares the runner's semantic version against `package.json` via `lib/version.ts`. Older runners receive `runner.update`; the server expands the saved `setitngs.runnerDownloadUrl` template using `${version}`, `${os}` (`darwin` → `macos`), and `${arch}`. Defaults and validation live in `lib/runner-update-settings.ts`; comparison and expansion live in `lib/runner-updates.ts`. Admin Settings → Runner Updates uses Save/Cancel. The runner only logs the notice. Local startup scripts and release builds use `runner/build.sh` to inject the package version; version comparison does not distinguish development and production environments.
+- **Runner automatic updates**: On registration, `lib/runner-server.ts` compares the runner's semantic version against `package.json` via `lib/version.ts`. Older runners receive `runner.update`; the server expands `setitngs.runnerDownloadUrl` using `${version}`, `${os}` (`darwin` → `macos`), and `${arch}`. Defaults and validation live in `lib/runner-update-settings.ts`; comparison and expansion live in `lib/runner-updates.ts`. Automatic updating defaults to false: the runner only logs the target version and URL unless started with `--auto-update=true`. When enabled, the runner downloads without forwarding its token, validates `--version`, then runs `--check-connection` with original args/env. The opt-in flag is preserved across exec. The main lifecycle waits for task operations, processes, and exit callbacks to finish before atomically freezing launches/restarts. Replacement keeps `<executable>.previous`, uses a cross-process file lock, and executes the new binary with the original args/env and inherited standard streams. The current connection remains open until exec, so ordinary exec failure can restore the backup and resume work. New-version crashes after successful exec do not automatically roll back. Duplicate in-flight updates are ignored; failed same-version attempts are limited to once per minute on later instructions. Local and release builds inject the package version through `runner/build.sh`; there is no development-mode exception.
 - **Task restart**: `restartTask()` sends `exec.restart` to the runner, killing the current process and re-spawning it with a new command within the same task slot.
 - **Runner resolution**: `resolveRunnerId()` falls back to any connected runner when a session's stored runnerId is stale.
 - **Global rules sync toggle**: `updateRunnerSyncGlobalRules()` persists a per-runner `syncGlobalRules` flag (`RunnerInfo.syncGlobalRules`, cached in `cachedSyncGlobalRules`, default `true`). Enabling it re-syncs rules via `syncGlobalRulesToRunner()`; disabling it calls `removeGlobalRulesFromRunner()` (sends `rules.remove`) to strip the previously written block from the runner's `GEMINI.md`/`CLAUDE.md`. `syncGlobalRulesToRunner()` is a no-op when the flag is `false`.

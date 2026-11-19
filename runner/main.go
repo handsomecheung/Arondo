@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -13,7 +14,13 @@ func main() {
 	serverURL := flag.String("server", "ws://localhost:3251/runner", "Server WebSocket URL")
 	token := flag.String("token", "", "Runner access token (optional, can also set ARONDO_RUNNER_TOKEN)")
 	check := flag.Bool("check-connection", false, "Check server authentication and WebSocket Ping/Pong without registering, then exit")
+	version := flag.Bool("version", false, "Print the runner version and exit")
+	autoUpdate := flag.Bool("auto-update", false, "Automatically download and apply runner updates (default: log update notices only)")
 	flag.Parse()
+	if *version {
+		fmt.Println(Version)
+		return
+	}
 
 	runnerToken := *token
 	if runnerToken == "" {
@@ -36,21 +43,11 @@ func main() {
 	log.Printf("starting runner, connecting to %s", *serverURL)
 
 	client := NewClient(*serverURL, runnerToken)
+	client.handler.autoUpdate = *autoUpdate
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
-	runDone := make(chan struct{})
-	go func() {
-		client.Run()
-		close(runDone)
-	}()
-
-	select {
-	case sig := <-sigCh:
-		log.Printf("received signal %v, shutting down", sig)
-		client.Stop()
-	case <-runDone:
-		log.Println("runner stopped")
-	}
+	defer signal.Stop(sigCh)
+	runRunner(client, sigCh)
 }

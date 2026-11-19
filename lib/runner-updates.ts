@@ -12,12 +12,12 @@ export function getRunnerUpdate(
     return null;
   }
   const values = {
-    version: target,
+    version: serverVersion.trim().replace(/^v/, ""),
     os: runner.os === "darwin" ? "macos" : runner.os,
     arch: runner.arch,
   };
   return {
-    version: target,
+    version: values.version,
     downloadUrl: template.replace(/\$\{(version|os|arch)\}/g, (_, key: keyof typeof values) =>
       encodeURIComponent(values[key]),
     ),
