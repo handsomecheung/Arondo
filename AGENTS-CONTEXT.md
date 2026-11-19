@@ -296,7 +296,7 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 | `exec.script` | S→R request | Start script (PTY mode) |
 | `exec.cancel` | S→R request | Kill a running task (SIGTERM/SIGKILL) |
 | `exec.restart` | S→R request | Kill current process and re-spawn with new command in the same task slot; shows ─── restarting ─── separator |
-| `runner.shutdown` | S→R request | Acknowledge, then stop the runner and its active tasks |
+| `runner.shutdown` | S→R request | Log the payload's `reason`, acknowledge, then stop the runner and its active tasks |
 | `exec.output` | R→S stream | Stdout/stderr data (base64-encoded) |
 | `exec.exit` | R→S event | Process exited with exit code |
 | `pty.input` | S→R request | Write stdin data to PTY |
@@ -323,7 +323,7 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 - **Task persistence & retention**: Active task contexts are persisted by saving execution metadata directly to `messages.json` (for both sessions and projects). Active session scripts are derived from unmatched `script-run` messages rather than a separate session field. Completed tasks are retained for 3 days (`TASK_RETENTION_MS`), then purged on startup. On server restart, active tasks are restored and re-associated to the reconnecting runner.
 - **Task cleanup**: `removeTasksForSession()` cleans up tasks when a session is deleted. `getAllTasks()` returns all tasks (active + retained). `purgeExpiredTasks()` removes completed tasks older than 3 days.
 - **Runner discovery**: `getAllKnownRunners()` returns both connected runners and disconnected runners persisted on disk, used by the `/api/runners` route.
-- **Runner shutdown**: `shutdownRunner()` sends `runner.shutdown`; the runner acknowledges before closing, so the UI can deliberately disconnect a runner and stop its active tasks.
+- **Runner shutdown**: `shutdownRunner()` sends `runner.shutdown` with a reason; the runner logs it and acknowledges before closing. Admin Disconnect identifies the administrator action. A new registration with the same token replaces the active connection and sends shutdown directly to the previous connection, with a replacement reason.
 - **Task restart**: `restartTask()` sends `exec.restart` to the runner, killing the current process and re-spawning it with a new command within the same task slot.
 - **Runner resolution**: `resolveRunnerId()` falls back to any connected runner when a session's stored runnerId is stale.
 - **Global rules sync toggle**: `updateRunnerSyncGlobalRules()` persists a per-runner `syncGlobalRules` flag (`RunnerInfo.syncGlobalRules`, cached in `cachedSyncGlobalRules`, default `true`). Enabling it re-syncs rules via `syncGlobalRulesToRunner()`; disabling it calls `removeGlobalRulesFromRunner()` (sends `rules.remove`) to strip the previously written block from the runner's `GEMINI.md`/`CLAUDE.md`. `syncGlobalRulesToRunner()` is a no-op when the flag is `false`.

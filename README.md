@@ -563,7 +563,7 @@ Flags:
   --token string    Runner access token (optional, can also set ARONDO_RUNNER_TOKEN)
 ```
 
-The runner auto-reconnects with exponential backoff if the server connection drops. It has no display name of its own — the name shown across the UI comes from the runner token's `name`, set by an admin when generating the token in Settings.
+The runner auto-reconnects with exponential backoff if the server connection drops. When another runner registers with the same token, the server requests that the previous runner shut down. The runner logs the reason before exiting, both for replacement and for an administrator's Disconnect action. It has no display name of its own — the name shown across the UI comes from the runner token's `name`, set by an admin when generating the token in Settings.
 
 Tagged releases build both `runner/arondo-runner` and `cli/arondo-cli` binaries for Linux amd64, macOS amd64, and macOS arm64.
 

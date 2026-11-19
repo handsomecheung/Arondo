@@ -444,7 +444,6 @@ class RunnerManager {
       return null;
     }
     const id = tokenRecord.boundRunnerId || crypto.randomUUID();
-    const isNewId = !tokenRecord.boundRunnerId;
 
     // Locks this token to this runner identity on first use; rejects the
     // connection if the token was already bound to a different runner
@@ -454,15 +453,6 @@ class RunnerManager {
       return null;
     }
     const name = bound.name || "unknown";
-
-    if (!isNewId) {
-      const existing = this.runners.get(id);
-      if (existing) {
-        if (existing.ws.readyState === 1 /* OPEN */ || existing.ws.readyState === 0 /* CONNECTING */) {
-          existing.ws.close();
-        }
-      }
-    }
 
     let quotaAgents: RunnerAgentQuotaRef[] = [];
     try {
@@ -491,7 +481,14 @@ class RunnerManager {
       syncGlobalRules: this.cachedSyncGlobalRules.get(id) ?? true,
     };
     this.cachedSyncGlobalRules.set(id, info.syncGlobalRules!);
+    if (ws.readyState !== 1 /* OPEN */) return null;
+    const previous = this.runners.get(id);
     this.runners.set(id, { id, ws, info });
+    if (previous && previous.ws !== ws && previous.ws.readyState === 1 /* OPEN */) {
+      this.sendFire(id, "runner.shutdown", {
+        reason: "Another runner connected with the same token.",
+      }, previous.ws);
+    }
     this.persistRunner(info).catch(() => {});
     console.log(`[runner-manager] runner registered: ${info.name} (${id})`);
 
@@ -809,9 +806,8 @@ class RunnerManager {
     });
   }
 
-  sendFire(runnerId: string, method: string, payload: any): void {
-    const ctrl = this.runners.get(runnerId);
-    if (!ctrl) {
+  sendFire(runnerId: string, method: string, payload: any, ws = this.runners.get(runnerId)?.ws): void {
+    if (!ws) {
       console.warn(
         `[runner-manager] sendFire ${method}: runner ${runnerId} not found`,
       );
@@ -827,11 +823,11 @@ class RunnerManager {
 
     const id = this.nextId();
     const msg: MessageEnvelope = { id, type: "request", method, payload };
-    ctrl.ws.send(JSON.stringify(msg));
+    ws.send(JSON.stringify(msg));
   }
 
-  async shutdownRunner(runnerId: string): Promise<void> {
-    await this.sendRequest(runnerId, "runner.shutdown", {}, 10_000);
+  async shutdownRunner(runnerId: string, reason: string): Promise<void> {
+    await this.sendRequest(runnerId, "runner.shutdown", { reason }, 10_000);
   }
 
   async checkPathExists(runnerId: string, path: string): Promise<boolean> {

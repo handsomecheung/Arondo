@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     let success = true;
     if (disconnect === true) {
-      await runnerManager.shutdownRunner(id);
+      await runnerManager.shutdownRunner(id, "Disconnected by an administrator.");
     }
     if (Array.isArray(allowedUserTokenUuids)) {
       success = (await runnerManager.updateRunnerAllowedUserTokenUuids(id, allowedUserTokenUuids)) && success;

@@ -81,6 +81,17 @@ func (h *Handler) handleRequest(msg *Message) {
 }
 
 func (h *Handler) handleRunnerShutdown(msg *Message) {
+	var payload struct {
+		Reason string `json:"reason"`
+	}
+	if err := parsePayloadInto(msg.Payload, &payload); err != nil {
+		h.sendError(msg.ID, "INTERNAL", "invalid payload: "+err.Error())
+		return
+	}
+	if payload.Reason == "" {
+		payload.Reason = "Shutdown requested by server."
+	}
+	log.Printf("shutdown requested: %s", payload.Reason)
 	h.sendResponse(msg.ID, OkResponse{OK: true})
 	go func() {
 		time.Sleep(50 * time.Millisecond)
