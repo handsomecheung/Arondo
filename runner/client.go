@@ -145,11 +145,12 @@ func (c *Client) sendRegister() error {
 	hostname, _ := os.Hostname()
 
 	payload := map[string]any{
-		"version":  "0.3.19",
+		"version":  Version,
 		"hostname": hostname,
 		"os":       runtime.GOOS,
 		"arch":     runtime.GOARCH,
 		"capabilities": []string{
+			"runner.update",
 			"exec.agent", "exec.script", "exec.cancel",
 			"exec.inputWait",
 			"pty.input", "pty.resize",

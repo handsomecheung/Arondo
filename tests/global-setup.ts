@@ -82,7 +82,7 @@ async function globalSetup() {
 
   console.log('Building Go runner...');
   try {
-    execSync('go build -o arondo-runner .', {
+    execSync('bash ./build.sh', {
       stdio: 'inherit',
       cwd: path.resolve(__dirname, '../runner'),
     });

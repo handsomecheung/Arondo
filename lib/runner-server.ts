@@ -2,6 +2,9 @@ import { IncomingMessage } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { runnerManager } from "./runner-manager";
 import { getAgentBinaryNames } from "./agents";
+import { getAppSettings } from "./store";
+import { getRunnerUpdate } from "./runner-updates";
+import { SERVER_VERSION } from "./version";
 
 const HEARTBEAT_INTERVAL = 30_000;
 
@@ -55,7 +58,7 @@ export function setupRunnerServer(wss: WebSocketServer): void {
           registering = true;
           runnerManager
             .addRunner(ws, msg.payload, remoteIp, runnerTokenId)
-            .then((newRunnerId) => {
+            .then(async (newRunnerId) => {
               registering = false;
               if (!newRunnerId) {
                 ws.close(4003, "Runner token is bound to a different runner");
@@ -69,7 +72,7 @@ export function setupRunnerServer(wss: WebSocketServer): void {
                 method: "connected",
                 payload: {
                   runnerId,
-                  serverVersion: "0.3.19",
+                  serverVersion: SERVER_VERSION,
                   // Inform the runner which binaries to detect on its PATH.
                   // The runner responds with an agent.status event.
                   queryAgents: getAgentBinaryNames(),
@@ -82,6 +85,12 @@ export function setupRunnerServer(wss: WebSocketServer): void {
                 runnerManager.handleMessage(runnerId!, pending);
               }
               pendingMessages.length = 0;
+
+              const settings = await getAppSettings();
+              const update = getRunnerUpdate(msg.payload, SERVER_VERSION, settings.runnerDownloadUrl);
+              if (update && ws.readyState === WebSocket.OPEN && runnerManager.getRunner(newRunnerId)?.ws === ws) {
+                runnerManager.sendFire(newRunnerId, "runner.update", update, ws);
+              }
             })
             .catch((err) => {
               registering = false;

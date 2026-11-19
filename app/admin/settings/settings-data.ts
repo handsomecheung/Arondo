@@ -1,5 +1,6 @@
 import type { AgentModelsConfig } from "@/lib/store";
 export interface AdminSettingsData {
+  runnerDownloadUrl?: string;
   sessionArchiveDays: number;
   automationSessionRetentionHours: number;
   showHiddenFiles?: boolean;

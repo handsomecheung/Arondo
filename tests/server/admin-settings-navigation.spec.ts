@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { adminSettingsSections } from "../../app/admin/settings/sections";
+import { DEFAULT_RUNNER_DOWNLOAD_URL } from "../../lib/runner-update-settings";
 
 test.setTimeout(120_000);
 
@@ -19,7 +20,9 @@ test("admin settings sections have separate pages with working return navigation
     page
       .getByRole("navigation", { name: "Admin settings sections" })
       .getByRole("link"),
-  ).toHaveCount(9);
+  ).toHaveCount(adminSettingsSections.length);
+  await expect(page.getByRole("navigation", { name: "Admin settings sections" }).getByRole("link").last())
+    .toHaveAttribute("href", "/admin/settings/runner-updates");
   await expect(page.getByRole("spinbutton")).toHaveCount(0);
 
   for (const section of adminSettingsSections) {
@@ -103,6 +106,44 @@ test("session settings Save and Cancel return to the settings index", async ({
       showAutomationSessions: false,
     },
   ]);
+});
+
+test("runner update URL edits support Save, Cancel, defaults, and validation", async ({ page }) => {
+  const writes: unknown[] = [];
+  let saved = DEFAULT_RUNNER_DOWNLOAD_URL;
+  await page.route("**/api/settings", async (route) => {
+    if (route.request().method() === "POST") {
+      const body = route.request().postDataJSON();
+      writes.push(body);
+      saved = body.runnerDownloadUrl;
+    }
+    await route.fulfill({ json: { runnerDownloadUrl: saved } });
+  });
+  await page.goto("/admin/settings/runner-updates");
+  const input = page.getByRole("textbox", { name: "Runner download URL template" });
+  await expect(input).toHaveValue(DEFAULT_RUNNER_DOWNLOAD_URL);
+  const custom = "https://mirror.example/${version}/${os}/${arch}";
+  await input.fill(custom);
+  expect(writes).toEqual([]);
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page).toHaveURL("/admin/settings");
+  await page.goto("/admin/settings/runner-updates");
+  await expect(input).toHaveValue(DEFAULT_RUNNER_DOWNLOAD_URL);
+  await input.fill("https://mirror.example/${platform}");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Only ${version}" }))
+    .toContainText("Only ${version}, ${os}, and ${arch}");
+  expect(writes).toEqual([]);
+  await input.fill(custom);
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page).toHaveURL("/admin/settings");
+  expect(writes).toEqual([{ runnerDownloadUrl: custom }]);
+  await page.goto("/admin/settings/runner-updates");
+  await expect(input).toHaveValue(custom);
+  await page.getByRole("button", { name: "Use default URL" }).click();
+  await expect(input).toHaveValue(DEFAULT_RUNNER_DOWNLOAD_URL);
+  expect(writes).toHaveLength(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
 test("regular users cannot open the settings index or subpages directly", async ({

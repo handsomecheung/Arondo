@@ -5,8 +5,8 @@ import { updateAppSettings, getAppSettings, getSessionArchiveDays, getAutomation
 import { isAutoAgentExcludable, DEFAULT_AGENT_MODELS } from "@/lib/agentModels";
 import { getLlmApiKeyEnvStatus, type LlmApiKeyName } from "@/lib/llm/config";
 import { getWebPushContactEmail, updateWebPushContactEmail } from "@/lib/web-push-server";
-import fs from "fs/promises";
-import path from "path";
+import { DEFAULT_RUNNER_DOWNLOAD_URL, getRunnerDownloadUrlError } from "@/lib/runner-update-settings";
+import { SERVER_VERSION } from "@/lib/version";
 
 const LLM_API_KEY_NAMES: LlmApiKeyName[] = [
   "TYPESAFE_API_KEY",
@@ -42,23 +42,14 @@ export async function GET(request: NextRequest) {
     }),
   );
 
-  let version = "unknown";
-  try {
-    const packageJsonPath = path.join(process.cwd(), "package.json");
-    const packageJsonContent = await fs.readFile(packageJsonPath, "utf-8");
-    const packageJson = JSON.parse(packageJsonContent);
-    version = packageJson.version || "unknown";
-  } catch (err) {
-    console.error("Failed to read package.json version:", err);
-  }
-
   return NextResponse.json({
     sessionArchiveDays,
     automationSessionRetentionHours,
     showHiddenFiles,
     showAutomationSessions,
     enableAutomodel,
-    version,
+    version: SERVER_VERSION,
+    runnerDownloadUrl: appSettings.runnerDownloadUrl ?? DEFAULT_RUNNER_DOWNLOAD_URL,
     llmApiKeys,
     agentModels,
     webPushContactEmail,
@@ -81,7 +72,12 @@ export async function POST(request: NextRequest) {
     llmApiKeys,
     agentModels,
     webPushContactEmail,
+    runnerDownloadUrl,
   } = await request.json();
+  if (runnerDownloadUrl !== undefined) {
+    const error = getRunnerDownloadUrlError(runnerDownloadUrl);
+    if (error) return NextResponse.json({ error }, { status: 400 });
+  }
   if (sessionArchiveDays !== undefined) {
     if (typeof sessionArchiveDays !== "number" || !Number.isFinite(sessionArchiveDays) || sessionArchiveDays < 1) {
       return NextResponse.json({ error: "sessionArchiveDays must be a positive number" }, { status: 400 });
@@ -154,6 +150,7 @@ export async function POST(request: NextRequest) {
   }
 
   const patch: {
+    runnerDownloadUrl?: string;
     sessionArchiveDays?: number;
     automationSessionRetentionHours?: number;
     showHiddenFiles?: boolean;
@@ -162,6 +159,7 @@ export async function POST(request: NextRequest) {
     llmApiKeys?: Partial<Record<LlmApiKeyName, string | undefined>>;
     agentModels?: AgentModelsConfig;
   } = {};
+  if (runnerDownloadUrl !== undefined) patch.runnerDownloadUrl = runnerDownloadUrl.trim();
   if (sessionArchiveDays !== undefined) patch.sessionArchiveDays = sessionArchiveDays;
   if (automationSessionRetentionHours !== undefined) patch.automationSessionRetentionHours = automationSessionRetentionHours;
   if (showHiddenFiles !== undefined) patch.showHiddenFiles = showHiddenFiles;
@@ -275,6 +273,7 @@ export async function POST(request: NextRequest) {
   );
   return NextResponse.json({
     ...updated,
+    runnerDownloadUrl: updated.runnerDownloadUrl ?? DEFAULT_RUNNER_DOWNLOAD_URL,
     enableAutomodel: updated.enableAutomodel !== undefined ? updated.enableAutomodel : false,
     llmApiKeys: status,
     agentModels: updated.agentModels || (await getAgentModelsConfig()),

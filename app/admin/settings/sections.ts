@@ -45,4 +45,9 @@ export const adminSettingsSections = [
     title: "Runner Access Control",
     description: "Choose which users can access each runner.",
   },
+  {
+    slug: "runner-updates",
+    title: "Runner Updates",
+    description: "Configure the download URL used in runner update notices.",
+  },
 ] as const;

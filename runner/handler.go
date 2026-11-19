@@ -75,6 +75,8 @@ func (h *Handler) handleRequest(msg *Message) {
 		h.handleOpencodeSessionList(msg)
 	case "runner.shutdown":
 		h.handleRunnerShutdown(msg)
+	case "runner.update":
+		h.handleRunnerUpdate(msg)
 	default:
 		h.sendError(msg.ID, "NOT_FOUND", "unknown method: "+msg.Method)
 	}

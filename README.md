@@ -180,6 +180,7 @@ Each section ends with **Save** and **Cancel**. Changes remain local until you s
 | System Access Tokens | `/admin/settings/system-tokens` |
 | Runner Tokens | `/admin/settings/runner-tokens` |
 | Runner Access Control | `/admin/settings/runner-access` |
+| Runner Updates | `/admin/settings/runner-updates` |
 
 ## Access Control
 
@@ -288,7 +289,7 @@ Alternatively, build and start the runner directly with the token you created:
 
 ```bash
 cd runner
-go build -o arondo-runner .
+bash ./build.sh
 ./arondo-runner --server ws://localhost:3251/runner --token <runner_access_token>
 
 # Alternatively, pass it via environment variable:
@@ -564,6 +565,20 @@ Flags:
 ```
 
 The runner auto-reconnects with exponential backoff if the server connection drops. When another runner registers with the same token, the server requests that the previous runner shut down. The runner logs the reason before exiting, both for replacement and for an administrator's Disconnect action. It has no display name of its own — the name shown across the UI comes from the runner token's `name`, set by an admin when generating the token in Settings.
+
+**Admin Settings → Runner Updates** configures the download URL template, stored as `setitngs.runnerDownloadUrl` in `arondo.json`. The default is:
+
+```text
+https://github.com/handsomecheung/Arondo/releases/download/v${version}/arondo-runner-${os}-${arch}
+```
+
+The supported placeholders are `${version}` (the server's `package.json` version, without a leading `v`), `${os}` (the connecting runner's OS, with `darwin` mapped to `macos`), and `${arch}` (the runner's architecture, such as `amd64` or `arm64`). Templates must use an absolute HTTP or HTTPS URL. Save applies edits; Cancel discards them, and **Use default URL** restores the default in the editor.
+
+On registration, the server compares semantic versions and sends `runner.update` with `{ version, downloadUrl }` when the runner is older. The runner logs the version and URL to prompt a manual update; it does not download, replace files, or restart. Template edits apply to subsequent registrations. Equal or newer versions, and missing or invalid versions, receive no update notice.
+
+`runner/build.sh` embeds the current `package.json` version into the runner. Both local startup scripts (such as `scripts/local/run.runner1.sh`) and tagged release builds use this script, so the same version comparison applies in both environments. When building directly with `go build` or `go run`, supply `-ldflags "-X main.Version=<version>"` to embed the version.
+
+For a version upgrade, update `version` in `package.json`, keep `package-lock.json` in sync, and use the matching release tag (for example, `0.3.20` and `v0.3.20`). The server and release runner use that package version; no runner source version needs to be edited.
 
 Tagged releases build both `runner/arondo-runner` and `cli/arondo-cli` binaries for Linux amd64, macOS amd64, and macOS arm64.
 

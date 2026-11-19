@@ -51,6 +51,7 @@ import type { LlmApiKeyName } from "./llm/config";
 import type { AgentFailureKind } from "./agent-failure-classifier";
 
 export interface AppSettings {
+  runnerDownloadUrl?: string;
   sessionArchiveDays?: number;
   automationSessionRetentionHours?: number;
   showHiddenFiles?: boolean;
