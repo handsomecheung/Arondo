@@ -50,8 +50,9 @@ All execution goes through a Runner — there is no local fallback on the server
 ```
 server.ts               # Custom HTTP server wrapping Next.js with WebSocket upgrade at /ws and /runner
 runner/                  # Go runner binary
-  main.go               # Entry point: --server and --token flags, signal handling
+  main.go               # Entry point: CLI flags, connection-check mode, signal handling
   client.go             # WebSocket client: connect, reconnect (exponential backoff), heartbeat, graceful remote shutdown
+  check_connection.go   # --check-connection: authenticated WebSocket Ping/Pong without registration, 10-second timeout
   protocol.go           # Message envelope struct (id, type, method, payload), constructors
   handler.go            # Request dispatcher by method string, response helpers, runner.shutdown
   handler_update.go     # runner.update: log the target version and download URL for manual updating
@@ -326,6 +327,7 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 - **Task cleanup**: `removeTasksForSession()` cleans up tasks when a session is deleted. `getAllTasks()` returns all tasks (active + retained). `purgeExpiredTasks()` removes completed tasks older than 3 days.
 - **Runner discovery**: `getAllKnownRunners()` returns both connected runners and disconnected runners persisted on disk, used by the `/api/runners` route.
 - **Runner shutdown**: `shutdownRunner()` sends `runner.shutdown` with a reason; the runner logs it and acknowledges before closing. Admin Disconnect identifies the administrator action. A new registration with the same token replaces the active connection and sends shutdown directly to the previous connection, with a replacement reason.
+- **Runner connection check**: `--check-connection` branches before the normal client is initialized. It uses the normal URL/token flags and environment fallback, verifies the authenticated WebSocket handshake and a matching Pong within 10 seconds, then exits with code 0 or 1. It never registers, binds a token, reports tasks, or retries, and leaves any Runner already using the same token connected. No application protocol or server changes are needed.
 - **Runner update notices**: On registration, `lib/runner-server.ts` compares the runner's semantic version against `package.json` via `lib/version.ts`. Older runners receive `runner.update`; the server expands the saved `setitngs.runnerDownloadUrl` template using `${version}`, `${os}` (`darwin` → `macos`), and `${arch}`. Defaults and validation live in `lib/runner-update-settings.ts`; comparison and expansion live in `lib/runner-updates.ts`. Admin Settings → Runner Updates uses Save/Cancel. The runner only logs the notice. Local startup scripts and release builds use `runner/build.sh` to inject the package version; version comparison does not distinguish development and production environments.
 - **Task restart**: `restartTask()` sends `exec.restart` to the runner, killing the current process and re-spawning it with a new command within the same task slot.
 - **Runner resolution**: `resolveRunnerId()` falls back to any connected runner when a session's stored runnerId is stale.

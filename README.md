@@ -560,8 +560,15 @@ Install only selected agents with `cli/install-skill codex claude`, for example.
 arondo-runner [flags]
 
 Flags:
-  --server string   Server WebSocket URL (default "ws://localhost:3251/runner")
-  --token string    Runner access token (optional, can also set ARONDO_RUNNER_TOKEN)
+  --server string     Server WebSocket URL (default "ws://localhost:3251/runner")
+  --token string      Runner access token (optional, can also set ARONDO_RUNNER_TOKEN)
+  --check-connection  Check server authentication and WebSocket Ping/Pong, then exit
+```
+
+`--check-connection` uses the same server URL and token options as normal startup, including `ARONDO_RUNNER_TOKEN` and the `--token` override. It makes one authenticated WebSocket connection and verifies a matching Pong within a total 10-second timeout covering connection setup and Ping/Pong. It logs the result and exits with code `0` on success or `1` on failure, without retrying. It sends no Runner registration or task messages, so it does not bind an unused token, create a Runner record, or disconnect an existing Runner using the same token.
+
+```bash
+arondo-runner --server wss://your-server/runner --check-connection
 ```
 
 The runner auto-reconnects with exponential backoff if the server connection drops. When another runner registers with the same token, the server requests that the previous runner shut down. The runner logs the reason before exiting, both for replacement and for an administrator's Disconnect action. It has no display name of its own — the name shown across the UI comes from the runner token's `name`, set by an admin when generating the token in Settings.
