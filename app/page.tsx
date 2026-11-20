@@ -29,6 +29,7 @@ import InfoDialog from "@/components/modals/InfoDialog";
 import {
   readUrlState, sortSessionsForSidebar,
   parseExecCommand, resolveRepoFilePath, isUnviewedCompletion,
+  DRAFT_STORAGE_PREFIX,
 } from "@/lib/homeUtils";
 import { safeDecodeURIComponent } from "@/lib/remarkFileLinks";
 import type { ExecCardInfo } from "@/lib/homeUtils";
@@ -61,8 +62,6 @@ function renderMessageContent(content: string) {
   }
   return content;
 }
-
-const DRAFT_STORAGE_PREFIX = "arondo:chat-draft:";
 
 export default function HomePage() {
   const [mounted, setMounted] = useState(false);

@@ -1,6 +1,9 @@
 import type { ExecCardItem } from "@/components/ExecCard";
 import type { Message, Session } from "@/types/home";
 
+export const DRAFT_STORAGE_PREFIX = "arondo:chat-draft:";
+export const GEN_DRAFT_STORAGE_KEY = `${DRAFT_STORAGE_PREFIX}gen`;
+
 // A session finished (done/error) since it was last opened, and the user
 // hasn't seen the outcome yet.
 export function isUnviewedCompletion(session: Session): boolean {

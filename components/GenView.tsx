@@ -6,7 +6,7 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import UserMessageCard from "@/components/UserMessageCard";
 import { IconSend, IconStop, IconTerminal } from "@/components/Icons";
-import { agentTypeLabel, autoResizeTextarea, formatTime } from "@/lib/homeUtils";
+import { agentTypeLabel, autoResizeTextarea, formatTime, GEN_DRAFT_STORAGE_KEY } from "@/lib/homeUtils";
 import type { GenMessage, GenSubAgentRunInfo } from "@/lib/gen/store";
 
 interface Props {
@@ -24,6 +24,40 @@ export default function GenView({ ws, onViewSubAgentLog }: Props) {
   const [sending, setSending] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isFirstRender = useRef(true);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(GEN_DRAFT_STORAGE_KEY);
+      if (saved) {
+        setInput(saved);
+      }
+    } catch {
+      // localStorage unavailable (private mode / quota)
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    try {
+      if (input) {
+        localStorage.setItem(GEN_DRAFT_STORAGE_KEY, input);
+      } else {
+        localStorage.removeItem(GEN_DRAFT_STORAGE_KEY);
+      }
+    } catch {
+      // localStorage unavailable (private mode / quota) — draft persistence best-effort only
+    }
+  }, [input]);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      autoResizeTextarea(textareaRef.current);
+    }
+  }, [input]);
 
   const fetchGenState = useCallback(async () => {
     try {
@@ -67,6 +101,11 @@ export default function GenView({ ws, onViewSubAgentLog }: Props) {
     if (!trimmed || sending) return;
 
     setInput("");
+    try {
+      localStorage.removeItem(GEN_DRAFT_STORAGE_KEY);
+    } catch {
+      // localStorage unavailable (private mode / quota)
+    }
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
