@@ -5,7 +5,7 @@ import type { Session, TaskItem } from "@/types/home";
 import { resolveAgentCommand, getUniqueTriggers, getTriggerWord } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
 import { parseDetachedAgentCommand } from "@/lib/detached-agent-command";
-import { autoResizeTextarea, DRAFT_STORAGE_PREFIX } from "@/lib/homeUtils";
+import { autoResizeTextarea, DRAFT_STORAGE_PREFIX, isMobileDevice } from "@/lib/homeUtils";
 
 interface UseSessionSubmitParams {
   prompt: string;
@@ -842,11 +842,7 @@ export function useSessionSubmit({
       return;
     }
     if (e.key === "Enter" && !e.shiftKey) {
-      const isMobile = typeof window !== "undefined" && (
-        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-      );
-      if (!isMobile) {
+      if (!isMobileDevice()) {
         e.preventDefault();
         handleSubmit();
       }

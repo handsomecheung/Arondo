@@ -6,7 +6,7 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import UserMessageCard from "@/components/UserMessageCard";
 import { IconSend, IconStop, IconTerminal } from "@/components/Icons";
-import { agentTypeLabel, autoResizeTextarea, formatTime, GEN_DRAFT_STORAGE_KEY } from "@/lib/homeUtils";
+import { agentTypeLabel, autoResizeTextarea, formatTime, GEN_DRAFT_STORAGE_KEY, isMobileDevice } from "@/lib/homeUtils";
 import type { GenMessage, GenSubAgentRunInfo } from "@/lib/gen/store";
 
 interface Props {
@@ -400,10 +400,8 @@ export default function GenView({ ws, onViewSubAgentLog }: Props) {
               autoResizeTextarea(e.target);
             }}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                handleSend();
-              } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+              if (e.nativeEvent.isComposing) return;
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
                 const el = e.currentTarget;
                 const start = el.selectionStart;
@@ -414,6 +412,13 @@ export default function GenView({ ws, onViewSubAgentLog }: Props) {
                   el.selectionStart = el.selectionEnd = start + 1;
                   autoResizeTextarea(el);
                 });
+                return;
+              }
+              if (e.key === "Enter" && !e.shiftKey) {
+                if (!isMobileDevice()) {
+                  e.preventDefault();
+                  handleSend();
+                }
               }
             }}
             rows={1}
