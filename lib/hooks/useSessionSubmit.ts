@@ -5,7 +5,7 @@ import type { Session, TaskItem } from "@/types/home";
 import { resolveAgentCommand, getUniqueTriggers, getTriggerWord } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
 import { parseDetachedAgentCommand } from "@/lib/detached-agent-command";
-import { autoResizeTextarea } from "@/lib/homeUtils";
+import { autoResizeTextarea, DRAFT_STORAGE_PREFIX } from "@/lib/homeUtils";
 
 interface UseSessionSubmitParams {
   prompt: string;
@@ -29,6 +29,7 @@ interface UseSessionSubmitParams {
   selectedSessionId: string | null;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   setPrompt: (v: string) => void;
+  isSendingPromptRef?: React.MutableRefObject<boolean>;
   setShowCommandMenu: (v: boolean) => void;
   setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
   setSelectedSessionId: React.Dispatch<React.SetStateAction<string | null>>;
@@ -74,6 +75,7 @@ export function useSessionSubmit({
   selectedSessionId,
   textareaRef,
   setPrompt,
+  isSendingPromptRef,
   setShowCommandMenu,
   setSessions,
   setSelectedSessionId,
@@ -97,6 +99,7 @@ export function useSessionSubmit({
   onClearSelectedModel,
 }: UseSessionSubmitParams) {
   const [commandMenuIndex, setCommandMenuIndex] = useState(-1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingConfirmation, setPendingConfirmation] = useState<{
     id?: string;
     rawText: string;
@@ -203,6 +206,8 @@ export function useSessionSubmit({
 
   const sendAgentMessage = useCallback(async (originalMessage: string, agentMessage: string) => {
     if (!hasAvailableAgents || !selectedSessionId) return;
+    const targetDraftKey = DRAFT_STORAGE_PREFIX + selectedSessionId;
+    if (isSendingPromptRef) isSendingPromptRef.current = true;
     setPrompt("");
     setShowCommandMenu(false);
     if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
@@ -235,15 +240,25 @@ export function useSessionSubmit({
         return;
       }
       if (!res.ok) {
-        const data = await res.json();
-        setApiError({ title: "Command Error", message: data.error || "Failed to send command" });
+        const data = await res.json().catch(() => ({}));
+        setApiError({ title: "Command Error", message: (data.error ? `${data.error}. ` : "") + "Failed to send command. Your input has been restored." });
         setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
+        if (isSendingPromptRef) isSendingPromptRef.current = false;
+        setPrompt(originalMessage);
+        if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
+        return;
       }
+      try { localStorage.removeItem(targetDraftKey); } catch {}
+      if (isSendingPromptRef) isSendingPromptRef.current = false;
     } catch (err: any) {
       console.error(err);
       setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
+      if (isSendingPromptRef) isSendingPromptRef.current = false;
+      setPrompt(originalMessage);
+      if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
+      setApiError({ title: "Command Error", message: "Failed to send command. Your input has been restored." });
     }
-  }, [hasAvailableAgents, selectedSessionId, repoPath, agentType, runnerId, setTaskQueue, setApiError]);
+  }, [hasAvailableAgents, selectedSessionId, repoPath, agentType, runnerId, setTaskQueue, setApiError, isSendingPromptRef, setPrompt, setShowCommandMenu, textareaRef]);
 
   // Called from SessionView with the raw prompt text (e.g. "/commit foo")
   const handleAgentCommand = useCallback(async (promptText: string) => {
@@ -254,6 +269,8 @@ export function useSessionSubmit({
         setApiError({ title: "Command Error", message: "/btw requires a message" });
         return;
       }
+      const targetDraftKey = DRAFT_STORAGE_PREFIX + selectedSessionId;
+      if (isSendingPromptRef) isSendingPromptRef.current = true;
       setPrompt("");
       setShowCommandMenu(false);
       if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
@@ -264,19 +281,28 @@ export function useSessionSubmit({
           body: JSON.stringify({ message: promptText }),
         });
         if (!res.ok) {
-          const data = await res.json();
-          setApiError({ title: "Command Error", message: data.error || "Failed to start separate agent" });
+          const data = await res.json().catch(() => ({}));
+          setApiError({ title: "Command Error", message: (data.error ? `${data.error}. ` : "") + "Failed to start separate agent. Your input has been restored." });
+          if (isSendingPromptRef) isSendingPromptRef.current = false;
+          setPrompt(promptText);
+          if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
+          return;
         }
+        try { localStorage.removeItem(targetDraftKey); } catch {}
+        if (isSendingPromptRef) isSendingPromptRef.current = false;
       } catch (err) {
         console.error(err);
-        setApiError({ title: "Command Error", message: "Failed to start separate agent" });
+        setApiError({ title: "Command Error", message: "Failed to start separate agent. Your input has been restored." });
+        if (isSendingPromptRef) isSendingPromptRef.current = false;
+        setPrompt(promptText);
+        if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
       }
       return;
     }
     const agentMessage = resolveAgentCommand(promptText, agentCommands);
     if (agentMessage === null) return;
     await sendAgentMessage(promptText, agentMessage);
-  }, [hasAvailableAgents, sendAgentMessage, agentCommands, selectedSessionId, setApiError, setPrompt, setShowCommandMenu, textareaRef]);
+  }, [hasAvailableAgents, sendAgentMessage, agentCommands, selectedSessionId, setApiError, setPrompt, setShowCommandMenu, textareaRef, isSendingPromptRef]);
 
   const handleSendMessage = useCallback(async (text: string) => {
     if (!selectedSessionId || !text.trim()) return;
@@ -405,8 +431,9 @@ export function useSessionSubmit({
   // an auto-send draft, or create a manual draft — all reuse the same /api/sessions POST.
   const resolvePendingConfirmation = useCallback(async (choice: "force" | "pendingAuto" | "draft") => {
     if (!hasAvailableAgents || !pendingConfirmation) return;
-    const { displayMessage, agentPrompt, repoPath: pendingRepoPath, agentType: pendingAgentType, runnerId: pendingRunnerId, existingSessionId, isFollowup } = pendingConfirmation;
+    const { rawText, displayMessage, agentPrompt, repoPath: pendingRepoPath, agentType: pendingAgentType, runnerId: pendingRunnerId, existingSessionId, isFollowup } = pendingConfirmation;
     setPendingConfirmation(null);
+    const targetDraftKey = DRAFT_STORAGE_PREFIX + (existingSessionId ?? "__new__");
 
     // First message on an already-created (empty) session: resolve against
     // that session directly instead of going through session creation.
@@ -425,9 +452,15 @@ export function useSessionSubmit({
           });
           if (!res.ok) {
             const data = await res.json().catch(() => ({}));
-            setApiError({ title: "Send Message Error", message: data.error || "Failed to send message" });
+            setApiError({ title: "Send Message Error", message: (data.error ? `${data.error}. ` : "") + "Failed to send message. Your input has been restored." });
             setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
+            if (isSendingPromptRef) isSendingPromptRef.current = false;
+            setPrompt(rawText);
+            if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
+            return;
           }
+          try { localStorage.removeItem(targetDraftKey); } catch {}
+          if (isSendingPromptRef) isSendingPromptRef.current = false;
         } else {
           const autoTriggerKind = isFollowup ? "afterSession" : "codebaseReady";
           const res = await fetch(`/api/sessions/${existingSessionId}/todo-messages`, {
@@ -442,16 +475,24 @@ export function useSessionSubmit({
           });
           if (!res.ok) {
             const data = await res.json().catch(() => ({}));
-            setApiError({ title: "Send Error", message: data.error || "Failed to queue message" });
+            setApiError({ title: "Send Error", message: (data.error ? `${data.error}. ` : "") + "Failed to queue message. Your input has been restored." });
+            if (isSendingPromptRef) isSendingPromptRef.current = false;
+            setPrompt(rawText);
+            if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
             return;
           }
+          try { localStorage.removeItem(targetDraftKey); } catch {}
+          if (isSendingPromptRef) isSendingPromptRef.current = false;
           const autoToast = isFollowup
             ? "Will send automatically once the current run finishes."
             : "Will send automatically once the project is ready.";
           setToast({ message: choice === "pendingAuto" ? autoToast : "Saved as draft — send it manually later.", type: "info" });
         }
       } catch (err: any) {
-        setApiError({ title: "Send Error", message: err.message || "Failed to send message" });
+        if (isSendingPromptRef) isSendingPromptRef.current = false;
+        setPrompt(rawText);
+        if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
+        setApiError({ title: "Send Error", message: (err?.message ? `${err.message}. ` : "") + "Failed to send message. Your input has been restored." });
       }
       return;
     }
@@ -478,24 +519,33 @@ export function useSessionSubmit({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setApiError({ title: "Send Error", message: data.error || "Failed to create session" });
+        setApiError({ title: "Send Error", message: (data.error ? `${data.error}. ` : "") + "Failed to create session. Your input has been restored." });
+        if (isSendingPromptRef) isSendingPromptRef.current = false;
+        setPrompt(rawText);
+        if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
         return;
       }
+      try { localStorage.removeItem(targetDraftKey); } catch {}
+      if (isSendingPromptRef) isSendingPromptRef.current = false;
       const newSession: Session = await res.json();
       finalizeNewSession(newSession, displayMessage, choice === "force");
     } catch (err: any) {
-      setApiError({ title: "Send Error", message: err.message || "Failed to create session" });
+      if (isSendingPromptRef) isSendingPromptRef.current = false;
+      setPrompt(rawText);
+      if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
+      setApiError({ title: "Send Error", message: (err?.message ? `${err.message}. ` : "") + "Failed to create session. Your input has been restored." });
     }
-  }, [hasAvailableAgents, pendingConfirmation, finalizeNewSession, setApiError, setTaskQueue, setToast]);
+  }, [hasAvailableAgents, pendingConfirmation, finalizeNewSession, setApiError, setTaskQueue, setToast, isSendingPromptRef, setPrompt, textareaRef]);
 
   const cancelPendingConfirmation = useCallback(() => {
     if (!pendingConfirmation) return;
+    if (isSendingPromptRef) isSendingPromptRef.current = false;
     setPrompt(pendingConfirmation.rawText);
     setPendingConfirmation(null);
-  }, [pendingConfirmation, setPrompt]);
+  }, [pendingConfirmation, setPrompt, isSendingPromptRef]);
 
   const handleSubmit = useCallback(async () => {
-    if (!hasAvailableAgents) return;
+    if (!hasAvailableAgents || isSubmitting) return;
     const trimmed = prompt.trim();
     const isBlankSession = (isNewSession || (!selectedSessionId && !isNewDraft)) && !trimmed && pendingFiles.length === 0;
 
@@ -585,6 +635,10 @@ export function useSessionSubmit({
       }
     }
 
+    const savedPrompt = prompt;
+    const targetDraftKey = DRAFT_STORAGE_PREFIX + (selectedSessionId ?? "__new__");
+    if (isSendingPromptRef) isSendingPromptRef.current = true;
+    setIsSubmitting(true);
     setPrompt("");
     setShowCommandMenu(false);
     if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
@@ -595,14 +649,23 @@ export function useSessionSubmit({
         if (isNewDraft && !displayMessage) return;
         if (isNewDraft && draftTrigger === "at" && !draftAt) {
           setApiError({ title: "Send Error", message: "Choose a date and time for the scheduled send." });
+          if (isSendingPromptRef) isSendingPromptRef.current = false;
+          setPrompt(savedPrompt);
+          if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
           return;
         }
         if (isNewDraft && draftTrigger === "at" && draftAt && draftAt <= Date.now()) {
           setApiError({ title: "Send Error", message: "The scheduled time must be in the future." });
+          if (isSendingPromptRef) isSendingPromptRef.current = false;
+          setPrompt(savedPrompt);
+          if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
           return;
         }
         if (!isNewDraft && sendScheduledAt && sendScheduledAt <= Date.now()) {
           setApiError({ title: "Send Error", message: "The scheduled time must be in the future." });
+          if (isSendingPromptRef) isSendingPromptRef.current = false;
+          setPrompt(savedPrompt);
+          if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
           return;
         }
         const trimmedRepoPath = repoPath.trim();
@@ -634,6 +697,16 @@ export function useSessionSubmit({
           setPendingConfirmation({ id: targetSessionId, rawText: trimmed, displayMessage, agentPrompt, repoPath: trimmedRepoPath, agentType, runnerId, model: selectedModel, reason: data.reason, files: uploadedFiles.length > 0 ? uploadedFiles : undefined });
           return;
         }
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setApiError({ title: "Send Error", message: (data.error ? `${data.error}. ` : "") + "Failed to create session. Your input has been restored." });
+          if (isSendingPromptRef) isSendingPromptRef.current = false;
+          setPrompt(savedPrompt);
+          if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
+          return;
+        }
+        try { localStorage.removeItem(targetDraftKey); } catch {}
+        if (isSendingPromptRef) isSendingPromptRef.current = false;
         const newSession: Session = await res.json();
         if (useSchedule) setSendScheduledAt(null);
         if (usePendingTrigger) setPendingSendTrigger(null);
@@ -641,6 +714,9 @@ export function useSessionSubmit({
       } else if (sendScheduledAt || pendingSendTrigger) {
         if (sendScheduledAt && sendScheduledAt <= Date.now()) {
           setApiError({ title: "Send Error", message: "The scheduled time must be in the future." });
+          if (isSendingPromptRef) isSendingPromptRef.current = false;
+          setPrompt(savedPrompt);
+          if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
           return;
         }
         try {
@@ -652,13 +728,21 @@ export function useSessionSubmit({
           });
           if (!res.ok) {
             const data = await res.json().catch(() => ({}));
-            setApiError({ title: "Send Error", message: data.error || "Failed to queue message" });
+            setApiError({ title: "Send Error", message: (data.error ? `${data.error}. ` : "") + "Failed to queue message. Your input has been restored." });
+            if (isSendingPromptRef) isSendingPromptRef.current = false;
+            setPrompt(savedPrompt);
+            if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
             return;
           }
+          try { localStorage.removeItem(targetDraftKey); } catch {}
+          if (isSendingPromptRef) isSendingPromptRef.current = false;
           setSendScheduledAt(null);
           setPendingSendTrigger(null);
         } catch (err: any) {
-          setApiError({ title: "Send Error", message: err.message || "Failed to queue message" });
+          if (isSendingPromptRef) isSendingPromptRef.current = false;
+          setPrompt(savedPrompt);
+          if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
+          setApiError({ title: "Send Error", message: (err?.message ? `${err.message}. ` : "") + "Failed to queue message. Your input has been restored." });
         }
       } else {
         const tempTaskId = `agent-${selectedSessionId}-${Date.now()}`;
@@ -690,19 +774,35 @@ export function useSessionSubmit({
             return;
           }
           if (!res.ok) {
-            const data = await res.json();
-            setApiError({ title: "Send Message Error", message: data.error || "Failed to send message" });
+            const data = await res.json().catch(() => ({}));
+            setApiError({ title: "Send Message Error", message: (data.error ? `${data.error}. ` : "") + "Failed to send message. Your input has been restored." });
             setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
+            if (isSendingPromptRef) isSendingPromptRef.current = false;
+            setPrompt(savedPrompt);
+            if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
+            return;
           }
+          try { localStorage.removeItem(targetDraftKey); } catch {}
+          if (isSendingPromptRef) isSendingPromptRef.current = false;
         } catch (err: any) {
           console.error(err);
           setTaskQueue((prev) => prev.filter((t) => t.id !== tempTaskId));
+          if (isSendingPromptRef) isSendingPromptRef.current = false;
+          setPrompt(savedPrompt);
+          if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
+          setApiError({ title: "Send Error", message: (err?.message ? `${err.message}. ` : "") + "Failed to send message. Your input has been restored." });
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      if (isSendingPromptRef) isSendingPromptRef.current = false;
+      setPrompt(savedPrompt);
+      if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
+      setApiError({ title: "Send Error", message: (err?.message ? `${err.message}. ` : "") + "Failed to send message. Your input has been restored." });
+    } finally {
+      setIsSubmitting(false);
     }
-  }, [hasAvailableAgents, prompt, repoPath, agentType, runnerId, selectedModel, isNewSession, isNewDraft, pendingFiles, setPendingFiles, uploadPendingFile, draftTrigger, draftAt, sendScheduledAt, setSendScheduledAt, pendingSendTrigger, setPendingSendTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, setApiError, setToast, handleNewSessionCommand, handleRenameSessionCommand, sendAgentMessage, handleScriptCommand, agentCommands, finalizeNewSession]);
+  }, [hasAvailableAgents, isSubmitting, prompt, repoPath, agentType, runnerId, selectedModel, isNewSession, isNewDraft, pendingFiles, setPendingFiles, uploadPendingFile, draftTrigger, draftAt, sendScheduledAt, setSendScheduledAt, pendingSendTrigger, setPendingSendTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, setApiError, setToast, handleNewSessionCommand, handleRenameSessionCommand, sendAgentMessage, handleScriptCommand, agentCommands, finalizeNewSession, isSendingPromptRef, setPrompt, textareaRef]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return;
@@ -767,5 +867,6 @@ export function useSessionSubmit({
     pendingConfirmation,
     resolvePendingConfirmation,
     cancelPendingConfirmation,
+    isSubmitting,
   };
 }

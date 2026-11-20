@@ -25,6 +25,7 @@ export default function GenView({ ws, onViewSubAgentLog }: Props) {
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isFirstRender = useRef(true);
+  const isSendingRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -40,6 +41,9 @@ export default function GenView({ ws, onViewSubAgentLog }: Props) {
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
+      return;
+    }
+    if (isSendingRef.current) {
       return;
     }
     try {
@@ -100,12 +104,9 @@ export default function GenView({ ws, onViewSubAgentLog }: Props) {
     const trimmed = input.trim();
     if (!trimmed || sending) return;
 
+    const savedInput = input;
+    isSendingRef.current = true;
     setInput("");
-    try {
-      localStorage.removeItem(GEN_DRAFT_STORAGE_KEY);
-    } catch {
-      // localStorage unavailable (private mode / quota)
-    }
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
@@ -126,11 +127,35 @@ export default function GenView({ ws, onViewSubAgentLog }: Props) {
         body: JSON.stringify({ message: trimmed }),
       });
       if (res.ok) {
+        try {
+          localStorage.removeItem(GEN_DRAFT_STORAGE_KEY);
+        } catch {
+          // ignore
+        }
+        isSendingRef.current = false;
         await fetchGenState();
+      } else {
+        setMessages((prev) => prev.filter((m) => m.id !== optimisticUserMsg.id));
+        isSendingRef.current = false;
+        setInput(savedInput);
+        try {
+          localStorage.setItem(GEN_DRAFT_STORAGE_KEY, savedInput);
+        } catch {
+          // ignore
+        }
       }
     } catch (err) {
       console.error("[GenView] failed to send message:", err);
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticUserMsg.id));
+      isSendingRef.current = false;
+      setInput(savedInput);
+      try {
+        localStorage.setItem(GEN_DRAFT_STORAGE_KEY, savedInput);
+      } catch {
+        // ignore
+      }
     } finally {
+      isSendingRef.current = false;
       setSending(false);
     }
   };

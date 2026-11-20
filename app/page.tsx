@@ -837,6 +837,7 @@ export default function HomePage() {
   }, [selectedSessionId]);
 
   const draftKeyRef = useRef<string>(selectedSessionId ?? "__new__");
+  const isSendingPromptRef = useRef(false);
   useEffect(() => {
     const key = selectedSessionId ?? "__new__";
     draftKeyRef.current = key;
@@ -848,6 +849,7 @@ export default function HomePage() {
   }, [selectedSessionId]);
 
   useEffect(() => {
+    if (isSendingPromptRef.current) return;
     try {
       const key = DRAFT_STORAGE_PREFIX + draftKeyRef.current;
       if (prompt) localStorage.setItem(key, prompt);
@@ -1093,7 +1095,7 @@ export default function HomePage() {
     };
   };
 
-  const { handlePromptChange, handleNewSessionCommand, handleRenameSessionCommand, handleAgentCommand, handleSelectScriptCommand, handleSubmit, handleKeyDown, handleSendMessage, commandMenuIndex, pendingConfirmation, resolvePendingConfirmation, cancelPendingConfirmation } = useSessionSubmit({
+  const { handlePromptChange, handleNewSessionCommand, handleRenameSessionCommand, handleAgentCommand, handleSelectScriptCommand, handleSubmit, handleKeyDown, handleSendMessage, commandMenuIndex, pendingConfirmation, resolvePendingConfirmation, cancelPendingConfirmation, isSubmitting } = useSessionSubmit({
     prompt,
     repoPath,
     agentType,
@@ -1114,6 +1116,7 @@ export default function HomePage() {
     selectedSessionId,
     textareaRef,
     setPrompt,
+    isSendingPromptRef,
     setShowCommandMenu,
     setSessions,
     setSelectedSessionId,
@@ -1568,6 +1571,7 @@ export default function HomePage() {
   const isDraftAutoSend = messages.find((m) => m.id === pendingDraftTodoId)?.todoTrigger?.kind === "codebaseReady";
 
   const canSubmit =
+    !isSubmitting &&
     hasAvailableAgents &&
     selectedRunnerConnected &&
     !isArchivedSession &&
