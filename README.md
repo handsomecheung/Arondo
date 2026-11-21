@@ -40,7 +40,7 @@ Arondo supports **Claude Code**, **Codex CLI**, **OpenCode**, **Antigravity CLI 
 
 ### Agent Slash Commands
 
-Type `/` in a session to run built-in or custom regex-powered slash commands configured in **Admin Settings → Default Agent Commands**:
+Type `/` in a session or on the New Session page to run built-in or custom regex-powered slash commands configured in **Admin Settings → Default Agent Commands**:
 
 - `/review [--agent <name>] [instructions]` — Runs a detached agent in a fresh context to review the working tree without modifying files or interrupting the main conversation.
 - `/btw [--agent <name>] <message>` — Asks an independent side question using the session's conversation context without modifying files.

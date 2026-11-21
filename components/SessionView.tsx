@@ -1601,11 +1601,13 @@ export default function SessionView({
 
         {showCommandMenu && !prompt.startsWith("!") && (() => {
           let menuItemIndex = 0;
-          const newVisible = ("/new").startsWith(prompt.trim()) || prompt.trim().startsWith("/new");
+          // Session-only commands are hidden on the New Session page.
+          const hasExistingSession = !isNewSession && !!selectedSessionId;
+          const newVisible = hasExistingSession && (("/new").startsWith(prompt.trim()) || prompt.trim().startsWith("/new"));
           const newItemIndex = newVisible ? menuItemIndex++ : -1;
-          const deleteVisible = ("/delete").startsWith(prompt.trim()) || prompt.trim().startsWith("/delete");
+          const deleteVisible = hasExistingSession && (("/delete").startsWith(prompt.trim()) || prompt.trim().startsWith("/delete"));
           const deleteItemIndex = deleteVisible ? menuItemIndex++ : -1;
-          const renameVisible = ("/rename").startsWith(prompt.trim()) || prompt.trim().startsWith("/rename");
+          const renameVisible = hasExistingSession && (("/rename").startsWith(prompt.trim()) || prompt.trim().startsWith("/rename"));
           const renameItemIndex = renameVisible ? menuItemIndex++ : -1;
           const renameName = prompt.trim().slice("/rename".length).trim();
           return (

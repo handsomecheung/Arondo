@@ -167,8 +167,11 @@ export function useSessionSubmit({
           : true;
         return hasProject;
       }
-      if (v.startsWith("/") && matchesCommand) {
-        return !isNewSession && !!selectedSessionId;
+      if (v.startsWith("/")) {
+        // /new, /rename and /delete only apply to an existing session;
+        // Agent Commands are also available on the New Session page.
+        if (isNewSession || !selectedSessionId) return matchesAgentCmd;
+        return matchesCommand;
       }
       return false;
     })();
@@ -263,6 +266,19 @@ export function useSessionSubmit({
   // Called from SessionView with the raw prompt text (e.g. "/commit foo")
   const handleAgentCommand = useCallback(async (promptText: string) => {
     if (!hasAvailableAgents) return;
+    if (isNewSession || !selectedSessionId) {
+      // No session exists yet: put the command into the input so submitting
+      // creates a session that starts with the resolved command prompt.
+      setPrompt(promptText);
+      setShowCommandMenu(false);
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.focus();
+        autoResizeTextarea(el);
+      });
+      return;
+    }
     const detached = parseDetachedAgentCommand(promptText);
     if (detached && selectedSessionId) {
       if (detached.kind === "btw" && !detached.message) {
@@ -302,7 +318,7 @@ export function useSessionSubmit({
     const agentMessage = resolveAgentCommand(promptText, agentCommands);
     if (agentMessage === null) return;
     await sendAgentMessage(promptText, agentMessage);
-  }, [hasAvailableAgents, sendAgentMessage, agentCommands, selectedSessionId, setApiError, setPrompt, setShowCommandMenu, textareaRef, isSendingPromptRef]);
+  }, [hasAvailableAgents, sendAgentMessage, agentCommands, selectedSessionId, isNewSession, setApiError, setPrompt, setShowCommandMenu, textareaRef, isSendingPromptRef]);
 
   const handleSendMessage = useCallback(async (text: string) => {
     if (!selectedSessionId || !text.trim()) return;
@@ -605,7 +621,8 @@ export function useSessionSubmit({
     // runner-local upload path); agentPrompt is the real instruction sent to
     // the agent, which does include the path so it can read the file.
     let displayMessage = trimmed;
-    let agentPrompt = trimmed;
+    // On the New Session page, an Agent Command is expanded to its prompt.
+    let agentPrompt = isNew && agentMsg !== null ? agentMsg : trimmed;
     const uploadedFiles: Array<{ name: string; serverFilename?: string; size?: number; mimeType?: string }> = [];
     if (pendingFiles.length > 0) {
       try {
