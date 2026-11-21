@@ -2,7 +2,7 @@ Translated by AI([日本語](README.ja.md) | [简体中文](README.zh-Hans.md) |
 
 # Arondo
 
-Arondo is a mobile-first developer workspace that delegates coding tasks to AI agents and monitors executions across multiple machines. It follows a **Frontend + Server + Runner** architecture where lightweight Go-based Runners are installed on development machines and the central Server coordinates all operations.
+Arondo is a mobile-first developer workspace that delegates coding tasks to AI agents and monitors executions across multiple machines. It follows a **Frontend + Server + Runner** architecture where lightweight Go-based Runners run on development machines and a central Server coordinates all operations.
 
 ## Basic Workflow
 
@@ -10,19 +10,13 @@ Arondo lets you delegate work to an AI agent from a mobile-friendly workspace, r
 
 ### 1. Start a session
 
-Choose a Runner, project, and agent, then describe the task and send it.
-
-On regular Session pages, when no Runners are connected, the Runner picker displays **No runners available**, and the Runner picker and chat controls are disabled with a hint to connect a Runner.
-
-On regular Session pages, if the selected Runner has no supported Agent CLI installed, the Agent picker, message input, attachment controls, and Send button are disabled. An installation hint appears beside the Agent picker and in the message input. Install a supported Agent CLI on that Runner to enable chatting.
-
-The **Agent** dropdown shows the selected Runner's latest recorded quota as progress bars labeled `hour:` and `week:`, with remaining percentages and the same color scale as the Runners page. Antigravity CLI shows separate Gemini, Anthropic & Other, and Gemini 4 Argon quota groups; its **Model** dropdown also shows these bars under each group heading. Only known quota windows have bars; missing data and API-key billing are labeled explicitly.
+Choose a connected Runner, project directory, and AI agent (or **Auto**), then describe your task and send it. The Agent and Model menus display remaining hourly and weekly subscription quotas directly as progress bars.
 
 <img src="public/readme/basic-usage/01-create-session.jpg" alt="Creating a new session by choosing a runner, project, and agent, then entering a task" width="360">
 
 ### 2. Review, validate, and commit
 
-Review the agent result and diff, run validation, provide follow-up instructions when needed, and finish by committing the completed work from the same session.
+Review the agent's markdown response and visual Git diff, run validation scripts, send follow-up instructions when needed, and commit the completed work from the same session.
 
 <p>
   <img src="public/readme/basic-usage/02-review-result.jpg" alt="Completed Codex response with changed-file links and a follow-up message input" width="360">
@@ -32,46 +26,45 @@ Review the agent result and diff, run validation, provide follow-up instructions
   <img src="public/readme/basic-usage/06-commit.jpg" alt="Completed commit agent command and final Codex response" width="360">
 </p>
 
-## Agent Commands
+## Core Features
 
-Create reusable slash commands in **Admin Settings → Default Agent Commands** by defining the command name, the instruction sent to the agent, and, when needed, a regular-expression matcher whose capture groups can be inserted as `$1`, `$2`, and so on; type `/` in a session to browse and run built-in and custom commands.
+### Multi-Agent Support & Auto Mode
 
-Two built-in commands start an agent in a fresh, separate context without continuing or changing the parent agent conversation:
+Arondo supports **Claude Code**, **Codex CLI**, **OpenCode**, **Antigravity CLI (`agy`)**, and **Pi**, with full conversation continuity (session resume) across turns.
 
-- `/review [--agent agy] [instructions]` reviews the current working tree for correctness, regressions, security issues, and missing tests. It does not modify files.
-- `/btw [--agent agy] <message>` asks an independent side question using the parent session's normal conversation context. It does not modify files.
+- **Auto Mode (`autoagent`)**: Automatically selects the best installed agent on the target Runner based on live subscription quota availability—filtering out exhausted quotas, prioritizing higher remaining weekly capacity relative to reset time, and holding back API-key-billed options as a fallback.
+- **Dynamic Model & Effort Routing (`automodel`)**: When enabled with TypeSafe AI Jev System One (or standard LLM API keys), automatically selects the optimal model and reasoning/thinking effort for single-use tasks, and dynamically adjusts thinking effort on every turn in ongoing sessions.
+- **Quota Monitoring & Auto-Retry**: Tracks remaining quota across Runners and automatically schedules a retry when an agent hits a rate or quota limit.
 
-Both commands appear as separate agent tasks and retain their own execution output. `agy` is an alias for Antigravity; the same option also accepts `antigravity`, `claude`, `codex`, `opencode`, `pi`, or `auto`.
+<img src="public/readme/auto-mode-quota.png" alt="Runner page showing Claude, Antigravity, and Codex quota information used by Auto Mode" width="360">
+
+### Agent Slash Commands
+
+Type `/` in a session to run built-in or custom regex-powered slash commands configured in **Admin Settings → Default Agent Commands**:
+
+- `/review [--agent <name>] [instructions]` — Runs a detached agent in a fresh context to review the working tree without modifying files or interrupting the main conversation.
+- `/btw [--agent <name>] <message>` — Asks an independent side question using the session's conversation context without modifying files.
+- `/new`, `/rename`, `/delete`, plus custom project or global commands (e.g., `/commit`).
 
 <p>
   <img src="public/readme/agent-command-add.png" alt="Agent Commands settings form for creating a custom slash command" width="360">
   <img src="public/readme/agent-command-list.png" alt="Session command menu listing built-in and custom slash commands" width="360">
 </p>
 
-## Scripts
+### Scripts & Fallback Terminal
 
-Run a shell command by typing `!` in a session, or use **Run Script** on a Project Page for a project-scoped command. Arondo records each command in that project's history, which then supplies the **Run Script** menu and `!` suggestions. Both flows let you choose a file or enter an ad-hoc command.
+- **Quick Scripts (`!`)**: Type `!` in chat or use **Run Script** on a Project Page to run shell commands and scripts concurrently in a PTY. Frequently used commands are saved per project for quick access.
+- **Interactive Terminal**: Open a live `xterm.js` shell on the Runner from the session menu when manual inspection is needed, complete with a mobile special-keys bar (`ESC`, `TAB`, `CTRL`, `ALT`, arrows, `F1`–`F12`).
 
 <p>
   <img src="public/readme/script-list.png" alt="Session quick-run menu showing history commands after typing an exclamation mark" width="360">
-</p>
-
-## Terminal
-
-Open a live shell on the selected Runner from a session’s three-dot menu when you need to inspect or recover from an exceptional situation.
-
-> **Fallback only:** Arondo is designed around agents and saved scripts, which are the recommended ways to work. The Terminal is provided as a safety net, not as the primary workflow; its dense command-line interface is particularly uncomfortable to use on mobile devices.
-
-> **Android keyboard suggestions:** Arondo disables autocorrection, auto-capitalization, spellcheck, and browser autocomplete for terminal input. However, a web app cannot reliably hide Gboard's suggestion strip on a per-site basis. If it is distracting, turn off **Show suggestion strip** in Gboard's **Text correction** settings.
-
-<p>
   <img src="public/readme/terminal-menu.png" alt="Session three-dot menu with the Open Terminal action" width="360">
   <img src="public/readme/terminal-htop.png" alt="Live terminal running htop with the mobile special-key bar" width="360">
 </p>
 
-## Todo Messages
+### Todo Messages & Smart Queuing
 
-Save a prompt as a Todo Message when the project is busy or has uncommitted changes, then choose whether to send it automatically once the codebase is ready, manually later, or at a scheduled time; pending messages remain visible in the session until they are dispatched.
+When a repository has uncommitted changes or an agent is already running, Arondo warns you and lets you queue prompts as **Todo Messages**—dispatched automatically once the codebase is clean, after the current run finishes, at a scheduled date/time, or manually.
 
 <p>
   <img src="public/readme/todo-new.png" alt="New session form with automatic, manual, and scheduled Todo Message modes" width="360">
@@ -79,116 +72,12 @@ Save a prompt as a Todo Message when the project is busy or has uncommitted chan
   <img src="public/readme/todo-message.png" alt="Pending Todo message waiting for the codebase to be ready" width="360">
 </p>
 
-## Auto Mode
+### Mobile-First Workspace & PWA
 
-Select **Auto** in the agent picker to let Arondo choose among the agent CLIs installed on the selected Runner. The **Runners** page shows the quota data that informs this choice.
-
-Auto Mode uses the following order of preference:
-
-1. Exclude subscription choices with known hourly or weekly quota remaining at or below 2%. OpenCode Go also checks monthly quota. Unknown quota is not treated as exhausted for other agents.
-2. Consider installed Antigravity, Claude, Codex, and OpenCode CLIs with known subscription quota. OpenCode requires a Go, Go Plus, or Go Teams record linked to the execution Runner, with all three quota windows known and above 2%; it never enters unknown-quota or API-billing fallback. Other API-key-billed agents are held back as a last resort.
-3. Deprioritize agents with less than 15% hourly quota remaining when another candidate has sufficient capacity; if every eligible candidate is low, keep those above 2% available.
-4. Rank the remaining candidates by weekly quota remaining, adjusted for how much time is left before the weekly reset.
-5. If no eligible subscription choice has known weekly quota, use an agent with unknown quota before falling back to an API-key-billed agent.
-
-Session locks are preserved only while the locked agent/quota group is not exhausted. If every installed choice is exhausted, Auto Mode returns HTTP 503 without starting an agent; queued messages remain pending for retry. Quota retry checks also require weekly quota above 2% and hourly quota of at least 15% when known. OpenCode additionally requires monthly quota above 2%; its retries wait until the last blocking quota window resets.
-
-Enable **automodel** in **Admin Settings → Automodel & LLM API Keys**, or set `ARONDO_ENABLE_AUTOMODEL=true`. It selects inference settings (model and reasoning effort) in two ways:
-
-- **Single-use Auto sessions (`--once`)**: After Auto Mode selects the agent and quota group, automodel can choose a model and effort from that choice’s allowed options. `ARONDO_INNER_AUTOMODEL_METHOD=DM` (default) tries Jev System One (`TYPESAFE_API_KEY`) first, with a 3-second timeout. If Jev is unavailable or fails, it selects the first configured standard LLM provider in Anthropic → OpenAI → Google order, with a 2-second timeout. A standard LLM failure does not retry the next provider. Invalid or failed routing keeps the quota-selected default model.
-- **Ongoing sessions and explicitly selected agents**: On the first message and each follow-up, Jev selects only the current model family’s effort, using the user message, bounded recent conversation context, and previous effort. This path always uses Jev, regardless of `ARONDO_INNER_AUTOMODEL_METHOD`, and never falls back to a standard LLM. An unavailable key, timeout, error, or invalid choice keeps the previous inference settings, or the configured default on the first turn. Explicitly selected agents keep their model family even with `--once`.
-
-Codex passes effort through `model_reasoning_effort`; Claude Code uses `--effort`; Pi uses `--thinking` with native effort options (`low`, `medium`, `high`, `xhigh`, `max`). Known models receive model-specific effort candidates, while unknown models require explicitly configured candidates. Antigravity uses configured names such as `Gemini 4 Argon (Low)` and `(High)` within the same family and quota group. OpenCode expands known `opencode-go/` models into their native reasoning variants, including bare model entries in single-use Auto routing. For example, MiniMax M3 offers `#none` (thinking disabled) and `#thinking` (adaptive thinking enabled), rather than low/medium/high. Automodel excludes `opencode-go/claude-haiku-5-5#none`, including explicitly configured candidates, to avoid invalid Anthropic effort values when switching from `none` to a graded effort. Explicitly configured `provider/model#variant` entries take precedence for that model; unknown models and other providers require configured variants in **Agent Models & Defaults**. If there are fewer than two supported effort choices, routing is skipped. Auto-selected OpenCode remains restricted to `opencode-go/`; explicitly selected OpenCode can use its configured non-Go and Free models. Model families without a resolved model or supported effort choices keep their settings.
-
-Environment API keys take precedence over saved keys. Turn logs record the applied `resolvedEffort` alongside `resolvedModel`, and follow-ups reuse those values when Jev fails. Agent execution cards display a separately recorded effort after the model name, for example `gpt-6-sol · high`. Antigravity and OpenCode variants remain part of the displayed model name.
-
-Excluding Haiku’s `#none` prevents new Automodel selections but does not repair existing OpenCode session history. In OpenCode v2.2.5, a resumed Haiku session that previously used `none` can still fail when switching to a graded effort. To recover it, merge the following into the Runner’s OpenCode configuration and reload it before retrying. This disables cache-preserving per-message effort updates for that model and sends the current effort directly:
-
-```json
-{
-  "providers": {
-    "opencode-go": {
-      "models": {
-        "claude-haiku-5-5": {
-          "compatibility": { "supportsEffortUpdates": false }
-        }
-      }
-    }
-  }
-}
-```
-
-Auto Mode writes its agent selection trace to `${ARONDO_CONFIG_DIR}/sessions/${sessionId}/logs/${messageId}.autoagent.log` (the configuration directory defaults to `~/.arondo`). The log includes available candidates, quota records and timestamps used for selection, filtering, scores, candidate order, and the selected agent/quota group, including session lock overrides. Model routing is recorded separately in `${messageId}.automodel.log`.
-
-<img src="public/readme/auto-mode-quota.png" alt="Runner page showing Claude, Antigravity, and Codex quota information used by Auto Mode" width="360">
-
-## Agent Models & Defaults
-
-Configure default models and available model lists in **Admin Settings → Agent Models & Defaults**:
-
-- **Antigravity CLI (agy)**: Configured separately for **Gemini Group**, **Others Group** (Claude/other models), and **Gemini 4 Argon Group**, aligning with Antigravity quota tiers.
-- **Claude Code (claude)**: Customize default models and recognized model options passed via `--model`.
-- **Codex CLI (codex)**: Customize default model and reasoning effort options passed to OpenAI Codex.
-- **OpenCode (opencode)**: Defaults to `opencode-go/minimax-m3` (MiniMax M3), with separate **Go / Pay-as-you-go** and **Free** groups. The Free group includes Go subscription free models and free `opencode/` models, including Big Pickle. Recognized free models in existing lists appear in the Free group automatically. Edit or reset each group in Admin Settings, then select **Save**. Configure models as `provider/model` or `provider/model#variant`; put whitespace before `#` comments to preserve attached variants. `opencode-go/` requires a Go subscription, including for its free models; `opencode/` provides both paid and free models. On runners without an active Go subscription (Free status), model dropdown menus present only free models under `opencode/`.
-- **Pi (pi)**: Defaults to `litellm/balanced-model`. Pi uses `--session-id` for session continuity and `--thinking` for effort. Pi does not report subscription quota windows; in Auto Mode, it is treated alongside API Key billing agents.
-
-The OpenCode Free list is stored as `setitngs.agentModels.opencode.freeModels` in `arondo.json`. Missing lists use the built-in defaults; administrators can edit the list as model availability changes. The Free group does not display Go subscription quota bars.
-
-The **Auto Agent** section at the top of the page lists agy, Claude Code, Codex CLI, OpenCode, and Pi with a checkbox each, all checked by default. Unchecking an agent temporarily excludes it from Auto Mode selection; agents chosen directly are not affected. Excluded agents are stored in `setitngs.agentModels.autoAgentExcluded` in `arondo.json`.
-
-When creating a session, choose a model family from **Model** and its optional thinking effort from the **Effort** row below it. In an existing session, the header’s agent dropdown lists only agents; clicking an agent opens a popup with **Thinking effort** above **Model**. Only the model list scrolls, keeping effort choices visible. Choosing a model or effort applies it immediately and closes the popup. Auto is selected directly from the agent dropdown. The agent dropdown follows the Runners page order (Claude Code, Antigravity CLI, OpenCode, Codex, Pi), with API Key billed agents last.
-
-Effort choices depend on the model’s capabilities and configured options. Antigravity variants such as `Gemini 3.8 Flash (High)` appear as one model family, with separate Low/Medium/High choices; selecting a family selects Auto when the family has two or more variants, otherwise its only variant. Every agent offers **Auto** (Antigravity only when a family has two or more variants), which leaves effort unset so automodel chooses it each turn without changing the selected model; for Antigravity, if automodel is unavailable, Auto falls back to the family’s Medium variant. OpenCode MiniMax M3 offers `none` and `thinking` rather than low/medium/high. The effort row uses the configured default model when Model is **Default**, including when opening another agent in the header. It is hidden when no model can be resolved or fewer than two choices are available.
-
-The model is saved on the session and takes precedence over the admin default on subsequent runs and resumes. Selecting **Default** in the model list clears the session’s explicit model and uses the configured admin default; switching agents also clears the previous model unless a new one is selected. For OpenCode, leaving the admin default blank omits `--model` and lets OpenCode select its own model, including a resumed session’s saved selection. API clients can include effort in the `model` string: Claude, Codex, and Pi use `<model> <effort>` (for example, `opus high`); Antigravity uses its configured full model name, and OpenCode uses `provider/model#variant`. With automodel enabled, per-turn effort routing adjusts the effort within the chosen family unless an explicit effort is selected.
-
-For signed-in OpenCode v2 installations, Arondo reads Go quota through `opencode api GET /api/experimental/usage/limits` on the Runner. The Runners page and Agent dropdown show the reported 5-hour, weekly, and monthly remaining quota and reset times. Initial discovery, stale refresh, and manual refresh use the same quota pipeline as other agents.
-
-When OpenCode quota is unavailable, the Runners page shows a login hint. On that Runner, run `opencode auth login opencode`, sign in to an OpenCode Console account with an active Go subscription, then refresh the quota. Configuring only an `opencode-go` API key does not provide the Console authentication required by the usage endpoint.
-
-Arondo records `Account` as `data.workspace.id` and normalizes `Plan` to the literal `"Go"` only when `data.go` is present. This labels Go-family subscription quota; it does not identify the Go, Go Plus, or Go Teams tier. The reported usage percentages are converted to remaining ratios, and reset timestamps are converted from milliseconds to seconds.
-
-Installations without an OpenCode Console account are still reported instead of being left blank. The Runner reads the stored Console credential to tell the billing modes apart:
-
-| State | `Plan` | `IsAPIKey` | Reported as |
-|---|---|---|---|
-| Go subscription | `Go` | `false` | 5-hour, weekly, and monthly remaining quota |
-| Signed in without Go (or unconfigured) | `Free` | `false` | No Go subscription; quota unavailable |
-| API-key credential connected | `API Key` | `true` | API key billing; quota unavailable |
-| Usage response unreadable | `Unknown` | `false` | Quota could not be read on this runner |
-
-Because a quota record now always exists for OpenCode, the Runner page lists OpenCode for every runner that has the binary installed, and the server stops retrying the usage request for an installation that cannot report Go quota.
-
-Auto Mode includes OpenCode only with verified Go subscription capacity. Its fallback model uses the configured OpenCode default when it belongs to `opencode-go/`; automodel options are restricted to that provider, preserving `#variant` suffixes and using inline comments as model descriptions.
-
-When an agent exits non-zero, Arondo uses Jev System One to classify the outcome, distinguishing actionable failures (invalid model selections, quota exhaustion, agent-side failures, invalid invocation parameters) from tasks completed with warnings where a substantive answer was produced in stdout. When stdout is present, Jev evaluates only stdout, so stderr messages alone do not turn a run into a failure; stderr is sent only when stdout is empty. Both logs remain available in the UI. Configure Jev in Admin Settings to enable this classification and its quota retry follow-up.
-
-## Admin Settings
-
-Open **Admin Settings** (`/admin/settings`) to choose a section. Each section has its own page and a back button that returns to the settings index. All pages require an admin token; personal and device preferences remain in **Settings** (`/settings`).
-
-Each section ends with **Save** and **Cancel**. Changes remain local until you select **Save**. A successful save returns to the Admin Settings index; **Cancel** discards unsaved edits and returns to the same index. Failed saves keep the editor open for correction or retry. This includes toggles, API key removals, runner permissions, commands, and token creation, renaming, or revocation. Newly created token values appear in a dialog after returning to the index so they can be copied securely.
-
-| Section | Page |
-| --- | --- |
-| Session & File Settings | `/admin/settings/sessions-and-files` |
-| Agent Models & Defaults | `/admin/settings/agent-models` |
-| Automodel & LLM API Keys | `/admin/settings/automodel` |
-| Web Push Notifications | `/admin/settings/web-push` |
-| Default Agent Commands | `/admin/settings/agent-commands` |
-| Global Agent Rules | `/admin/settings/global-rules` |
-| System Access Tokens | `/admin/settings/system-tokens` |
-| Runner Tokens | `/admin/settings/runner-tokens` |
-| Runner Access Control | `/admin/settings/runner-access` |
-| Runner Updates | `/admin/settings/runner-updates` |
-
-## Access Control
-
-Configure authentication from **Admin Settings** using three separate pages:
-
-- **System Access Tokens** authenticate people and automations to Arondo. Create `admin` tokens for full administrative access and `user` tokens for restricted access; token values are only shown in full when generated, so store them securely.
-- **Runner Tokens** authenticate each Runner machine. Generate one dedicated token per Runner and pass it with `--token` or `ARONDO_RUNNER_TOKEN`; it binds to the first Runner identity that connects, preventing a leaked token from impersonating a different Runner.
-- **Runner Access Control** grants individual `user` tokens access to selected Runners. Admin tokens can access every Runner; users can access only the Runners that explicitly include their token, so a Runner with no selected users remains admin-only.
+- **Installable PWA & Web Push**: Install Arondo to your home screen and receive native VAPID Web Push notifications on desktop and mobile (including iOS/iPadOS 16.4+) when agents finish, fail, or wait for terminal input.
+- **Integrated File Browser & Diff Viewer**: Browse remote files with syntax highlighting, insert paths with `@`, upload files directly from chat, and inspect session or project Git diffs inline.
+- **Multi-User Access Control**: Role-based authentication (`admin` and `user` tokens), dedicated per-runner tokens bound on first connect, and per-runner user access control lists.
+- **Gen Main Agent (Experimental)**: A unified conversational interface (`/gen`) with self-compacting memory that automatically infers the target project and delegates multi-turn tasks to sub-agents.
 
 <img src="public/readme/access-control.png" alt="Settings page for system access tokens, runner tokens, and per-runner access control" width="360">
 
@@ -199,466 +88,90 @@ Browser (Next.js UI)  <--ws-->  Server (Next.js)  <--ws-->  Runner A (Go, machin
                                                   <--ws-->  Runner B (Go, machine-2)
 ```
 
-- **Runner** (`runner/`): A Go binary that connects to the Server via WebSocket. Executes commands, manages PTY sessions, runs git/filesystem operations. Minimal config — just a server URL and token.
-- **Server**: Routes operations to Runners. Manages all persistent state (sessions, projects, messages, logs). Serves the frontend.
-- **Frontend**: Single-page React UI with runner selection, file browsing, chat, terminal modals, and task queue.
-
-All execution goes through a Runner — there is no local fallback on the server.
-
-## Features
-
-- **Multi-Machine Runners**: Install Go runners on any development machine. The UI lets you pick which runner runs each session. Runner cards on the Runners dashboard show the Runner version without expanding details, displaying `unknown` when unavailable; IP addresses are available in the expanded System Information panel. Administrators can deliberately disconnect a runner and delete disconnected runners from the Runners dashboard. Active tasks of a disconnected runner stay open until it reconnects and reports them; deleting the runner marks any still-open tasks as lost.
-- **Todo Messages (Drafts, Scheduled Send, Auto-Queue Follow-ups & Quota Retry)**: "Send this message later" is a single `user-todo` chat message with a status/trigger (manual, codebaseReady, afterSession, quotaAvailable, or a fixed time), rendered inline with a three-dot menu (Cancel / Send Now / Change Trigger). Covers TODO drafts saved while a project has uncommitted changes or a running agent, follow-ups queued behind a running agent, and automatic quota-exhaustion retries — all shown as first-class tasks in the Tasks dashboard. A session can queue multiple todo messages at once; the chat input stays enabled while a draft/pending todo exists so you can keep composing further follow-ups. The chat input's "+" popup menu offers "Upload File", "Send Later" (manual), "Send When Clean" (codebaseReady), and "Schedule Send" (pick a future date/time) — all backed by the same todo-messages plumbing. Scheduled ("at") todos left stuck mid-send by a server restart are automatically resolved to `failed` instead of hanging.
-- **Session Archiving**: Automatically archive sessions idle for more than a configured period, or manually archive/unarchive them. Pinned sessions are exempted from auto-archiving. Archived sessions are read-only to prevent sending new messages, while preserving history, logs, and diff views. The default idle day count before auto-archiving is configurable in **Admin Settings → Session & File Settings**. Unarchiving a session is disabled if its parent project has been deleted. Before deleting a project, a warning dialog flags any associated archived sessions that would become unusable.
-- **Recent Sessions, Pinning, Filtering & Three-dot Menu**: The sidebar is centered on recent sessions, with a lightweight Archived Sessions hint instead of a separate Projects tab. Pin important sessions to the top (ordered by pinned timestamp), filter by project or runner when needed (the selected filters are kept in the URL as `?runner=` and `?project=` query parameters, so they survive a refresh), and use each session's three-dot menu to Pin, Rename, Archive, or Delete it.
-- **Project Readiness Warnings**: Warns before creating a session or sending the first message on an empty session when the project has uncommitted changes or a running agent, offering options to send anyway, auto-send once ready, or save as a TODO session. The "Send now anyway" option is hidden when an agent is already running, since the server always rejects it in that case. Follow-up messages on a session that already has history skip this check and only block on that session's own running state or an already-queued todo.
-- **Project Page Navigation & Three-dot Menu**: The Project Page header includes a back button to return to the previous session (with the previous session highlighted in the project's session list) and offers a three-dot menu with File Browser, Open Terminal, Show Changes (a sessionless visual diff of the project's working tree, disabled when clean), and Delete Project. The Scripts section shows running project-scoped scripts with live execution time, inline log streaming, and stop controls.
-- **Multi-User Token-Based Authentication**: Secure the application with token-based authentication supporting `admin` and `user` roles. Automatically generates an admin access token on first startup if not already configured. Client tokens support custom names and distinct colors, which are displayed on user message cards alongside sender avatars. Admins can manage access tokens and configure runner-specific access control lists (restricting runners to specific user token UUIDs) from the Settings dashboard.
-- **Secure WebSocket Communication**: Browser-to-server WebSocket connections are secured by passing the authentication token via the `Sec-WebSocket-Protocol` header (`arondo-token`), preventing exposure of sensitive credentials in query parameters or server logs.
-- **Session-Based Workspaces**: Each task is encapsulated inside a self-contained session under the configuration directory (`~/.arondo/sessions/[sessionId]/` by default), tracking history, settings, and outputs.
-- **Detached Review & Side-Question Agents**: Run `/review` to inspect the current working tree or `/btw <message>` to ask a side question without interrupting the parent agent session. Each run receives copied normal session context, uses a fresh agent conversation, never modifies files by instruction, and is displayed and retained as a separate task with its own output.
-- **Granular Execution Logging**: Outputs for every CLI command execution are logged separately under `~/.arondo/sessions/[sessionId]/logs/[messageId].log`, with stderr captured in adjacent `.stderr.log` files when agents run in piped mode. Stderr output can be viewed in a modal from the agent execution card's menu (Show Stderr).
-- **Multiple AI Agents Support**: Supports **Antigravity CLI (agy)**, **Claude Code**, **Codex**, and **OpenCode** for code generation tasks.
-- **Interactive Terminal (PTY)**: Both agent and script execution run in a full pseudo-terminal via Go's `creack/pty`, rendered in the browser with `xterm.js`. Supports interactive stdin, ANSI colors, and cursor control. PTY ensures reliable process cleanup on runner exit (SIGHUP). Interactive shell terminals are spawned directly on the runner rather than the server.
-- **Mobile Terminal Keyboard Bar**: Includes a mobile-specific special-keys bar (ESC, TAB, CTRL, ALT, arrows, and an FN layer for F1-F12) for the terminal modal. It dynamically tracks visualViewport to pin itself above the virtual keyboard, preventing keyboard obstruction.
-- **Dedicated Execution Cards & Rich Markdown View**: Script execution uses `ScriptExecCard` (supporting inline log streaming for quick-run commands), while agent execution uses `AgentExecCard` which renders output as Markdown with syntax highlighting (`rehype-highlight`) and clickable file/URL links. Agent cards show the model selected for each run on a separate, wrapping line below the agent name when model information is available, and omit the status line after successful completion. Clicking a verified file path automatically opens the Remote File Browser. Users can copy the formatted markdown output or raw text output directly from the card's menu, inspect Stderr via Show Stderr, or view execution status and raw exit codes via Show Status. Users can also copy chat messages using the Copy action on user chat cards.
-- **Terminal Session Persistence & Reattaching**: Terminal sessions persist across browser refreshes or close events. Re-opening a terminal automatically reattaches to the active PTY session on the runner and replays the output buffer.
-- **Quota & Session Limit Detection**: Uses Jev System One to classify agent failures, including quota exhaustion, from the execution context and displays human-readable error messages. Confirmed quota exhaustion continues through the automatic retry flow.
-- **AI Agent Quota Monitoring**: Automatically collects quota usage data for Claude, Antigravity, and Codex via tmux, and OpenCode Go via its authenticated usage API on the runners, recognizes API-key billing accounts, and displays known remaining quota or an explicit unknown state in the Runners dashboard. Supports an interactive LLM fallback loop to handle agent UI changes, modals, and slash commands.
-- **autoagent (Auto Mode)**: Automatically selects the best agent from known subscription quotas, preferring available capacity over unknown data and using API-key billed choices only as a last fallback. When configured, automodel makes a second-stage model/effort choice from only the quota-filtered options that Auto Mode passes to it.
-- **Manual Agent Switching**: Switch the active agent (Antigravity CLI, Claude Code, Codex, OpenCode, or Auto) on-the-fly within an existing session when the agent is idle. The session header's agent menu shows the session Runner's latest recorded quota using the same progress bars and quota groups as the New Session Agent dropdown. Each agent expands in place to a secondary list of its models, so the agent and model can be chosen in one dropdown, with scrolling on smaller screens.
-- **Agent Session Continuity (Resume)**: Conversations in the same session retain their agent-specific history. Claude Code uses native resume support, Codex CLI stores and reuses Codex session IDs, OpenCode CLI stores and reuses OpenCode session IDs, and Antigravity CLI (agy) stores detected conversation IDs for subsequent `--conversation` runs.
-- **Secure Prompt Passing**: The Runner writes prompts to temporary files referenced by `ARONDO_PROMPT_FILE`, and agent commands read the contents into a quoted CLI argument. Claude, Codex, and OpenCode place `--` before that argument so messages such as `--hi` are treated as prompt text, including when resuming a conversation. The expanded prompt is still present in the agent process arguments and subject to operating-system argument size limits. The "Show Prompt" panel displays the real resolved prompt instead of the original raw inputs.
-- **Concurrent Script Execution**: Allows running multiple scripts simultaneously within a single session. Active session scripts are derived from unmatched `script-run` messages, so their state survives persistence without a separate session field. The user can continue chatting while background scripts are running. Also supports running project-scoped scripts while an agent is executing.
-- **Script Input Waiting Detection (Linux only)**: Linux Runners inspect `/proc/<pid>/wchan` for TTY read wait channels. When a script waits for terminal input, its execution card shows a keyboard icon and Arondo sends a push notification. Each new wait cycle after submitted input sends a new notification. This detection is unavailable on macOS and Windows.
-- **History-based Scripts**: Script commands run in a session or from a Project Page are retained as per-project history and can be selected again from the **Run Script** menu or by typing `!`.
-- **Config-driven & Custom Slash Commands**: Built-in slash commands (like `/new`, `/delete`, `/rename <name>`, `/review`, and `/btw <message>`) and custom user-defined agent slash commands are config-driven and customizable. `/review` and `/btw` are dispatched as detached agents rather than normal follow-up messages. You can configure user-defined agent slash commands via the **Agent Commands** management UI in Settings (saved in `~/.arondo/agent-commands.json` by default) with regex matcher and replacement expansion support.
-- **Smart Chat Input, Drafts & File Uploads**: Supports Tab completion to cycle through slash commands in the command menu. Supports typing `@` symbol trigger to open a file/directory selector modal and insert the relative path into the chat input. Direct file uploads are supported in the chat input (files are sent to the runner's temporary directory and the resolved path is passed to the agent). Chat drafts are persisted in `localStorage` per session and for the Gen Main Agent chat to survive switching sessions/views or client reloads, clearing only upon successful send (HTTP 200) and automatically restoring input on delivery failure. Typing `!` trigger allows quick execution of project-scoped scripts (with autocompletion), including while creating a new session, your 5 most-used ad-hoc history commands, a "Select…" entry to run a picked file directly as a shell command, or fallback to arbitrary shell commands. Keyboard behavior is streamlined across both Session and Gen chat inputs: send messages on `Enter` (on desktop), insert a newline on `Ctrl+Enter` / `Meta+Enter` or `Shift+Enter`, and keep standalone `Enter` as a newline on mobile devices to prevent accidental sends. Also supports a global reload shortcut (`F5` or `Ctrl+R` / `Cmd+R`) for PWA/Standalone app use, and manual "Refresh App" buttons across the application.
-- **Remote File Browsing & File Browser**: Browse directories on any connected runner directly from the UI when selecting a project path. Open a Remote File Browser from the session's three-dot menu, featuring code syntax highlighting (loaded in 64KB chunks on scroll to support files of any size), word wrap enabled by default with a toggle, and an admin-configurable hidden-files setting.
-- **Global Agent Rules Sync**: Configure global agent rules in the Settings UI, which are automatically synced to `~/.gemini/GEMINI.md`, `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.config/opencode/AGENTS.md`, and `~/.pi/agent/AGENTS.md` on the runners. Global rules are stored in `~/.arondo/global-rules.md`.
-- **Integrated Diff Viewer (diff2html) & Commit History**: View visual code changes directly from the browser, supporting session-wide diffs and single-file inline diff viewer modals triggered directly from file links in agent execution cards, featuring word wrap enabled by default with a toggle. Supports collapsing and expanding individual changed files dynamically inside the diff view. Also supports viewing git commit history and specific commit diffs (Show Commits) via a modal.
-- **Scheduled Tasks, Auto-Queue Follow-ups & Heartbeat Quota Retry**: Schedule project-scoped scripts to run at a future fixed time. Chat input remains active during agent runs; follow-up messages are automatically queued as `afterSession` scheduled tasks. When an agent hits a quota limit, the server's 1-minute Heartbeat service detects the error, verifies/refreshes the agent's quota info from the runner if older than 5 minutes, and automatically converts the user prompt into a scheduled retry at `reset time + 5 minutes` (or `now + 5 minutes`).
-- **Runner Connection Stability (Heartbeat & Dead Link Detection)**: The Go runner client maintains a persistent connection with the server via periodic heartbeats, detecting dead WebSocket connections using a read deadline and ping/pong exchanges, and auto-reconnecting with exponential backoff.
-- **Task Queue & Live Tracking**: Active task queue in the header with PID tracking and live log inspection. Clicking a task opens its dedicated console log modal. Each running task can be killed from the queue, and stopped project-scoped tasks can be deleted from their three-dot menu. Completed tasks are retained for 3 days, and are removed from the queue as soon as their session is archived. Tasks and todo messages belonging to automation sessions are automatically filtered out from the active queue and Tasks dashboard by default.
-- **Task Grouping, Filtering & Inline Logs**: In the Tasks dashboard, tasks can be filtered by type (Agent/Script), toggled to show only non-completed tasks by default, and grouped by Scope or Status. Script execution logs are now also viewable inline.
-- **Task Persistence**: Active task contexts are persisted by serializing execution metadata directly into the session and project `messages.json` files and dynamically restored on server restart. Runner IDs are stable across reconnections.
-- **Automated Data Lifecycle**: Automatically purges sessions or projects during listing queries if their parent references (e.g. project or runner) no longer exist.
-- **Mobile-Friendly UI**: Designed with collapsible panels, modal logs, responsive menus, and touch-friendly actions. Supports a swipe-to-archive gesture for session items in the mobile sidebar with a 3-second undo button.
-- **Project Management**: Scopes and tracks sessions within resolved repository paths.
-- **Unread Session Completion Indicator**: Automatically tracks when background running sessions complete (`done` or `error`). It compares the session's `completedAt` timestamp with the user's `lastViewedAt` timestamp. If a session has unviewed completions, the UI displays a colored dot next to the session in the sidebar (green for success, red for error) and an unread count badge in the header menu button.
-- **Native Web Push Notifications (VAPID)**: Delivers server-driven native push notifications to registered desktop and mobile devices even when the browser is closed or running in the background. Notifies upon agent completion, script exit, or task failure. Device subscriptions and delayed test notifications (e.g. 30s) are managed in Settings, and server VAPID contact email is configurable in Admin Settings. Supports modern browsers and iOS/iPadOS 16.4+ (as an installed PWA).
-- **PWA / Installable App**: Ships a web app manifest (`app/manifest.ts`) and a registered service worker (`public/sw.js`) so the app can be installed to the home screen with a standalone window across desktop and mobile platforms.
-- **Gen Main Agent (Experimental)**: Accessible via the **Gen** button in the sidebar (`/gen`). Provides a conversational interface with self-compacting memory where Gen automatically infers the target project from context (or asks for clarification), selects the agent, model, and reasoning effort via `autoagent` + `automodel`, delegates execution to a Sub-Agent (automatically continuing the target repository's latest Sub-Agent session across related multi-turn tasks, even if other repositories were queried in between, and showing the session ID and turn number on each card), reports results in chat, and sends a Web Push notification upon completion. All Gen state, conversations, and sub-agent logs are isolated per client under `${ARONDO_CONFIG_DIR}/gen/${clientId}/`.
+- **Runner** (`runner/`): Lightweight stateless Go binary connecting to the Server via WebSocket to execute agent CLIs, PTY scripts, file browsing, and Git operations.
+- **Server**: Coordinates Runners, manages persistent state (`~/.arondo/` by default), and serves the web application and REST/WebSocket APIs.
+- **Frontend**: Mobile-first React UI for sessions, projects, live terminals, diffs, and task monitoring.
 
 ## Getting Started
 
-### 1. Install dependencies and create the script environment file
-
-Run these commands from the repository root:
+### 1. Install dependencies & configure environment
 
 ```bash
 npm install
 cp scripts/sample.env scripts/.env
 ```
 
-The startup scripts load `scripts/.env` as a Bash file. See [scripts/sample.env](scripts/sample.env) for configuration instructions. Keep credentials in `scripts/.env`, which is ignored by Git. Use `export` for optional server environment variables.
-
-### 2. Start the server and create a runner token
+### 2. Start the server & create a Runner token
 
 ```bash
 ./scripts/run.server.sh
 ```
 
-Open [http://localhost:3251](http://localhost:3251) and sign in with the admin access token printed in the server console on first startup. In **Admin Settings → Runner Tokens**, create a token for your local runner. Edit `scripts/.env` and set:
+Open [http://localhost:3251](http://localhost:3251) and sign in with the admin token printed in the server console on first startup. Go to **Admin Settings → Runner Tokens**, generate a token for your Runner, and set `ARONDO_RUNNER_TOKEN_LOCALDEV` in `scripts/.env`.
 
-```bash
-ARONDO_RUNNER_TOKEN_LOCALDEV='your-runner-token'
-```
-
-The runner token is separate from the admin access token.
-
-### 3. Start a runner
-
-In another terminal, run the convenience script from the repository root (requires Go):
+### 3. Start a Runner
 
 ```bash
 ./scripts/run.runner.sh
 ```
 
-Alternatively, build and start the runner directly with the token you created:
+Or build and run the Go binary directly on any machine:
 
 ```bash
-cd runner
-bash ./build.sh
-./arondo-runner --server ws://localhost:3251/runner --token <runner_access_token>
-
-# Alternatively, pass it via environment variable:
-# ARONDO_RUNNER_TOKEN=<runner_access_token> ./arondo-runner --server ws://localhost:3251/runner
-cd ..
+cd runner && bash ./build.sh
+./arondo-runner --server ws://localhost:3251/runner --token <runner_token>
 ```
+
+Runners support `--check-connection` to verify connectivity and `--auto-update=true` to automatically update when a newer server version is deployed.
 
 ### 4. Build the CLI (optional)
 
 ```bash
-cd cli
-go build -o arondo-cli .
-cd ..
+cd cli && go build -o arondo-cli . && cd ..
 ```
 
-### 5. Start a session in the UI
+## CLI & Automation API
 
-Open [http://localhost:3251](http://localhost:3251) in your browser. Select the connected runner, choose a project directory, and start a session.
-
-## Configuration & Environment Variables
-
-- `ARONDO_CONFIG_DIR` – (Optional) Custom directory to store configuration and runtime data. Defaults to `~/.arondo` in both development and production.
-- `PORT` – (Optional) Server port. Defaults to `3251` in development, `3250` in production.
-- `ARONDO_SESSION_ARCHIVE_DAYS_DEFAULT` – (Optional) Default number of idle days before active sessions are auto-archived, used when no override is set in Settings. Defaults to `7`.
-- `ARONDO_AUTOMATION_SESSION_RETENTION_HOURS_DEFAULT` – (Optional) Default number of hours automation sessions are retained before cleanup, used when no override is set in Settings. Defaults to `72`.
-- `ARONDO_FILE_SHOW_HIDDEN_DEFAULT` – (Optional) Default for whether hidden files/directories (dotfiles) appear in the file browser and @ path selector, used when no override is set in Settings. Defaults to `true`; set to `false` to hide dotfiles by default.
-- `TYPESAFE_API_KEY` (or `JEV_API_KEY`), `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY` – Provider API keys used by `automodel` (with Jev prioritized first for model routing, falling back to Anthropic -> OpenAI -> Google) and LLM-assisted quota extraction (using standard LLMs). These can also be configured from Settings and stored as `setitngs.llmApiKeys` in `arondo.json`; environment variables take precedence and disable editing for that provider in the UI. If none are configured, Auto Mode keeps using the predefined model selected by the existing quota-based logic.
-- `ARONDO_INNER_RUNNER_QUOTA_METHOD` – (Optional) Runner agent quota fetching strategy (`AUTO` | `LLM`). Defaults to `AUTO` (uses fast regex extraction, falling back to an interactive LLM loop if parsing fails and an LLM API key is configured). Set to `LLM` to force using the interactive LLM loop directly from the initial screen upon agent launch. Configured strictly via server environment variable (invalid values cause the server to fail on startup).
-- `ARONDO_INNER_AUTOMODEL_METHOD` – (Optional) Automodel decision routing strategy for single-use Auto sessions (`DM` | `LLM`); per-turn effort routing always uses Jev. Defaults to `DM` (prioritizes TypeSafe AI Jev System One for ultra-fast categorical model/effort decisions when configured, falling back to standard LLMs if Jev is unavailable or fails). Set to `LLM` to force routing directly with standard LLMs (Anthropic -> OpenAI -> Google), bypassing Jev. Configured strictly via server environment variable (invalid values cause the server to fail on startup).
-
-### Configuration Files (in `ARONDO_CONFIG_DIR` or `~/.arondo/`)
-
-- `arondo.json` – Unified runtime config containing multi-user access tokens, per-runner access tokens, and global app settings. Stored with the following structure:
-  ```json
-  {
-    "clients": [
-      {
-        "token": "32-character-hex-string",
-        "uuid": "canonical-uuid-string",
-        "name": "Display Name",
-        "type": "admin"
-      }
-    ],
-    "runners": [
-      {
-        "id": "token-id",
-        "token": "32-character-hex-string",
-        "name": "Runner Token Name",
-        "createdAt": 1720000000000,
-        "lastUsedAt": 1720000100000,
-        "boundRunnerId": "server-generated-runner-id"
-      }
-    ],
-    "cli": {
-      "server": "https://arondo.example",
-      "clientToken": "client-access-token"
-    },
-    "setitngs": {
-      "sessionArchiveDays": 7,
-      "showHiddenFiles": true
-    }
-  }
-  ```
-  If no token with `type: "admin"` exists on startup, one is generated automatically, written to the config, and printed in the server logs. Runner tokens are created and managed individually in **Admin Settings → Runner Tokens**; each locks to the first runner identity that registers with it (`boundRunnerId`).
-  The CLI reads `cli.server` and `cli.clientToken` from this same file. Its connection-setting precedence is `--server` / `--client-token`, then `ARONDO_SERVER` / `ARONDO_CLIENT_TOKEN`, then this config file.
-- `global-rules.md` – Rules synced to `~/.gemini/GEMINI.md`, `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.config/opencode/AGENTS.md`, and `~/.pi/agent/AGENTS.md` on connected runners.
-- `agent-commands.json` – User-defined agent slash commands.
-- Global application configuration settings are stored under the top-level `setitngs` field in `arondo.json`.
-- `agent-sessions.json` – Agent conversation/session continuity map, stored as `{ "agy": {}, "codex": {}, "opencode": {}, "pi": {} }`.
-
-### Data Migrations
-
-Server-side data migrations live in the repository's `migration/` directory. On every server startup, Arondo finds files named `YYYY-MM-DD-description.mjs`, sorts them by filename, and executes them in that order before accepting requests.
-
-Each migration must export a default function (or a named `migrate` function) that accepts `{ configDir }`. `configDir` is the active `ARONDO_CONFIG_DIR` directory, or `~/.arondo/` when that environment variable is unset.
-
-```js
-export default async function migrateExample({ configDir }) {
-  // Apply an idempotent data migration under configDir.
-}
-```
-
-Because every migration runs again after each restart, migrations must be idempotent: do not overwrite existing destination data, and make a completed migration safe to run again. Use a date prefix based on the day the migration is added so execution order remains explicit.
-
-## Automation API
-
-Scripts and external programs can drive Arondo directly over HTTP using the same REST endpoints as the UI. Three endpoints cover the full create → message → poll lifecycle:
-
-### Authentication
-
-Every request must include a valid client token, either as a header or a query parameter:
-
-```
-x-arondo-token: <client_access_token>
-# or
-?token=<client_access_token>
-```
-
-Tokens are issued by an admin from Settings → Client Tokens (`/api/auth/client-tokens`), stored in `~/.arondo/arondo.json`. A `user`-role token must also be granted access to the target runner via its `allowedUserTokenUuids` list; `admin`-role tokens can access any runner.
-
-### 1. Create a session
-
-```
-POST /api/sessions
-Content-Type: application/json
-x-arondo-token: <token>
-
-{
-  "repoPath": "/path/to/repo",   // repository path on the runner — required unless "noProject" or "automation" is set
-  "automation": false,           // optional — create a hidden, project-free automation session; cannot be combined with repoPath or noProject
-  "runnerId": "runner-id",       // target runner — optional for noProject or automation; an accessible connected runner is picked at random
-  "prompt": "Fix the login bug", // prompt sent to the agent; omit/blank to create an idle session
-  "agentType": "auto",           // optional — "antigravity" | "claude" | "codex" | "opencode" | "pi" | "auto" (default: "auto")
-  "name": "My session",          // optional — defaults to first line of the prompt
-  "force": false                 // optional — bypass the dirty-working-tree / already-running checks
-}
-```
-
-- `prompt` can contain an Agent Command such as `/commit`. When no separate display `message` is supplied, the server expands matching commands using built-in, default, and project definitions, with project definitions taking priority. The history keeps the original command as the message and stores the expanded instruction as its prompt. This also applies when creating a draft with `isDraft: true`.
-- Returns `201` with the created `Session` object (includes `id`).
-- Returns `409 { error: "Session already exists" }` if an explicit session `id` is supplied that already exists.
-- Returns `409 { needsConfirmation: true, reason: { dirty, busy } }` if the repo has uncommitted changes or an agent is already running and `force` was not set — retry with `force: true` to proceed anyway.
-
-### 2. Send a message to a session
-
-```
-POST /api/sessions/{id}/messages
-Content-Type: application/json
-x-arondo-token: <token>
-
-{
-  "message": "Also add a test for this", // required
-  "force": false                         // optional — bypass the dirty-working-tree / already-running checks
-}
-```
-
-- Runs the agent again with the new message appended to the session's history (agent session continuity/resume is preserved).
-- When `prompt` is omitted, matching Agent Commands in `message` are expanded using the session's project and default definitions. An explicit `prompt` is preserved. The same expansion applies when queueing a message through `POST /api/sessions/{id}/todo-messages`.
-- Returns `403` if the session is archived — unarchive it first.
-- If this is the first message ever sent on the session, the same dirty/busy confirmation gate as session creation applies: returns `409 { needsConfirmation: true, reason: { dirty, busy, isFollowup: false } }` unless `force: true` is set. For later follow-ups, only this session's own running state and already-queued todo messages block the send: returns `409 { needsConfirmation: true, reason: { dirty: false, busy, queued, isFollowup: true } }`.
-
-### 3. Query session status
-
-```
-GET /api/sessions/{id}
-x-arondo-token: <token>
-```
-
-- Returns the `Session` object. Check `status`, one of: `idle`, `running`, `script-running`, `done`, `error`.
-- `done`/`error` means the agent finished; poll this endpoint until the status leaves `running`/`script-running`.
-
-### Automation sessions
-
-Set `automation: true` on `POST /api/sessions`, or use `arondo-cli send --automation`, to create a session with `automation: true` and `noProject: true` in `session.json` and no project record. Each session receives a fresh Runner-side directory at `${ARONDO_CONFIG_DIR:-$HOME/.arondo}/automation-workspaces/YYYY-MM-DD_HH-mm-ssZ-<random>/` (UTC). The configuration directory is resolved on the Runner, independently of the CLI and server. When no runner is specified, an accessible connected Runner is selected at random. Decision agents run on the server without a Runner or a dedicated workspace.
-
-Automation sessions are hidden from session lists, archived lists, search, Tasks, Todo lists, and completion notifications by default. An admin can enable **Admin Settings → Show automation sessions** (`setitngs.showAutomationSessions`). Direct session-ID access and polling remain available. Automation sessions are retained for `automationSessionRetentionHours` (default 72 hours, configurable in Admin Settings or via `ARONDO_AUTOMATION_SESSION_RETENTION_HOURS_DEFAULT`) before automatic session cleanup; workspaces are retained until manually removed, including after session deletion. No automatic workspace deletion is performed.
-
-The sidebar's active and archived session lists label Jev decision sessions with a **Jev** tag, automation sessions with an **Automation** tag, and single-use sessions with a **Once** tag. Sessions with multiple attributes display each applicable tag.
-
-`--automation` cannot be combined with `--path`, `--no-path`, `--resume`, or `--session-id`. It permits follow-up messages via a later `send --session-id <id>` unless `--once` was used. Both `--automation --once` and `--automation --once --cache on` are supported.
-
-### CLI
-
-`cli/arondo-cli` is a dependency-free Go CLI. Build it with `cd cli && go build -o arondo-cli . && cd ..`. Its `send` command creates a session or sends a message to an existing session, then polls until it finishes and prints the result. The required message is passed as the final positional argument.
+External scripts and coding agents can delegate tasks via the REST API (`/api/sessions`) or `cli/arondo-cli`:
 
 ```bash
+# Run an isolated automation task and stream/wait for completion
 cli/arondo-cli send \
   --server http://localhost:3251 \
   --client-token <client_access_token> \
   --automation \
-  "Print the current date"
-```
+  "Summarize the system environment"
 
-The command prints the session ID. Use it to continue that conversation in a later invocation:
+# Continue an existing session or run a slash command on the current repo
+cli/arondo-cli send --resume "/commit"
 
-```bash
-cli/arondo-cli send \
-  --server http://localhost:3251 \
-  --client-token <client_access_token> \
-  --session-id <session_id> \
-  "Now also print the current directory"
-```
+# Run fast categorical decisions via TypeSafe AI Jev System One
+cli/arondo-cli decide '{"questions":{"is_urgent":{"type":"noul","instructions":"Conveys urgency"}}}'
 
-When creating a session without `--automation`, `--no-path`, or `--path`, the script uses its current working directory as the repository path.
-For sessions using an existing path, omitting `--runner-id` and `--runner-name` selects the connected runner with the current hostname; use `--runner-id` or `--runner-name` when no runner or multiple runners share that hostname (if multiple runners share the same name, use `--runner-id` instead of `--runner-name`). `--automation` and `--no-path` instead select an accessible connected Runner at random.
-Use `--resume` to send the message to the most recently updated session for the selected runner and repository path. It cannot be combined with `--session-id`, `--automation`, or `--no-path`.
-Pass an Agent Command as the message, for example `cli/arondo-cli send --resume "/commit"`, to run its configured prompt. Matcher capture groups such as `$1` are expanded, and project commands take priority over default and built-in commands. This works for new sessions, follow-ups, and messages queued with `--confirmation auto` or `--confirmation draft`; `/review` and `/btw` require an existing session.
-Use `--once` with `--automation` to create a single-use session that disallows follow-up messages; subsequent `--resume` or `--session-id` requests targeting this session will be rejected.
-Use `--cache on` (default: `off`, requires `--once`) to cache single-use session outputs in `${ARONDO_CONFIG_DIR}/cache/once/` keyed by the SHA-256 hash of the prompt. Cache entries expire after seven days; their creation timestamps are stored in `${hash}.meta.json`. Expired files are retained and refreshed only after a subsequent successful agent run.
-Use `--confirmation auto`, `--confirmation draft`, or `--confirmation force` to resolve a server `needsConfirmation` response the same way as the Web UI buttons: queue for automatic send, save as a manual draft, or send now anyway.
-When the server returns `needsConfirmation: true`, the CLI prints a hint with those retry choices.
-Use `--output plain` (default), `--output json`, or `--output html` to choose the output format. In `plain` mode, terminal output is streamed in real time. In `json` mode, the final JSON result uses `sessionId` and includes the agent's stdout as `rawOutput`. In `html` mode, the rendered HTML is printed upon completion.
-The final result is written to stdout; progress messages and errors are written to stderr.
-Failed sessions exit nonzero and report the failure reason on stderr. If a completion event omits the reason, the CLI refreshes it from the session API.
-
-#### Fast Categorical Decisions (`decide`)
-
-Run fast categorical decisions, classifications, triage, or probability evaluations powered by TypeSafe AI's System One model (`jev-latest`) without spawning a coding agent or connecting a runner:
-
-```bash
-cli/arondo-cli decide '{
-  "state": "Our API integration started returning 500 errors on every request about 20 minutes ago, and we can'\''t process any customer orders until this is fixed.",
-  "questions": {
-    "department": {
-      "type": "choice",
-      "instructions": "Which team should handle this",
-      "criteria": {
-        "billing": "Payment or subscription issues",
-        "technical": "Bugs or integration problems",
-        "sales": "Pricing or account questions"
-      }
-    },
-    "frustration": {
-      "type": "score",
-      "instructions": "How frustrated the customer appears",
-      "criteria": [
-        "Calm, just stating facts",
-        "Frustrated but civil",
-        "Very angry, strong language"
-      ]
-    },
-    "is_urgent": {
-      "type": "noul",
-      "instructions": "The message conveys urgency or time-sensitivity"
-    }
-  }
-}'
-```
-
-Or pipe JSON directly via standard input:
-
-```bash
-cat payload.json | cli/arondo-cli decide
-```
-
-- **Input Format**: Expects a valid JSON object containing a `questions` map. Supported question primitives:
-  - `choice`: Categorical selection among string options (`choices` array or `criteria` map with descriptions).
-  - `score`: Ordered evaluation scale between 2 and 10 levels (`criteria` array).
-  - `noul`: Bernoulli truth probability estimation between 0.0 and 1.0 (True/False or Yes/No propositions).
-  - The `model` field is optional (defaults to `jev-latest` on the server). The `state` field is optional context.
-- **Server-Side Execution**: Runs directly on the server via `TYPESAFE_API_KEY` (in ~180ms) without requiring a connected runner or git repository.
-- **Ephemeral & Web-Clean**: Automatically runs with `--automation` and `--once` semantics, so sessions do not appear in the Web UI session list by default.
-- **Output**: Formatted plain text by default, or structured JSON when using `--output json`. JSON output includes `decisionAnswers`, the native Jev answer map with choices, probabilities, and confidence values.
-
-Additional CLI commands help inspect runner readiness before sending work:
-
-```bash
+# Inspect connected runners, available agents, and quotas
 cli/arondo-cli get-agents
 cli/arondo-cli get-quota
 cli/arondo-cli update-quota
 ```
 
-`get-agents` reports whether Antigravity, Claude, Codex, and OpenCode are available on each accessible runner, including quota-derived availability reasons. `get-quota` prints the latest recorded quota data, and `update-quota` queues an asynchronous quota refresh. All CLI commands use the same connection-setting precedence: explicit `--server` / `--client-token`, then `ARONDO_SERVER` / `ARONDO_CLIENT_TOKEN`, then `cli.server` / `cli.clientToken` in `~/.arondo/arondo.json`.
+Run `cli/install-skill` to install the bundled `arondo-cli` skill for Codex, Claude Code, Antigravity CLI, or OpenCode.
 
-### Install the Arondo CLI Skill
+## Configuration
 
-Install the bundled `arondo-cli` skill so Codex, Claude Code, Antigravity CLI (`agy`), or OpenCode can delegate tasks through `cli/arondo-cli`:
+Runtime data is stored in `ARONDO_CONFIG_DIR` (defaults to `~/.arondo/`). Most settings—including agent model defaults, LLM API keys, global agent rules, Web Push VAPID contact, and access tokens—are managed directly in the UI under **Admin Settings** (`/admin/settings`).
 
-```bash
-cli/install-skill
-```
+Common environment variables:
 
-Install only selected agents with `cli/install-skill codex claude`, for example. The installer refuses to replace an existing skill unless `--force` is supplied.
-
-## Runner CLI
-
-```
-arondo-runner [flags]
-
-Flags:
-  --server string     Server WebSocket URL (default "ws://localhost:3251/runner")
-  --token string      Runner access token (optional, can also set ARONDO_RUNNER_TOKEN)
-  --check-connection  Check server authentication and WebSocket Ping/Pong, then exit
-  --version           Print the runner version and exit
-  --auto-update       Automatically apply runner updates (default false; log notices only)
-```
-
-`--check-connection` uses the same server URL and token options as normal startup, including `ARONDO_RUNNER_TOKEN` and the `--token` override. It makes one authenticated WebSocket connection and verifies a matching Pong within a total 10-second timeout covering connection setup and Ping/Pong. It logs the result and exits with code `0` on success or `1` on failure, without retrying. It sends no Runner registration or task messages, so it does not bind an unused token, create a Runner record, or disconnect an existing Runner using the same token.
-
-```bash
-arondo-runner --server wss://your-server/runner --check-connection
-```
-
-The runner auto-reconnects with exponential backoff if the server connection drops. When another runner registers with the same token, the server requests that the previous runner shut down. The runner logs the reason before exiting, both for replacement and for an administrator's Disconnect action. It has no display name of its own — the name shown across the UI comes from the runner token's `name`, set by an admin when generating the token in Settings.
-
-**Admin Settings → Runner Updates** configures the download URL template, stored as `setitngs.runnerDownloadUrl` in `arondo.json`. The default is:
-
-```text
-https://github.com/handsomecheung/Arondo/releases/download/v${version}/arondo-runner-${os}-${arch}
-```
-
-The supported placeholders are `${version}` (the server's `package.json` version, without a leading `v`), `${os}` (the connecting runner's OS, with `darwin` mapped to `macos`), and `${arch}` (the runner's architecture, such as `amd64` or `arm64`). Templates must use an absolute HTTP or HTTPS URL. Save applies edits; Cancel discards them, and **Use default URL** restores the default in the editor.
-
-On registration, the server compares semantic versions and sends `runner.update` with `{ version, downloadUrl }` when the runner is older. Template edits apply to subsequent registrations. Equal or newer versions, and missing or invalid versions, receive no update instruction.
-
-Automatic updating is disabled by default. Without `--auto-update`, or with `--auto-update=false`, the runner only logs the target version and download URL when it receives an update instruction. Enable automatic updating explicitly at startup:
-
-```bash
-arondo-runner --server wss://your-server/runner --auto-update=true
-```
-
-With `--auto-update=true`, the runner downloads the binary into a temporary file beside its executable, checks that `--version` matches the requested version, and runs the new binary with its original arguments and environment plus `--check-connection`. Downloading and preflight leave the current runner connected and accepting work. Downloads time out after five minutes; the version and connection-check subprocesses have five- and fifteen-second limits respectively. The download request does not include the runner token.
-
-After preflight succeeds, the runner waits until all agents, scripts, and interactive terminals have finished, including their exit notifications and in-progress script restarts. It atomically stops accepting new task launches, backs up the existing binary as `<executable>.previous`, replaces it with the verified binary, and calls `execve`. The PID, original arguments, environment, and standard input/output/error redirections are preserved. Long-running tasks postpone the update; they are not terminated. Multiple processes sharing an executable serialize replacement using `<executable>.update.lock`.
-
-Download or preflight failure leaves the current runner running and removes the temporary file. If `execve` returns an error, the old binary is restored and task execution resumes on the existing connection. Failed updates can be retried by a later server update instruction; repeated instructions for the same version are limited to one attempt per minute. The previous binary remains available after a successful switch. Automatic rollback after a successful `execve` followed by a crash is not provided. Automatic updates require write access to the executable's directory and support for hard links for the backup; symlinked installations update the executable's resolved target.
-
-`runner/build.sh` embeds the current `package.json` version into the runner. Both local startup scripts (such as `scripts/local/run.runner1.sh`) and tagged release builds use this script, so the same version comparison applies in both environments. When building directly with `go build` or `go run`, supply `-ldflags "-X main.Version=<version>"` to embed the version.
-
-For a version upgrade, update `version` in `package.json`, keep `package-lock.json` in sync, and use the matching release tag (for example, `0.3.20` and `v0.3.20`). The server and release runner use that package version; no runner source version needs to be edited.
-
-Tagged releases build both `runner/arondo-runner` and `cli/arondo-cli` binaries for Linux amd64, macOS amd64, and macOS arm64.
+- `PORT` – Server port (default: `3251` in dev, `3250` in prod).
+- `ARONDO_CONFIG_DIR` – Directory for configuration and session data (default: `~/.arondo`).
+- `ARONDO_ENABLE_AUTOMODEL` – Enable automatic model and effort routing (`true` | `false`).
+- `TYPESAFE_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY` – Optional API keys for `automodel`, Jev decisions, and LLM-assisted quota extraction.
 
 ## Testing
 
-Integration tests are implemented using Playwright. They spawn a mock-configured server and a Go runner to test API endpoints and WebSocket operations end-to-end.
-
-The Admin Settings navigation tests also launch Chromium, which requires a Playwright browser installation and its system libraries.
-
-To run the integration tests:
+Run the end-to-end Playwright integration test suite (spawns an isolated server and Go runner):
 
 ```bash
 npx playwright install --with-deps chromium
 npm run test:integration
 ```
-
-The browser tests use Playwright's normal browser cache (or `PLAYWRIGHT_BROWSERS_PATH` when set), while the server and test runners use an isolated home directory.
-
-On Ubuntu 24.04, you can install the Chromium libraries explicitly instead of using `--with-deps`:
-
-```bash
-sudo apt install -y libnspr4 libnss3 libatk1.0-0t64 libatk-bridge2.0-0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libxkbcommon-x11-0 libasound2t64
-npx playwright install chromium
-npm run test:integration
-```
-
-On Linux with Nix and a `nixpkgs` channel, supply Chromium's shared libraries without installing system packages:
-
-```bash
-npx playwright install chromium
-nix-shell --expr '
-  let pkgs = import <nixpkgs> { }; in
-  pkgs.mkShell {
-    LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (with pkgs; [
-      alsa-lib
-      at-spi2-core
-      dbus
-      expat
-      glib
-      libgbm
-      libx11
-      libxcb
-      libxcomposite
-      libxdamage
-      libxext
-      libxfixes
-      libxkbcommon
-      libxrandr
-      nspr
-      nss
-      systemd
-    ]);
-  }
-' --run 'npm run test:integration'
-```
-
-The test runner will:
-1. Build the Go runner binary.
-2. Spin up the Next.js server on port `3252` using a temporary config directory (`.arondo-test/`).
-3. Spawn the Go runner to connect to the test server.
-4. Run server API tests (`tests/server/`) and runner-capabilities tests (`tests/runner/`).
-5. Terminate all test processes and clean up temporary test configurations and logs automatically.
