@@ -90,9 +90,13 @@ export async function dispatchDetachedAgent(
 
   const runner = runnerManager.getRunner(runnerId);
   if (!session.noProject && session.repoPath && runner) {
-    const exists = await runnerManager.checkPathExists(runnerId, session.repoPath);
-    if (!exists) {
-      return { ok: false, error: "Session path does not exist on runner", status: 400 };
+    try {
+      const exists = await runnerManager.checkPathExists(runnerId, session.repoPath);
+      if (!exists) {
+        return { ok: false, error: "Session path does not exist on runner", status: 400 };
+      }
+    } catch (err: any) {
+      return { ok: false, error: `Failed to verify session path on runner: ${err?.message || String(err)}`, status: 503 };
     }
   }
   const selectedAgentType = agentType || session.agentType;
@@ -198,9 +202,13 @@ export async function dispatchFollowupMessage(
   if (!session.noProject && session.repoPath) {
     const runner = runnerManager.getRunner(session.runnerId);
     if (runner) {
-      const exists = await runnerManager.checkPathExists(session.runnerId, session.repoPath);
-      if (!exists) {
-        return { ok: false, error: "Session path does not exist on runner", status: 400 };
+      try {
+        const exists = await runnerManager.checkPathExists(session.runnerId, session.repoPath);
+        if (!exists) {
+          return { ok: false, error: "Session path does not exist on runner", status: 400 };
+        }
+      } catch (err: any) {
+        return { ok: false, error: `Failed to verify session path on runner: ${err?.message || String(err)}`, status: 503 };
       }
     }
   }
@@ -720,9 +728,13 @@ export async function dispatchSessionScript(
   if (!session.noProject && session.repoPath) {
     const runner = runnerManager.getRunner(session.runnerId);
     if (runner) {
-      const exists = await runnerManager.checkPathExists(session.runnerId, session.repoPath);
-      if (!exists) {
-        return { ok: false, error: "Session path does not exist on runner", status: 400 };
+      try {
+        const exists = await runnerManager.checkPathExists(session.runnerId, session.repoPath);
+        if (!exists) {
+          return { ok: false, error: "Session path does not exist on runner", status: 400 };
+        }
+      } catch (err: any) {
+        return { ok: false, error: `Failed to verify session path on runner: ${err?.message || String(err)}`, status: 503 };
       }
     }
   }

@@ -832,30 +832,54 @@ class RunnerManager {
 
   async checkPathExists(runnerId: string, path: string): Promise<boolean> {
     const connectedId = this.resolveRunnerId(runnerId);
-    if (!connectedId) return false;
+    if (!connectedId) {
+      throw new Error(`Runner ${runnerId} not found or disconnected`);
+    }
+
+    let shouldFallbackToFsList = false;
     try {
       const res = await this.sendRequest(connectedId, "fs.infos", { paths: [path] }, 5_000);
       const info = res?.results?.[path];
       if (info && typeof info.exists === "boolean") {
         return info.exists;
       }
-    } catch {
-      // Fall through to fs.list
-    }
-    try {
-      await this.sendRequest(connectedId, "fs.list", { path }, 5_000);
-      return true;
-    } catch {
       return false;
+    } catch (err: any) {
+      if (String(err?.message).toLowerCase().includes("unknown method")) {
+        shouldFallbackToFsList = true;
+      } else {
+        throw err;
+      }
     }
+
+    if (shouldFallbackToFsList) {
+      try {
+        await this.sendRequest(connectedId, "fs.list", { path }, 5_000);
+        return true;
+      } catch (err: any) {
+        if (
+          err?.code === "NOT_FOUND" ||
+          String(err?.message).includes("failed to read directory") ||
+          String(err?.message).includes("no such file")
+        ) {
+          return false;
+        }
+        throw err;
+      }
+    }
+
+    return false;
   }
 
   async checkPathsExist(runnerId: string, paths: string[]): Promise<Record<string, boolean>> {
     if (paths.length === 0) return {};
     const connectedId = this.resolveRunnerId(runnerId);
-    if (!connectedId) return {};
+    if (!connectedId) {
+      throw new Error(`Runner ${runnerId} not found or disconnected`);
+    }
 
     const results: Record<string, boolean> = {};
+    let shouldFallbackToFsList = false;
     try {
       const res = await this.sendRequest(connectedId, "fs.infos", { paths }, 5_000);
       if (res?.results) {
@@ -865,22 +889,36 @@ class RunnerManager {
           }
         }
       }
-    } catch {
-      // Fall through to fs.list
+    } catch (err: any) {
+      if (String(err?.message).toLowerCase().includes("unknown method")) {
+        shouldFallbackToFsList = true;
+      } else {
+        throw err;
+      }
     }
 
-    const remaining = paths.filter((p) => results[p] === undefined);
-    if (remaining.length > 0) {
-      await Promise.all(
-        remaining.map(async (p) => {
-          try {
-            await this.sendRequest(connectedId, "fs.list", { path: p }, 5_000);
-            results[p] = true;
-          } catch {
-            results[p] = false;
-          }
-        })
-      );
+    if (shouldFallbackToFsList) {
+      const remaining = paths.filter((p) => results[p] === undefined);
+      if (remaining.length > 0) {
+        await Promise.all(
+          remaining.map(async (p) => {
+            try {
+              await this.sendRequest(connectedId, "fs.list", { path: p }, 5_000);
+              results[p] = true;
+            } catch (err: any) {
+              if (
+                err?.code === "NOT_FOUND" ||
+                String(err?.message).includes("failed to read directory") ||
+                String(err?.message).includes("no such file")
+              ) {
+                results[p] = false;
+              } else {
+                throw err;
+              }
+            }
+          })
+        );
+      }
     }
 
     return results;
@@ -926,7 +964,7 @@ class RunnerManager {
   }
 
   getTaskIdByPtyKey(sessionId: string, messageId: string): string | undefined {
-    let taskId = this.ptyKeyToTaskId.get(`${sessionId}:${messageId}`);
+    const taskId = this.ptyKeyToTaskId.get(`${sessionId}:${messageId}`);
     if (!taskId) {
       for (const [id, ctx] of this.tasks) {
         if (ctx.messageId === messageId && !ctx.completedAt) {

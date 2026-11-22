@@ -71,9 +71,13 @@ export async function GET(request: NextRequest) {
     Array.from(projectsByRunner.entries()).map(async ([runnerId, runnerProjects]) => {
       if (!runnerManager.getRunner(runnerId)) return;
       const paths = runnerProjects.map((p) => p.repoPath);
-      const res = await runnerManager.checkPathsExist(runnerId, paths);
-      for (const [pathStr, exists] of Object.entries(res)) {
-        existenceResults.set(`${runnerId}:${pathStr}`, exists);
+      try {
+        const res = await runnerManager.checkPathsExist(runnerId, paths);
+        for (const [pathStr, exists] of Object.entries(res)) {
+          existenceResults.set(`${runnerId}:${pathStr}`, exists);
+        }
+      } catch (err) {
+        console.warn(`[projects] Failed to check paths on runner ${runnerId}:`, err);
       }
     })
   );

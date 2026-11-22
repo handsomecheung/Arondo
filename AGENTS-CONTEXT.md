@@ -115,6 +115,8 @@ app/
           route.ts      # GET: fetch run log for specific messageId
         git-status/
           route.ts      # GET: check git changes via runner
+        path-status/
+          route.ts      # GET: check session repository path existence on runner
         messages/
           route.ts      # POST: add user follow-up message & trigger agent via runner
         detached-agent-runs/

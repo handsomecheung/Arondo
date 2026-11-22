@@ -32,9 +32,16 @@ export async function POST(
   if (!session.noProject && session.repoPath) {
     const runner = runnerManager.getRunner(session.runnerId);
     if (runner) {
-      const exists = await runnerManager.checkPathExists(session.runnerId, session.repoPath);
-      if (!exists) {
-        return NextResponse.json({ error: "Session path does not exist on runner" }, { status: 400 });
+      try {
+        const exists = await runnerManager.checkPathExists(session.runnerId, session.repoPath);
+        if (!exists) {
+          return NextResponse.json({ error: "Session path does not exist on runner" }, { status: 400 });
+        }
+      } catch (err: any) {
+        return NextResponse.json(
+          { error: `Failed to verify session path on runner: ${err?.message || String(err)}` },
+          { status: 503 },
+        );
       }
     }
   }

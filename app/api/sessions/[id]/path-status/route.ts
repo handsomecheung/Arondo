@@ -28,8 +28,16 @@ export async function GET(
     return NextResponse.json({ exists: true, runnerConnected: false });
   }
 
-  const exists = await runnerManager.checkPathExists(session.runnerId, session.repoPath);
-  return NextResponse.json({ exists, runnerConnected: true });
+  try {
+    const exists = await runnerManager.checkPathExists(session.runnerId, session.repoPath);
+    return NextResponse.json({ exists, runnerConnected: true });
+  } catch (err: any) {
+    return NextResponse.json({
+      exists: true,
+      runnerConnected: true,
+      checkError: err?.message || String(err),
+    });
+  }
 }
 
 export const dynamic = "force-dynamic";
