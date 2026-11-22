@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { useMessageCompletenessCheck } from "./useMessageCompletenessCheck";
 import type { Session, TaskItem } from "@/types/home";
 import { resolveAgentCommand, getUniqueTriggers, getTriggerWord } from "@/lib/agentCommands";
 import type { AgentCommand } from "@/lib/agentCommands";
@@ -98,6 +99,13 @@ export function useSessionSubmit({
   selectedModel,
   onClearSelectedModel,
 }: UseSessionSubmitParams) {
+  const { check: checkCompleteness, isChecking, needsConfirmation: incompleteMessage, resolve: resolveCompleteness } = useMessageCompletenessCheck(
+    `${isNewSession}:${isNewDraft}:${selectedSessionId}:${runnerId}:${repoPath}`, prompt,
+  );
+  const resolveIncompleteMessage = useCallback((send: boolean) => {
+    resolveCompleteness(send);
+    if (!send) requestAnimationFrame(() => textareaRef.current?.focus());
+  }, [resolveCompleteness, textareaRef]);
   const [commandMenuIndex, setCommandMenuIndex] = useState(-1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingConfirmation, setPendingConfirmation] = useState<{
@@ -209,6 +217,7 @@ export function useSessionSubmit({
 
   const sendAgentMessage = useCallback(async (originalMessage: string, agentMessage: string) => {
     if (!hasAvailableAgents || !selectedSessionId) return;
+    if (!(await checkCompleteness(originalMessage, selectedSessionId))) return;
     const targetDraftKey = DRAFT_STORAGE_PREFIX + selectedSessionId;
     if (isSendingPromptRef) isSendingPromptRef.current = true;
     setPrompt("");
@@ -261,7 +270,7 @@ export function useSessionSubmit({
       if (textareaRef.current) requestAnimationFrame(() => { if (textareaRef.current) autoResizeTextarea(textareaRef.current); });
       setApiError({ title: "Command Error", message: "Failed to send command. Your input has been restored." });
     }
-  }, [hasAvailableAgents, selectedSessionId, repoPath, agentType, runnerId, setTaskQueue, setApiError, isSendingPromptRef, setPrompt, setShowCommandMenu, textareaRef]);
+  }, [checkCompleteness, hasAvailableAgents, selectedSessionId, repoPath, agentType, runnerId, setTaskQueue, setApiError, isSendingPromptRef, setPrompt, setShowCommandMenu, textareaRef]);
 
   // Called from SessionView with the raw prompt text (e.g. "/commit foo")
   const handleAgentCommand = useCallback(async (promptText: string) => {
@@ -561,7 +570,7 @@ export function useSessionSubmit({
   }, [pendingConfirmation, setPrompt, isSendingPromptRef]);
 
   const handleSubmit = useCallback(async () => {
-    if (!hasAvailableAgents || isSubmitting) return;
+    if (!hasAvailableAgents || isSubmitting || isChecking) return;
     const trimmed = prompt.trim();
     const isBlankSession = (isNewSession || (!selectedSessionId && !isNewDraft)) && !trimmed && pendingFiles.length === 0;
 
@@ -614,6 +623,8 @@ export function useSessionSubmit({
     if (!trimmed && !isBlankSession) return;
 
     const isNew = isNewSession || isNewDraft || !selectedSessionId;
+    if (!isNewDraft && !sendScheduledAt && !pendingSendTrigger && !isBlankSession &&
+      !(await checkCompleteness(trimmed, isNew ? undefined : selectedSessionId || undefined))) return;
     const targetRunnerId = isNew ? runnerId : (selectedSession?.runnerId ?? runnerId);
     const targetSessionId = isNew ? crypto.randomUUID() : (selectedSessionId || undefined);
 
@@ -819,7 +830,7 @@ export function useSessionSubmit({
     } finally {
       setIsSubmitting(false);
     }
-  }, [hasAvailableAgents, isSubmitting, prompt, repoPath, agentType, runnerId, selectedModel, isNewSession, isNewDraft, pendingFiles, setPendingFiles, uploadPendingFile, draftTrigger, draftAt, sendScheduledAt, setSendScheduledAt, pendingSendTrigger, setPendingSendTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, setApiError, setToast, handleNewSessionCommand, handleRenameSessionCommand, sendAgentMessage, handleScriptCommand, agentCommands, finalizeNewSession, isSendingPromptRef, setPrompt, textareaRef]);
+  }, [checkCompleteness, isChecking, hasAvailableAgents, isSubmitting, prompt, repoPath, agentType, runnerId, selectedModel, isNewSession, isNewDraft, pendingFiles, setPendingFiles, uploadPendingFile, draftTrigger, draftAt, sendScheduledAt, setSendScheduledAt, pendingSendTrigger, setPendingSendTrigger, selectedSessionId, selectedSession, loadProjects, setTaskQueue, setApiError, setToast, handleNewSessionCommand, handleRenameSessionCommand, sendAgentMessage, handleScriptCommand, agentCommands, finalizeNewSession, isSendingPromptRef, setPrompt, textareaRef]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return;
@@ -880,6 +891,8 @@ export function useSessionSubmit({
     pendingConfirmation,
     resolvePendingConfirmation,
     cancelPendingConfirmation,
-    isSubmitting,
+    isSubmitting: isSubmitting || isChecking,
+    incompleteMessage,
+    resolveIncompleteMessage,
   };
 }

@@ -22,6 +22,7 @@ import CommandModal from "@/components/modals/CommandModal";
 import ProjectScriptCommandModal from "@/components/modals/ProjectScriptCommandModal";
 import ToastNotification from "@/components/modals/ToastNotification";
 import ApiErrorModal from "@/components/modals/ApiErrorModal";
+import MessageCompletenessModal from "@/components/modals/MessageCompletenessModal";
 import ProjectNotReadyModal from "@/components/modals/ProjectNotReadyModal";
 import RenameSessionDialog from "@/components/modals/RenameSessionDialog";
 import ConfirmDialog from "@/components/modals/ConfirmDialog";
@@ -1095,7 +1096,7 @@ export default function HomePage() {
     };
   };
 
-  const { handlePromptChange, handleNewSessionCommand, handleRenameSessionCommand, handleAgentCommand, handleSelectScriptCommand, handleSubmit, handleKeyDown, handleSendMessage, commandMenuIndex, pendingConfirmation, resolvePendingConfirmation, cancelPendingConfirmation, isSubmitting } = useSessionSubmit({
+  const { handlePromptChange, handleNewSessionCommand, handleRenameSessionCommand, handleAgentCommand, handleSelectScriptCommand, handleSubmit, handleKeyDown, handleSendMessage, commandMenuIndex, pendingConfirmation, resolvePendingConfirmation, cancelPendingConfirmation, isSubmitting, incompleteMessage, resolveIncompleteMessage } = useSessionSubmit({
     prompt,
     repoPath,
     agentType,
@@ -2164,6 +2165,8 @@ export default function HomePage() {
         apiError={apiError}
         onClose={() => setApiError(null)}
       />
+
+      <MessageCompletenessModal open={incompleteMessage} onResolve={resolveIncompleteMessage} />
 
       <ProjectNotReadyModal
         pendingConfirmation={pendingConfirmation}

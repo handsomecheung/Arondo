@@ -62,6 +62,12 @@ Type `/` in a session or on the New Session page to run built-in or custom regex
   <img src="public/readme/terminal-htop.png" alt="Live terminal running htop with the mobile special-key bar" width="360">
 </p>
 
+### Accidental Send Check
+
+When Jev is configured with a TypeSafe AI API key in **Admin Settings** or `TYPESAFE_API_KEY`, immediate messages in the web session chat are checked for accidentally unfinished text before starting the agent. A high-confidence detection offers **Keep editing** or **Send anyway**, preserving your input and attachments while you decide.
+
+The check uses up to 600 characters of your message (the first 100 and last 500 for longer messages), plus up to 300 characters from recent conversation. The full message still goes to the agent. Jev checks time out after 1.5 seconds; unavailable or failed checks allow sending normally. CLI requests, automation, slash commands, scripts, and explicit draft or queued submissions skip the check.
+
 ### Todo Messages & Smart Queuing
 
 When a repository has uncommitted changes or an agent is already running, Arondo warns you and lets you queue prompts as **Todo Messages**—dispatched automatically once the codebase is clean, after the current run finishes, at a scheduled date/time, or manually.
