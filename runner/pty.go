@@ -368,7 +368,8 @@ func (tm *TaskManager) Restart(taskID, command, workDir string, cols, rows uint1
 		onData(separator)
 	}
 
-	cmd := execCommand("bash", "-c", command)
+	shell, args := scriptShell(command)
+	cmd := execCommand(shell, args...)
 	cmd.Dir = workDir
 	cmd.Env = os.Environ()
 	t.mu.Lock()

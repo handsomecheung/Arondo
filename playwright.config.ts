@@ -14,6 +14,7 @@ process.env.PLAYWRIGHT_BROWSERS_PATH ??= path.join(browserCacheDir, 'ms-playwrig
 process.env.ARONDO_CONFIG_DIR = testConfigDir;
 process.env.HOME = testHomeDir;
 process.env.USERPROFILE = testHomeDir;
+process.env.SHELL = '/bin/bash';
 
 export default defineConfig({
   testDir: './tests',

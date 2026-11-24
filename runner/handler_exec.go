@@ -173,10 +173,11 @@ func (h *Handler) handleExecScript(msg *Message) {
 		return
 	}
 
+	shell, args := scriptShell(req.Command)
 	pid, err := h.taskManager.Spawn(SpawnOptions{
 		TaskID:  req.TaskID,
-		Command: "bash",
-		Args:    []string{"-c", req.Command},
+		Command: shell,
+		Args:    args,
 		WorkDir: req.WorkDir,
 		Cols:    req.Cols,
 		Rows:    req.Rows,
@@ -270,14 +271,9 @@ func (h *Handler) handleShellSpawn(msg *Message) {
 		return
 	}
 
-	shell := os.Getenv("SHELL")
-	if shell == "" {
-		shell = "bash"
-	}
-
 	pid, err := h.taskManager.Spawn(SpawnOptions{
 		TaskID:  req.TaskID,
-		Command: shell,
+		Command: defaultShell(),
 		Args:    []string{},
 		WorkDir: req.WorkDir,
 		Cols:    req.Cols,

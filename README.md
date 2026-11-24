@@ -54,6 +54,7 @@ Type `/` in a session or on the New Session page to run built-in or custom regex
 ### Scripts & Fallback Terminal
 
 - **Quick Scripts (`!`)**: Type `!` in chat or use **Run Script** on a Project Page to run shell commands and scripts concurrently in a PTY. Frequently used commands are saved per project for quick access.
+  Commands, including restarts, run with the Runner's `$SHELL` (falling back to Bash when `SHELL` is unset or empty). Zsh runs with `-ic` to load `.zshrc`, including configured Oh My Zsh plugins, aliases, and functions; other shells run with `-c`. No login shell is requested. Shell syntax follows that shell; use `bash -c '…'` explicitly for Bash-specific commands. Executable script files use their own shebang.
 - **Interactive Terminal**: Open a live `xterm.js` shell on the Runner from the session menu when manual inspection is needed, complete with a mobile special-keys bar (`ESC`, `TAB`, `CTRL`, `ALT`, arrows, `F1`–`F12`).
 
 <p>
