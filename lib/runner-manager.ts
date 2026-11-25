@@ -1560,6 +1560,13 @@ class RunnerManager {
     if (!message) return;
     eventBus.publish({ type: "message_updated", payload: message });
 
+    const hasAgentTask = Array.from(this.tasks.values()).some(
+      (t) => t.sessionId === ctx.sessionId && t.type === "agent" && !t.completedAt,
+    );
+    const nextStatus = payload.waiting ? "needs_attention" : hasAgentTask ? "running" : "script-running";
+    const updatedSession = await updateSession(ctx.sessionId, { status: nextStatus });
+    eventBus.publish({ type: "session_updated", payload: updatedSession });
+
     if (!payload.waiting) return;
     if (!shouldSendTaskNotification(ctx.createdAt)) return;
     if (ctx.sessionId && !(await this.shouldSendSessionNotification(ctx.sessionId))) return;

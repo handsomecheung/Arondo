@@ -720,7 +720,9 @@ async function withDerivedSessionError(session: Session): Promise<Session> {
   const messages = await getMessages(session.id);
   const completion = deriveSessionCompletion(messages);
   const status =
-    session.status === "script-running" && getRunningScriptRuns(messages).length === 0
+    session.status === "script-running" && getRunningScriptRuns(messages).some((m) => m.waitingForInput)
+      ? "needs_attention"
+      : session.status === "script-running" && getRunningScriptRuns(messages).length === 0
       ? completion.status
       : session.status === "error" || session.status === "needs_attention"
       ? completion.status
