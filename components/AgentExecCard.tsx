@@ -250,7 +250,7 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
   const canSpeak = !isLive && !onViewLog && hasLog && !!(cachedHtml || log);
   const toggleSpeech = () => {
     if (speech.status !== "idle") speech.stop();
-    else if (outputRef.current) speech.speak(extractSpeechText(outputRef.current));
+    else if (outputRef.current) speech.speak(extractSpeechText(outputRef.current), { sessionId, projectId });
   };
 
   const copyRaw = () => navigator.clipboard.writeText(log).catch(() => {});

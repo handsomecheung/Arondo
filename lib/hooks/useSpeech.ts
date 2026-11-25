@@ -20,11 +20,16 @@ const SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAE
 
 let stopActive: (() => void) | null = null;
 
-async function fetchChunkUrl(text: string, lang: string): Promise<string> {
+export interface SpeechScope {
+  sessionId: string;
+  projectId?: string;
+}
+
+async function fetchChunkUrl(text: string, lang: string, scope: SpeechScope): Promise<string> {
   const res = await fetch("/api/tts", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, lang }),
+    body: JSON.stringify({ text, lang, ...scope }),
   });
   if (!res.ok) {
     const { error } = await res.json();
@@ -49,7 +54,7 @@ export function useSpeech() {
 
   const stop = useCallback(() => stopRef.current?.(), []);
 
-  const speak = useCallback(async (text: string) => {
+  const speak = useCallback(async (text: string, scope: SpeechScope) => {
     stopActive?.();
 
     const chunks = splitSpeechChunks(text);
@@ -74,14 +79,14 @@ export function useSpeech() {
     setStatus("loading");
 
     try {
-      let next = fetchChunkUrl(chunks[0], lang);
+      let next = fetchChunkUrl(chunks[0], lang, scope);
       for (let i = 0; i < chunks.length; i++) {
         const url = await next;
         if (cancelled) {
           URL.revokeObjectURL(url);
           return;
         }
-        if (i + 1 < chunks.length) next = fetchChunkUrl(chunks[i + 1], lang);
+        if (i + 1 < chunks.length) next = fetchChunkUrl(chunks[i + 1], lang, scope);
         setStatus("playing");
         await playUrl(audio, url);
         URL.revokeObjectURL(url);

@@ -263,7 +263,7 @@ import {
 
 export { isGenSubSessionId, registerGenSubSession };
 
-function getSessionDir(id: string, tokenUuid?: string | null): string {
+export function getSessionDir(id: string, tokenUuid?: string | null): string {
   if (isGenSubSessionId(id)) {
     return findGenSubSessionDir(id, tokenUuid);
   }
@@ -289,7 +289,7 @@ function getMessagesFilePath(id: string, projectId?: string): string {
   return path.join(getSessionDir(id), "messages.json");
 }
 
-function getProjectDir(id: string): string {
+export function getProjectDir(id: string): string {
   return path.join(PROJECTS_DIR, id);
 }
 
