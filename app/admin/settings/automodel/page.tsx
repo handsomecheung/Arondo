@@ -11,7 +11,8 @@ type LlmApiKeyName =
   | "TYPESAFE_API_KEY"
   | "ANTHROPIC_API_KEY"
   | "OPENAI_API_KEY"
-  | "GOOGLE_GENERATIVE_AI_API_KEY";
+  | "GOOGLE_GENERATIVE_AI_API_KEY"
+  | "GOOGLE_TTS_API_KEY";
 interface AutoModelApiKeyStatus {
   configured: boolean;
   source: "env" | "settings" | "none";
@@ -44,12 +45,19 @@ const LLM_API_KEYS: {
     label: "Google",
     description: "Standard LLM router (third priority).",
   },
+  {
+    name: "GOOGLE_TTS_API_KEY",
+    label: "Google Cloud Text-to-Speech",
+    description:
+      "Powers \"Read Aloud\" on agent results. This is not the Gemini API key above: it must belong to a Google Cloud project with the Cloud Text-to-Speech API enabled and billing attached, and any API restriction on the key must allow Cloud Text-to-Speech. A Gemini key from Google AI Studio is usually restricted to the Generative Language API and will be rejected. Uses Chirp 3: HD voices (1M characters free per month, then billed).",
+  },
 ];
 const EMPTY_LLM_KEYS: Record<LlmApiKeyName, string> = {
   TYPESAFE_API_KEY: "",
   ANTHROPIC_API_KEY: "",
   OPENAI_API_KEY: "",
   GOOGLE_GENERATIVE_AI_API_KEY: "",
+  GOOGLE_TTS_API_KEY: "",
 };
 const EMPTY_LLM_STATUS: Record<LlmApiKeyName, AutoModelApiKeyStatus> = {
   TYPESAFE_API_KEY: { configured: false, source: "none", env: false },
@@ -60,6 +68,7 @@ const EMPTY_LLM_STATUS: Record<LlmApiKeyName, AutoModelApiKeyStatus> = {
     source: "none",
     env: false,
   },
+  GOOGLE_TTS_API_KEY: { configured: false, source: "none", env: false },
 };
 
 type Draft = {

@@ -8,7 +8,10 @@ import remarkFileLinks, { extractCandidatePaths, candidateToPath, isPathCandidat
 import remarkSoftLineBreaks from "@/lib/remarkSoftLineBreaks";
 import { resolveRepoFilePath } from "@/lib/homeUtils";
 import ExecCard, { ExecCardProps } from "@/components/ExecCard";
-import { IconTerminal, IconFileText, IconCopy, IconCode, IconInfo } from "@/components/Icons";
+import { IconTerminal, IconFileText, IconCopy, IconCode, IconInfo, IconVolume } from "@/components/Icons";
+import { useSpeech } from "@/lib/hooks/useSpeech";
+import { extractSpeechText } from "@/lib/speechText";
+import SpeechErrorModal from "@/components/modals/SpeechErrorModal";
 import DiffModal from "@/components/modals/DiffModal";
 import CommandModal from "@/components/modals/CommandModal";
 import ResultStatusModal from "@/components/modals/ResultStatusModal";
@@ -243,6 +246,13 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
   const hasLog = !!props.item.messageId;
   const canCopy = !onViewLog && hasLog && !!log;
 
+  const speech = useSpeech();
+  const canSpeak = !isLive && !onViewLog && hasLog && !!(cachedHtml || log);
+  const toggleSpeech = () => {
+    if (speech.status !== "idle") speech.stop();
+    else if (outputRef.current) speech.speak(extractSpeechText(outputRef.current));
+  };
+
   const copyRaw = () => navigator.clipboard.writeText(log).catch(() => {});
   const copyRendered = () => {
     const text = outputRef.current?.innerText ?? log;
@@ -265,6 +275,15 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
   const extraMenuItems = (onShowPrompt || (hasLog && onViewLog) || canCopy || hasLog)
     ? (closeMenu: () => void) => (
         <>
+          {canSpeak && (
+            <button
+              className="task-menu-item"
+              onClick={() => { closeMenu(); toggleSpeech(); }}
+            >
+              <IconVolume />
+              <span>{speech.status === "idle" ? "Read Aloud" : "Stop Reading"}</span>
+            </button>
+          )}
           {hasLog && onViewLog && (
             <button
               className="task-menu-item"
@@ -418,6 +437,7 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
         onClose={() => setStderrText(null)}
         title="Stderr Log"
       />
+      <SpeechErrorModal error={speech.error} onClose={speech.clearError} />
       <ResultStatusModal
         open={statusModalOpen}
         onClose={() => setStatusModalOpen(false)}

@@ -7,7 +7,8 @@ export type LlmApiKeyName =
   | "TYPESAFE_API_KEY"
   | "ANTHROPIC_API_KEY"
   | "OPENAI_API_KEY"
-  | "GOOGLE_GENERATIVE_AI_API_KEY";
+  | "GOOGLE_GENERATIVE_AI_API_KEY"
+  | "GOOGLE_TTS_API_KEY";
 
 const CONFIG_FILE = path.join(getConfigDir(), "arondo.json");
 
@@ -61,6 +62,7 @@ export function getLlmApiKeyEnvStatus(): Record<LlmApiKeyName, boolean> {
     ANTHROPIC_API_KEY: !!process.env.ANTHROPIC_API_KEY?.trim(),
     OPENAI_API_KEY: !!process.env.OPENAI_API_KEY?.trim(),
     GOOGLE_GENERATIVE_AI_API_KEY: !!process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim(),
+    GOOGLE_TTS_API_KEY: !!process.env.GOOGLE_TTS_API_KEY?.trim(),
   };
 }
 
@@ -82,6 +84,10 @@ function readApiKey(keyName: LlmApiKeyName, stored: Partial<Record<LlmApiKeyName
   const envValue = process.env[keyName]?.trim();
   if (envValue) return envValue;
   return stored[keyName]?.trim();
+}
+
+export function getGoogleTtsApiKey(): string | undefined {
+  return readApiKey("GOOGLE_TTS_API_KEY", readStoredApiKeys());
 }
 
 export function getJevConfig(timeoutMs = 3000): JevConfig | null {

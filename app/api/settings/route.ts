@@ -13,6 +13,7 @@ const LLM_API_KEY_NAMES: LlmApiKeyName[] = [
   "ANTHROPIC_API_KEY",
   "OPENAI_API_KEY",
   "GOOGLE_GENERATIVE_AI_API_KEY",
+  "GOOGLE_TTS_API_KEY",
 ];
 
 export async function GET(request: NextRequest) {

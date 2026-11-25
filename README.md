@@ -181,6 +181,7 @@ Common environment variables:
 - `ARONDO_CONFIG_DIR` – Directory for configuration and session data (default: `~/.arondo`).
 - `ARONDO_ENABLE_AUTOMODEL` – Enable automatic model and effort routing (`true` | `false`).
 - `TYPESAFE_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY` – Optional API keys for `automodel`, Jev decisions, and LLM-assisted quota extraction.
+- `GOOGLE_TTS_API_KEY` – Optional Google Cloud Text-to-Speech key for "Read Aloud" on agent results. Separate from `GOOGLE_GENERATIVE_AI_API_KEY`: the Cloud project must enable the Text-to-Speech API.
 
 ## Testing
 

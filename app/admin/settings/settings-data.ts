@@ -12,7 +12,8 @@ export interface AdminSettingsData {
     | "TYPESAFE_API_KEY"
     | "ANTHROPIC_API_KEY"
     | "OPENAI_API_KEY"
-    | "GOOGLE_GENERATIVE_AI_API_KEY",
+    | "GOOGLE_GENERATIVE_AI_API_KEY"
+    | "GOOGLE_TTS_API_KEY",
     { configured: boolean; source: "env" | "settings" | "none"; env: boolean }
   >;
 }
