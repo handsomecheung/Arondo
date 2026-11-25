@@ -77,6 +77,8 @@ func (h *Handler) handleRequest(msg *Message) {
 		h.handleGitLog(msg)
 	case "rules.sync":
 		h.handleRulesSync(msg)
+	case "skills.install":
+		h.handleSkillsInstall(msg)
 	case "rules.remove":
 		h.handleRulesRemove(msg)
 	case "info.fetch":

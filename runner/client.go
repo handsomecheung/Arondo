@@ -152,6 +152,7 @@ func (c *Client) sendRegister() error {
 		"arch":     runtime.GOARCH,
 		"capabilities": []string{
 			"runner.update",
+			"skills.install",
 			"exec.agent", "exec.script", "exec.cancel",
 			"exec.inputWait",
 			"pty.input", "pty.resize",

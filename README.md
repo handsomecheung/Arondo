@@ -51,6 +51,14 @@ Type `/` in a session or on the New Session page to run built-in or custom regex
   <img src="public/readme/agent-command-list.png" alt="Session command menu listing built-in and custom slash commands" width="360">
 </p>
 
+### Install Skills Across Agents
+
+Open **Admin Settings → Skills**, enter a Git repository URL (or an absolute skill directory path on the Runner) and the skill name from `SKILL.md`, then select Runners and installation locations. Codex, OpenCode, and Pi share one checkbox and one installation in `~/.agents/skills`; Claude Code and Antigravity have separate checkboxes. Initially, all available locations on the most recently used compatible, connected Runner are selected. Select locations on additional Runners to include them. Installation runs in the background and reports results and logs per Runner and location; recent installation history survives page reloads and server restarts. Failed targets can be selected for another attempt.
+
+Skills are installed globally for the Runner's operating-system user using the pinned Skills CLI 1.9.0. Each Runner needs **Node.js 22.20+ and npm**, plus Git for Git sources. Existing installations report **Skipped** unless **Replace existing skill** is enabled; replacement also updates agents reading the shared skill copy. If the shared copy already exists, selecting a new Claude Code or Antigravity location adds a link to that copy without replacing its contents. Update and restart older Runners to enable this feature. Installing a skill does not install its external dependencies or configure credentials it requires.
+
+Installation history and logs are stored on the **server** in `${ARONDO_CONFIG_DIR}/skill-installations.json` (default `~/.arondo/skill-installations.json`). Each result contains its log in `results[].output`. When a new job is created, history retains the latest 20 jobs plus any older jobs still running. Installations accept one individual skill name at a time; select the `name` declared in that skill's `SKILL.md`.
+
 ### Scripts & Fallback Terminal
 
 - **Quick Scripts (`!`)**: Type `!` in chat or use **Run Script** on a Project Page to run shell commands and scripts concurrently in a PTY. Frequently used commands are saved per project for quick access.

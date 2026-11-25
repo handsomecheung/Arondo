@@ -31,6 +31,11 @@ export const adminSettingsSections = [
     description: "Edit shared agent rules and choose which runners sync them.",
   },
   {
+    slug: "skills",
+    title: "Skills",
+    description: "Install a skill across agents on selected runners.",
+  },
+  {
     slug: "system-tokens",
     title: "System Access Tokens",
     description: "Manage access tokens for administrators and users.",

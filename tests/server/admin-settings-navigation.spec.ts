@@ -35,7 +35,7 @@ test("admin settings sections have separate pages with working return navigation
       page.getByRole("navigation", { name: "Admin settings sections" }),
     ).toHaveCount(0);
     await expect(
-      page.getByRole("button", { name: "Save", exact: true }),
+      page.getByRole("button", { name: section.slug === "skills" ? /^Install to/ : "Save", exact: section.slug !== "skills" }),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Cancel", exact: true }),

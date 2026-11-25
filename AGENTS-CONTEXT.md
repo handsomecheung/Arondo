@@ -61,6 +61,7 @@ runner/                  # Go runner binary
   task_activity.go      # Atomic task admission and process/callback accounting during updates
   update_apply.go       # Serialize binary replacement, keep backup, and restore on exec failure
   handler_exec.go       # exec.agent, exec.script, exec.cancel, exec.restart (all PTY-based)
+  handler_skills.go     # skills.install: grouped global skill installation, existing-copy links, and skipped results
   handler_fs.go         # fs.list: directory listing; fs.mkdtemp: create a runner-side workspace for automation or standalone sessions
   handler_git.go        # git.status, git.diff
   handler_pty.go        # pty.input (write to PTY), pty.resize
@@ -143,6 +144,9 @@ app/
     agents/
       info/
         route.ts        # GET: fetch quota status for agents on all runners
+    skills/
+      install/
+        route.ts        # Admin-only GET: installation history; POST: start a background skill installation
     tasks/
       route.ts        # GET: list all tasks (active + retained, excluding tasks belonging to hidden automation sessions or archived sessions)
       kill/
@@ -208,6 +212,8 @@ lib/
   autoagent.ts          # Auto Mode agent selector; reads quota from ~/.arondo/autoagent/agent/quota.json and returns agent plus allowed model options
   project-actions.ts    # Extracted action helpers for executing project-scoped scripts
   session-actions.ts    # Extracted action helpers for session messages, normal agent runs, and detached review/side-question runs
+  skills.ts             # Skill agent groups, input validation, and grouped history results
+  skill-install-jobs.ts # Persistent background skill installation jobs and Runner dispatch
   gen/
     store.ts            # Persistent storage for Gen Main Agent messages and self-compacting memory under ~/.arondo/gen/
     orchestrator.ts     # Server-side Gen Main Agent orchestrator (project inference/clarification, sub-agent delegation via autoagent/automodel, completion callback, and Web Push notification)
@@ -240,6 +246,7 @@ tests/                  # Playwright integration tests
     auth.spec.ts        # RBAC and token validation tests
     runners.spec.ts     # Runner registration and authorization management
     global-rules.spec.ts # Reading and writing global agent rules
+    skills-install.spec.ts # Grouped installation, partial failure/retry, duplicate skipping, and admin access
     sessions.spec.ts    # Session lifecycle (create, update, delete) integration
     detached-agent-runs.spec.ts # Detached review and side-question agent integration
     web-push.spec.ts    # Web Push (VAPID) API and settings integration test suite
@@ -255,6 +262,7 @@ tests/                  # Playwright integration tests
   web-push.json         # Web Push VAPID keys, contactEmail, and registered device subscriptions
   agent-commands.json   # Persisted custom agent slash commands
   global-rules.md       # Global agent rules written from Settings
+  skill-installations.json # Installation jobs and logs stored in each job's results[].output
   agent-sessions.json  # Agent session map: { "agy": {}, "codex": {}, "opencode": {} }
   cache/
     once/               # Cached outputs for single-use sessions (keyed by prompt SHA-256, expire after 7 days; metadata in ${hash}.meta.json)
@@ -319,9 +327,31 @@ All messages use a JSON envelope: `{ id, type, method, payload }`.
 | `git.diff` | S→R request | Run `git diff HEAD` |
 | `rules.sync` | S→R request | Write global agent rules block into `~/.gemini/GEMINI.md`, `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.config/opencode/AGENTS.md`, and `~/.pi/agent/AGENTS.md` |
 | `rules.remove` | S→R request | Strip the previously synced rules block from the same five files |
+| `skills.install` | S→R request | Install a named skill globally with pinned Skills CLI 1.9.0; deduplicated locations, success/skipped/failed results, explicit replacement policy |
 | `info.fetch` | S→R request | Request quota/info fetch for an agent binary on the runner (includes `method: "AUTO" \| "LLM"`) |
 | `quota.interactiveStep` | R→S request | Runner sends captured terminal screen during LLM interactive quota loop; server returns action decision (`need_action` with keysToSend, `quota_extracted`, `failed`) |
 | `quota.update` | R→S event | Runner reports parsed quota data to server |
+
+## Skill Installation API
+
+`GET /api/skills/install` and `POST /api/skills/install` require an admin client token (for example, `x-arondo-token`). Non-admin or invalid tokens receive `403`.
+
+POST accepts one skill per job:
+
+```json
+{
+  "source": "owner/repo",
+  "skill": "skill-name",
+  "replace": false,
+  "targets": [
+    { "runnerId": "runner-id", "agents": ["codex", "claude-code", "antigravity-cli"] }
+  ]
+}
+```
+
+- `source` accepts a Git source or a Runner-local path; `skill` selects the individual skill by its `SKILL.md` name. Each request supports up to 50 distinct Runners. Agent IDs are `codex`, `opencode`, `pi`, `claude-code`, and `antigravity-cli`; selected agents must be detected on their Runner. Codex/OpenCode/Pi selections are deduplicated to one shared location.
+- POST returns `202` with the job (`id`, `createdAt` in Unix milliseconds, input fields, and `results`). Each result contains `runnerId`, `runnerName`, a representative `agent`, `status` (`running`, `success`, `skipped`, or `failed`), and `output`. Poll GET for completion; it returns jobs newest first. Invalid input receives `400`; disconnected/incompatible Runners or an installation already running on a selected Runner receive `409`.
+- Jobs and logs persist on the server in `${ARONDO_CONFIG_DIR}/skill-installations.json`. Logs live in `results[].output`; CLI stdout and stderr each retain their last 32 KiB. Creating a job retains the latest 20 jobs plus any older jobs still running. Existing installations return `skipped` without modification unless `replace` is enabled. Interrupted jobs are marked failed with an unknown-outcome explanation on server restart and require manual inspection/retry.
 
 ## Runner Manager
 
@@ -515,7 +545,8 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **Model and Thinking Effort Selection**: New Session lists model families in **Model**, with optional **Effort** choices below. `lib/model-effort.ts` shares family defaults, effective-model fallback, and capability-specific choices with the header. Antigravity folds configured suffixes into families and prefers Medium when selecting a family; OpenCode MiniMax M3 offers none/thinking. Other agents include Default to omit explicit effort. An unset model uses the configured default to determine effort choices; no resolved model or fewer than two choices hides the row. Claude, Codex, and Pi split trailing effort from the family, preserving choices after selection and parsing configured `<model> <effort>` entries.
 - **Manual Agent Switching**: The session header uses `components/SessionAgentSwitchMenu.tsx` for an agent-only dropdown. Clicking an agent opens a popup with Thinking effort fixed above a scrolling Model list (Default first), sharing `ModelOptions` and `AgentOptionQuota` with New Session. Effort choices use the current model for the active agent and the configured default for other agents. Model or effort selection applies immediately and closes the popup; Auto is selected directly. OpenCode includes the Free group; Antigravity retains its three groups. `PATCH /api/sessions/[id]` accepts `agentType` and optional string `model`, saves the explicit model for subsequent runs, and clears Auto locks. Changing agents clears the previous model if a replacement is omitted; an empty model selects the configured default. Claude/Codex/Pi model strings can include a trailing effort, which the agent resolver passes separately to the CLI. The menus show the Runner’s quota and fit the viewport. `tests/server/model-effort-browser.spec.ts` verifies selection, persistence, and fixed effort positioning at mobile and desktop widths; `new-session-model-select.spec.ts` covers family parsing and configured choices.
 - **Decision Mode (Jev System One)**: Allows running fast categorical decisions directly without spawning an agent process on a runner. Configurable via `agentType: "decision"` (or `--agent decision` / `--agent jev` in `cli/arondo-cli send`). The server-side Decision Engine (`lib/decision/runner.ts`) parses user prompts for explicit candidate choices (or defaults to Yes/No or action verdict criteria), evaluates them via TypeSafe AI System One (`TYPESAFE_API_KEY` / `https://api.typesafe.ai/v1/systemone`), and records probability distributions, risk levels, and response latency directly in the session card. Decision Mode works both with connected runners (incorporating git diff context when available) and standalone (`--no-path` / runner-free).
-- **Admin Settings Navigation**: `/admin/settings` is an index linking to ten section subpages, including Runner Updates. A shared layout enforces admin access and provides navigation back to the index; each subpage loads only its own required data.
+- **Admin Settings Navigation**: `/admin/settings` is an index linking to eleven section subpages, including Runner Updates and Skills. A shared layout enforces admin access and provides navigation back to the index; each subpage loads only its own required data.
+- **Skill Installation**: `/admin/settings/skills` installs a named skill from a Git source or Runner-local directory across selected connected Runners and detected agents. Codex/OpenCode/Pi share one checkbox, installation, and history row for `~/.agents/skills`; Claude Code and Antigravity have separate locations. `lib/skills.ts` defines the groups and consolidates legacy history rows. The admin-only `/api/skills/install` GET/POST endpoint persists recent jobs in `${ARONDO_CONFIG_DIR}/skill-installations.json` via `lib/skill-install-jobs.ts`, which deduplicates agent selections by location before dispatch. The server dispatches `skills.install` to each Runner; `runner/handler_skills.go` runs `npx --yes skills@1.9.0` with argument arrays, a two-minute limit per location, bounded logs, process-group cancellation, and per-Runner serialization without blocking WebSocket reads. Requires Node.js 22.20+ and npm on Runners; Git sources also need Git. Existing destinations return `skipped` unless replacement is enabled; missing Claude/Antigravity destinations can link an existing shared copy without overwriting it. The Runner also deduplicates shared locations for older callers. Results persist across reloads; server-interrupted runs are marked unknown/failed on startup and never automatically retried. The Skills action uses an explicit Install button and keeps results visible on the page.
 - **Settings Session Controls**: **Admin Settings → Session & File Settings** (`/admin/settings/sessions-and-files`) groups session archive and file browser controls together. All Admin Settings sections use explicit Save/Cancel actions: edits remain local until Save. Successful saves and Cancel return to `/admin/settings`; Cancel discards unsaved edits, while failed saves keep the editor open. Generated tokens remain available in a layout-owned dialog after navigation. This also applies to automation visibility, automodel keys, runner rule sync/access, commands, and token creation/renaming/revocation. Shared draft handling and actions live in `components/admin/SettingsForm.tsx`; successful individual writes checkpoint the saved state so retries do not repeat completed operations.
 - **Authentication UI**: The old Settings-page reset-token button moved into the app sidebar as a Log Out action with a confirmation dialog.
 - **Inline Runner Details**: The Runners dashboard displays the runner details panel inline directly below the selected runner card for better usability.

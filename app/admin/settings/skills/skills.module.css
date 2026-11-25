@@ -1,0 +1,88 @@
+.hint {
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.runners {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.runner {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+}
+
+.runner legend {
+  max-width: 100%;
+  padding: 0 4px;
+  font-weight: 600;
+}
+
+.agents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 8px;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.install {
+  background: var(--accent) !important;
+  color: white !important;
+}
+
+.job {
+  padding: 16px 0;
+  border-top: 1px solid var(--border);
+}
+
+.source {
+  overflow-wrap: anywhere;
+}
+
+.results {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+}
+
+.results li {
+  padding: 8px 0;
+}
+
+.result {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+
+.failed {
+  color: var(--error);
+}
+
+.success {
+  color: var(--accent);
+}
+
+.log {
+  max-height: 280px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 12px;
+  font-size: 11px;
+  background: var(--bg-elevated);
+}
