@@ -86,7 +86,7 @@ test.describe('runner lost tasks', () => {
       expect(returnMsg?.rawExitCode).toBeUndefined();
       expect(returnMsg?.content).toContain('runner lost track');
       expect(messages.find((m) => m.id === run.id)?.exitCode).toBeUndefined();
-      expect((await getSession(session.id))?.status).toBe('error');
+      expect((await getSession(session.id))?.status).toBe('needs_attention');
     } finally {
       restoreJev();
       (runnerManager as any).tasks.delete(taskId);

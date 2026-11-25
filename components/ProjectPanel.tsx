@@ -283,7 +283,9 @@ export default function ProjectPanel({
                 >
                   <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0, flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span className={`task-status-badge ${session.status}`}>{session.status}</span>
+                      <span className={`task-status-badge ${session.status}`}>
+                        {session.status === "needs_attention" ? "attention" : session.status}
+                      </span>
                       {isPrevious && (
                         <span
                           className="task-status-badge"

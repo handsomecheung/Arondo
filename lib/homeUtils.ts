@@ -14,11 +14,15 @@ export function isUnviewedCompletion(session: Session): boolean {
 
 export function sortSessionsForSidebar(sessions: Session[]): Session[] {
   return [...sessions].sort((a, b) => {
+    const aNeedsAttention = (a.status === "needs_attention" || a.status === "error") && isUnviewedCompletion(a);
+    const bNeedsAttention = (b.status === "needs_attention" || b.status === "error") && isUnviewedCompletion(b);
+    if (aNeedsAttention !== bNeedsAttention) return aNeedsAttention ? -1 : 1;
+
     const aHasUnreadSuccess = a.status === "done" && isUnviewedCompletion(a);
     const bHasUnreadSuccess = b.status === "done" && isUnviewedCompletion(b);
     if (aHasUnreadSuccess !== bHasUnreadSuccess) return aHasUnreadSuccess ? -1 : 1;
 
-    if (aHasUnreadSuccess && bHasUnreadSuccess) {
+    if ((aNeedsAttention && bNeedsAttention) || (aHasUnreadSuccess && bHasUnreadSuccess)) {
       const aCompleted = new Date(a.completedAt!).getTime();
       const bCompleted = new Date(b.completedAt!).getTime();
       if (aCompleted !== bCompleted) return bCompleted - aCompleted;

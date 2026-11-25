@@ -66,7 +66,7 @@ interface ArondoConfigWithSettings {
   [key: string]: unknown;
 }
 
-export type SessionStatus = "idle" | "running" | "script-running" | "done" | "error";
+export type SessionStatus = "idle" | "running" | "script-running" | "done" | "needs_attention" | "error";
 
 export type TodoTriggerKind = "manual" | "codebaseReady" | "afterSession" | "quotaAvailable" | "at";
 
@@ -543,7 +543,7 @@ export async function updateSession(
       noProject: persistentSession.noProject,
       updatedAt,
     };
-    if (persistentPatch.status === "done" || persistentPatch.status === "error") {
+    if (persistentPatch.status === "done" || persistentPatch.status === "needs_attention" || persistentPatch.status === "error") {
       updated.completedAt = updated.updatedAt;
     }
 
@@ -659,24 +659,61 @@ export async function markMessageDeleted(
 }
 
 export function deriveSessionCompletion(messages: Message[]): Pick<Session, "status" | "errorMessage" | "completedAt"> {
-  const latestResult = [...messages].reverse().find(
+  const isWaitingForInput = messages.some((message) => !message.deleted && message.waitingForInput);
+  if (isWaitingForInput) {
+    return { status: "needs_attention", errorMessage: undefined };
+  }
+
+  const completedResults = messages.filter(
     (message) =>
       !message.deleted &&
-      (message.type === "agent-return" || message.type === "script-return" || message.type === "system-error"),
+      (message.type === "agent-return" ||
+        message.type === "script-return" ||
+        message.type === "detached-agent-return" ||
+        message.type === "system-error"),
   );
 
-  if (!latestResult) {
+  if (completedResults.length === 0) {
     return { status: "idle", errorMessage: undefined, completedAt: undefined };
   }
 
-  if (latestResult.content.startsWith("❌") || latestResult.content.startsWith("⚠️")) {
+  const resultsWithInitiationTime = completedResults.map((result) => {
+    let initiationTime = new Date(result.createdAt).getTime();
+    if (result.parentId) {
+      const parent = messages.find((m) => m.id === result.parentId);
+      if (parent?.createdAt) {
+        initiationTime = new Date(parent.createdAt).getTime();
+      }
+    }
+    return { result, initiationTime };
+  });
+
+  resultsWithInitiationTime.sort((a, b) => {
+    if (b.initiationTime !== a.initiationTime) {
+      return b.initiationTime - a.initiationTime;
+    }
+    return new Date(b.result.createdAt).getTime() - new Date(a.result.createdAt).getTime();
+  });
+
+  const latest = resultsWithInitiationTime[0];
+  const isError =
+    latest.result.content.startsWith("❌") ||
+    latest.result.content.startsWith("⚠️") ||
+    (latest.result.exitCode !== undefined && latest.result.exitCode !== 0 && !latest.result.statusOverride);
+
+  if (isError) {
     return {
-      status: "error",
-      errorMessage: latestResult.content.replace(/^(?:❌|⚠\uFE0F?)\s*(?:Error:\s*)?/, ""),
+      status: "needs_attention",
+      errorMessage: latest.result.content.replace(/^(?:❌|⚠\uFE0F?)\s*(?:Error:\s*)?/, "").trim(),
+      completedAt: latest.result.createdAt,
     };
   }
 
-  return { status: "done", errorMessage: undefined };
+  return {
+    status: "done",
+    errorMessage: undefined,
+    completedAt: latest.result.createdAt,
+  };
 }
 
 async function withDerivedSessionError(session: Session): Promise<Session> {
@@ -684,6 +721,8 @@ async function withDerivedSessionError(session: Session): Promise<Session> {
   const completion = deriveSessionCompletion(messages);
   const status =
     session.status === "script-running" && getRunningScriptRuns(messages).length === 0
+      ? completion.status
+      : session.status === "error" || session.status === "needs_attention"
       ? completion.status
       : session.status;
   return { ...withoutLegacyRunningScripts(session), status, errorMessage: completion.errorMessage };

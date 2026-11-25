@@ -23,7 +23,7 @@ test('agent failure completion events include the reason derived from the saved 
     await appendSessionLog(session.id, run.id, 'agent', 'The selected model is not supported for this account.', true, undefined, 'stderr');
     await (runnerManager as any).handleAgentExit({ sessionId: session.id, messageId: run.id, runnerId: '', taskId: 'failed-model-test', createdAt: Date.now(), type: 'agent' }, 1);
     expect(events).toHaveLength(1);
-    expect(events[0].status).toBe('error');
+    expect(events[0].status).toBe('needs_attention');
     expect(events[0].errorMessage).toBe('Invalid model selection. Update the model in Admin Settings.');
     expect((await getSession(session.id))?.errorMessage).toBe(events[0].errorMessage);
   } finally {

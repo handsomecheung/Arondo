@@ -13,6 +13,7 @@ import {
   getRunningSessionScriptRuns,
   isGenSubSessionId,
   writeOnceCache,
+  deriveSessionCompletion,
 } from "./store";
 import {
   getAgySessionId,
@@ -379,19 +380,8 @@ class RunnerManager {
           // A script-return can be persisted just before the session status is
           // updated. Recover its final state instead of reporting an interruption.
           if (executionRuns.length > 0 && unfinishedRuns.length === 0) {
-            const latestReturn = messages
-              .filter(
-                (message) =>
-                  !!message.parentId &&
-                  !message.deleted &&
-                  executionRuns.some((run) => run.id === message.parentId),
-              )
-              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-            const failed = latestReturn?.content.startsWith("❌") || latestReturn?.content.startsWith("⚠️");
-            const updated = await updateSession(s.id, {
-              status: failed ? "error" : "done",
-              errorMessage: failed ? latestReturn.content : undefined,
-            });
+            const completion = deriveSessionCompletion(messages);
+            const updated = await updateSession(s.id, completion);
             eventBus.publish({ type: "session_updated", payload: updated });
             continue;
           }
@@ -409,10 +399,10 @@ class RunnerManager {
           if (!hasActiveTask) {
             const errorMessage = "Session execution interrupted (possibly server restarted)";
             console.log(
-              `[runner-manager] session ${s.id} is marked as "${s.status}" but has no active tasks. Reconciling to "error".`,
+              `[runner-manager] session ${s.id} is marked as "${s.status}" but has no active tasks. Reconciling to "needs_attention".`,
             );
             await updateSession(s.id, {
-              status: "error",
+              status: "needs_attention",
             });
             const message = await addMessage({
               sessionId: s.id,
@@ -1772,7 +1762,7 @@ class RunnerManager {
     if (hasRunningScripts) {
       nextStatus = "script-running";
     } else {
-      nextStatus = stoppedByUser || (success && !quotaExhausted && !invalidModelSelection && !emptySuccessfulOutput) ? "done" : "error";
+      nextStatus = stoppedByUser || (success && !quotaExhausted && !invalidModelSelection && !emptySuccessfulOutput) ? "done" : "needs_attention";
     }
 
     const updated = await updateSession(ctx.sessionId, {
@@ -1988,26 +1978,25 @@ class RunnerManager {
       );
       const runningScripts = await getRunningSessionScriptRuns(ctx.sessionId);
 
-      if (exitCode === 0) {
-        let nextStatus: string;
-        if (hasAgentTask) nextStatus = "running";
-        else if (runningScripts.length > 0) nextStatus = "script-running";
-        else nextStatus = "done";
-        const updated = await updateSession(ctx.sessionId, {
-          status: nextStatus as any,
-        });
-        eventBus.publish({ type: "session_updated", payload: updated });
+      let nextStatus: string;
+      let nextErrorMessage: string | undefined = stoppedByUser ? undefined : errorMessage;
+      if (hasAgentTask) {
+        nextStatus = "running";
+      } else if (runningScripts.length > 0) {
+        nextStatus = "script-running";
+      } else if (stoppedByUser) {
+        nextStatus = "done";
       } else {
-        let nextStatus: string;
-        if (hasAgentTask) nextStatus = "running";
-        else if (runningScripts.length > 0) nextStatus = "script-running";
-        else nextStatus = stoppedByUser ? "done" : "error";
-        const updated = await updateSession(ctx.sessionId, {
-          status: nextStatus as any,
-          errorMessage: stoppedByUser ? undefined : errorMessage,
-        });
-        eventBus.publish({ type: "session_updated", payload: updated });
+        const messages = await getMessages(ctx.sessionId);
+        const completion = deriveSessionCompletion(messages);
+        nextStatus = completion.status;
+        nextErrorMessage = completion.errorMessage;
       }
+      const updated = await updateSession(ctx.sessionId, {
+        status: nextStatus as any,
+        errorMessage: nextStatus === "done" ? undefined : nextErrorMessage,
+      });
+      eventBus.publish({ type: "session_updated", payload: updated });
     }
 
     if (

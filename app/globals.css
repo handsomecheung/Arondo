@@ -796,6 +796,7 @@ body {
   background: var(--success-bg);
   color: var(--success);
 }
+.task-status-badge.needs_attention,
 .task-status-badge.error {
   background: var(--error-bg);
   color: var(--error);

@@ -14,7 +14,7 @@ import type { TodoTrigger } from "@/types/home";
 
 const Terminal = dynamic(() => import("@/components/Terminal"), { ssr: false });
 
-type SessionStatus = "idle" | "running" | "script-running" | "done" | "error";
+type SessionStatus = "idle" | "running" | "script-running" | "done" | "needs_attention" | "error";
 
 interface Session {
   id: string;
@@ -358,7 +358,7 @@ export default function TasksPage() {
                   ...prev,
                 ];
               });
-            } else if (updated.status === "done" || updated.status === "error") {
+            } else if (updated.status === "done" || updated.status === "needs_attention" || updated.status === "error") {
               const now = Date.now();
               setTaskQueue((prev) =>
                 prev.map((t) => {

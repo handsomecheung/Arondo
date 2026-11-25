@@ -452,7 +452,9 @@ export default function AppSidebar({
                       id={`archived-session-item-${session.id}`}
                     >
                       <div className="task-item-header" style={{ flexWrap: "wrap" }}>
-                        <span className={`task-status-badge ${session.status}`}>{session.status}</span>
+                        <span className={`task-status-badge ${session.status}`}>
+                          {session.status === "needs_attention" ? "attention" : session.status}
+                        </span>
                         <SessionTags session={session} />
                         {projectName && (
                           <span
@@ -505,7 +507,8 @@ export default function AppSidebar({
                 const swipeDx = isSwiping ? swipe!.dx : 0;
                 const clampedDx = Math.max(0, Math.min(120, swipeDx));
                 const unread = isUnviewedCompletion(session);
-                const unreadColor = session.status === "error" ? "var(--error)" : "var(--success)";
+                const isAttention = session.status === "needs_attention" || session.status === "error";
+                const unreadColor = isAttention ? "var(--error)" : "var(--success)";
                 const hasPendingTodo = (session.pendingTodoMessageIds?.length ?? 0) > 0;
                 const statusBadgeClass = hasPendingTodo ? "todo" : session.status;
                 return (
@@ -534,7 +537,7 @@ export default function AppSidebar({
                       {unread && (
                         <span
                           className="task-item-unread-dot"
-                          title={session.status === "error" ? "Finished with an error" : "Finished"}
+                          title={isAttention ? "Finished with an error or needs attention" : "Finished"}
                         />
                       )}
                       {session.pinnedAt && (
@@ -548,6 +551,8 @@ export default function AppSidebar({
                           ? "TODO"
                           : session.status === "script-running"
                           ? "running"
+                          : session.status === "needs_attention"
+                          ? "attention"
                           : session.status}
                       </span>
                       <SessionTags session={session} />

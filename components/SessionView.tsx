@@ -532,7 +532,17 @@ export default function SessionView({
                   }
                 : undefined
             }
-            title={hasPendingTodo ? "TODO message pending" : selectedSession.status === "script-running" ? "Script running…" : "Agent working…"}
+            title={
+              hasPendingTodo
+                ? "TODO message pending"
+                : selectedSession.status === "script-running"
+                ? "Script running…"
+                : selectedSession.status === "needs_attention"
+                ? "Needs attention"
+                : selectedSession.status === "error"
+                ? "Error"
+                : "Agent working…"
+            }
           >
             {!hasPendingTodo && (selectedSession.status === "running" || selectedSession.status === "script-running") ? (
               <span className="agent-pulse">
@@ -565,7 +575,11 @@ export default function SessionView({
                 })()}
               </span>
             ) : (
-              hasPendingTodo ? "TODO" : selectedSession.status
+              hasPendingTodo
+                ? "TODO"
+                : selectedSession.status === "needs_attention"
+                ? "attention"
+                : selectedSession.status
             )}
           </span>
           <div

@@ -419,7 +419,7 @@ export async function dispatchFollowupMessage(
     })
     .catch(async (err) => {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      const updated = await updateSession(sessionId, { status: "error", errorMessage });
+      const updated = await updateSession(sessionId, { status: "needs_attention", errorMessage });
       const errMsg = await addMessage({
         sessionId,
         role: "system",
@@ -695,7 +695,7 @@ export async function dispatchCreateSession(
     })
     .catch(async (err) => {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      const updated = await updateSession(session.id, { status: "error", errorMessage });
+      const updated = await updateSession(session.id, { status: "needs_attention", errorMessage });
       const errMsg = await addMessage({
         sessionId: session.id,
         role: "system",
@@ -798,7 +798,7 @@ export async function dispatchSessionScript(
       const hasAgentTask = runnerManager.getAllTasks().some(
         (t) => t.sessionId === sessionId && t.type === "agent" && !t.completedAt,
       );
-      const nextStatus = hasAgentTask ? "running" : runningScripts.length > 0 ? "script-running" : "error";
+      const nextStatus = hasAgentTask ? "running" : runningScripts.length > 0 ? "script-running" : "needs_attention";
       const updated = await updateSession(sessionId, {
         status: nextStatus as any,
         errorMessage,

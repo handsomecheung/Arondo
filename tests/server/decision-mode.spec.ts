@@ -80,7 +80,7 @@ test.describe('Decision Mode integration tests', () => {
     await executeDecisionSession(session, messageId, 'Plain natural language prompt without JSON');
 
     const updated = await getSession(session.id);
-    expect(updated?.status).toBe('error');
+    expect(updated?.status).toBe('needs_attention');
 
     const log = await getSessionLog(session.id, messageId, 'agent');
     expect(log).toContain('Invalid JSON format');
@@ -117,7 +117,7 @@ test.describe('Decision Mode integration tests', () => {
     );
 
     const updated = await getSession(session.id);
-    expect(updated?.status).toBe('error');
+    expect(updated?.status).toBe('needs_attention');
     expect(updated?.errorMessage).toContain('TYPESAFE_API_KEY is not configured');
   });
 

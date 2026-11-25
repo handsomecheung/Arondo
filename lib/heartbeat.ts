@@ -257,7 +257,7 @@ export async function processQuotaErrorRetries(): Promise<void> {
         continue;
       }
 
-      if (session.status === "error" && isQuotaErrorMessage(session.errorMessage)) {
+      if ((session.status === "needs_attention" || session.status === "error") && isQuotaErrorMessage(session.errorMessage)) {
         try {
           await processQuotaErrorSession(session, quotas);
         } catch (err) {

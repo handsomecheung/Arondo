@@ -423,7 +423,7 @@ test.describe('Chat while history-based scripts are running', () => {
         headers: { 'x-arondo-token': 'test-token-123456' },
       });
       const failedSession = await failedSessionRes.json();
-      expect(failedSession.status).toBe('error');
+      expect(failedSession.status).toBe('needs_attention');
       expect(failedSession.errorMessage).toBe('Script exited with code 1');
 
       const configDir = process.env.ARONDO_CONFIG_DIR ? path.resolve(process.env.ARONDO_CONFIG_DIR) : path.join(process.cwd(), 'data');

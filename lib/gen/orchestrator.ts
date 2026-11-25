@@ -393,7 +393,7 @@ export async function handleUserGenMessage(
   const latestSubSession = await getSession(subSessionId);
   if (
     latestSubSession &&
-    (latestSubSession.status === "done" || latestSubSession.status === "error")
+    (latestSubSession.status === "done" || latestSubSession.status === "needs_attention" || latestSubSession.status === "error")
   ) {
     await onSubAgentSessionFinished(latestSubSession);
   }
@@ -584,7 +584,7 @@ export function ensureGenOrchestratorInitialized(): void {
       if (
         session.id &&
         isGenSubSessionId(session.id) &&
-        (session.status === "done" || session.status === "error")
+        (session.status === "done" || session.status === "needs_attention" || session.status === "error")
       ) {
         onSubAgentSessionFinished(session).catch((err) => {
           console.error("[gen] onSubAgentSessionFinished error:", err);
@@ -606,7 +606,7 @@ export async function reconcileRunningGenSubAgents(targetClientId?: string | nul
     for (const msg of messages) {
       if (msg.subAgent?.status === "running") {
         const subSession = await getSession(msg.subAgent.subSessionId);
-        if (subSession && (subSession.status === "done" || subSession.status === "error")) {
+        if (subSession && (subSession.status === "done" || subSession.status === "needs_attention" || subSession.status === "error")) {
           await onSubAgentSessionFinished(subSession);
         }
       }

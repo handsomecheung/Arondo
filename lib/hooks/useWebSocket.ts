@@ -79,6 +79,7 @@ export function useWebSocket({
               );
             } else if (
               updated.status === "done" ||
+              updated.status === "needs_attention" ||
               updated.status === "error" ||
               updated.status === "idle"
             ) {

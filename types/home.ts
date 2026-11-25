@@ -1,6 +1,6 @@
 import type { AutoModelEffort } from "@/lib/llm/automodel/types";
 
-export type SessionStatus = "idle" | "running" | "script-running" | "done" | "error";
+export type SessionStatus = "idle" | "running" | "script-running" | "done" | "needs_attention" | "error";
 
 export type TodoTriggerKind = "manual" | "codebaseReady" | "afterSession" | "quotaAvailable" | "at";
 
