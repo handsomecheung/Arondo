@@ -10,7 +10,18 @@ import {
   type SkillInstallJob,
 } from "./skills";
 
-const jobsFile = path.join(getConfigDir(), "skill-installations.json");
+function jobsDir() {
+  return path.join(getConfigDir(), "skill-installations");
+}
+
+function legacyJobsFile() {
+  return path.join(getConfigDir(), "skill-installations.json");
+}
+
+function jobFile(id: string) {
+  return path.join(jobsDir(), `${id}.json`);
+}
+
 interface JobState {
   jobs: SkillInstallJob[];
   ready: Promise<void>;
@@ -19,32 +30,46 @@ const processState = process as typeof process & {
   _skillInstallJobs?: JobState;
 };
 
+async function persistJob(job: SkillInstallJob) {
+  const file = jobFile(job.id);
+  await withFileLock(file, () => writeJsonAtomic(file, job));
+}
+
 function state(): JobState {
   if (!processState._skillInstallJobs) {
     const value: JobState = { jobs: [], ready: Promise.resolve() };
     processState._skillInstallJobs = value;
     value.ready = (async () => {
+      await fs.rm(legacyJobsFile(), { force: true });
+      let entries: string[] = [];
       try {
-        value.jobs = JSON.parse(await fs.readFile(jobsFile, "utf8"));
+        entries = await fs.readdir(jobsDir());
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
       }
-      for (const job of value.jobs) {
+      const loaded: SkillInstallJob[] = [];
+      for (const entry of entries) {
+        if (!entry.endsWith(".json") || entry.startsWith(".")) continue;
+        const job: SkillInstallJob = JSON.parse(
+          await fs.readFile(path.join(jobsDir(), entry), "utf8"),
+        );
+        let interrupted = false;
         for (const result of job.results) {
           if (result.status === "running") {
             result.status = "failed";
             result.output =
               "Server restarted during installation. The outcome is unknown; check the runner before retrying.";
+            interrupted = true;
           }
         }
+        if (interrupted) await persistJob(job);
+        loaded.push(job);
       }
+      loaded.sort((a, b) => b.createdAt - a.createdAt);
+      value.jobs = loaded;
     })();
   }
   return processState._skillInstallJobs;
-}
-
-async function persist() {
-  await withFileLock(jobsFile, () => writeJsonAtomic(jobsFile, state().jobs));
 }
 
 export async function getSkillInstallJobs() {
@@ -92,11 +117,20 @@ export async function createSkillInstallJob(
     ),
   };
   jobs.unshift(job);
-  state().jobs = jobs.filter(
-    (entry, index) =>
-      index < 20 || entry.results.some((result) => result.status === "running"),
+  const retained: SkillInstallJob[] = [];
+  const pruned: SkillInstallJob[] = [];
+  for (const [index, entry] of jobs.entries()) {
+    if (index < 20 || entry.results.some((result) => result.status === "running")) {
+      retained.push(entry);
+    } else {
+      pruned.push(entry);
+    }
+  }
+  state().jobs = retained;
+  await persistJob(job);
+  await Promise.all(
+    pruned.map((entry) => fs.rm(jobFile(entry.id), { force: true })),
   );
-  await persist();
   void Promise.all(
     input.targets.map(async (target) => {
       const results = job.results.filter(
@@ -138,7 +172,7 @@ export async function createSkillInstallJob(
           result.output = `${error instanceof Error ? error.message : String(error)}\nThe outcome may be unknown if the runner disconnected or timed out. Check it before retrying.`;
         }
       }
-      await persist();
+      await persistJob(job);
     }),
   ).catch((error) =>
     console.error("Failed to persist skill installation results:", error),
