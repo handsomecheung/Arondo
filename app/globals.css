@@ -2571,6 +2571,63 @@ pre.agent-exec-output {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2'/%3E%3Crect x='8' y='2' width='8' height='4' rx='1' ry='1'/%3E%3Cpath d='M9 12h6'/%3E%3Cpath d='M12 9v6'/%3E%3C/svg%3E");
 }
 
+.agent-paragraph {
+  position: relative;
+}
+
+.agent-paragraph-speaker-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin: 0 4px 0 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0.35;
+  border-radius: var(--radius-sm);
+  vertical-align: -2px;
+  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease, transform 0.1s ease;
+  flex-shrink: 0;
+}
+
+.agent-paragraph-speaker-btn svg {
+  pointer-events: none;
+}
+
+.agent-paragraph:hover > .agent-paragraph-speaker-btn,
+.agent-paragraph-speaker-btn:focus-visible {
+  opacity: 1;
+  color: var(--text);
+}
+
+.agent-paragraph-speaker-btn:hover {
+  opacity: 1;
+  color: var(--accent);
+  background-color: var(--accent-glow);
+}
+
+.agent-paragraph.speech-active > .agent-paragraph-speaker-btn,
+.agent-paragraph-speaker-btn.is-active {
+  opacity: 1 !important;
+  color: var(--accent) !important;
+  background-color: var(--accent-glow);
+  animation: pulse-speaker 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse-speaker {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.agent-paragraph .agent-paragraph > .agent-paragraph-speaker-btn {
+  display: none !important;
+}
+
 /* Legacy: keep for modal badge */
 .console-badge-running {
   font-size: 10px;

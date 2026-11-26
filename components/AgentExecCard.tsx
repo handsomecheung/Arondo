@@ -10,13 +10,13 @@ import { resolveRepoFilePath } from "@/lib/homeUtils";
 import ExecCard, { ExecCardProps } from "@/components/ExecCard";
 import { IconTerminal, IconFileText, IconCopy, IconCode, IconInfo, IconVolume } from "@/components/Icons";
 import { useSpeech } from "@/lib/hooks/useSpeech";
-import { extractSpeechText } from "@/lib/speechText";
+import { extractSpeechParagraphs, extractElementSpeechText } from "@/lib/speechText";
 import SpeechErrorModal from "@/components/modals/SpeechErrorModal";
 import DiffModal from "@/components/modals/DiffModal";
 import CommandModal from "@/components/modals/CommandModal";
 import ResultStatusModal from "@/components/modals/ResultStatusModal";
 
-const RENDERED_HTML_CACHE_MARKER = "<!--arondo-agent-output-html-v4-->";
+const RENDERED_HTML_CACHE_MARKER = "<!--arondo-agent-output-html-v5-->";
 
 // Terminal mode-control sequences (cursor visibility, mouse tracking, bracketed paste, etc.)
 // leak into agent PTY output but carry no visual meaning outside a real terminal emulator.
@@ -217,6 +217,21 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
 
   const handleOutputClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
+
+    const speakerBtn = target.closest(".agent-paragraph-speaker-btn") as HTMLElement | null;
+    if (speakerBtn) {
+      e.stopPropagation();
+      e.preventDefault();
+      const paragraphEl = speakerBtn.closest(".agent-paragraph") as HTMLElement | null;
+      if (paragraphEl) {
+        const text = extractElementSpeechText(paragraphEl);
+        if (text) {
+          speech.speakParagraph({ element: paragraphEl, text }, { sessionId, projectId });
+        }
+      }
+      return;
+    }
+
     const fileBtn = target.closest(".agent-filelink-btn, .agent-filelink-view-btn");
     if (fileBtn) {
       const path = fileBtn.getAttribute("data-path");
@@ -249,8 +264,14 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
   const speech = useSpeech();
   const canSpeak = !isLive && !onViewLog && hasLog && !!(cachedHtml || log);
   const toggleSpeech = () => {
-    if (speech.status !== "idle") speech.stop();
-    else if (outputRef.current) speech.speak(extractSpeechText(outputRef.current), { sessionId, projectId });
+    if (speech.status !== "idle") {
+      speech.stop();
+    } else if (outputRef.current) {
+      const paragraphs = extractSpeechParagraphs(outputRef.current);
+      if (paragraphs.length > 0) {
+        speech.speakAll(paragraphs, { sessionId, projectId });
+      }
+    }
   };
 
   const copyRaw = () => navigator.clipboard.writeText(log).catch(() => {});
@@ -367,6 +388,48 @@ export default function AgentExecCard({ sessionId, projectId, ws, repoPath, runn
               rehypePlugins={[rehypeHighlight]}
               urlTransform={(url) => url}
               components={{
+                p: ({ children, ...rest }) => (
+                  <p className="agent-paragraph" {...rest}>
+                    <button
+                      type="button"
+                      className="agent-paragraph-speaker-btn"
+                      title="Read paragraph aloud"
+                      aria-label="Read paragraph aloud"
+                      tabIndex={-1}
+                    >
+                      <IconVolume size={11} strokeWidth={2} />
+                    </button>
+                    {children}
+                  </p>
+                ),
+                blockquote: ({ children, ...rest }) => (
+                  <blockquote className="agent-paragraph" {...rest}>
+                    <button
+                      type="button"
+                      className="agent-paragraph-speaker-btn"
+                      title="Read quote aloud"
+                      aria-label="Read quote aloud"
+                      tabIndex={-1}
+                    >
+                      <IconVolume size={11} strokeWidth={2} />
+                    </button>
+                    {children}
+                  </blockquote>
+                ),
+                li: ({ children, ...rest }) => (
+                  <li className="agent-paragraph" {...rest}>
+                    <button
+                      type="button"
+                      className="agent-paragraph-speaker-btn"
+                      title="Read item aloud"
+                      aria-label="Read item aloud"
+                      tabIndex={-1}
+                    >
+                      <IconVolume size={11} strokeWidth={2} />
+                    </button>
+                    {children}
+                  </li>
+                ),
                 a: ({ href, children, ...rest }) => {
                   if (href?.startsWith("filelink:")) {
                     const path = href.slice("filelink:".length);
