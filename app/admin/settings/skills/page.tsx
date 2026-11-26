@@ -10,6 +10,7 @@ import {
 import styles from "@/components/admin/SettingsForm.module.css";
 import local from "./skills.module.css";
 import {
+  BUILTIN_SKILLS,
   availableSkillInstallGroups,
   groupSkillInstallResults,
   skillInstallGroup,
@@ -178,6 +179,32 @@ export default function SkillsPage() {
   return (
     <>
       <section className={styles.section}>
+        <div className={local.builtins}>
+          <h2>Built-in skills</h2>
+          <p className={local.hint}>
+            Quickly fill in official skills to install across selected runners.
+          </p>
+          {BUILTIN_SKILLS.map((item) => (
+            <div key={item.id} className={local.builtinCard}>
+              <div className={local.builtinInfo}>
+                <div className={local.builtinTitle}>
+                  <strong>{item.name}</strong>
+                </div>
+                <div className={local.hint}>{item.description}</div>
+              </div>
+              <button
+                type="button"
+                disabled={loading || submitting}
+                onClick={() => {
+                  setSource(item.source);
+                  setSkill(item.skill);
+                }}
+              >
+                Use {item.name}
+              </button>
+            </div>
+          ))}
+        </div>
         <form
           onSubmit={(event) => {
             event.preventDefault();

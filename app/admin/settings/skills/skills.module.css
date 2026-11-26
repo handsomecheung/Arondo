@@ -3,6 +3,35 @@
   overflow-wrap: anywhere;
 }
 
+.builtins {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.builtinCard {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+}
+
+.builtinInfo {
+  min-width: 0;
+  flex: 1 1 200px;
+}
+
+.builtinTitle {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
 .runners {
   display: grid;
   gap: 12px;

@@ -22,6 +22,16 @@ export const SKILL_INSTALL_GROUPS = [
   },
 ];
 
+export const BUILTIN_SKILLS = [
+  {
+    id: "arondo-cli",
+    name: "arondo-cli",
+    source: "handsomecheung/arondo",
+    skill: "arondo-cli",
+    description: "Delegate tasks, run Jev System One decisions, and inspect runner status.",
+  },
+] as const;
+
 export function skillInstallGroup(agent: string) {
   return SKILL_INSTALL_GROUPS.find((group) => group.agents.includes(agent));
 }
