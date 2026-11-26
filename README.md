@@ -139,10 +139,24 @@ cd runner && bash ./build.sh
 
 Runners support `--check-connection` to verify connectivity and `--auto-update=true` to automatically update when a newer server version is deployed.
 
-### 4. Build the CLI (optional)
+### 4. Build or install the CLI (optional)
+
+> **Note:** Windows is currently not supported; `arondo-cli` targets Linux and macOS (`linux-amd64`, `macos-amd64`, `macos-arm64`).
+
+Build from source:
 
 ```bash
 cd cli && go build -o arondo-cli . && cd ..
+```
+
+Or download the prebuilt binary from [GitHub Releases](https://github.com/handsomecheung/Arondo/releases):
+
+```bash
+OS=$(uname -s | tr '[:upper:]' '[:lower:]' | sed 's/darwin/macos/')
+ARCH=$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')
+mkdir -p ~/.local/bin
+curl -sSL -o ~/.local/bin/arondo-cli "https://github.com/handsomecheung/Arondo/releases/latest/download/arondo-cli-${OS}-${ARCH}"
+chmod +x ~/.local/bin/arondo-cli
 ```
 
 ## CLI & Automation API
@@ -169,7 +183,23 @@ cli/arondo-cli get-quota
 cli/arondo-cli update-quota
 ```
 
-Run `cli/install-skill` to install the bundled `arondo-cli` skill for Codex, Claude Code, Antigravity CLI, or OpenCode.
+### Agent Skill (`skills/arondo-cli`)
+
+Install the `arondo-cli` skill into your coding agent (Claude Code, Cursor, Codex, OpenCode, Antigravity CLI, etc.) using [`npx skills`](https://skills.sh):
+
+```bash
+# Install to the current project
+npx skills add handsomecheung/arondo --skill arondo-cli
+
+# Or install globally across all projects
+npx skills add handsomecheung/arondo --skill arondo-cli -g
+```
+
+From a local checkout of Arondo, you can also install the skill directly without fetching from GitHub:
+
+```bash
+npx skills add . --skill arondo-cli -g
+```
 
 ## Configuration
 

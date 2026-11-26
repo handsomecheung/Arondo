@@ -5,11 +5,29 @@ description: Delegate tasks to an AI agent, run fast categorical decisions with 
 
 # Arondo CLI
 
-Use `cli/arondo-cli` to interact with an Arondo server: delegate bounded tasks to remote AI coding agents with `send`, execute fast categorical classifications without a runner using `decide`, or inspect runner and session status with read-only commands.
+Use `arondo-cli` (or `cli/arondo-cli` when working inside an Arondo checkout) to interact with an Arondo server: delegate bounded tasks to remote AI coding agents with `send`, execute fast categorical classifications without a runner using `decide`, or inspect runner and session status with read-only commands.
 
 ## Before delegation
 
-Confirm that the target Arondo checkout provides the built `cli/arondo-cli` binary, and obtain a permitted server URL and client token. The CLI accepts command-line options, `ARONDO_SERVER` / `ARONDO_CLIENT_TOKEN`, or the `cli` object in `~/.arondo/arondo.json` (or `$ARONDO_CONFIG_DIR/arondo.json`). Earlier sources in that list take precedence:
+Confirm that `arondo-cli` is available in `$PATH` (or built as `cli/arondo-cli` in the local checkout). Note that Windows is currently not supported; prebuilt binaries target Linux and macOS (`linux-amd64`, `macos-amd64`, `macos-arm64`).
+
+If `arondo-cli` is not installed, download the prebuilt release binary:
+
+```bash
+# Download and install arondo-cli into ~/.local/bin (or any directory in $PATH)
+OS=$(uname -s | tr '[:upper:]' '[:lower:]' | sed 's/darwin/macos/')
+ARCH=$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')
+mkdir -p ~/.local/bin
+curl -sSL -o ~/.local/bin/arondo-cli "https://github.com/handsomecheung/Arondo/releases/latest/download/arondo-cli-${OS}-${ARCH}"
+chmod +x ~/.local/bin/arondo-cli
+```
+
+Alternatively, build it from the repository checkout:
+```bash
+cd cli && go build -o arondo-cli .
+```
+
+Next, obtain a permitted server URL and client token. The CLI accepts command-line options, `ARONDO_SERVER` / `ARONDO_CLIENT_TOKEN`, or the `cli` object in `~/.arondo/arondo.json` (or `$ARONDO_CONFIG_DIR/arondo.json`). Earlier sources in that list take precedence:
 
 ```json
 {
@@ -21,7 +39,7 @@ Confirm that the target Arondo checkout provides the built `cli/arondo-cli` bina
 ```
 
 ```bash
-cli/arondo-cli send --server "$ARONDO_SERVER" --client-token "$ARONDO_CLIENT_TOKEN" ...
+arondo-cli send --server "$ARONDO_SERVER" --client-token "$ARONDO_CLIENT_TOKEN" ...
 ```
 
 Treat the token as a secret: do not echo it, include it in prompts, or put it in reports. Choose a connected Runner with `--runner-id` or `--runner-name` whenever the local hostname does not uniquely identify the intended Runner (if multiple runners share the same name, use `--runner-id` instead of `--runner-name`).
@@ -31,7 +49,7 @@ Treat the token as a secret: do not echo it, include it in prompts, or put it in
 Use an explicit repository path for work in an existing project. When `--path`, `--automation`, and `--no-path` are omitted, the current working directory is used as the repository path. Keep the prompt self-contained: name the expected outcome, relevant files or constraints, and validation expected from the delegated agent.
 
 ```bash
-cli/arondo-cli send \
+arondo-cli send \
   --server "$ARONDO_SERVER" \
   --client-token "$ARONDO_CLIENT_TOKEN" \
   --runner-id "<runner-id>" \
@@ -55,7 +73,7 @@ cli/arondo-cli send \
 For a known session, preserve its conversation context with `--session-id`:
 
 ```bash
-cli/arondo-cli send --server "$ARONDO_SERVER" --client-token "$ARONDO_CLIENT_TOKEN" \
+arondo-cli send --server "$ARONDO_SERVER" --client-token "$ARONDO_CLIENT_TOKEN" \
   --session-id "<session-id>" "Address the failing test and rerun it."
 ```
 
@@ -79,7 +97,7 @@ Do not automatically retry failed commands or use `--confirmation force` merely 
 Run fast categorical decisions, classifications, triage, or probability evaluations powered by TypeSafe AI's System One model (`jev-latest`) without spawning a coding agent or connecting a runner:
 
 ```bash
-cli/arondo-cli decide '{
+arondo-cli decide '{
   "state": "Our API integration started returning 500 errors on every request about 20 minutes ago, and we cannot process customer orders.",
   "questions": {
     "department": {
@@ -111,7 +129,7 @@ cli/arondo-cli decide '{
 Or pipe JSON directly via standard input:
 
 ```bash
-cat payload.json | cli/arondo-cli decide
+cat payload.json | arondo-cli decide
 ```
 
 - **Input format**: Expects a JSON object containing a `questions` map. Supported question primitives:
@@ -129,22 +147,22 @@ Inspect runner readiness, quota, active sessions, and conversation history befor
 
 ```bash
 # Check agent availability on accessible runners (including quota reasons)
-cli/arondo-cli get-agents
+arondo-cli get-agents
 
 # View latest recorded quota usage across runners
-cli/arondo-cli get-quota
+arondo-cli get-quota
 
 # Force an asynchronous quota refresh across runners
-cli/arondo-cli update-quota
+arondo-cli update-quota
 
 # List active sessions
-cli/arondo-cli get-sessions
+arondo-cli get-sessions
 
 # List accessible projects
-cli/arondo-cli get-projects
+arondo-cli get-projects
 
 # Print full conversation history of a session (supports --output plain, json, or html)
-cli/arondo-cli get-messages --session-id "<session-id>" --output html
+arondo-cli get-messages --session-id "<session-id>" --output html
 ```
 
 OpenCode quota records use the fixed `Plan: "Go"` label when the authenticated usage response contains Go quota; this label does not distinguish Go, Go Plus, and Go Teams. Installations without a Go subscription are recorded as `Plan: "Free"`, and installations billed by provider API key as `Plan: "API Key"` with `IsAPIKey: true`; both report no usage windows. A usage response that carries no data is recorded as `Plan: "Unknown"`.

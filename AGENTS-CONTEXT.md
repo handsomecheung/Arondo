@@ -23,7 +23,7 @@
 
 6. **Settings vs Admin Settings Separation**: `/settings` is accessible to all users for device-level and personal preferences (such as enabling Web Push notifications on the current device). All server-level settings and configuration file modifications (`arondo.json`, `web-push.json`, agent models, tokens, global rules, etc.) must strictly be implemented in `/admin/settings` (Admin role only).
 
-7. **Sync CLI Skill Documentation**: Whenever modifications, new flags, new subcommands, or behavioral changes are made to the Arondo CLI (`cli/`) or its documentation in `README.md`, always update `cli/skills/arondo-cli/SKILL.md` to keep the bundled agent skill documentation in sync.
+7. **Sync CLI Skill Documentation**: Whenever modifications, new flags, new subcommands, or behavioral changes are made to the Arondo CLI (`cli/`) or its documentation in `README.md`, always update `skills/arondo-cli/SKILL.md` to keep the bundled agent skill documentation in sync.
 
 ---
 
@@ -68,7 +68,6 @@ runner/                  # Go runner binary
   pty.go                # TaskManager: spawn processes with PTY, scrollback buffer, auto-cleanup on exit
 cli/
   main.go               # Dependency-free Go CLI: send/decide/get-messages/get-sessions/get-projects/get-agents/get-quota/update-quota
-  install-skill         # Installs the bundled arondo-cli skill for supported agents
 app/
   page.tsx              # Main UI (runner selector, chat, status tracking, terminal modals, 3-dot dropdown)
   login/
@@ -587,7 +586,7 @@ The application enforces token-based authentication on all API routes and WebSoc
 - **CLI (`cli/arondo-cli`) Details**:
   - `send`: Creates or continues a session and streams/polls until completion. Defaults to current working directory and matching-hostname runner unless `--automation` or `--no-path` is set (which picks a random accessible runner). `--resume` targets the most recent session for runner+repoPath. `--once` (with `--automation`) creates a single-use session disallowing follow-ups; `--cache on` (requires `--once`) caches outputs in `${ARONDO_CONFIG_DIR}/cache/once/${sha256}` for 7 days (timestamp in `${hash}.meta.json`). `--confirmation auto|draft|force` handles `needsConfirmation` responses. `--output plain|json|html` selects output format (`json` returns `sessionId` and `rawOutput`).
   - `decide`: Executes fast server-side categorical decisions via TypeSafe AI System One (`jev-latest`, `TYPESAFE_API_KEY`) without a runner. Expects JSON via argument or stdin with `questions` (`choice`, `score`, `noul`) and optional `state`/`model`. Runs as `--automation --once`; `--output json` includes `decisionAnswers`.
-  - `cli/install-skill`: Installs the bundled `arondo-cli` skill for supported agents (accepts agent names and `--force`).
+  - `skills/arondo-cli`: Bundled agent skill for delegating tasks and running decisions via Arondo CLI, installable to agents via `npx skills`.
 - **Runner CLI & Auto-Update Mechanics**:
   - Flags: `--server`, `--token` (or `ARONDO_RUNNER_TOKEN`), `--check-connection` (10s authenticated Ping/Pong check without registration or token binding), `--version`, `--auto-update` (default `false`).
   - `setitngs.runnerDownloadUrl` in `arondo.json` (configured in **Admin Settings → Runner Updates**) defaults to `https://github.com/handsomecheung/Arondo/releases/download/v${version}/arondo-runner-${os}-${arch}` (`darwin` mapped to `macos`).
