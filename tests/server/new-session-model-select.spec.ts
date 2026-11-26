@@ -20,7 +20,7 @@ test.describe('New Session Model Select UI & Logic', () => {
     expect(result.agy.hasTrigger).toBe(true);
     expect(result.agy.hasGeminiGroup).toBe(true);
     expect(result.agy.hasAnthropicGroup).toBe(true);
-    expect(result.agy.hasArgonGroup).toBe(true);
+    expect(result.agy.hasArgonGroup).toBe(false);
     expect(result.agy.hasGeminiModel).toBe(true);
     expect(result.agy.hasClaudeModel).toBe(true);
     expect(result.agy.hasArgonModel).toBe(true);
@@ -134,7 +134,7 @@ test.describe('New Session Model Select UI & Logic', () => {
     const result = JSON.parse(output.trim());
     const option = (group: string[], model: string) => group.find((row) => row.includes(model));
     expect(result.agy.every((row: string) => !row.includes('%') && !row.includes('quota'))).toBe(true);
-    expect(result.agyGroups).toHaveLength(3);
+    expect(result.agyGroups).toHaveLength(2);
     expect(result.opencodeGroups).toHaveLength(2);
     expect(result.opencodeGroups[0]).toContain('hour: 80% week: 70% month: 60%');
     expect(result.opencodeGroups[1]).toBe('Free');
@@ -145,10 +145,8 @@ test.describe('New Session Model Select UI & Logic', () => {
     expect(result.opencodeFree.filter((m: string) => m !== 'Default').every((m: string) => m.startsWith('opencode/'))).toBe(true);
     expect(option(result.agyGroups, 'Gemini ')).toContain('hour: 81% week: 62%');
     expect(option(result.agyGroups, 'Anthropic &amp; Other')).toContain('hour: 0% week: 19%');
-    expect(option(result.agyGroups, 'Gemini 4 Argon')).toContain('week: 44%');
     expect(option(result.agents, 'Antigravity CLI')).toContain('Gemini hour: 81% week: 62%');
     expect(option(result.agents, 'Antigravity CLI')).toContain('Anthropic &amp; Other hour: 0% week: 19%');
-    expect(option(result.agents, 'Antigravity CLI')).toContain('Gemini 4 Argon week: 44%');
     expect(option(result.agents, 'Claude Code')).toContain('hour: 75% week: 32%');
     expect(option(result.agents, 'Codex')).toContain('hour: 91% week: 55%');
     expect(option(result.agents, 'Auto')).not.toContain('%');
@@ -162,7 +160,6 @@ test.describe('New Session Model Select UI & Logic', () => {
     expect(result.apiKey.every((row: string) => row.includes('API key billing · Quota unavailable') && !row.includes('80%'))).toBe(true);
     expect(result.bars.gemini.map((bar: { percent: number }) => bar.percent)).toEqual([81, 62]);
     expect(result.bars.other.map((bar: { percent: number }) => bar.percent)).toEqual([0, 19]);
-    expect(result.bars.argon.map((bar: { percent: number }) => bar.percent)).toEqual([44]);
     expect(result.bars.gemini[1].style).toContain('hsl(120 70% 42%)');
     expect(result.bars.other[1].style).toContain('hsl(0 70% 42%)');
     expect(result.bars.other[0].style).toContain('width:0%');
@@ -219,7 +216,6 @@ test.describe('New Session Model Select UI & Logic', () => {
             antigravity: {
               gemini: { defaultModel: '', availableModels: ['Gemini 3.8 Flash (High)'] },
               other: { defaultModel: '', availableModels: ['Claude Sonnet 5.5 (Medium)'] },
-              argon: { defaultModel: '', availableModels: ['Gemini 4 Argon (Medium)'] },
             },
             claude: { defaultModel: '', availableModels: ['opus', 'sonnet'] },
             codex: { defaultModel: '', availableModels: ['gpt-6-sol'] },

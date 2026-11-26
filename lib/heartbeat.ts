@@ -107,7 +107,7 @@ function getLatestQuotaEntry(
 function getResetTimestampSec(
   entry: QuotaEntry | null,
   agentType: string,
-  agyQuotaGroup?: "gemini" | "other" | "argon"
+  agyQuotaGroup?: "gemini" | "other"
 ): number | null {
   if (!entry) return null;
 
@@ -128,15 +128,11 @@ function getResetTimestampSec(
       if ((q.OtherHourRemain ?? 1) < 0.15 && q.OtherHourResetsAt) return q.OtherHourResetsAt;
       return q.OtherWeeklyResetsAt || q.OtherHourResetsAt || null;
     }
-    if (agyQuotaGroup === "argon") {
-      return q.ArgonWeeklyResetsAt || null;
-    }
     return (
       q.GeminiHourResetsAt ||
       q.GeminiWeeklyResetsAt ||
       q.OtherHourResetsAt ||
       q.OtherWeeklyResetsAt ||
-      q.ArgonWeeklyResetsAt ||
       null
     );
   }
@@ -208,7 +204,7 @@ async function processQuotaErrorSession(
   const resetTimeSec = getResetTimestampSec(
     quotaEntry,
     agentType,
-    agyQuotaGroup as "gemini" | "other" | "argon" | undefined
+    agyQuotaGroup as "gemini" | "other" | undefined
   );
   const nowMs = Date.now();
   const resetTimeMs = resetTimeSec ? resetTimeSec * 1000 : null;

@@ -10,7 +10,6 @@ export interface OpencodeModelsConfig extends AgentModelConfig {
 export interface AntigravityModelsConfig {
   gemini: AgentModelConfig;
   other: AgentModelConfig;
-  argon?: AgentModelConfig;
 }
 
 export const AUTO_AGENT_EXCLUDABLE = ["agy", "claude", "codex", "opencode", "pi"] as const;
@@ -88,34 +87,38 @@ export const DEFAULT_AGENT_MODELS: AgentModelsConfig & { opencode: OpencodeModel
     gemini: {
       defaultModel: "Gemini 3.8 Flash (Medium)",
       availableModels: [
-        "Gemini 3.8 Flash (High)",
-        "Gemini 3.8 Flash (Medium)",
-        "Gemini 3.8 Flash (Low)",
-        "Gemini 4 Hydrogen (High)",
-        "Gemini 4 Hydrogen (XHigh)",
-        "Gemini 4 Hydrogen (Medium)",
-        "Gemini 4 Hydrogen (Low)",
+        "Gemini 4 Neon (Low) # Frontier flagship with low thinking for quick queries",
+        "Gemini 4 Neon (Medium) # Frontier flagship balanced for complex tasks and architecture",
+        "Gemini 4 Neon (High) # Frontier flagship with deep reasoning for tough bugs and refactoring",
+        "Gemini 4 Neon (XHigh) # Frontier flagship with maximum reasoning for hardest problems",
+        "Gemini 4 Carbon (Low) # High-performance workhorse with low thinking for simple edits",
+        "Gemini 4 Carbon (Medium) # Balanced workhorse for everyday feature development",
+        "Gemini 4 Carbon (High) # Workhorse with deep reasoning for complex implementations",
+        "Gemini 4 Argon (Low) # Fast and lightweight option for simple requests",
+        "Gemini 4 Argon (Medium) # Efficient pragmatic model for code review and routine tasks",
+        "Gemini 4 Argon (High) # Best for complex tasks with deep reasoning in Gemini 4",
+        "Gemini 4 Hydrogen (Low) # High-throughput execution model for quick script runs",
+        "Gemini 4 Hydrogen (Medium) # Fast execution engine for tool use and multi-step changes",
+        "Gemini 4 Hydrogen (High) # High-throughput execution engine with deep reasoning",
+        "Gemini 4 Hydrogen (XHigh) # Maximum reasoning high-throughput execution model",
+        "Orchestrator (Neon) # Frontier planner with Neon and fast Hydrogen execution",
+        "Orchestrator (Carbon) # Balanced planner with Carbon for end-to-end features",
+        "Orchestrator (Argon) # Lightweight planner with Argon for rapid iterative tasks",
+        "Gemini 3.8 Flash (Low) # Fastest lightweight model with low thinking",
+        "Gemini 3.8 Flash (Medium) # Default fast, cost-effective option for light tasks",
+        "Gemini 3.8 Flash (High) # Flash model with high thinking for budget-friendly logic",
       ],
     },
     other: {
       defaultModel: "Claude Sonnet 5.5 (Medium)",
       availableModels: [
-        "Claude Opus 5.5 (Low)",
-        "Claude Opus 5.5 (Medium)",
-        "Claude Opus 5.5 (High)",
-        "Claude Sonnet 5.5 (Low)",
-        "Claude Sonnet 5.5 (Medium)",
-        "Claude Sonnet 5.5 (High)",
-        "GPT-OSS 120B (Medium)",
-      ],
-    },
-    argon: {
-      defaultModel: "Gemini 4 Argon (Medium)",
-      availableModels: [
-        "Gemini 4 Argon (High) # Best for complex tasks with deep reasoning in Gemini 4",
-        "Gemini 4 Argon (Medium) # Default recommended Argon model",
-        "Gemini 4 Argon (Low) # Fast and lightweight for simple requests",
-        "Orchestrator (Argon)",
+        "Claude Opus 5.5 (Low) # Anthropic Opus with low thinking for quick answers",
+        "Claude Opus 5.5 (Medium) # Most capable Anthropic model for everyday, complex tasks",
+        "Claude Opus 5.5 (High) # Deep reasoning Opus 5.5 for hardest architecture and debugging",
+        "Claude Sonnet 5.5 (Low) # Efficient Anthropic model with low thinking",
+        "Claude Sonnet 5.5 (Medium) # Default recommended Sonnet 5.5 for routine tasks",
+        "Claude Sonnet 5.5 (High) # High thinking Sonnet 5.5 for complex code generation",
+        "GPT-OSS 120B (Medium) # Open-weight model option for general tasks",
       ],
     },
   },

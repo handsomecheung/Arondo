@@ -26,7 +26,6 @@ interface GroupFormState {
 interface FormState {
   antigravityGemini: GroupFormState;
   antigravityOther: GroupFormState;
-  antigravityArgon: GroupFormState;
   claude: GroupFormState;
   codex: GroupFormState;
   opencode: GroupFormState;
@@ -57,10 +56,6 @@ function configToFormState(config?: AgentModelsConfig): FormState {
     antigravityOther: {
       defaultModel: config?.antigravity?.other?.defaultModel ?? DEFAULT_AGENT_MODELS.antigravity.other.defaultModel ?? "",
       availableModelsText: (config?.antigravity?.other?.availableModels ?? DEFAULT_AGENT_MODELS.antigravity.other.availableModels ?? []).join("\n"),
-    },
-    antigravityArgon: {
-      defaultModel: config?.antigravity?.argon?.defaultModel ?? DEFAULT_AGENT_MODELS.antigravity.argon?.defaultModel ?? "",
-      availableModelsText: (config?.antigravity?.argon?.availableModels ?? DEFAULT_AGENT_MODELS.antigravity.argon?.availableModels ?? []).join("\n"),
     },
     claude: {
       defaultModel: config?.claude?.defaultModel ?? DEFAULT_AGENT_MODELS.claude.defaultModel ?? "",
@@ -102,13 +97,11 @@ export default function AgentModelsManager({ initialConfig, onSaved, onCancel }:
     }));
   };
 
-  const handleResetAgyGroup = (group: "gemini" | "other" | "argon") => {
+  const handleResetAgyGroup = (group: "gemini" | "other") => {
     const def = DEFAULT_AGENT_MODELS.antigravity[group];
     const fieldKey: keyof FormState = group === "gemini"
       ? "antigravityGemini"
-      : group === "other"
-        ? "antigravityOther"
-        : "antigravityArgon";
+      : "antigravityOther";
     setForm((prev) => ({
       ...prev,
       [fieldKey]: {
@@ -158,13 +151,6 @@ export default function AgentModelsManager({ initialConfig, onSaved, onCancel }:
         other: {
           defaultModel: form.antigravityOther.defaultModel.trim(),
           availableModels: form.antigravityOther.availableModelsText
-            .split("\n")
-            .map((m) => m.trim())
-            .filter(Boolean),
-        },
-        argon: {
-          defaultModel: form.antigravityArgon.defaultModel.trim(),
-          availableModels: form.antigravityArgon.availableModelsText
             .split("\n")
             .map((m) => m.trim())
             .filter(Boolean),
@@ -408,7 +394,7 @@ export default function AgentModelsManager({ initialConfig, onSaved, onCancel }:
               (k, v) => handleChange("antigravityGemini", k, v),
               () => handleResetAgyGroup("gemini"),
               "e.g. Gemini 3.8 Flash (Medium)",
-              "Gemini 3.8 Flash (High)\nGemini 3.8 Flash (Medium)\nGemini 3.8 Flash (Low)\nGemini 4 Hydrogen (High)\nGemini 4 Hydrogen (XHigh)\nGemini 4 Hydrogen (Medium)\nGemini 4 Hydrogen (Low)",
+              "Gemini 4 Neon (Low) # Frontier flagship with low thinking\nGemini 4 Neon (Medium) # Frontier flagship balanced option\nGemini 4 Neon (High) # Frontier flagship with deep reasoning\nGemini 4 Neon (XHigh) # Frontier flagship with max reasoning\nGemini 4 Carbon (Low) # Workhorse with low thinking\nGemini 4 Carbon (Medium) # Balanced workhorse option\nGemini 4 Carbon (High) # Workhorse with deep reasoning\nGemini 4 Argon (Low) # Fast and lightweight option\nGemini 4 Argon (Medium) # Efficient pragmatic option\nGemini 4 Argon (High) # Deep reasoning Argon option\nGemini 4 Hydrogen (Low) # High-throughput execution model\nGemini 4 Hydrogen (Medium) # Fast execution engine\nGemini 4 Hydrogen (High) # Execution engine with deep reasoning\nGemini 4 Hydrogen (XHigh) # Max reasoning execution model\nOrchestrator (Neon) # Frontier planner with Neon\nOrchestrator (Carbon) # Balanced planner with Carbon\nOrchestrator (Argon) # Lightweight planner with Argon\nGemini 3.8 Flash (Low) # Fast lightweight model\nGemini 3.8 Flash (Medium) # Default fast, cost-effective option\nGemini 3.8 Flash (High) # Flash model with high thinking",
               "agy-gemini",
             )}
             {renderGroupCard(
@@ -418,18 +404,8 @@ export default function AgentModelsManager({ initialConfig, onSaved, onCancel }:
               (k, v) => handleChange("antigravityOther", k, v),
               () => handleResetAgyGroup("other"),
               "e.g. Claude Sonnet 5.5 (Medium)",
-              "Claude Opus 5.5 (Low)\nClaude Opus 5.5 (Medium)\nClaude Opus 5.5 (High)\nClaude Sonnet 5.5 (Low)\nClaude Sonnet 5.5 (Medium)\nClaude Sonnet 5.5 (High)\nGPT-OSS 120B (Medium)",
+              "Claude Opus 5.5 (Low) # Anthropic Opus with low thinking\nClaude Opus 5.5 (Medium) # Capable Anthropic model for everyday tasks\nClaude Opus 5.5 (High) # Deep reasoning Opus 5.5\nClaude Sonnet 5.5 (Low) # Efficient Anthropic model with low thinking\nClaude Sonnet 5.5 (Medium) # Default recommended Sonnet 5.5\nClaude Sonnet 5.5 (High) # High thinking Sonnet 5.5\nGPT-OSS 120B (Medium) # Open-weight model option",
               "agy-other",
-            )}
-            {renderGroupCard(
-              "Gemini 4 Argon Group",
-              "Gemini 4 Argon models counted against Antigravity Argon quota tier.",
-              form.antigravityArgon,
-              (k, v) => handleChange("antigravityArgon", k, v),
-              () => handleResetAgyGroup("argon"),
-              "e.g. Gemini 4 Argon (Medium)",
-              "Gemini 4 Argon (High) # Best for complex tasks with deep reasoning in Gemini 4\nGemini 4 Argon (Medium) # Default recommended Argon model\nGemini 4 Argon (Low) # Fast and lightweight for simple requests\nOrchestrator (Argon)",
-              "agy-argon",
             )}
           </div>
         </div>

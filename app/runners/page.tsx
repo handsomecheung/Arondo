@@ -19,8 +19,6 @@ interface AgyQuota {
   OtherWeeklyResetsAt: number | null;
   OtherHourRemain: number | null;
   OtherHourResetsAt: number | null;
-  ArgonWeeklyRemain?: number | null;
-  ArgonWeeklyResetsAt?: number | null;
   updatedAt: number | null;
   IsAPIKey?: boolean;
 }
@@ -474,9 +472,6 @@ export default function RunnersPage() {
                               { label: "Gemini Weekly", used: agentsQuota.antigravity.GeminiWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.GeminiWeeklyRemain, remaining: agentsQuota.antigravity.GeminiWeeklyRemain, resetsAt: agentsQuota.antigravity.GeminiWeeklyResetsAt, scoreColor: quotaScoreColors.gemini },
                               { label: "Other Hour", used: agentsQuota.antigravity.OtherHourRemain == null ? null : 1 - agentsQuota.antigravity.OtherHourRemain, remaining: agentsQuota.antigravity.OtherHourRemain, resetsAt: agentsQuota.antigravity.OtherHourResetsAt, scoreColor: quotaScoreColors.other },
                               { label: "Other Weekly", used: agentsQuota.antigravity.OtherWeeklyRemain == null ? null : 1 - agentsQuota.antigravity.OtherWeeklyRemain, remaining: agentsQuota.antigravity.OtherWeeklyRemain, resetsAt: agentsQuota.antigravity.OtherWeeklyResetsAt, scoreColor: quotaScoreColors.other },
-                              ...(agentsQuota.antigravity.ArgonWeeklyRemain !== undefined && agentsQuota.antigravity.ArgonWeeklyRemain !== null
-                                ? [{ label: "Argon Weekly", used: 1 - agentsQuota.antigravity.ArgonWeeklyRemain, remaining: agentsQuota.antigravity.ArgonWeeklyRemain, resetsAt: agentsQuota.antigravity.ArgonWeeklyResetsAt ?? null, scoreColor: quotaScoreColors.argon }]
-                                : []),
                             ]}
                             onRefresh={r.connected && !agentsQuota.antigravity.IsAPIKey ? () => refreshQuota(r.id, "agy") : undefined}
                             isRefreshing={refreshingQuota[`${r.id}:agy`]}

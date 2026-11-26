@@ -107,11 +107,11 @@ export async function resolveAgentType(
       agentType: concrete,
       model: parsed.model,
       effort: parsed.effort,
-      modelOptions: getModelOptionsForAgent(concrete, getAgyQuotaGroupForModel(configured), agentModels, { includeAllOpencode: true }),
+      modelOptions: getModelOptionsForAgent(concrete, getAgyQuotaGroupForModel(configured, agentModels), agentModels, { includeAllOpencode: true }),
     }, options, true);
   }
   const resolved = await selectAgent(runnerAgentBinaries, options.autoagentLog, options.lockedAgent?.agentType, options.opencodeQuotaRef);
-  const lockedGroup = options.lockedAgent?.agyQuotaGroup ?? getAgyQuotaGroupForModel(options.lockedAgent?.model);
+  const lockedGroup = options.lockedAgent?.agyQuotaGroup ?? getAgyQuotaGroupForModel(options.lockedAgent?.model, agentModels);
   const lockedModel = options.lockedAgent?.model?.trim()
     || (options.lockedAgent
       ? getConfiguredDefaultModel(options.lockedAgent.agentType, lockedGroup, agentModels)

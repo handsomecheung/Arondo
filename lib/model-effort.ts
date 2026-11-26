@@ -19,7 +19,7 @@ const ANTIGRAVITY_EFFORT_ORDER = ["low", "medium", "high", "xhigh", "max"];
 function configuredModelLines(agent: EffortAgent, config?: AgentModelsConfig | null): string[] {
   if (agent === "antigravity") {
     const agy = config?.antigravity ?? DEFAULT_AGENT_MODELS.antigravity;
-    return [agy.gemini, agy.other, agy.argon].flatMap((group) => parseModelList(group?.availableModels ?? []));
+    return [agy.gemini, agy.other].flatMap((group) => parseModelList(group?.availableModels ?? []));
   }
   if (agent === "opencode") {
     return getOpencodeModelGroups(config?.opencode).flatMap((group) => parseOpencodeModelList(group.models));

@@ -33,7 +33,6 @@ export function ModelOptions({ agentType, selectedModel, config, byFamily = fals
     ? [
       { name: "Gemini", key: "Gemini", models: agy?.gemini?.availableModels ?? DEFAULT_AGENT_MODELS.antigravity.gemini.availableModels },
       { name: "Anthropic & Other", key: "Other", models: agy?.other?.availableModels ?? DEFAULT_AGENT_MODELS.antigravity.other.availableModels },
-      { name: "Gemini 4 Argon", key: "Argon", models: agy?.argon?.availableModels ?? DEFAULT_AGENT_MODELS.antigravity.argon?.availableModels },
     ]
     : agentType === "opencode" ? getOpencodeModelGroups(config?.opencode, { freeOnly: isOpencodeFree })
     : [{ name: "", key: "", models: config?.[agentType]?.availableModels ?? DEFAULT_AGENT_MODELS[agentType]?.availableModels ?? [] }];

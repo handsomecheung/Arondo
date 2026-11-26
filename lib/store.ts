@@ -74,7 +74,7 @@ export interface TodoTrigger {
   kind: TodoTriggerKind;
   timestamp?: number; // "at" only
   agentType?: string; // "quotaAvailable" only
-  agyQuotaGroup?: "gemini" | "other" | "argon"; // agy "quotaAvailable" only
+  agyQuotaGroup?: "gemini" | "other"; // agy "quotaAvailable" only
 }
 
 export interface Project {
@@ -120,7 +120,7 @@ export interface Session {
   autoLockedAgentType?: string;
   autoLockedAgentModel?: string;
   autoLockedAgentEffort?: string;
-  autoLockedAgyQuotaGroup?: "gemini" | "other" | "argon";
+  autoLockedAgyQuotaGroup?: "gemini" | "other";
   model?: string;
   tokenUuid?: string;
   // Set to true if the session only allows a single message (automation).
@@ -182,7 +182,7 @@ export interface Message {
   resolvedAgentType?: string;
   resolvedModel?: string;
   resolvedEffort?: AutoModelEffort;
-  resolvedAgyQuotaGroup?: "gemini" | "other" | "argon";
+  resolvedAgyQuotaGroup?: "gemini" | "other";
   prompt?: string;
   tokenUuid?: string;
   userName?: string;
@@ -1010,7 +1010,7 @@ export async function getAppSettings(): Promise<AppSettings> {
   const defaults = getDefaultAgentModels();
   const rawAgentModels = settings.agentModels as any;
 
-  // Handle migration if antigravity was stored in flat format
+  // Handle migration if antigravity was stored in flat format or had an argon group
   let rawAgyGemini = rawAgentModels?.antigravity?.gemini;
   let rawAgyOther = rawAgentModels?.antigravity?.other;
   let rawAgyArgon = rawAgentModels?.antigravity?.argon;
@@ -1023,15 +1023,28 @@ export async function getAppSettings(): Promise<AppSettings> {
       : "";
     rawAgyGemini = {
       defaultModel: flatDefault || defaults.antigravity.gemini.defaultModel,
-      availableModels: flatModels.filter((m) => m.toLowerCase().includes("gemini") && !m.toLowerCase().includes("argon")),
-    };
-    rawAgyArgon = {
-      defaultModel: defaults.antigravity.argon?.defaultModel,
-      availableModels: flatModels.filter((m) => m.toLowerCase().includes("argon")),
+      availableModels: flatModels.filter((m) => m.toLowerCase().includes("gemini") || m.toLowerCase().includes("orchestrator") || m.toLowerCase().includes("argon")),
     };
     rawAgyOther = {
       defaultModel: defaults.antigravity.other.defaultModel,
-      availableModels: flatModels.filter((m) => !m.toLowerCase().includes("gemini")),
+      availableModels: flatModels.filter((m) => !m.toLowerCase().includes("gemini") && !m.toLowerCase().includes("orchestrator") && !m.toLowerCase().includes("argon")),
+    };
+  } else if (rawAgyArgon && rawAgyGemini) {
+    // Automatically merge legacy argon group models into gemini group
+    const geminiModels: string[] = Array.isArray(rawAgyGemini.availableModels) ? [...rawAgyGemini.availableModels] : [];
+    const existingNames = new Set(geminiModels.map(parseModelLine).filter(Boolean));
+    if (Array.isArray(rawAgyArgon.availableModels)) {
+      for (const model of rawAgyArgon.availableModels) {
+        const name = parseModelLine(model);
+        if (name && !existingNames.has(name)) {
+          geminiModels.push(model);
+          existingNames.add(name);
+        }
+      }
+    }
+    rawAgyGemini = {
+      ...rawAgyGemini,
+      availableModels: geminiModels,
     };
   }
 
@@ -1053,14 +1066,6 @@ export async function getAppSettings(): Promise<AppSettings> {
         availableModels: Array.isArray(rawAgyOther?.availableModels)
           ? rawAgyOther.availableModels
           : defaults.antigravity.other.availableModels,
-      },
-      argon: {
-        defaultModel: rawAgyArgon?.defaultModel !== undefined
-          ? rawAgyArgon.defaultModel
-          : defaults.antigravity.argon?.defaultModel,
-        availableModels: Array.isArray(rawAgyArgon?.availableModels)
-          ? rawAgyArgon.availableModels
-          : defaults.antigravity.argon?.availableModels,
       },
     },
     claude: {

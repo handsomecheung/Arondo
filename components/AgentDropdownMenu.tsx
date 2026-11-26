@@ -30,11 +30,13 @@ export function availableAgentItems(isAgentAvailable: (command: string) => boole
 
 export function AgentOptionQuota({ value, quotas, loading = false }: { value: string; quotas: ModelQuotas | null; loading?: boolean }) {
   if (value === "antigravity") {
+    const groups: [string, string][] = [
+      ["Gemini", "Gemini"],
+      ["Anthropic & Other", "Other"],
+    ];
     return (
       <>
-        {[
-          ["Gemini", "Gemini"], ["Anthropic & Other", "Other"], ["Gemini 4 Argon", "Argon"],
-        ].map(([name, group]) => (
+        {groups.map(([name, group]) => (
           <span key={group} className="dropdown-option-quota">
             <span className="agent-quota-line">{name}</span>
             <DropdownQuotaBars quotas={quotas} agent="antigravity" group={group} loading={loading} />

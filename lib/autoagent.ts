@@ -21,7 +21,7 @@ export interface ResolvedAgent {
   agyQuotaGroup?: AgyQuotaGroup;
 }
 
-export type AgyQuotaGroup = "gemini" | "other" | "argon";
+export type AgyQuotaGroup = "gemini" | "other";
 
 interface ClaudeQuota {
   Type: "claude";
@@ -49,8 +49,6 @@ interface AntigravityQuota {
   OtherWeeklyResetsAt: number | null;
   OtherHourRemain: number | null;
   OtherHourResetsAt: number | null;
-  ArgonWeeklyRemain?: number | null;
-  ArgonWeeklyResetsAt?: number | null;
   updatedAt: number | null;
   IsAPIKey?: boolean;
 }
@@ -120,9 +118,9 @@ function getQuotaMetrics(entry?: QuotaEntry, group?: AgyQuotaGroup, agentType?: 
   }
   if (entry?.Type === "antigravity") {
     return {
-      hourRemain: group === "argon" ? null : group === "other" ? entry.OtherHourRemain ?? null : entry.GeminiHourRemain ?? null,
-      weekRemain: group === "argon" ? entry.ArgonWeeklyRemain ?? null : group === "other" ? entry.OtherWeeklyRemain ?? null : entry.GeminiWeeklyRemain ?? null,
-      resetsAt: group === "argon" ? entry.ArgonWeeklyResetsAt ?? null : group === "other" ? entry.OtherWeeklyResetsAt ?? null : entry.GeminiWeeklyResetsAt ?? null,
+      hourRemain: group === "other" ? entry.OtherHourRemain ?? null : entry.GeminiHourRemain ?? null,
+      weekRemain: group === "other" ? entry.OtherWeeklyRemain ?? null : entry.GeminiWeeklyRemain ?? null,
+      resetsAt: group === "other" ? entry.OtherWeeklyResetsAt ?? null : entry.GeminiWeeklyResetsAt ?? null,
       monthRemain: null,
       isAPIKey: entry.IsAPIKey === true,
     };
@@ -169,6 +167,13 @@ interface AgentChoice {
 }
 
 const PREDEFINED_MODEL_OPTIONS: Record<string, Omit<AutoModelOption, "model">> = {
+  "Gemini 4 Neon (Low)": { id: "gemini-4-neon-low", costTier: "cheap", description: "Gemini 4 Neon (Low)" },
+  "Gemini 4 Neon (Medium)": { id: "gemini-4-neon-medium", costTier: "standard", description: "Gemini 4 Neon (Medium)" },
+  "Gemini 4 Neon (High)": { id: "gemini-4-neon-high", costTier: "strong", description: "Gemini 4 Neon (High)" },
+  "Gemini 4 Neon (XHigh)": { id: "gemini-4-neon-xhigh", costTier: "strong", description: "Gemini 4 Neon (XHigh)" },
+  "Gemini 4 Carbon (Low)": { id: "gemini-4-carbon-low", costTier: "cheap", description: "Gemini 4 Carbon (Low)" },
+  "Gemini 4 Carbon (Medium)": { id: "gemini-4-carbon-medium", costTier: "standard", description: "Gemini 4 Carbon (Medium)" },
+  "Gemini 4 Carbon (High)": { id: "gemini-4-carbon-high", costTier: "strong", description: "Gemini 4 Carbon (High)" },
   "Gemini 4 Argon (High)": { id: "gemini-4-argon-high", costTier: "strong", description: "Gemini 4 Argon with high thinking for complex tasks." },
   "Gemini 4 Argon (Medium)": { id: "gemini-4-argon-medium", costTier: "standard", description: "Gemini 4 Argon balanced option." },
   "Gemini 4 Argon (Low)": { id: "gemini-4-argon-low", costTier: "cheap", description: "Gemini 4 Argon low thinking for small tasks." },
@@ -176,6 +181,8 @@ const PREDEFINED_MODEL_OPTIONS: Record<string, Omit<AutoModelOption, "model">> =
   "Gemini 4 Hydrogen (XHigh)": { id: "gemini-4-hydrogen-xhigh", costTier: "strong", description: "Gemini 4 Hydrogen (XHigh)" },
   "Gemini 4 Hydrogen (Medium)": { id: "gemini-4-hydrogen-medium", costTier: "standard", description: "Gemini 4 Hydrogen (Medium)" },
   "Gemini 4 Hydrogen (Low)": { id: "gemini-4-hydrogen-low", costTier: "cheap", description: "Gemini 4 Hydrogen (Low)" },
+  "Orchestrator (Neon)": { id: "gemini-pro-orchestrator-neon", costTier: "strong", description: "Orchestrator (Neon)" },
+  "Orchestrator (Carbon)": { id: "gemini-pro-orchestrator", costTier: "strong", description: "Orchestrator (Carbon)" },
   "Orchestrator (Argon)": { id: "gemini-pro-orchestrator-g1-pro", costTier: "strong", description: "Orchestrator (Argon)" },
   "Gemini 3.8 Flash (High)": { id: "gemini-3.8-flash-high", costTier: "strong", description: "Gemini 3.8 Flash (High)" },
   "Gemini 3.8 Flash (Medium)": { id: "gemini-3.8-flash-medium", costTier: "standard", description: "Gemini 3.8 Flash (Medium)" },
@@ -253,9 +260,6 @@ export function getConfiguredDefaultModel(
     if (agyQuotaGroup === "other") {
       return parseModelLine(configs.antigravity?.other?.defaultModel) || undefined;
     }
-    if (agyQuotaGroup === "argon") {
-      return parseModelLine(configs.antigravity?.argon?.defaultModel) || undefined;
-    }
     return parseModelLine(configs.antigravity?.gemini?.defaultModel) || undefined;
   }
   if (agentType === "claude") {
@@ -283,20 +287,15 @@ export function getModelOptionsForAgent(
   if (agentType === "antigravity") {
     const geminiModels = parseModelList(configs.antigravity?.gemini?.availableModels);
     const otherModels = parseModelList(configs.antigravity?.other?.availableModels);
-    const argonModels = parseModelList(configs.antigravity?.argon?.availableModels);
     if (agyQuotaGroup === "gemini") {
       return geminiModels.map((m) => buildModelOption(m, "antigravity"));
     }
     if (agyQuotaGroup === "other") {
       return otherModels.map((m) => buildModelOption(m, "antigravity"));
     }
-    if (agyQuotaGroup === "argon") {
-      return argonModels.map((m) => buildModelOption(m, "antigravity"));
-    }
     return [
       ...geminiModels.map((m) => buildModelOption(m, "antigravity")),
       ...otherModels.map((m) => buildModelOption(m, "antigravity")),
-      ...argonModels.map((m) => buildModelOption(m, "antigravity")),
     ];
   }
   if (agentType === "opencode") {
@@ -344,12 +343,11 @@ export function getModelOptionsForAgent(
   return [];
 }
 
-export function getAgyQuotaGroupForModel(model?: string): AgyQuotaGroup | undefined {
+export function getAgyQuotaGroupForModel(model?: string, configs?: AgentModelsConfig): AgyQuotaGroup | undefined {
   const cleaned = parseModelLine(model);
   if (!cleaned) return undefined;
   const lower = cleaned.toLowerCase();
-  if (lower.includes("argon")) return "argon";
-  if (lower.includes("gemini")) return "gemini";
+  if (lower.includes("gemini") || lower.includes("argon") || lower.includes("neon") || lower.includes("carbon") || lower.includes("hydrogen") || lower.includes("orchestrator")) return "gemini";
   if (lower.includes("gpt-oss") || lower.includes("claude") || lower.includes("opus") || lower.includes("sonnet")) return "other";
   return "gemini";
 }
@@ -400,17 +398,14 @@ async function selectAgentFromQuota(
   // B: agy + Other (Claude) models
   // C: claude
   // D: codex + gpt-6-sol
-  // E: agy + Gemini 4 Argon models
   // F: OpenCode Go subscription models
   // G: pi
   const choices: AgentChoice[] = [];
   if (hasAgy) {
     const geminiOptions = getModelOptionsForAgent("antigravity", "gemini", agentModels);
     const otherOptions = getModelOptionsForAgent("antigravity", "other", agentModels);
-    const argonOptions = getModelOptionsForAgent("antigravity", "argon", agentModels);
     const agyDefault = getConfiguredDefaultModel("antigravity", "gemini", agentModels);
     const otherDefault = getConfiguredDefaultModel("antigravity", "other", agentModels);
-    const argonDefault = getConfiguredDefaultModel("antigravity", "argon", agentModels);
 
     choices.push({
       id: "A",
@@ -425,13 +420,6 @@ async function selectAgentFromQuota(
       model: otherDefault,
       modelOptions: otherOptions,
       agyQuotaGroup: "other",
-    });
-    choices.push({
-      id: "E",
-      agentType: "antigravity",
-      model: argonDefault,
-      modelOptions: argonOptions,
-      agyQuotaGroup: "argon",
     });
   }
   if (hasClaude) {
@@ -635,7 +623,9 @@ export async function isQuotaAvailable(
   return relevant.some((entry) => {
     if (entry?.Type === "opencode" && !hasOpencodeSubscriptionQuota(entry)) return false;
     const groups: (AgyQuotaGroup | undefined)[] = entry?.Type === "antigravity"
-      ? agyQuotaGroup ? [agyQuotaGroup] : ["gemini", "other", "argon"]
+      ? agyQuotaGroup
+        ? [agyQuotaGroup]
+        : ["gemini", "other"]
       : [undefined];
     return groups.some((group) => {
       const metrics = getQuotaMetrics(entry, group, entry?.Type);

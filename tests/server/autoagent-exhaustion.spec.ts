@@ -12,7 +12,6 @@ const cases = [
   { Type: 'codex', binaries: ['codex'], hour: 'FiveHourRemain', week: 'WeeklyRemain' },
   { Type: 'antigravity', binaries: ['agy'], group: 'gemini', hour: 'GeminiHourRemain', week: 'GeminiWeeklyRemain' },
   { Type: 'antigravity', binaries: ['agy'], group: 'other', hour: 'OtherHourRemain', week: 'OtherWeeklyRemain' },
-  { Type: 'antigravity', binaries: ['agy'], group: 'argon', week: 'ArgonWeeklyRemain' },
 ] as const;
 
 async function writeQuota(quota: object) {
@@ -23,7 +22,7 @@ async function writeQuota(quota: object) {
 const exhausted = {
   claude: { Type: 'claude', HourRemain: 1, WeekRemain: 0.02 },
   codex: { Type: 'codex', FiveHourRemain: 0.02, WeeklyRemain: 1 },
-  agy: { Type: 'antigravity', GeminiWeeklyRemain: 0, OtherWeeklyRemain: 0.02, ArgonWeeklyRemain: 0.01 },
+  agy: { Type: 'antigravity', GeminiWeeklyRemain: 0, OtherWeeklyRemain: 0.02 },
 };
 
 test.afterEach(async () => {
@@ -45,7 +44,7 @@ for (const entry of cases) {
       ]) {
         await writeQuota({ entry: {
           Type: entry.Type,
-          GeminiWeeklyRemain: 0, OtherWeeklyRemain: 0, ArgonWeeklyRemain: 0,
+          GeminiWeeklyRemain: 0, OtherWeeklyRemain: 0,
           [entry.week]: 0.9,
           ...('hour' in entry ? { [entry.hour]: 1 } : {}),
           [metric]: remain,
@@ -71,14 +70,13 @@ test('excludes the exhausted Gemini group from the production scoring scenario',
       Type: 'antigravity', GeminiWeeklyRemain: 0, GeminiHourRemain: null,
       GeminiWeeklyResetsAt: now + 14470,
       OtherWeeklyRemain: 0.1993, OtherHourRemain: 1, OtherWeeklyResetsAt: now + 211570,
-      ArgonWeeklyRemain: 0.3363, ArgonWeeklyResetsAt: now + 227710,
     },
     codex: { Type: 'codex', FiveHourRemain: 1, WeeklyRemain: 0.87, WeeklyResetAt: now + 543680 },
   });
   const logs: string[] = [];
   await expect(selectAgent(['agy', 'codex'], (text) => { logs.push(text); })).resolves.toMatchObject({ agentType: 'codex' });
   expect(logs.join('')).toContain('Excluded exhausted choice A');
-  expect(logs.join('')).toContain('Final Candidate Order: [D, E, B]');
+  expect(logs.join('')).toContain('Final Candidate Order: [D, B]');
 });
 
 test('falls back to unknown quota and then API billing without reusing exhausted choices', async () => {
@@ -109,7 +107,7 @@ test('returns no agent when all quotas are exhausted, including locked choices',
 
 test('releases an exhausted agy group lock and logs the replacement', async () => {
   await writeQuota({ agy: {
-    Type: 'antigravity', GeminiWeeklyRemain: 0.8, OtherWeeklyRemain: 0.02, ArgonWeeklyRemain: 0,
+    Type: 'antigravity', GeminiWeeklyRemain: 0.8, OtherWeeklyRemain: 0.02,
   } });
   const logs: string[] = [];
   await expect(resolveAgentType('auto', ['agy'], {
@@ -129,7 +127,6 @@ test('prioritizes alternative groups within the same agent over switching to ano
       Type: 'antigravity',
       GeminiWeeklyRemain: 0.4,
       OtherWeeklyRemain: 0.02, // exhausted
-      ArgonWeeklyRemain: 0.01, // exhausted
     },
     codex: {
       Type: 'codex',

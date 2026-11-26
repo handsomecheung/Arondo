@@ -5,10 +5,9 @@ export type AgentQuota = { Account?: string; IsAPIKey?: boolean; Plan?: string }
   | 'MonthlyRemain' | 'MonthlyResetAt'
   | 'FiveHourRemain' | 'FiveHourResetAt' | 'WeeklyRemain' | 'WeeklyResetAt'
   | 'GeminiHourRemain' | 'GeminiHourResetsAt' | 'GeminiWeeklyRemain' | 'GeminiWeeklyResetsAt'
-  | 'OtherHourRemain' | 'OtherHourResetsAt' | 'OtherWeeklyRemain' | 'OtherWeeklyResetsAt'
-  | 'ArgonHourRemain' | 'ArgonHourResetsAt' | 'ArgonWeeklyRemain' | 'ArgonWeeklyResetsAt', number | null>>;
+  | 'OtherHourRemain' | 'OtherHourResetsAt' | 'OtherWeeklyRemain' | 'OtherWeeklyResetsAt', number | null>>;
 export type ModelQuotas = Partial<Record<"antigravity" | "claude" | "codex" | "opencode" | "pi", AgentQuota | null>>;
-export type QuotaGroup = "claude" | "codex" | "opencode" | "gemini" | "other" | "argon";
+export type QuotaGroup = "claude" | "codex" | "opencode" | "gemini" | "other";
 
 export function quotaNumber(quota: AgentQuota | null | undefined, key: string): number | null {
   const value = quota?.[key as keyof AgentQuota];
@@ -36,7 +35,6 @@ export function getQuotaScoreColors(quota: ModelQuotas | null): Partial<Record<Q
     claude: score(quota.claude, "WeekRemain", "WeekResetsAt"),
     gemini: score(quota.antigravity, "GeminiWeeklyRemain", "GeminiWeeklyResetsAt"),
     other: score(quota.antigravity, "OtherWeeklyRemain", "OtherWeeklyResetsAt"),
-    argon: score(quota.antigravity, "ArgonWeeklyRemain", "ArgonWeeklyResetsAt"),
     opencode: score(quota.opencode, "WeeklyRemain", "WeeklyResetAt"),
     codex: score(quota.codex, "WeeklyRemain", "WeeklyResetAt"),
   };

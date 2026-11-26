@@ -183,9 +183,9 @@ console.log(
     agy: {
       hasModelRow: agyHtml.includes('model-meta-row'),
       hasTrigger: agyHtml.includes('id="model-select-trigger"'),
-      hasGeminiGroup: agyHtml.includes('Gemini'),
-      hasAnthropicGroup: agyHtml.includes('Anthropic &amp; Other'),
-      hasArgonGroup: agyHtml.includes('Gemini 4 Argon'),
+      hasGeminiGroup: agyHtml.includes('model-quota-group-header">Gemini<'),
+      hasAnthropicGroup: agyHtml.includes('model-quota-group-header">Anthropic &amp; Other<'),
+      hasArgonGroup: agyHtml.includes('model-quota-group-header">Gemini 4 Argon<'),
       hasGeminiModel: agyHtml.includes('dropdown-option-name">Gemini 3.8 Flash<'),
       hasClaudeModel: agyHtml.includes('dropdown-option-name">Claude Sonnet 5.5<'),
       hasArgonModel: agyHtml.includes('dropdown-option-name">Gemini 4 Argon<'),

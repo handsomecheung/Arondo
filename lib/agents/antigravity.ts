@@ -23,9 +23,24 @@ export async function saveAgySessionId(sessionId: string, agyId: string): Promis
 export class AntigravityAgent extends BaseAgent {
   readonly name = "antigravity";
 
-  getCommand({ repoPath, sessionId, model }: Omit<AgentRunOptions, "onOutput">): string {
+  getCommand({ repoPath, sessionId, model, effort }: Omit<AgentRunOptions, "onOutput">): string {
     const addDirArg = repoPath ? ` --add-dir "${repoPath}"` : "";
-    const modelArg = model ? ` --model "${model}"` : "";
+    let effectiveModel = model;
+    if (model) {
+      if (/^orchestrator\b/i.test(model)) {
+        // Orchestrator models (e.g. "Orchestrator (Argon)") do not take an effort suffix
+        effectiveModel = model;
+      } else {
+        const match = model.match(/^(.+?)\s+\((Low|Medium|High|XHigh|Max)\)$/i);
+        if (match) {
+          // Model name already contains effort, e.g. "Gemini 4 Argon (Medium)"
+        } else {
+          // Bare model name, e.g. "Gemini 4 Argon" -> resolve to Medium default
+          effectiveModel = `${model} (Medium)`;
+        }
+      }
+    }
+    const modelArg = effectiveModel ? ` --model "${effectiveModel}"` : "";
     if (sessionId) {
       const agyId = getAgySessionIdSync(sessionId);
       if (agyId) {

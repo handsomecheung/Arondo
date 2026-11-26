@@ -100,7 +100,7 @@ export interface TaskContext {
   projectId?: string;
   prompt?: string;
   agentType?: string;
-  agyQuotaGroup?: "gemini" | "other" | "argon";
+  agyQuotaGroup?: "gemini" | "other";
   detachedKind?: "review" | "btw";
   cache?: "on" | "off";
   tokenUuid?: string;

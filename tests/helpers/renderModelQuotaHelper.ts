@@ -38,7 +38,7 @@ function bars(agent: 'antigravity' | 'claude' | 'codex', group = '', data = quot
   return [...html.matchAll(/role="progressbar".*?aria-valuenow="(\d+)".*?<span class="dropdown-quota-fill" style="([^"]*)"/g)].map((match) => ({ percent: Number(match[1]), style: match[2] }));
 }
 console.log(JSON.stringify({
-  bars: { gemini: bars('antigravity', 'Gemini'), other: bars('antigravity', 'Other'), argon: bars('antigravity', 'Argon'), codex: bars('codex'), unknown: bars('claude', '', {}), apiKey: bars('claude', '', { claude: { IsAPIKey: true, WeekRemain: 0.8 } }), noReset: bars('claude', '', { claude: { WeekRemain: 0.2 } }) },
+  bars: { gemini: bars('antigravity', 'Gemini'), other: bars('antigravity', 'Other'), codex: bars('codex'), unknown: bars('claude', '', {}), apiKey: bars('claude', '', { claude: { IsAPIKey: true, WeekRemain: 0.8 } }), noReset: bars('claude', '', { claude: { WeekRemain: 0.2 } }) },
   agents: renderAgents(quotas),
   singleAgent: renderAgents(quotas, false, ['claude']),
   agy: render('antigravity', quotas),

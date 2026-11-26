@@ -84,7 +84,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
     await expect(selectAgent(['agy', 'claude', 'codex'], (text) => { logs.push(text); })).resolves.toMatchObject({
       agentType: 'codex',
     });
-    expect(logs.join('')).toContain('Final Candidate Order: [D, A, B, E, C]');
+    expect(logs.join('')).toContain('Final Candidate Order: [D, A, B, C]');
     expect(logs.join('')).toContain('WeekRemain=0.500, WeekTimeRemain=0.000');
   });
 
@@ -94,7 +94,6 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
         Type: 'antigravity',
         GeminiHourRemain: 0.8, GeminiWeeklyRemain: 0.9, GeminiWeeklyResetsAt: null,
         OtherHourRemain: 0.1, OtherWeeklyRemain: 0.1, OtherWeeklyResetsAt: null,
-        ArgonWeeklyRemain: 0.1, ArgonWeeklyResetsAt: null,
         updatedAt: 123,
       },
     }));
@@ -111,7 +110,7 @@ test.describe('Automode Session Resume and Handoff Tests', () => {
       expect(log).toContain('"latestEntryByType"');
       expect(log).toContain('Low quota choices (<0.15) = [B]');
       expect(log).toContain('Step 2 Scoring: Choice A');
-      expect(log).toContain('Final Candidate Order: [A, E, B]');
+      expect(log).toContain('Final Candidate Order: [A, B]');
       expect(log).toContain('"source": "lockedAgent"');
       expect(log).toContain('"agyQuotaGroup": "other"');
       expect(log).toContain('## Result');
