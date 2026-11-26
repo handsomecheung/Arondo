@@ -213,7 +213,7 @@ export default function SkillsPage() {
             <p className={local.hint}>
               Installs for the runner&apos;s user across all projects. Local
               paths refer to the selected runner. Each runner needs Node.js
-              22.20+ and npm; Git sources also need Git.
+              22.20+, npm, and npx; Git sources also need Git.
             </p>
             <h2>Runners &amp; agents</h2>
             <p className={local.hint}>
