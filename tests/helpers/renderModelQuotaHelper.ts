@@ -12,9 +12,8 @@ const quotas: ModelQuotas = {
   antigravity: {
     GeminiHourRemain: 0.81, GeminiWeeklyRemain: 0.62,
     OtherHourRemain: 0, OtherWeeklyRemain: 0.19,
-    ArgonWeeklyRemain: 0.44,
     GeminiHourResetsAt: hourReset, GeminiWeeklyResetsAt: weekReset,
-    OtherHourResetsAt: hourReset, OtherWeeklyResetsAt: weekReset, ArgonWeeklyResetsAt: weekReset,
+    OtherHourResetsAt: hourReset, OtherWeeklyResetsAt: weekReset,
   },
   claude: { HourRemain: 0.75, WeekRemain: 0.32, HourResetAt: hourReset, WeekResetsAt: weekReset },
   codex: { FiveHourRemain: 0.91, WeeklyRemain: 0.55, FiveHourResetAt: hourReset, WeeklyResetAt: weekReset },

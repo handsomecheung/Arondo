@@ -120,3 +120,90 @@ func TestHandleFsInfosDirectoryAndFile(t *testing.T) {
 		t.Fatalf("expected missingPath to not exist, got: %+v", missingInfo)
 	}
 }
+
+func TestHandleFsReadBase64AndOffset(t *testing.T) {
+	tempDir := t.TempDir()
+	testFile := filepath.Join(tempDir, "sample.bin")
+	data := []byte{0x00, 0x01, 0x02, 0x03, 0xFF, 0xFE, 0xFD, 0xFC}
+	if err := os.WriteFile(testFile, data, 0o644); err != nil {
+		t.Fatalf("failed to write binary file: %v", err)
+	}
+
+	var upgrader = websocket.Upgrader{}
+	responseChan := make(chan *Message, 2)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+
+		for {
+			_, msgBytes, err := conn.ReadMessage()
+			if err != nil {
+				break
+			}
+			var msg Message
+			if err := json.Unmarshal(msgBytes, &msg); err == nil {
+				if msg.ID == "test-read-b64" {
+					responseChan <- &msg
+				}
+			}
+		}
+	}))
+	defer server.Close()
+
+	wsURL := strings.Replace(server.URL, "http://", "ws://", 1)
+	client := NewClient(wsURL, "test-token")
+	if err := client.connect(); err != nil {
+		t.Fatalf("failed to connect test client: %v", err)
+	}
+	defer client.Stop()
+
+	h := client.handler
+
+	payloadBytes, _ := json.Marshal(fsReadRequest{
+		Path:     testFile,
+		Offset:   2,
+		Length:   4,
+		Encoding: "base64",
+	})
+	msg := &Message{
+		ID:      "test-read-b64",
+		Type:    TypeRequest,
+		Method:  "fs.read",
+		Payload: payloadBytes,
+	}
+
+	h.handleFsRead(msg)
+
+	var responseMsg *Message
+	select {
+	case responseMsg = <-responseChan:
+	case <-time.After(3 * time.Second):
+		t.Fatalf("timed out waiting for response message")
+	}
+
+	var res fsReadResponse
+	if err := json.Unmarshal(responseMsg.Payload, &res); err != nil {
+		t.Fatalf("failed to parse response payload: %v", err)
+	}
+
+	if !res.OK {
+		t.Fatalf("expected OK true, got false, payload: %s", string(responseMsg.Payload))
+	}
+	if res.Encoding != "base64" {
+		t.Fatalf("expected encoding base64, got %q", res.Encoding)
+	}
+	if res.TotalSize != int64(len(data)) {
+		t.Fatalf("expected totalSize %d, got %d", len(data), res.TotalSize)
+	}
+	if res.Size != 4 {
+		t.Fatalf("expected size 4, got %d", res.Size)
+	}
+	// bytes at index 2..5 are [0x02, 0x03, 0xFF, 0xFE] -> base64 is "AgP//g=="
+	if res.Content != "AgP//g==" {
+		t.Fatalf("expected content AgP//g==, got %q", res.Content)
+	}
+}

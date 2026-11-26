@@ -15,9 +15,10 @@ const defaultChunkSize int64 = 64 * 1024   // 64KB per chunk
 const maxFileUploadSize = 50 * 1024 * 1024 // 50MB
 
 type fsReadRequest struct {
-	Path   string `json:"path"`
-	Offset int64  `json:"offset,omitempty"`
-	Length int64  `json:"length,omitempty"`
+	Path     string `json:"path"`
+	Offset   int64  `json:"offset,omitempty"`
+	Length   int64  `json:"length,omitempty"`
+	Encoding string `json:"encoding,omitempty"`
 }
 
 type fsReadResponse struct {
@@ -28,6 +29,7 @@ type fsReadResponse struct {
 	TotalSize int64  `json:"totalSize"`
 	Offset    int64  `json:"offset"`
 	HasMore   bool   `json:"hasMore"`
+	Encoding  string `json:"encoding,omitempty"`
 }
 
 func (h *Handler) handleFsRead(msg *Message) {
@@ -80,14 +82,24 @@ func (h *Handler) handleFsRead(msg *Message) {
 	}
 	buf = buf[:n]
 
+	var content string
+	encoding := req.Encoding
+	if encoding == "base64" {
+		content = base64.StdEncoding.EncodeToString(buf)
+	} else {
+		content = string(buf)
+		encoding = "utf-8"
+	}
+
 	h.sendResponse(msg.ID, fsReadResponse{
 		OK:        true,
 		Path:      absPath,
-		Content:   string(buf),
+		Content:   content,
 		Size:      int64(n),
 		TotalSize: info.Size(),
 		Offset:    req.Offset,
 		HasMore:   req.Offset+int64(n) < info.Size(),
+		Encoding:  encoding,
 	})
 }
 

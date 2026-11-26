@@ -90,7 +90,7 @@ When a repository has uncommitted changes or an agent is already running, Arondo
 ### Mobile-First Workspace & PWA
 
 - **Installable PWA & Web Push**: Install Arondo to your home screen and receive native VAPID Web Push notifications on desktop and mobile (including iOS/iPadOS 16.4+) when agents finish, fail, or wait for terminal input.
-- **Integrated File Browser & Diff Viewer**: Browse remote files with syntax highlighting, insert paths with `@`, upload files directly from chat, and inspect session or project Git diffs inline.
+- **Integrated File Browser & Diff Viewer**: Browse remote files with syntax highlighting and rich media preview (images, videos, audio, SVGs with code/preview toggle, automatic window fit, and Range-backed streaming), insert paths with `@`, upload files directly from chat, and inspect session or project Git diffs inline.
 - **Multi-User Access Control**: Role-based authentication (`admin` and `user` tokens), dedicated per-runner tokens bound on first connect, and per-runner user access control lists.
 - **Gen Main Agent (Experimental)**: A unified conversational interface (`/gen`) with self-compacting memory that automatically infers the target project and delegates multi-turn tasks to sub-agents.
 

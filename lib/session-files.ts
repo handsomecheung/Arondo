@@ -4,49 +4,15 @@ import fsSync from "fs";
 import { NextRequest, NextResponse } from "next/server";
 import { getConfigDir } from "./config";
 import { getArondoToken, verifySessionPermission } from "./auth";
+import { getMimeType } from "./media-types";
 
-const MIME_MAP: Record<string, string> = {
-  // Images
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".gif": "image/gif",
-  ".webp": "image/webp",
-  ".svg": "image/svg+xml",
-  ".bmp": "image/bmp",
-  ".ico": "image/x-icon",
-  // Audio
-  ".mp3": "audio/mpeg",
-  ".wav": "audio/wav",
-  ".ogg": "audio/ogg",
-  ".m4a": "audio/mp4",
-  // Video
-  ".mp4": "video/mp4",
-  ".webm": "video/webm",
-  ".mov": "video/quicktime",
-  // Documents & Data
-  ".pdf": "application/pdf",
-  ".json": "application/json",
-  ".txt": "text/plain; charset=utf-8",
-  ".log": "text/plain; charset=utf-8",
-  ".md": "text/markdown; charset=utf-8",
-  ".csv": "text/csv; charset=utf-8",
-  ".html": "text/html; charset=utf-8",
-  ".xml": "application/xml",
-  ".zip": "application/zip",
-  ".tar": "application/x-tar",
-  ".gz": "application/gzip",
-};
-
-export function getMimeType(filename: string): string {
-  const ext = path.extname(filename).toLowerCase();
-  return MIME_MAP[ext] || "application/octet-stream";
-}
-
-export function isImageFileName(filename: string): boolean {
-  const ext = path.extname(filename).toLowerCase();
-  return [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".ico"].includes(ext);
-}
+export {
+  getMimeType,
+  isImageFileName,
+  isVideoFileName,
+  isAudioFileName,
+  isMediaFileName,
+} from "./media-types";
 
 export function extractOriginalFileName(storedFilename: string): string {
   const match = storedFilename.match(/^\d+_(.+)$/);

@@ -110,4 +110,33 @@ test.describe('Runner File System API integration tests', () => {
     });
     expect(response.status()).toBe(404);
   });
+
+  test('should read raw binary content with raw=1', async ({ request }) => {
+    const targetFile = path.resolve(__filename);
+    const response = await request.get(`/api/fs/file?path=${encodeURIComponent(targetFile)}&runner=${runnerId}&raw=1`, {
+      headers: { 'x-arondo-token': 'test-token-123456' }
+    });
+    expect(response.status()).toBe(200);
+    expect(response.headers()['accept-ranges']).toBe('bytes');
+    expect(Number(response.headers()['content-length'])).toBeGreaterThan(0);
+    const text = await response.text();
+    expect(text).toContain('Runner File System API integration tests');
+  });
+
+  test('should support HTTP Range requests with 206 Partial Content', async ({ request }) => {
+    const targetFile = path.resolve(__filename);
+    const response = await request.get(`/api/fs/file?path=${encodeURIComponent(targetFile)}&runner=${runnerId}`, {
+      headers: {
+        'x-arondo-token': 'test-token-123456',
+        'Range': 'bytes=0-15'
+      }
+    });
+    expect(response.status()).toBe(206);
+    expect(response.headers()['accept-ranges']).toBe('bytes');
+    expect(response.headers()['content-range']).toMatch(/^bytes 0-15\/\d+$/);
+    expect(response.headers()['content-length']).toBe('16');
+    const text = await response.text();
+    expect(text.length).toBe(16);
+    expect(text).toBe('import { test, e');
+  });
 });
