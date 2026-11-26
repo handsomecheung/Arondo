@@ -2,6 +2,6 @@
 
 package main
 
-func processGroupWaitingForTTYInput(pid int) bool {
+func processTreeWaitingForTTYInput(pid int) bool {
 	return false
 }

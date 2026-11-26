@@ -474,7 +474,7 @@ func (tm *TaskManager) monitorInputWait() {
 			}
 			t.mu.Unlock()
 			if detect {
-				waiting := processGroupWaitingForTTYInput(pid)
+				waiting := processTreeWaitingForTTYInput(pid)
 				if !waiting && isMatchingPasswordPrompt(bufferTail) &&
 					!lastOutput.IsZero() && time.Since(lastOutput) >= 300*time.Millisecond &&
 					(lastInput.IsZero() || lastOutput.After(lastInput)) {
